@@ -11,12 +11,6 @@
 *.gch
 *.pch
 
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
 # Compiled Dynamic libraries
 *.so
 *.dylib
@@ -37,5 +31,14 @@
 *.out
 *.app
 
-# debug information files
-*.dwo
+cmake-build-debug
+cmake-build-release
+cmake-build-*
+build
+
+# CLion settings
+.idea
+
+resources
+
+test/config.json

@@ -1,0 +1,45 @@
+#!/bin/bash
+
+CLANG_FORMAT=clang-format
+CLANG_TIDY=clang-tidy
+
+if ! command -v "$CLANG_FORMAT" &> /dev/null; then
+  echo "clang format not found"
+  exit 1
+fi
+if ! command -v "$CLANG_TIDY" > /dev/null; then
+  echo "clang-tidy not found"
+  exit 1
+fi
+
+EXTENSIONS="h cpp cc cxx c"
+
+FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E "\.(${EXTENSIONS// /|})$")
+
+if [ -z "$FILES" ]; then
+  exit 0
+fi
+
+COMPILER_FLAGS="-std=c++20 -I./include"
+
+FAIL=0
+for file in $FILES; do
+  $CLANG_FORMAT -i "$file"
+  git add "$file"
+  echo "formatted: $file"
+
+  echo "  • $file"
+  "$CLANG_TIDY" "$file" -- $COMPILER_FLAGS
+  if [ $? -ne 0 ]; then
+      echo "clang-tidy found issues in $file"
+      FAIL=1
+    fi
+done
+
+if [ "$FAIL" -ne 0 ]; then
+  echo "Commit blocked due to clang-tidy errors."
+  exit 1
+fi
+
+exit 0
+

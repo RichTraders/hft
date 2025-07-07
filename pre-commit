@@ -14,25 +14,31 @@ fi
 
 EXTENSIONS="h cpp cc cxx c"
 
-FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E "\.(${EXTENSIONS// /|})$")
+FILES=$(git diff --cached --name-only --diff-filter=ACM |grep -v "test" |grep -E "\.(${EXTENSIONS// /|})$")
 
 if [ -z "$FILES" ]; then
   exit 0
 fi
 
-COMPILER_FLAGS="-std=c++20 -I./include"
+COMPILER_FLAGS=(-xc++ -std=c++20 -I./include -I./hft -include include/pch.h)
 
 FAIL=0
 for file in $FILES; do
+  echo "  • $file"
   $CLANG_FORMAT -i "$file"
   git add "$file"
   echo "formatted: $file"
 
-  echo "  • $file"
-  "$CLANG_TIDY" "$file" -- $COMPILER_FLAGS
+  if [ ! -e build/compile_commands.json ]; then
+    echo "make build folder and run cmake"
+    cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+  fi
+
+  "$CLANG_TIDY" "$file" -p build
   if [ $? -ne 0 ]; then
       echo "clang-tidy found issues in $file"
       FAIL=1
+      break
     fi
 done
 

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <thread.h>
+#include <thread.hpp>
 #include <pch.h>
 
 namespace common {

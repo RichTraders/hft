@@ -16,81 +16,205 @@
  *  -
  */
 
+#pragma once
+
 #include <pthread.h>
 #include <pch.h>
 
-#pragma once
+namespace hft {
+class NormalTag {
+public:
+  static int set_thread_cpu(pthread_t) {
+    return 0;
+  }
+};
 
-// Callable + 인자들을 캡처하는 컨텍스트
-struct PThreadContextBase {
-  virtual ~PThreadContextBase() = default;
-  virtual void run() = 0;
+template<int PriorityLevel>
+class PriorityTag {
+public:
+  static int set_thread_cpu(pthread_t tid){
+    sched_param sch_params;
+    sch_params.sched_priority = PriorityLevel;
+
+    int ret = pthread_setschedparam(tid, SCHED_FIFO, &sch_params);
+
+    if (ret != 0) {
+      return ret;
+    }
+
+    int policy;
+    sched_param cur_sch_params;
+
+    ret = pthread_getschedparam(tid, &policy, &cur_sch_params);
+    if (ret != 0) {
+      return ret;
+    }
+
+    if (cur_sch_params.sched_priority != PriorityLevel) {
+      return -1;
+    }
+
+    return 0;
+  }
+};
+
+template<int CpuID>
+class AffinityTag {
+
+public:
+  static constexpr bool is_affinity_with_level(int cpu_id) {
+    return cpu_id < 0;
+  }
+
+  static int set_thread_cpu(pthread_t tid){
+    static_assert(!is_affinity_with_level(CpuID), "cpu_id can't be below 0 in Affinity mode");
+
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(CpuID, &mask);
+
+    return pthread_setaffinity_np(tid, sizeof(mask), &mask);
+  }
 };
 
 template<typename F, typename... Args>
-struct PThreadContext : PThreadContextBase {
+struct ThreadContext  {
   std::decay_t<F> fn;
   std::tuple<std::decay_t<Args>...> args;
 
-  PThreadContext(F&& f, Args&&... a)
+  ThreadContext(F&& f, Args&&... a)
     : fn(std::forward<F>(f))
     , args(std::forward<Args>(a)...)
   {}
 
-  void run() override {
+  void run() {
     std::apply(fn, args);
   }
 
   static void* entry(void* vp) {
-    std::unique_ptr<PThreadContext> ctx(static_cast<PThreadContext*>(vp));
-    ctx->run();
-    return nullptr;
+    std::unique_ptr<ThreadContext> ctx(
+            static_cast<ThreadContext*>(vp)
+        );
+
+    using RetT = std::invoke_result_t<F, Args...>;
+
+    if constexpr (std::is_void_v<RetT>) {
+      std::apply(ctx->fn, ctx->args);
+      return nullptr;
+    }
+    else if constexpr (std::is_same_v<RetT, void*>) {
+      return std::apply(ctx->fn, ctx->args);
+    }
+    else if constexpr (std::is_same_v<RetT, int>) {
+      int r = std::apply(ctx->fn, ctx->args);
+      return new int(r);
+    }
+    else {
+      static_assert(false, "Unsupported thread function return type");
+    }
   }
 };
 
-class PThread {
+template<typename... Tags>
+class Thread {
 public:
-  PThread() = default;
-  virtual ~PThread() = default;
+  Thread() = default;
+  virtual ~Thread() = default;
 
-  void set_cpu_id(const int id) {
-    _cpu_id = id;
-  }
-
-  pthread_t get_thread_id() const {
-    return tid_;
-  }
-
-  // 임의의 Callable + 인자 지원
   template<typename F, typename... Args>
-  void start(F&& fn, Args&&... args) {
-    // 컨텍스트를 heap에 올려서 pthread에 넘김
-    auto* ctx = new PThreadContext<F, Args...>(
+  int start(F&& fn, Args&&... args) {
+
+    auto* ctx = new ThreadContext<F, Args...>(
         std::forward<F>(fn),
         std::forward<Args>(args)...
     );
-    int err = pthread_create(&tid_, nullptr,
-                             &PThreadContext<F, Args...>::entry,
+
+    int err = pthread_create(&_tid, nullptr,
+                             &ThreadContext<F, Args...>::entry,
                              ctx);
     if (err) {
       delete ctx;
-      throw std::system_error(err, std::generic_category(),
-                              "pthread_create failed");
+      ctx = nullptr;
+      return false;
     }
 
-    cpu_set_t mask;
-    CPU_ZERO(&mask);
-    CPU_SET(_cpu_id, &mask);  // i번 스레드는 CPU (i % num_cpus)에 고정
-    if (pthread_setaffinity_np(tid_, sizeof(mask), &mask) !=0)
-      throw std::system_error(err, std::generic_category(),"pthread_create failed to allocate cpu");
-
+    return (Tags::set_thread_cpu(_tid) || ...);
   }
-  void join() {
-    if (tid_) pthread_join(tid_, nullptr);
+
+  int join() const {
+    void *ret = nullptr;
+
+    if (_tid) {
+      if (pthread_join(_tid, &ret) !=0)
+        return -1;
+    }
+
+    if (ret == nullptr)
+      return -1;
+
+    std::unique_ptr<int> p(static_cast<int*>(ret));
+    return *p;
+  }
+
+  int detach() const {
+    if (_tid == 0)
+      return -1;
+
+    return pthread_detach(_tid);
+  }
+
+  int get_priority_level() const {
+    int policy;
+    sched_param cur_sch_params;
+
+    if (pthread_getschedparam(_tid, &policy, &cur_sch_params)) {
+      return -1;
+    }
+
+    return cur_sch_params.sched_priority;
+  }
+
+  int set_thread_name(const std::string& name) {
+    if (_tid == 0)
+      return -1;
+
+    return pthread_setname_np(_tid, name.c_str());
+  }
+
+  std::string get_thread_name() const {
+    if (_tid == 0)
+      return "";
+
+    char name[16] = { 0, };
+
+    pthread_getname_np(_tid, name, sizeof(name));
+    return std::string(name);
+  }
+
+  int get_cpu_id() const {
+    int cpu_id = -1;
+    cpu_set_t cpuset;
+
+    CPU_ZERO(&cpuset);
+
+    if (pthread_getaffinity_np(_tid, sizeof(cpu_set_t), &cpuset))
+      return -1;
+
+    for (int i = 0; i < CPU_SETSIZE; i++) {
+      if (CPU_ISSET(i, &cpuset)) {
+        cpu_id = i;
+        break;
+      }
+    }
+
+    return cpu_id;
+  }
+
+  pthread_t get_thread_id() const {
+    return _tid;
   }
 
 private:
-  int _cpu_id;
-  pthread_t tid_{0};
+  pthread_t _tid{0};
 };
-
+}

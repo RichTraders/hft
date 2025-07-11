@@ -10,15 +10,9 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "hft_lib.h"
+#ifndef HFT_LIB_H
+#define HFT_LIB_H
 
-int main() {
-  constexpr auto kLang = "C++";
-  std::cout << "Hello and welcome to " << kLang << "!\n";
-  constexpr int kAmy = 5;
-  for (int i = 1; i <= kAmy; i++) {
-    std::cout << "i = " << i << '\n';
-  }
+#include "common/spsc_queue.h"
 
-  return 0;
-}
+#endif  // HFT_LIB_H

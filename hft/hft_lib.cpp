@@ -11,14 +11,3 @@
  */
 
 #include "hft_lib.h"
-
-int main() {
-  constexpr auto kLang = "C++";
-  std::cout << "Hello and welcome to " << kLang << "!\n";
-  constexpr int kAmy = 5;
-  for (int i = 1; i <= kAmy; i++) {
-    std::cout << "i = " << i << '\n';
-  }
-
-  return 0;
-}

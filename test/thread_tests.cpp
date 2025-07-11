@@ -3,11 +3,11 @@
 //
 
 
-#include "../util/_pthread.h"
+#include "../hft/common/thread.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using namespace hft;
+using namespace common;
 
 class ThreadNameTest {
 public:

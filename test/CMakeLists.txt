@@ -26,7 +26,7 @@ endmacro()
 add_definitions(-DGOOGLEMOCK_INCLUDE_GMOCK_INTERNAL_GMOCK_GENERATED_FUNCTION_MOCKER_H_)
 
 add_unit_test(spsc)
-add_unit_test(_pthread)
+add_unit_test(thread)
 
 file(GLOB TEST_EXECUTABLES "${CMAKE_BINARY_DIR}/tests/*_tests")
 

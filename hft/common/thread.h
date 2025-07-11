@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include <pthread.h>
+#include <thread.h>
 #include <pch.h>
 
-namespace hft {
+namespace common {
 class NormalTag {
 public:
   static int set_thread_cpu(pthread_t) {

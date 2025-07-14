@@ -27,6 +27,7 @@ add_definitions(-DGOOGLEMOCK_INCLUDE_GMOCK_INTERNAL_GMOCK_GENERATED_FUNCTION_MOC
 
 add_unit_test(spsc)
 add_unit_test(thread)
+add_unit_test(logger)
 
 file(GLOB TEST_EXECUTABLES "${CMAKE_BINARY_DIR}/tests/*_tests")
 

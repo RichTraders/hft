@@ -12,9 +12,9 @@ if ! command -v "$CLANG_TIDY" > /dev/null; then
   exit 1
 fi
 
-EXTENSIONS="h cpp cc cxx c"
+EXTENSIONS="h cpp cc cxx c hpp"
 
-FILES=$(git diff --cached --name-only --diff-filter=ACM |grep -v "test" |grep -E "\.(${EXTENSIONS// /|})$")
+FILES=$(git diff --cached --name-only --diff-filter=ACM |grep -Ev "test|Fix44" |grep -E "\.(${EXTENSIONS// /|})$")
 
 if [ -z "$FILES" ]; then
   exit 0

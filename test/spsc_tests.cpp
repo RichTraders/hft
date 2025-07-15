@@ -12,7 +12,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
+using namespace common;
 TEST(SPSCQueueTest, SingleThreadBasic) {
   SPSCQueue<int> q(8);
   EXPECT_TRUE(q.empty());

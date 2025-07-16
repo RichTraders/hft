@@ -17,6 +17,7 @@
 #include "NewOroFix44_types.hpp"
 #include "NewOroFix44_router.hpp"
 #include "NewOroFix44_classes.hpp"
+#include "performance.h"
 
 namespace core {
 using namespace FIX8::NewOroFix44;
@@ -43,7 +44,11 @@ std::string Fix::create_log_on_message(const std::string& sig_b64,
       << new RawDataLength(static_cast<int>(sig_b64.size()))
       << new RawData(sig_b64)
       << new Username(
+#ifdef UNIT_TEST
           "XMJMVrlohHOtkzAn6WyiRQngkEqiSgJwacbMX3J5k0YwJx8Y7S0jE9xUsvwNclO9")
+#else
+          "cJHjHNqHUG1nhTs0YPEKlmxoXokNomptrrilcGzrhoqhd8S9kEFfcJg2YQjVKgGw")
+#endif
       << new MessageHandling(2);
 
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))
@@ -155,10 +160,11 @@ std::string Fix::timestamp() {
 }
 
 FIX8::Message* Fix::get_data(const std::string& message) {
+  START_MEASURE(Convert_Message);
   std::cout << "[" << __func__ << "]: " << message << "\n";
   FIX8::Message* msg(
       FIX8::Message::factory(ctx(), message, true, true));
-
+  END_MEASURE(Convert_Message);
   if (likely(msg)) {
     std::cout << "Parsed FIX message: " << msg->get_msgtype() << "\n";
 

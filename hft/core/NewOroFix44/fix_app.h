@@ -30,6 +30,7 @@ namespace core {
 class Fix;
 class SSLSocket;
 
+template <int cpu = 1>
 class FixApp {
 public:
   FixApp(const std::string& address, int port,
@@ -54,13 +55,14 @@ public:
   void read_loop();
 
   std::string create_log_on_message(
-      const std::string& sig_b64, const std::string& timestamp);
+      const std::string& sig_b64, const std::string& timestamp) const;
 
-  std::string create_log_out_message();
-  std::string create_heartbeat_message();
+  std::string create_log_out_message() const;
+  std::string create_heartbeat_message() const;
 
   std::string create_subscription_message(const RequestId& request_id,
-                                          const MarketDepthLevel& level, const SymbolId& symbol);
+                                          const MarketDepthLevel& level,
+                                          const SymbolId& symbol) const;
 
 private:
   bool has_full_fix_message(const std::string& buffer, size_t& msg_len);
@@ -70,8 +72,8 @@ private:
   std::map<std::string, std::function<void(FIX8::Message*)>> callbacks_;
   std::unique_ptr<common::SPSCQueue<std::string>> queue_;
 
-  common::Thread<common::AffinityTag<1>> write_thread_;
-  common::Thread<common::AffinityTag<1>> read_thread_;
+  common::Thread<common::AffinityTag<cpu>> write_thread_;
+  common::Thread<common::AffinityTag<cpu>> read_thread_;
   bool thread_running{true};
 
   bool log_on_{false};

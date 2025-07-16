@@ -20,10 +20,14 @@
 #include <csignal>
 #include <sys/epoll.h>
 
+#include "performance.h"
+
 #define SPSCQueueSize 8
+constexpr int kReadBufferSize = 1024;
 
 namespace core {
-FixApp::FixApp(const std::string& address, int port,
+template<int cpu>
+FixApp<cpu>::FixApp(const std::string& address, int port,
                const std::string& sender_comp_id,
                const std::string& target_comp_id):
   fix_(std::make_unique<Fix>(sender_comp_id, target_comp_id)),
@@ -36,14 +40,16 @@ FixApp::FixApp(const std::string& address, int port,
   read_thread_.start(&FixApp::read_loop, this);
 }
 
-FixApp::~FixApp() {
+template<int cpu>
+FixApp<cpu>::~FixApp() {
   auto msg = fix_->create_log_out_message();
   tls_sock_->write(msg.data(), msg.size());
 
   thread_running = false;
 }
 
-void FixApp::register_callback(MsgType type,
+template<int cpu>
+void FixApp<cpu>::register_callback(MsgType type,
                                std::function<void(FIX8::Message*)> cb) {
   if (!callbacks_.contains(type)) {
     callbacks_[type] = cb;
@@ -52,57 +58,63 @@ void FixApp::register_callback(MsgType type,
   }
 }
 
-int FixApp::start() {
+template<int cpu>
+int FixApp<cpu>::start() {
   const auto timestamp = fix_->timestamp();
   const std::string sig_b64 = fix_->get_sigature_base64(timestamp);
   const std::string fixmsg = fix_->create_log_on_message(sig_b64, timestamp);
 
-  std::cout << "fixmesage : " << fixmsg << "\n";
   send(fixmsg);
   return 0;
 }
 
-int FixApp::stop() {
+template<int cpu>
+int FixApp<cpu>::stop() {
   auto msg = fix_->create_log_out_message();
   tls_sock_->write(msg.data(), msg.size());
   thread_running = false;
   return 0;
 }
 
-int FixApp::send(const std::string& msg) {
+template<int cpu>
+int FixApp<cpu>::send(const std::string& msg) {
   queue_->enqueue(msg);
 
   return 0;
 }
 
-
-void FixApp::write_loop() {
+template<int cpu>
+void FixApp<cpu>::write_loop() {
   while (thread_running) {
     std::string msg;
 
     while (queue_->dequeue(msg)) {
+      START_MEASURE(TLS_WRITE);
       ssize_t result = tls_sock_->write(msg.data(),
                                         static_cast<int>(msg.size()));
       if (result < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
           queue_->enqueue(msg);
           break;
-        } else {
-          perror("send failed");
-          thread_running = false;
-          break;
         }
+        perror("send failed");
+        thread_running = false;
+        break;
       }
+      END_MEASURE(TLS_WRITE);
     }
     std::this_thread::yield();
   }
 }
 
-void FixApp::read_loop() {
+template<int cpu>
+void FixApp<cpu>::read_loop() {
   std::string received_buffer;
   while (thread_running) {
-    char buf[2048];
+    char buf[kReadBufferSize];
+    START_MEASURE(TLS_READ);
     int kRead = tls_sock_->read(buf, sizeof(buf) - 1);
+    END_MEASURE(TLS_READ);
     if (kRead <= 0) {
       std::this_thread::yield();
       continue;
@@ -127,26 +139,32 @@ void FixApp::read_loop() {
   }
 }
 
-std::string FixApp::create_log_on_message(const std::string& sig_b64,
-                                          const std::string& timestamp) {
+template<int cpu>
+std::string FixApp<cpu>::create_log_on_message(const std::string& sig_b64,
+                                          const std::string& timestamp) const {
   return fix_->create_log_on_message(sig_b64, timestamp);
 }
 
-std::string FixApp::create_log_out_message() {
+template<int cpu>
+std::string FixApp<cpu>::create_log_out_message() const {
   return fix_->create_log_out_message();
 }
 
-std::string FixApp::create_heartbeat_message() {
+template<int cpu>
+std::string FixApp<cpu>::create_heartbeat_message() const {
   return fix_->create_heartbeat_message();
 }
 
-std::string FixApp::create_subscription_message(const RequestId& request_id,
+template<int cpu>
+std::string FixApp<cpu>::create_subscription_message(const RequestId& request_id,
                                                 const MarketDepthLevel& level,
-                                                const SymbolId& symbol) {
-  return fix_->create_market_data_subscription_message(request_id, level, symbol);
+                                                const SymbolId& symbol) const {
+  return fix_->create_market_data_subscription_message(
+      request_id, level, symbol);
 }
 
-bool FixApp::has_full_fix_message(const std::string& buffer, size_t& msg_len) {
+template<int cpu>
+bool FixApp<cpu>::has_full_fix_message(const std::string& buffer, size_t& msg_len) {
   size_t begin = buffer.find("8=FIX");
   if (begin == std::string::npos) {
     return false;
@@ -170,4 +188,8 @@ bool FixApp::has_full_fix_message(const std::string& buffer, size_t& msg_len) {
 
   return true;
 }
+
+template class FixApp<1>;
+template class FixApp<2>;
+template class FixApp<3>;
 }

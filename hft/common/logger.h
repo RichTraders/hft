@@ -13,23 +13,23 @@
 #pragma once
 
 #include <pch.h>
-#include <mpsc_queue_cas.hpp>
-#include <thread.hpp>
+#include "mpsc_queue_cas.hpp"
+#include "thread.hpp"
 
-namespace util {
+namespace common {
 // 로그 레벨 정의
 enum class LogLevel : uint8_t { kTrace, kDebug, kInfo, kWarn, kError, kFatal };
 enum class PriorityLevel : uint8_t {
-  kPercent_100 = 100,
-  kPercent_90 = 90,
-  kPercent_80 = 80,
-  kPercent_70 = 70,
-  kPercent_60 = 60,
-  kPercent_50 = 50,
-  kPercent_40 = 40,
-  kPercent_30 = 30,
-  kPercent_20 = 20,
-  kPercent_10 = 10,
+  kPercent100 = 100,
+  kPercent90 = 90,
+  kPercent80 = 80,
+  kPercent70 = 70,
+  kPercent60 = 60,
+  kPercent50 = 50,
+  kPercent40 = 40,
+  kPercent30 = 30,
+  kPercent20 = 20,
+  kPercent10 = 10,
 };
 enum class QueueChunkSize : uint16_t {
   kDefaultSize = 64,
@@ -57,49 +57,45 @@ class LogSink {
 };
 
 // 콘솔 싱크
-class ConsoleSink : public LogSink {
+class ConsoleSink final : public LogSink {
  public:
   ConsoleSink() = default;
-  virtual ~ConsoleSink() = default;
   void write(const std::string& msg) override;
 };
 
 // 파일 싱크 (회전 기능 지원)
-class FileSink : public LogSink {
+class FileSink final : public LogSink {
  public:
   FileSink() = delete;
   FileSink(const std::string& filename, std::size_t max_size)
-      : _max_size(max_size),
-        _index(0) {
+      : max_size_(max_size), index_(0) {
     auto pos = filename.find_last_of('.');
-    std::string filename_temp = filename;
-    std::string name = (pos == std::string::npos)
-                         ? filename                  // 확장자 없음
-                         : filename.substr(0, pos);  // “file_name”
+    const std::string name = (pos == std::string::npos)
+                                 ? filename                  // 확장자 없음
+                                 : filename.substr(0, pos);  // “file_name”
 
-    std::string ext  = (pos == std::string::npos)
-                         ? ""                        // 확장자 없음
-                         : filename.substr(pos);
+    const std::string ext = (pos == std::string::npos) ? ""  // 확장자 없음
+                                                       : filename.substr(pos);
 
-    _filename = name;
-    _file_extension = ext;
+    filename_ = name;
+    file_extension_ = ext;
 
-    if (_file_extension.empty())
-      _file_extension = ".txt";
+    if (file_extension_.empty())
+      file_extension_ = ".txt";
 
-    _ofs.open(_filename + '_' + std::to_string(_index) + _file_extension, std::ios::app);
+    ofs_.open(filename_ + '_' + std::to_string(index_) + file_extension_,
+              std::ios::app);
   }
-  virtual ~FileSink() = default;
   void write(const std::string& msg) override;
 
  private:
   void rotate();
 
-  std::string _filename;
-  std::string _file_extension;
-  std::size_t _max_size;
-  std::ofstream _ofs;
-  int _index;
+  std::string filename_;
+  std::string file_extension_;
+  std::size_t max_size_;
+  std::ofstream ofs_;
+  int index_;
 };
 
 // 포맷터
@@ -151,45 +147,37 @@ class Logger {
     return inst;
   }
 
-  void setLevel(LogLevel lvl) {
-    _level.store(lvl, std::memory_order_relaxed);
-  }
+  void setLevel(LogLevel lvl) { level_.store(lvl, std::memory_order_relaxed); }
 
   void addSink(std::unique_ptr<LogSink> sink) {
-    _sinks.push_back(std::move(sink));
+    sinks_.push_back(std::move(sink));
   }
 
   void log(LogLevel lvl, const char* file, int line, const char* func,
            const std::string& text);
 
-  void clearSink() {
-    _sinks.clear();
-  }
+  void clearSink() { sinks_.clear(); }
 
  private:
-  Logger() {
-    _stop = static_cast<bool>(_worker.start(&Logger::process, this));
-  }
+  Logger() { stop_ = static_cast<bool>(worker_.start(&Logger::process, this)); }
 
   ~Logger() {
-    _stop = true;
-    _worker.join();
+    stop_ = true;
+    worker_.join();
   }
 
   void process();
 
-  std::atomic<LogLevel> _level;
-  std::vector<std::unique_ptr<LogSink>> _sinks;
-  common::MPSCSegQueue<LogMessage, static_cast<int>(QueueChunkSize::kDefaultSize)>
-      _queue;
+  std::atomic<LogLevel> level_;
+  std::vector<std::unique_ptr<LogSink>> sinks_;
+  MPSCSegQueue<LogMessage, static_cast<int>(QueueChunkSize::kDefaultSize)>
+      queue_;
 #ifdef UNIT_TEST
-  common::Thread<
-      common::NormalTag> _worker;
+  Thread<NormalTag> worker_;
 #else
-  common::Thread<
-      common::PriorityTag<static_cast<int>(PriorityLevel::kPercent_80)>> _worker;
+  Thread<PriorityTag<static_cast<int>(PriorityLevel::kPercent80)>> worker_;
 #endif
-  std::atomic<bool> _stop;
+  std::atomic<bool> stop_;
 };
 
 // 매크로 편의 함수
@@ -202,4 +190,4 @@ class Logger {
 #define LOG_ERROR(text) \
   Logger::instance().log(LogLevel::kError, __FILE__, __LINE__, __func__, text)
 
-}  // namespace util
+}  // namespace common

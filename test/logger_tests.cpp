@@ -15,7 +15,7 @@
 #include "gtest/gtest.h"
 #include <cerrno>
 
-using namespace util;
+using namespace common;
 
 std::string getCurrentWorkingDirectory() {
   char buf[PATH_MAX];

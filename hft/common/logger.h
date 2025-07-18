@@ -20,10 +20,21 @@ namespace util {
 // 로그 레벨 정의
 enum class LogLevel : uint8_t { kTrace, kDebug, kInfo, kWarn, kError, kFatal };
 enum class PriorityLevel : uint8_t {
-  kPriority = 80,
+  kPercent_100 = 100,
+  kPercent_90 = 90,
+  kPercent_80 = 80,
+  kPercent_70 = 70,
+  kPercent_60 = 60,
+  kPercent_50 = 50,
+  kPercent_40 = 40,
+  kPercent_30 = 30,
+  kPercent_20 = 20,
+  kPercent_10 = 10,
 };
 enum class QueueChunkSize : uint16_t {
-  kMidSize = 64,
+  kDefaultSize = 64,
+  kSmallSize = 128,
+  kMidSize = 512,
   kBigSize = 1024,
 };
 
@@ -48,25 +59,47 @@ class LogSink {
 // 콘솔 싱크
 class ConsoleSink : public LogSink {
  public:
+  ConsoleSink() = default;
+  virtual ~ConsoleSink() = default;
   void write(const std::string& msg) override;
 };
 
 // 파일 싱크 (회전 기능 지원)
 class FileSink : public LogSink {
  public:
+  FileSink() = delete;
   FileSink(const std::string& filename, std::size_t max_size)
-      : filename_(filename),
-        max_size_(max_size),
-        ofs_(filename, std::ios::app) {}
+      : _max_size(max_size),
+        _index(0) {
+    auto pos = filename.find_last_of('.');
+    std::string filename_temp = filename;
+    std::string name = (pos == std::string::npos)
+                         ? filename                  // 확장자 없음
+                         : filename.substr(0, pos);  // “file_name”
 
+    std::string ext  = (pos == std::string::npos)
+                         ? ""                        // 확장자 없음
+                         : filename.substr(pos);
+
+    _filename = name;
+    _file_extension = ext;
+
+    if (_file_extension.empty())
+      _file_extension = ".txt";
+
+    _ofs.open(_filename + '_' + std::to_string(_index) + _file_extension, std::ios::app);
+  }
+  virtual ~FileSink() = default;
   void write(const std::string& msg) override;
 
  private:
   void rotate();
 
-  std::string filename_;
-  std::size_t max_size_;
-  std::ofstream ofs_;
+  std::string _filename;
+  std::string _file_extension;
+  std::size_t _max_size;
+  std::ofstream _ofs;
+  int _index;
 };
 
 // 포맷터
@@ -118,33 +151,45 @@ class Logger {
     return inst;
   }
 
-  void setLevel(LogLevel lvl) { level_.store(lvl, std::memory_order_relaxed); }
+  void setLevel(LogLevel lvl) {
+    _level.store(lvl, std::memory_order_relaxed);
+  }
 
   void addSink(std::unique_ptr<LogSink> sink) {
-    sinks_.push_back(std::move(sink));
+    _sinks.push_back(std::move(sink));
   }
 
   void log(LogLevel lvl, const char* file, int line, const char* func,
            const std::string& text);
 
+  void clearSink() {
+    _sinks.clear();
+  }
+
  private:
-  Logger() { stop_ = static_cast<bool>(worker_.start(&Logger::process, this)); }
+  Logger() {
+    _stop = static_cast<bool>(_worker.start(&Logger::process, this));
+  }
+
   ~Logger() {
-    stop_ = true;
-    worker_.join();
+    _stop = true;
+    _worker.join();
   }
 
   void process();
 
-  std::atomic<LogLevel> level_;
-  std::vector<std::unique_ptr<LogSink>> sinks_;
-  common::MPSCSegQueue<LogMessage, static_cast<int>(QueueChunkSize::kMidSize)>
-      queue_;
+  std::atomic<LogLevel> _level;
+  std::vector<std::unique_ptr<LogSink>> _sinks;
+  common::MPSCSegQueue<LogMessage, static_cast<int>(QueueChunkSize::kDefaultSize)>
+      _queue;
+#ifdef UNIT_TEST
   common::Thread<
-      common::PriorityTag<static_cast<int>(PriorityLevel::kPriority)>>
-      worker_;
-  std::counting_semaphore<INT_MAX> sem_{0};
-  std::atomic<bool> stop_;
+      common::NormalTag> _worker;
+#else
+  common::Thread<
+      common::PriorityTag<static_cast<int>(PriorityLevel::kPercent_80)>> _worker;
+#endif
+  std::atomic<bool> _stop;
 };
 
 // 매크로 편의 함수

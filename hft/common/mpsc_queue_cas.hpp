@@ -22,27 +22,27 @@ private:
     T                   data[ChunkSize];
   };
 
-  std::atomic<Chunk*> tail_;
-  Chunk*              head_;
-  size_t              head_pos_{0};
+  std::atomic<Chunk*> _tail;
+  Chunk*              _head;
+  size_t              _head_pos{0};
 
 public:
   MPSCSegQueue() {
     auto* dummy = new Chunk();
-    head_ = dummy;
-    tail_.store(dummy, std::memory_order_relaxed);
+    _head = dummy;
+    _tail.store(dummy, std::memory_order_relaxed);
   }
 
   ~MPSCSegQueue() {
     T tmp;
-    while (pop(tmp));
-    delete head_;
+    while (dequeue(tmp));
+    delete _head;
   }
 
   template<typename U>
-  void push(U&& v) {
+  void enqueue(U&& v) {
     while (true) {
-      Chunk* cur = tail_.load(std::memory_order_acquire);
+      Chunk* cur = _tail.load(std::memory_order_acquire);
       size_t pos = cur->idx.fetch_add(1, std::memory_order_acq_rel);
 
       if (pos < ChunkSize) {
@@ -63,38 +63,38 @@ public:
                 }
       }
 
-      tail_.compare_exchange_strong(
+      _tail.compare_exchange_strong(
           cur, next,
           std::memory_order_release,
           std::memory_order_relaxed);
     }
   }
 
-  bool pop(T& out) {
-    if (head_pos_ < ChunkSize) {
-      if (head_pos_ >= head_->idx.load(std::memory_order_acquire))
+  bool dequeue(T& out) {
+    if (_head_pos < ChunkSize) {
+      if (_head_pos >= _head->idx.load(std::memory_order_acquire))
         return false;
-      out = std::move(head_->data[head_pos_++]);
+      out = std::move(_head->data[_head_pos++]);
       return true;
     }
 
-    Chunk* nxt = head_->next.load(std::memory_order_acquire);
+    Chunk* nxt = _head->next.load(std::memory_order_acquire);
     if (!nxt)
       return false;
 
-    delete head_;
-    head_ = nxt;
-    head_pos_ = 0;
+    delete _head;
+    _head = nxt;
+    _head_pos = 0;
 
-    return pop(out);
+    return dequeue(out);
   }
 
   bool empty() const {
 
-    if (head_pos_ < head_->idx.load(std::memory_order_acquire))
+    if (_head_pos < _head->idx.load(std::memory_order_acquire))
       return false;
 
-    return head_->next.load(std::memory_order_acquire) == nullptr;
+    return _head->next.load(std::memory_order_acquire) == nullptr;
   }
 };
 }

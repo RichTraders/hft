@@ -14,27 +14,26 @@
 namespace util {
 
 void ConsoleSink::write(const std::string& msg) {
-  std::cout << msg << '\n';
+  std::cout << msg.c_str() << '\n';
 }
 
 void FileSink::write(const std::string& msg) {
-  ofs_ << msg << '\n';
-  if (ofs_.tellp() > static_cast<std::streamoff>(max_size_)) {
+  if (_ofs.tellp() > static_cast<std::streamoff>(_max_size)) {
     rotate();
   }
+  _ofs << msg << '\n';
 }
 
 void FileSink::rotate() {
-  ofs_.close();
-  const std::string backup = filename_ + ".1";
-  std::remove(backup.c_str());
-  std::rename(filename_.c_str(), backup.c_str());
-  ofs_.open(filename_, std::ios::trunc);
+  _ofs.close();
+  const std::string new_file_name = _filename + "_" + std::to_string(++_index) + _file_extension;
+
+  _ofs.open(new_file_name, std::ios::trunc);
 }
 
 void Logger::log(LogLevel lvl, const char* file, int line, const char* func,
                  const std::string& text) {
-  if (lvl < level_.load(std::memory_order_relaxed))
+  if (lvl < _level.load(std::memory_order_relaxed))
     return;
   LogMessage msg;
   msg.level = lvl;
@@ -43,28 +42,25 @@ void Logger::log(LogLevel lvl, const char* file, int line, const char* func,
   msg.func = func;
   msg.text = text;
   msg.thread_id = std::this_thread::get_id();
-  msg.timestamp = "";  // timestamp generated in formatter
-  { queue_.push(std::move(msg)); }
-  sem_.release();
+  msg.timestamp = "";
+  { _queue.enqueue(std::move(msg)); }
 }
 
 void Logger::process() {
-  while (!stop_) {
-
-    sem_.acquire();
-
-    // 2) 종료 플래그 & 큐 비어있으면 종료
-    if (stop_.load(std::memory_order_relaxed) && queue_.empty()) {
+  while (!_stop) {
+    if (_stop.load(std::memory_order_relaxed) && _queue.empty()) {
       break;
     }
 
     LogMessage msg;
-    while (queue_.pop(msg)) {
+    while (_queue.dequeue(msg)) {
       auto out = LogFormatter::format(msg);
-      for (const auto& sink : sinks_) {
+      for (const auto& sink : _sinks) {
         sink->write(out);
       }
     }
+
+    sleep(0.5);
   }
 }
-}  // namespace util
+}

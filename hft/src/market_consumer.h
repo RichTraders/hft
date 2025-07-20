@@ -14,6 +14,7 @@
 #define MARKET_CONSUMER_H
 
 namespace core {
+template <int>
 class FixApp;
 }
 
@@ -35,7 +36,7 @@ class MarketConsumer {
   void on_heartbeat(FIX8::Message* msg);
 
  private:
-  std::unique_ptr<core::FixApp> app_;
+  std::unique_ptr<core::FixApp<1>> app_;
   std::unique_ptr<TradeEngine> trade_engine_;
 };
 

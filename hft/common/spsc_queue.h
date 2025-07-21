@@ -13,8 +13,7 @@
 #ifndef SPSCQUEUE_H
 #define SPSCQUEUE_H
 
-#include <pch.h>
-
+namespace common {
 constexpr std::size_t kCachelineSize = 64;
 
 template <typename T>
@@ -66,5 +65,5 @@ class SPSCQueue final {
     std::array<char, kCachelineSize - sizeof(std::size_t)> pad;
   } consumer_;
 };
-
+}  // namespace common
 #endif  //SPSCQUEUE_H

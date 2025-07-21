@@ -11,14 +11,17 @@
  */
 
 #include "hft_lib.h"
+#include "market_consumer.h"
+#include "thread.hpp"
 
 int main() {
-  constexpr auto kLang = "C++";
-  std::cout << "Hello and welcome to " << kLang << "!\n";
-  constexpr int kAmy = 5;
-  for (int i = 1; i <= kAmy; i++) {
-    std::cout << "i = " << i << '\n';
-  }
+  common::Thread<common::PriorityTag<1>, common::AffinityTag<1>>
+      consumer_thread;
+  consumer_thread.start([]() {
+    const MarketConsumer consumer;
+    while (true) {}
+  });
 
+  consumer_thread.join();
   return 0;
 }

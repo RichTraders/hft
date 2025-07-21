@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <thread.hpp>
 #include <pch.h>
 
 namespace common {

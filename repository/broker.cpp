@@ -22,7 +22,6 @@ constexpr int kKilo = 1024;
 constexpr int kThirty = 30;
 
 using common::FileSink;
-using common::Logger;
 using common::LogLevel;
 using core::FixApp;
 
@@ -36,16 +35,15 @@ Broker::Broker()
                                           kPort, "BMDWATCH", "SPOT")) {
   app_->register_callback(
       "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });
-  app_->register_callback([](auto&& msg) { on_subscribe(msg); });
+  app_->register_callback([this](auto&& msg) { on_subscribe(msg); });
   app_->register_callback("1", [this](auto&& msg) {
     on_heartbeat(std::forward<decltype(msg)>(msg));
   });
 
   app_->start();
-  auto& logger = Logger::instance();
-  logger.setLevel(LogLevel::kInfo);
-  logger.clearSink();
-  logger.addSink(
+  log_.setLevel(LogLevel::kInfo);
+  log_.clearSink();
+  log_.addSink(
       std::make_unique<FileSink>("repository", kKilo * kKilo * kThirty));
 }
 
@@ -63,5 +61,5 @@ void Broker::on_heartbeat(FIX8::Message* msg) const {
 }
 
 void Broker::on_subscribe(const std::string& msg) {
-  LOG_INFO(msg);
+  log_.info(msg);
 }

@@ -13,6 +13,7 @@
 #ifndef BROKER_H
 #define BROKER_H
 
+#include "common/logger.h"
 #include "core/NewOroFix44/fix_app.h"
 
 class Broker {
@@ -20,11 +21,12 @@ class Broker {
   Broker();
 
  private:
-  std::unique_ptr<core::FixApp<1>> app_;
+  std::unique_ptr<core::FixApp<>> app_;
 
   void on_login(FIX8::Message*) const;
   void on_heartbeat(FIX8::Message*) const;
-  static void on_subscribe(const std::string& msg);
+  void on_subscribe(const std::string& msg);
+  common::Logger log_;
 };
 
 #endif  //BROKER_H

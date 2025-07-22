@@ -25,7 +25,7 @@ std::string getCurrentWorkingDirectory() {
 }
 
 TEST(LoggerTest, ConsoleLogTest) {
-  auto& lg = Logger::instance();
+  Logger lg;
   lg.setLevel(LogLevel::kDebug);
   lg.clearSink();
   lg.addSink(std::make_unique<ConsoleSink>());
@@ -39,7 +39,7 @@ TEST(LoggerTest, ConsoleLogTest) {
   logs.emplace_back("Application shutting down");
 
   for (const auto& log : logs) {
-    LOG_INFO(log);
+    lg.debug(log);
   }
   sleep(2);
 
@@ -60,16 +60,13 @@ TEST(LoggerTest, ConsoleLogTest) {
   // 6) std::cin 버퍼도 복원
   std::cin.rdbuf(old_cin_buf);
 }
-#include <cstdio>
-#include <cstring>
-#include <iostream>
 
 TEST(LoggerTest, FileLogTest) {
   std::string cur_dir_path = getCurrentWorkingDirectory();
   std::string remove_dir = cur_dir_path + "/file_log_test_0.txt";
   std::remove(remove_dir.c_str());
 
-  auto& lg = Logger::instance();
+  Logger lg;
   lg.setLevel(LogLevel::kDebug);
   lg.clearSink();
   lg.addSink(std::make_unique<FileSink>("file_log_test", 1024));
@@ -78,8 +75,8 @@ TEST(LoggerTest, FileLogTest) {
   line_list.push_back("FileLogTest Test");
   line_list.push_back("Application shutting down333");
 
-  LOG_INFO(line_list[0].c_str());
-  LOG_INFO(line_list[1].c_str());
+  lg.debug(line_list[0]);
+  lg.debug(line_list[1]);
 
   sleep(2);
 
@@ -110,16 +107,14 @@ TEST(LoggerTest, FileLogLotateTest) {
   const std::string file_path = "file_log_lotate_test_0.txt";
   const std::string file_path2 = "file_log_lotate_test_1.txt";
 
-  {
-    auto& lg = Logger::instance();
-    lg.setLevel(LogLevel::kDebug);
-    lg.clearSink();
-    lg.addSink(std::make_unique<FileSink>("file_log_lotate_test", 32));
+  Logger lg;
 
+  lg.setLevel(LogLevel::kDebug);
+  lg.clearSink();
+  lg.addSink(std::make_unique<FileSink>("file_log_lotate_test", 32));
 
-    LOG_INFO(line_list[0].c_str());
-    LOG_INFO(line_list[1].c_str());
-  }
+  lg.debug(line_list[0].c_str());
+  lg.debug(line_list[1].c_str());
 
   sleep(2);
 
@@ -147,6 +142,7 @@ TEST(LoggerTest, FileLogLotateTest) {
       int ssss = line.find(line_list[1]) != std::string::npos;
       EXPECT_TRUE(ssss);
     }
+    ifs.close();
   }
 }
 
@@ -156,7 +152,7 @@ TEST(LoggerTest, FileAndConsoleLogTest) {
 
   std::remove(remove_dir.c_str());
 
-  auto& lg = Logger::instance();
+  Logger lg;
   lg.setLevel(LogLevel::kDebug);
   lg.clearSink();
   lg.addSink(std::make_unique<ConsoleSink>());
@@ -171,7 +167,7 @@ TEST(LoggerTest, FileAndConsoleLogTest) {
   logs.emplace_back("FileAndConsoleLogTest shutting down");
 
   for (const auto& log : logs) {
-    LOG_INFO(log);
+    lg.debug(log);
   }
   sleep(3);
 
@@ -204,4 +200,17 @@ TEST(LoggerTest, FileAndConsoleLogTest) {
       EXPECT_TRUE(line.find(logs[i]) != std::string::npos);
     }
   }
+}
+
+TEST(LoggerTest, LogLevelTest) {
+  Logger lg;
+  lg.setLevel(LogLevel::kInfo);
+  lg.clearSink();
+  lg.addSink(std::make_unique<FileSink>("LogLevelTest", 1024*1024));
+
+  for (int i = 0 ; i < 200;i++) {
+    lg.info("info LogLevelTest" + std::to_string(i));
+  }
+
+  sleep(3);
 }

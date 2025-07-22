@@ -13,8 +13,11 @@
 #pragma once
 
 #include <pch.h>
+#include <source_location>
 #include "mpsc_queue_cas.hpp"
 #include "thread.hpp"
+
+//fsink 추가 필요
 
 namespace common {
 // 로그 레벨 정의
@@ -41,10 +44,9 @@ enum class QueueChunkSize : uint16_t {
 // 로그 메시지 구조체
 struct LogMessage {
   LogLevel level;
+  uint32_t line;
   std::string timestamp;
   std::thread::id thread_id;
-  std::string file;
-  int line;
   std::string func;
   std::string text;
 };
@@ -84,7 +86,9 @@ class FileSink final : public LogSink {
       file_extension_ = ".txt";
 
     ofs_.open(filename_ + '_' + std::to_string(index_) + file_extension_,
-              std::ios::app);
+              std::ios::out | std::ios::app);
+
+    line_cnt_ = 0;
   }
   void write(const std::string& msg) override;
 
@@ -95,6 +99,7 @@ class FileSink final : public LogSink {
   std::string file_extension_;
   std::size_t max_size_;
   std::ofstream ofs_;
+  uint32_t line_cnt_;
   int index_;
 };
 
@@ -115,8 +120,7 @@ class LogFormatter {
         << std::setw(3) << std::setfill('0') << milisec << "]";
     oss << "[" << levelToString(msg.level) << "]";
     oss << "[tid=" << msg.thread_id << "]";
-    oss << "[" << msg.file << ":" << msg.line << "]";
-    oss << "[" << msg.func << "] ";
+    oss << "[" << msg.func << ": " << std::to_string(msg.line) << "] ";
 #endif
     oss << msg.text;
     return oss.str();
@@ -144,9 +148,14 @@ class LogFormatter {
 
 class Logger {
  public:
-  static Logger& instance() {
-    static Logger inst;
-    return inst;
+  Logger() {
+    stop_ = static_cast<bool>(worker_.start(&Logger::process, this));
+    level_ = LogLevel::kInfo;
+  }
+
+  ~Logger() {
+    stop_ = true;
+    worker_.join();
   }
 
   void setLevel(LogLevel lvl) { level_.store(lvl, std::memory_order_relaxed); }
@@ -155,20 +164,25 @@ class Logger {
     sinks_.push_back(std::move(sink));
   }
 
-  void log(LogLevel lvl, const char* file, int line, const char* func,
-           const std::string& text);
+  void trace(const std::string& text,
+             const std::source_location& loc = std::source_location::current());
+  void debug(const std::string& text,
+             const std::source_location& loc = std::source_location::current());
+  void info(const std::string& text,
+            const std::source_location& loc = std::source_location::current());
+  void warn(const std::string& text,
+            const std::source_location& loc = std::source_location::current());
+  void error(const std::string& text,
+             const std::source_location& loc = std::source_location::current());
+  void fatal(const std::string& text,
+             const std::source_location& loc = std::source_location::current());
 
   void clearSink() { sinks_.clear(); }
 
  private:
-  Logger() { stop_ = static_cast<bool>(worker_.start(&Logger::process, this)); }
-
-  ~Logger() {
-    stop_ = true;
-    worker_.join();
-  }
-
   void process();
+  void log(LogLevel lvl, const std::string& text,
+           const std::source_location& loc);
 
   std::atomic<LogLevel> level_;
   std::vector<std::unique_ptr<LogSink>> sinks_;
@@ -181,15 +195,5 @@ class Logger {
 #endif
   std::atomic<bool> stop_{false};
 };
-
-// 매크로 편의 함수
-#define LOG_INFO(text) \
-  Logger::instance().log(LogLevel::kInfo, __FILE__, __LINE__, __func__, text)
-
-#define LOG_DEBUG(text) \
-  Logger::instance().log(LogLevel::kDebug, __FILE__, __LINE__, __func__, text)
-
-#define LOG_ERROR(text) \
-  Logger::instance().log(LogLevel::kError, __FILE__, __LINE__, __func__, text)
 
 }  // namespace common

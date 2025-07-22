@@ -3,7 +3,7 @@
 //
 
 
-#include "../hft/common/thread.hpp"
+#include "thread.hpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

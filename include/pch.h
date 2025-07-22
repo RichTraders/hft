@@ -40,4 +40,17 @@
 #include <variant>
 #include <vector>
 
+#define LIKELY(x) __builtin_expect(!!(x), 1)
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+
+// 매크로 편의 함수
+#define LOG_INFO(logger, text) \
+  logger.log(LogLevel::kInfo, __FILE__, __LINE__, __func__, text)
+
+#define LOG_DEBUG(logger, text) \
+  logger.log(LogLevel::kDebug, __FILE__, __LINE__, __func__, text)
+
+#define LOG_ERROR(logger, text) \
+  logger.log(LogLevel::kError, __FILE__, __LINE__, __func__, text)
+
 #endif  // PCH_H

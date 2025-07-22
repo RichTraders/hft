@@ -41,8 +41,9 @@ public:
 
   std::string timestamp();
 
-  FIX8::Message* get_data(const std::string& message);
-  const std::string get_sigature_base64(const std::string& timestamp);
+  FIX8::Message* decode(const std::string& message);
+  const std::string get_signature_base64(const std::string& timestamp);
+  static void encode(std::string& data, FIX8::Message* msg);
 
 private:
   int64_t sequence_{1};

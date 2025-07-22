@@ -17,12 +17,12 @@
 constexpr int kPort = 9000;
 
 MarketConsumer::MarketConsumer()
-#ifdef UNIT_TEST
-    : app_(std::make_unique<core::FixApp>("fix-md.testnet.binance.vision",
+#ifdef DEBUG
+    : app_(std::make_unique<core::FixApp<>>("fix-md.testnet.binance.vision",
 #else
     : app_(std::make_unique<core::FixApp<1>>("fix-md.binance.com",
 #endif
-                                          kPort, "BMDWATCH", "SPOT")),
+                                            kPort, "BMDWATCH", "SPOT")),
       trade_engine_(std::make_unique<TradeEngine>()) {
   //app(core::FixApp("fix-md.binance.com", 9000)) {
 
@@ -52,7 +52,7 @@ MarketConsumer::~MarketConsumer() {
 void MarketConsumer::on_login(FIX8::Message*) {
   std::cout << "login successful\n";
   const std::string message =
-      app_->create_subscription_message("DEPTH_STREAM", "100", "BTCUSDT");
+      app_->create_subscription_message("DEPTH_STREAM", "5000", "BTCUSDT");
   std::cout << "snapshot : " << message << "\n";
   app_->send(message);
 }

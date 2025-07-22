@@ -35,7 +35,7 @@ TEST_F(FixTest, CreateLogOnMessageProducesValidFixMessage) {
   std::string timestamp = "20250101-01:01:12.123";
 
   std::string msg_str = fix->create_log_on_message(sig, timestamp);
-  FIX8::Message* msg = fix->get_data(msg_str);
+  FIX8::Message* msg = fix->decode(msg_str);
   ASSERT_NE(msg, nullptr);
 
   EXPECT_EQ(msg->get_msgtype(), "A"); // Logon
@@ -57,7 +57,7 @@ TEST_F(FixTest, CreateLogOnMessageProducesValidFixMessage) {
 
 TEST_F(FixTest, CreateLogOutMessageProducesValidFixMessage) {
   std::string msg_str = fix->create_log_out_message();
-  FIX8::Message* msg = fix->get_data(msg_str);
+  FIX8::Message* msg = fix->decode(msg_str);
   ASSERT_NE(msg, nullptr);
 
   EXPECT_EQ(msg->get_msgtype(), "5");  // Logout
@@ -81,7 +81,7 @@ TEST_F(FixTest, CreateLogOutMessageProducesValidFixMessage) {
 }
 TEST_F(FixTest, CreateHeartbeatMessage_ContainsCorrectFields) {
   std::string msg_str = fix->create_heartbeat_message();
-  FIX8::Message* msg = fix->get_data(msg_str);
+  FIX8::Message* msg = fix->decode(msg_str);
   ASSERT_NE(msg, nullptr);
 
   EXPECT_EQ(msg->get_msgtype(), "0");  // Heartbeat
@@ -110,7 +110,7 @@ TEST_F(FixTest, CreateSubscriptionMessage_ContainsCorrectFields) {
   Fix::SymbolId symbol = "BTCUSD";
 
   std::string msg_str = fix->create_market_data_subscription_message(req_id, depth, symbol);
-  FIX8::Message* msg = fix->get_data(msg_str);
+  FIX8::Message* msg = fix->decode(msg_str);
   ASSERT_NE(msg, nullptr);
 
   EXPECT_EQ(msg->get_msgtype(), "V");  // MarketDataRequest

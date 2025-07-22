@@ -108,6 +108,7 @@ class LogFormatter {
  public:
   static std::string format(const LogMessage& msg) {
     std::ostringstream oss;
+#ifndef LOGGER_PREFIX_DISABLED
     auto now = std::chrono::system_clock::now();
     auto ttime = std::chrono::system_clock::to_time_t(now);
     auto milisec = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -118,9 +119,9 @@ class LogFormatter {
     oss << "[" << std::put_time(&ttm, "%Y-%m-%dT%H:%M:%S") << "."
         << std::setw(3) << std::setfill('0') << milisec << "]";
     oss << "[" << levelToString(msg.level) << "]";
-
     oss << "[tid=" << msg.thread_id << "]";
     oss << "[" << msg.func << ": " << std::to_string(msg.line) << "] ";
+#endif
     oss << msg.text;
     return oss.str();
   }
@@ -192,7 +193,7 @@ class Logger {
 #else
   Thread<PriorityTag<static_cast<int>(PriorityLevel::kPercent80)>> worker_;
 #endif
-  std::atomic<bool> stop_;
+  std::atomic<bool> stop_{false};
 };
 
 }  // namespace common

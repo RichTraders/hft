@@ -1,5 +1,5 @@
 /*
-* MIT License
+ * MIT License
  *
  * Copyright (c) 2025 NewOro Corporation
  *
@@ -10,15 +10,11 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-
 #include "fix_app.h"
-
 #include "ssl_socket.h"
 #include "fix_wrapper.h"
 #include "common/spsc_queue.h"
 #include <fix8/f8includes.hpp>
-#include <csignal>
-#include <sys/epoll.h>
 
 #include "performance.h"
 
@@ -26,10 +22,10 @@
 constexpr int kReadBufferSize = 1024;
 
 namespace core {
-template<int cpu>
-FixApp<cpu>::FixApp(const std::string& address, int port,
-               const std::string& sender_comp_id,
-               const std::string& target_comp_id):
+template <int Cpu>
+FixApp<Cpu>::FixApp(const std::string& address, const int port,
+                    const std::string& sender_comp_id,
+                    const std::string& target_comp_id):
   fix_(std::make_unique<Fix>(sender_comp_id, target_comp_id)),
   tls_sock_(std::make_unique<SSLSocket>(address, port)),
   queue_(std::make_unique<common::SPSCQueue<std::string>>(SPSCQueueSize)),
@@ -40,56 +36,48 @@ FixApp<cpu>::FixApp(const std::string& address, int port,
   read_thread_.start(&FixApp::read_loop, this);
 }
 
-template<int cpu>
-FixApp<cpu>::~FixApp() {
+template <int Cpu>
+FixApp<Cpu>::~FixApp() {
   auto msg = fix_->create_log_out_message();
   tls_sock_->write(msg.data(), msg.size());
 
   thread_running = false;
 }
 
-template<int cpu>
-void FixApp<cpu>::register_callback(MsgType type,
-                               std::function<void(FIX8::Message*)> cb) {
-  if (!callbacks_.contains(type)) {
-    callbacks_[type] = cb;
-  } else {
-    std::cout << "already registered type" << type << "\n";
-  }
-}
-
-template<int cpu>
-int FixApp<cpu>::start() {
+template <int Cpu>
+int FixApp<Cpu>::start() {
   const auto timestamp = fix_->timestamp();
-  const std::string sig_b64 = fix_->get_sigature_base64(timestamp);
+  const std::string sig_b64 = fix_->get_signature_base64(timestamp);
   const std::string fixmsg = fix_->create_log_on_message(sig_b64, timestamp);
 
   send(fixmsg);
   return 0;
 }
 
-template<int cpu>
-int FixApp<cpu>::stop() {
+template <int Cpu>
+int FixApp<Cpu>::stop() {
   auto msg = fix_->create_log_out_message();
   tls_sock_->write(msg.data(), msg.size());
   thread_running = false;
   return 0;
 }
 
-template<int cpu>
-int FixApp<cpu>::send(const std::string& msg) {
+template <int Cpu>
+int FixApp<Cpu>::send(const std::string& msg) {
   queue_->enqueue(msg);
 
   return 0;
 }
 
-template<int cpu>
-void FixApp<cpu>::write_loop() {
+template <int Cpu>
+void FixApp<Cpu>::write_loop() {
   while (thread_running) {
     std::string msg;
 
     while (queue_->dequeue(msg)) {
+#ifdef DEBUG
       START_MEASURE(TLS_WRITE);
+#endif
       ssize_t result = tls_sock_->write(msg.data(),
                                         static_cast<int>(msg.size()));
       if (result < 0) {
@@ -101,92 +89,149 @@ void FixApp<cpu>::write_loop() {
         thread_running = false;
         break;
       }
+#ifdef DEBUG
       END_MEASURE(TLS_WRITE);
+#endif
     }
     std::this_thread::yield();
   }
 }
 
-template<int cpu>
-void FixApp<cpu>::read_loop() {
-  std::string received_buffer;
-  while (thread_running) {
-    char buf[kReadBufferSize];
-    START_MEASURE(TLS_READ);
-    int kRead = tls_sock_->read(buf, sizeof(buf) - 1);
-    END_MEASURE(TLS_READ);
-    if (kRead <= 0) {
-      std::this_thread::yield();
-      continue;
-    }
-
-    received_buffer.append(buf, kRead);
-
-    size_t msg_len;
-    while (has_full_fix_message(received_buffer, msg_len)) {
-      auto msg = fix_->get_data(received_buffer);
-      auto type = msg->get_msgtype();
-
-      if (unlikely(!callbacks_.contains(type))) {
-        delete msg;
-        continue;
-      }
-
-      callbacks_[type](msg);
-      delete msg;
-      received_buffer.clear();
-    }
-  }
-}
-
-template<int cpu>
-std::string FixApp<cpu>::create_log_on_message(const std::string& sig_b64,
-                                          const std::string& timestamp) const {
+template <int Cpu>
+std::string FixApp<Cpu>::create_log_on_message(
+    const std::string& sig_b64,
+    const std::string& timestamp)
+const {
   return fix_->create_log_on_message(sig_b64, timestamp);
 }
 
-template<int cpu>
-std::string FixApp<cpu>::create_log_out_message() const {
+template <int Cpu>
+std::string FixApp<Cpu>::create_log_out_message() const {
   return fix_->create_log_out_message();
 }
 
-template<int cpu>
-std::string FixApp<cpu>::create_heartbeat_message() const {
-  return fix_->create_heartbeat_message();
+template <int Cpu>
+std::string FixApp<
+  Cpu>::create_heartbeat_message(FIX8::Message* message) const {
+  return fix_->create_heartbeat_message(message);
 }
 
-template<int cpu>
-std::string FixApp<cpu>::create_subscription_message(const RequestId& request_id,
-                                                const MarketDepthLevel& level,
-                                                const SymbolId& symbol) const {
+template <int Cpu>
+std::string FixApp<Cpu>::create_subscription_message(
+    const RequestId& request_id,
+    const MarketDepthLevel& level,
+    const SymbolId& symbol) const {
   return fix_->create_market_data_subscription_message(
       request_id, level, symbol);
 }
 
-template<int cpu>
-bool FixApp<cpu>::has_full_fix_message(const std::string& buffer, size_t& msg_len) {
-  size_t begin = buffer.find("8=FIX");
-  if (begin == std::string::npos) {
+template <int Cpu>
+void FixApp<Cpu>::encode(std::string& data,
+                         FIX8::Message* msg) const {
+  return fix_->encode(data, msg);
+}
+
+template <int Cpu>
+bool FixApp<Cpu>::strip_to_header(std::string& buffer) {
+  const size_t pos = buffer.find("8=FIX");
+  if (pos == std::string::npos) {
+    // 헤더가 없으면 entire buffer 가 garbage
+    buffer.clear();
     return false;
   }
+  if (pos > 0) {
+    buffer.erase(0, pos);
+  }
+  return true;
+}
 
-  size_t body_start = buffer.find("9=", begin);
+template <int Cpu>
+bool FixApp<Cpu>::peek_full_message_len(const std::string& buffer,
+                                        size_t& msg_len) const {
+  constexpr size_t kBegin = 0; // strip_to_header() 후라면 항상 0
+  const size_t body_start = buffer.find("9=", kBegin);
   if (body_start == std::string::npos)
     return false;
 
-  size_t body_end = buffer.find('\x01', body_start);
+  const size_t body_end = buffer.find('\x01', body_start);
   if (body_end == std::string::npos)
     return false;
 
   int body_len = std::stoi(
       buffer.substr(body_start + 2, body_end - (body_start + 2)));
-  size_t header_len = body_end + 1 - begin;
-  msg_len = header_len + body_len + 7;
+  const size_t header_len = (body_end + 1) - kBegin;
+  msg_len = header_len + body_len + 7; // 7 = "10=" + 3bytes + SOH
+  return buffer.size() >= msg_len;
+}
 
-  if (buffer.size() < begin + msg_len)
+template <int Cpu>
+bool FixApp<Cpu>::extract_next_message(std::string& buffer,
+                                       std::string& msg) {
+  if (!strip_to_header(buffer))
     return false;
 
+  size_t msg_len = 0;
+  if (!peek_full_message_len(buffer, msg_len))
+    return false;
+
+  msg = buffer.substr(0, msg_len);
+  buffer.erase(0, msg_len);
   return true;
+}
+
+template <int Cpu>
+void FixApp<Cpu>::process_message(const std::string& raw_msg) {
+  auto* msg = fix_->decode(raw_msg);
+  const auto type = msg->get_msgtype();
+
+  if (callbacks_.contains(type)) {
+    callbacks_[type](msg);
+  }
+  if (raw_data_callback) {
+    raw_data_callback(raw_msg);
+  }
+  delete msg;
+}
+
+template <int Cpu>
+void FixApp<Cpu>::read_loop() {
+  std::string received_buffer;
+  while (thread_running) {
+#ifdef DEBUG
+    START_MEASURE(TLS_READ);
+#endif
+    char buf[kReadBufferSize];
+    int kRead = tls_sock_->read(buf, sizeof(buf));
+#ifdef DEBUG
+    END_MEASURE(TLS_READ);
+#endif
+    if (kRead <= 0) {
+      std::this_thread::yield();
+      continue;
+    }
+    received_buffer.append(buf, kRead);
+
+    std::string raw_msg;
+    while (extract_next_message(received_buffer, raw_msg)) {
+      process_message(raw_msg);
+    }
+  }
+}
+
+template <int Cpu>
+void FixApp<Cpu>::register_callback(MsgType type,
+                                    std::function<void(FIX8::Message*)> cb) {
+  if (!callbacks_.contains(type)) {
+    callbacks_[type] = cb;
+  } else {
+    std::cout << "already registered type" << type << "\n";
+  }
+}
+
+template <int Cpu>
+void FixApp<
+  Cpu>::register_callback(std::function<void(const std::string&)> cb) {
+  raw_data_callback = std::move(cb);
 }
 
 template class FixApp<1>;

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(hft)
+project(repository)
 
 set(CMAKE_CXX_STANDARD 20)
 
@@ -11,9 +11,7 @@ endif ()
 include_directories(
         hft
 )
-add_subdirectory(hft)
-add_executable(HFT main.cpp)
-target_link_libraries(HFT PRIVATE HftLib)
 
-add_subdirectory(repository)
-add_subdirectory(test)
+add_executable(Repository main.cpp broker.cpp)
+target_precompile_headers(Repository PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
+target_link_libraries(Repository PRIVATE HftLib)

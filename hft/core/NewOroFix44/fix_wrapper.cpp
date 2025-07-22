@@ -73,12 +73,15 @@ std::string Fix::create_log_out_message() {
   return wire;
 }
 
-std::string Fix::create_heartbeat_message() {
+std::string Fix::create_heartbeat_message(FIX8::Message* message) {
+  auto test_req_id = message->get<TestReqID>();
+
   Heartbeat request;
   request.Header()->add_field(new SenderCompID(sender_comp_id_));
   request.Header()->add_field(new TargetCompID(target_comp_id_));
   request.Header()->add_field(new MsgSeqNum(sequence_++));
   request.Header()->add_field(new SendingTime());
+  request << new TestReqID(*test_req_id);
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))
     scid->set("0");
 
@@ -87,9 +90,10 @@ std::string Fix::create_heartbeat_message() {
   return wire;
 }
 
-std::string Fix::create_market_data_subscription_message(const RequestId& request_id,
-                                             const MarketDepthLevel& level,
-                                             const SymbolId& symbol) {
+std::string Fix::create_market_data_subscription_message(
+    const RequestId& request_id,
+    const MarketDepthLevel& level,
+    const SymbolId& symbol) {
   MarketDataRequest request(false);
   request.Header()->add_field(new SenderCompID(sender_comp_id_));
   request.Header()->add_field(new TargetCompID(target_comp_id_));
@@ -159,21 +163,22 @@ std::string Fix::timestamp() {
   return std::string(buf);
 }
 
-FIX8::Message* Fix::get_data(const std::string& message) {
+FIX8::Message* Fix::decode(const std::string& message) {
+#ifdef DEBUG
   START_MEASURE(Convert_Message);
-  std::cout << "[" << __func__ << "]: " << message << "\n";
+#endif
   FIX8::Message* msg(
       FIX8::Message::factory(ctx(), message, true, true));
+#ifdef DEBUG
   END_MEASURE(Convert_Message);
+#endif
   if (likely(msg)) {
-    std::cout << "Parsed FIX message: " << msg->get_msgtype() << "\n";
-
     return msg;
   }
   return nullptr;
 }
 
-const std::string Fix::get_sigature_base64(const std::string& timestamp) {
+const std::string Fix::get_signature_base64(const std::string& timestamp) {
   EVP_PKEY* private_key = Util::load_ed25519(
       "/home/neworo/CLionProjects/hft/resources/private.pem", "akaj124!");
 
@@ -185,5 +190,10 @@ const std::string Fix::get_sigature_base64(const std::string& timestamp) {
                               + timestamp;
 
   return Util::sign_and_base64(private_key, payload);
+}
+
+void Fix::encode(std::string& data, FIX8::Message* msg) {
+  auto* ptr = data.data();
+  msg->encode(&ptr);
 }
 }

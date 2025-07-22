@@ -34,15 +34,16 @@ public:
       const std::string& sig_b64, const std::string& timestamp);
 
   std::string create_log_out_message();
-  std::string create_heartbeat_message();
+  std::string create_heartbeat_message(FIX8::Message* message);
 
   std::string create_market_data_subscription_message(const RequestId& request_id,
                                           const MarketDepthLevel& level, const SymbolId& symbol);
 
   std::string timestamp();
 
-  FIX8::Message* get_data(const std::string& message);
-  const std::string get_sigature_base64(const std::string& timestamp);
+  FIX8::Message* decode(const std::string& message);
+  const std::string get_signature_base64(const std::string& timestamp);
+  static void encode(std::string& data, FIX8::Message* msg);
 
 private:
   int64_t sequence_{1};

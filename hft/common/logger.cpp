@@ -14,7 +14,7 @@
 namespace common {
 
 void ConsoleSink::write(const std::string& msg) {
-  std::cout << msg.c_str() << '\n';
+  std::cout << msg << '\n';
 }
 
 void FileSink::write(const std::string& msg) {
@@ -22,6 +22,15 @@ void FileSink::write(const std::string& msg) {
     rotate();
   }
   ofs_ << msg << '\n';
+
+  constexpr uint32_t kMaxLineCnt = 100;
+
+  if (line_cnt_ >= kMaxLineCnt) {
+    ofs_.flush();
+    line_cnt_ = 0;
+  }
+
+  line_cnt_++;
 }
 
 void FileSink::rotate() {
@@ -32,15 +41,61 @@ void FileSink::rotate() {
   ofs_.open(new_file_name, std::ios::trunc);
 }
 
-void Logger::log(LogLevel lvl, const char* file, int line, const char* func,
-                 const std::string& text) {
-  if (lvl < level_.load(std::memory_order_relaxed))
+void Logger::trace(const std::string& text, const std::source_location& loc) {
+  if (level_ > LogLevel::kTrace) {
     return;
+  }
+
+  log(LogLevel::kTrace, text, loc);
+}
+
+void Logger::debug(const std::string& text, const std::source_location& loc) {
+  if (level_ > LogLevel::kDebug) {
+    return;
+  }
+
+  log(LogLevel::kDebug, text, loc);
+}
+
+void Logger::info(const std::string& text, const std::source_location& loc) {
+  if (level_ > LogLevel::kInfo) {
+    return;
+  }
+
+  log(LogLevel::kInfo, text, loc);
+}
+
+void Logger::warn(const std::string& text, const std::source_location& loc) {
+  if (level_ > LogLevel::kWarn) {
+    return;
+  }
+
+  log(LogLevel::kWarn, text, loc);
+}
+
+void Logger::error(const std::string& text, const std::source_location& loc) {
+  if (level_ > LogLevel::kError) {
+    return;
+  }
+
+  log(LogLevel::kError, text, loc);
+}
+
+void Logger::fatal(const std::string& text, const std::source_location& loc) {
+  if (level_ > LogLevel::kFatal) {
+    return;
+  }
+
+  log(LogLevel::kFatal, text, loc);
+}
+
+void Logger::log(LogLevel lvl, const std::string& text,
+                 const std::source_location& loc) {
   LogMessage msg;
+
   msg.level = lvl;
-  msg.file = file;
-  msg.line = line;
-  msg.func = func;
+  msg.line = loc.line();
+  msg.func = loc.function_name();
   msg.text = text;
   msg.thread_id = std::this_thread::get_id();
   msg.timestamp = "";

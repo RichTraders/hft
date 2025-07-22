@@ -29,6 +29,7 @@ add_unit_test(spsc)
 add_unit_test(thread)
 add_unit_test(logger)
 add_unit_test(mpsc)
+add_unit_test(memory_pool)
 
 file(GLOB TEST_EXECUTABLES "${CMAKE_BINARY_DIR}/tests/*_tests")
 

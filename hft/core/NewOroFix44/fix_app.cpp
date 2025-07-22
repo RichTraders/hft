@@ -23,7 +23,7 @@ constexpr int kReadBufferSize = 1024;
 
 namespace core {
 template <int Cpu>
-FixApp<Cpu>::FixApp(const std::string& address, int port,
+FixApp<Cpu>::FixApp(const std::string& address, const int port,
                     const std::string& sender_comp_id,
                     const std::string& target_comp_id):
   fix_(std::make_unique<Fix>(sender_comp_id, target_comp_id)),

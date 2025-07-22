@@ -90,9 +90,10 @@ std::string Fix::create_heartbeat_message(FIX8::Message* message) {
   return wire;
 }
 
-std::string Fix::create_market_data_subscription_message(const RequestId& request_id,
-                                             const MarketDepthLevel& level,
-                                             const SymbolId& symbol) {
+std::string Fix::create_market_data_subscription_message(
+    const RequestId& request_id,
+    const MarketDepthLevel& level,
+    const SymbolId& symbol) {
   MarketDataRequest request(false);
   request.Header()->add_field(new SenderCompID(sender_comp_id_));
   request.Header()->add_field(new TargetCompID(target_comp_id_));
@@ -163,14 +164,15 @@ std::string Fix::timestamp() {
 }
 
 FIX8::Message* Fix::decode(const std::string& message) {
-  //START_MEASURE(Convert_Message);
-  //std::cout << "[" << __func__ << "]: " << message << "\n";
+#ifdef DEBUG
+  START_MEASURE(Convert_Message);
+#endif
   FIX8::Message* msg(
       FIX8::Message::factory(ctx(), message, true, true));
-  //END_MEASURE(Convert_Message);
+#ifdef DEBUG
+  END_MEASURE(Convert_Message);
+#endif
   if (likely(msg)) {
-    //std::cout << "Parsed FIX message: " << msg->get_msgtype() << "\n";
-
     return msg;
   }
   return nullptr;

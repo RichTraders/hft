@@ -60,7 +60,7 @@ TEST_F(FixTest, CreateLogOutMessageProducesValidFixMessage) {
   FIX8::Message* msg = fix->decode(msg_str);
   ASSERT_NE(msg, nullptr);
 
-  EXPECT_EQ(msg->get_msgtype(), "5");  // Logout
+  EXPECT_EQ(msg->get_msgtype(), "5"); // Logout
 
   const SenderCompID* sender = msg->Header()->get<SenderCompID>();
   ASSERT_NE(sender, nullptr);
@@ -79,14 +79,15 @@ TEST_F(FixTest, CreateLogOutMessageProducesValidFixMessage) {
 
   delete msg;
 }
+
 TEST_F(FixTest, CreateHeartbeatMessage_ContainsCorrectFields) {
   Heartbeat heartbeat;
-  heartbeat<<new TestReqID("111111");
+  heartbeat << new TestReqID("111111");
   std::string msg_str = fix->create_heartbeat_message(&heartbeat);
   FIX8::Message* msg = fix->decode(msg_str);
   ASSERT_NE(msg, nullptr);
 
-  EXPECT_EQ(msg->get_msgtype(), "0");  // Heartbeat
+  EXPECT_EQ(msg->get_msgtype(), "0"); // Heartbeat
 
   const SenderCompID* sender = msg->Header()->get<SenderCompID>();
   ASSERT_NE(sender, nullptr);
@@ -111,11 +112,12 @@ TEST_F(FixTest, CreateSubscriptionMessage_ContainsCorrectFields) {
   Fix::MarketDepthLevel depth = "1";
   Fix::SymbolId symbol = "BTCUSD";
 
-  std::string msg_str = fix->create_market_data_subscription_message(req_id, depth, symbol);
+  std::string msg_str = fix->create_market_data_subscription_message(
+      req_id, depth, symbol);
   FIX8::Message* msg = fix->decode(msg_str);
   ASSERT_NE(msg, nullptr);
 
-  EXPECT_EQ(msg->get_msgtype(), "V");  // MarketDataRequest
+  EXPECT_EQ(msg->get_msgtype(), "V"); // MarketDataRequest
 
   const SenderCompID* sender = msg->Header()->get<SenderCompID>();
   ASSERT_NE(sender, nullptr);

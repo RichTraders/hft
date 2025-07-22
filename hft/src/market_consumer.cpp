@@ -63,7 +63,7 @@ void MarketConsumer::on_reject(FIX8::Message*) {}
 
 void MarketConsumer::on_logout(FIX8::Message*) {}
 
-void MarketConsumer::on_heartbeat(FIX8::Message*) {
-  auto message = app_->create_heartbeat_message();
+void MarketConsumer::on_heartbeat(FIX8::Message* msg) {
+  auto message = app_->create_heartbeat_message(msg);
   app_->send(message);
 }

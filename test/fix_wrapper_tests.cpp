@@ -80,7 +80,9 @@ TEST_F(FixTest, CreateLogOutMessageProducesValidFixMessage) {
   delete msg;
 }
 TEST_F(FixTest, CreateHeartbeatMessage_ContainsCorrectFields) {
-  std::string msg_str = fix->create_heartbeat_message();
+  Heartbeat heartbeat;
+  heartbeat<<new TestReqID("111111");
+  std::string msg_str = fix->create_heartbeat_message(&heartbeat);
   FIX8::Message* msg = fix->decode(msg_str);
   ASSERT_NE(msg, nullptr);
 

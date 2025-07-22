@@ -73,12 +73,15 @@ std::string Fix::create_log_out_message() {
   return wire;
 }
 
-std::string Fix::create_heartbeat_message() {
+std::string Fix::create_heartbeat_message(FIX8::Message* message) {
+  auto test_req_id = message->get<TestReqID>();
+
   Heartbeat request;
   request.Header()->add_field(new SenderCompID(sender_comp_id_));
   request.Header()->add_field(new TargetCompID(target_comp_id_));
   request.Header()->add_field(new MsgSeqNum(sequence_++));
   request.Header()->add_field(new SendingTime());
+  request << new TestReqID(*test_req_id);
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))
     scid->set("0");
 
@@ -160,13 +163,13 @@ std::string Fix::timestamp() {
 }
 
 FIX8::Message* Fix::decode(const std::string& message) {
-  START_MEASURE(Convert_Message);
+  //START_MEASURE(Convert_Message);
   //std::cout << "[" << __func__ << "]: " << message << "\n";
   FIX8::Message* msg(
       FIX8::Message::factory(ctx(), message, true, true));
-  END_MEASURE(Convert_Message);
+  //END_MEASURE(Convert_Message);
   if (likely(msg)) {
-    std::cout << "Parsed FIX message: " << msg->get_msgtype() << "\n";
+    //std::cout << "Parsed FIX message: " << msg->get_msgtype() << "\n";
 
     return msg;
   }

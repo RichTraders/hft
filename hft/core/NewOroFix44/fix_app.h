@@ -58,7 +58,7 @@ public:
       const std::string& sig_b64, const std::string& timestamp) const;
 
   std::string create_log_out_message() const;
-  std::string create_heartbeat_message() const;
+  std::string create_heartbeat_message(FIX8::Message* test_req_id) const;
 
   std::string create_subscription_message(const RequestId& request_id,
                                           const MarketDepthLevel& level,

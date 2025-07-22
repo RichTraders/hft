@@ -57,8 +57,8 @@ void Broker::on_login(FIX8::Message*) const {
   app_->send(message);
 }
 
-void Broker::on_heartbeat(FIX8::Message*) const {
-  auto message = app_->create_heartbeat_message();
+void Broker::on_heartbeat(FIX8::Message* msg) const {
+  auto message = app_->create_heartbeat_message(msg);
   app_->send(message);
 }
 

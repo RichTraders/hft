@@ -76,6 +76,7 @@ void FixApp<Cpu>::write_loop() {
 
     while (queue_->dequeue(msg)) {
       START_MEASURE(TLS_WRITE);
+      std::cout << "============================================ sent" << msg;
       ssize_t result = tls_sock_->write(msg.data(),
                                         static_cast<int>(msg.size()));
       if (result < 0) {
@@ -107,8 +108,8 @@ std::string FixApp<Cpu>::create_log_out_message() const {
 }
 
 template <int Cpu>
-std::string FixApp<Cpu>::create_heartbeat_message() const {
-  return fix_->create_heartbeat_message();
+std::string FixApp<Cpu>::create_heartbeat_message(FIX8::Message* message) const {
+  return fix_->create_heartbeat_message(message);
 }
 
 template <int Cpu>
@@ -192,10 +193,10 @@ template <int Cpu>
 void FixApp<Cpu>::read_loop() {
   std::string received_buffer;
   while (thread_running) {
-    START_MEASURE(TLS_READ);
+    //START_MEASURE(TLS_READ);
     char buf[kReadBufferSize];
     int kRead = tls_sock_->read(buf, sizeof(buf));
-    END_MEASURE(TLS_READ);
+    //END_MEASURE(TLS_READ);
     if (kRead <= 0) {
       std::this_thread::yield();
       continue;
@@ -220,7 +221,8 @@ void FixApp<Cpu>::register_callback(MsgType type,
 }
 
 template <int Cpu>
-void FixApp<Cpu>::register_callback(std::function<void(const std::string&)> cb) {
+void FixApp<
+  Cpu>::register_callback(std::function<void(const std::string&)> cb) {
   raw_data_callback = std::move(cb);
 }
 

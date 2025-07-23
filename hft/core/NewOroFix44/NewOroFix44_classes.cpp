@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-15 18:57:49 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-07-17 17:44:16 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -92,30 +92,9 @@ namespace {
 const char *cn[] // Component names
 {
    "",
-   "CommissionData", // 1
-   "DiscretionInstructions", // 2
-   "FinancingDetails", // 3
-   "Instrument", // 4
-   "InstrumentExtension", // 5
-   "InstrumentLeg", // 6
-   "LegBenchmarkCurveData", // 7
-   "LegStipulations", // 8
-   "NestedParties", // 9
-   "NestedParties2", // 10
-   "NestedParties3", // 11
-   "OrderQtyData", // 12
-   "Parties", // 13
-   "PegInstructions", // 14
-   "PositionAmountData", // 15
-   "PositionQty", // 16
-   "SettlInstructionsData", // 17
-   "SettlParties", // 18
-   "SpreadOrBenchmarkCurveData", // 19
-   "Stipulations", // 20
-   "TrdRegTimestamps", // 21
-   "UnderlyingInstrument", // 22
-   "UnderlyingStipulations", // 23
-   "YieldData", // 24
+   "ListTriggeringInstruction", // 1
+   "NewOrder", // 2
+   "TriggeringInstruction", // 3
 };
 
 } // namespace
@@ -125,107 +104,40 @@ const NewOroFix44::NewOroFix44_BaseMsgEntry::Pair msgpairs[]
 {
    { "0", { Type2Type<NewOroFix44::Heartbeat>(), "Heartbeat" } },
    { "1", { Type2Type<NewOroFix44::TestRequest>(), "TestRequest" } },
-   { "2", { Type2Type<NewOroFix44::ResendRequest>(), "ResendRequest" } },
    { "3", { Type2Type<NewOroFix44::Reject>(), "Reject" } },
-   { "4", { Type2Type<NewOroFix44::SequenceReset>(), "SequenceReset" } },
    { "5", { Type2Type<NewOroFix44::Logout>(), "Logout" } },
-   { "6", { Type2Type<NewOroFix44::IOI>(), "IOI" } },
-   { "7", { Type2Type<NewOroFix44::Advertisement>(), "Advertisement" } },
    { "8", { Type2Type<NewOroFix44::ExecutionReport>(), "ExecutionReport" } },
    { "9", { Type2Type<NewOroFix44::OrderCancelReject>(), "OrderCancelReject" } },
    { "A", { Type2Type<NewOroFix44::Logon>(), "Logon" } },
-   { "AA", { Type2Type<NewOroFix44::DerivativeSecurityList>(), "DerivativeSecurityList" } },
-   { "AB", { Type2Type<NewOroFix44::NewOrderMultileg>(), "NewOrderMultileg" } },
-   { "AC", { Type2Type<NewOroFix44::MultilegOrderCancelReplace>(), "MultilegOrderCancelReplace" } },
-   { "AD", { Type2Type<NewOroFix44::TradeCaptureReportRequest>(), "TradeCaptureReportRequest" } },
-   { "AE", { Type2Type<NewOroFix44::TradeCaptureReport>(), "TradeCaptureReport" } },
-   { "AF", { Type2Type<NewOroFix44::OrderMassStatusRequest>(), "OrderMassStatusRequest" } },
-   { "AG", { Type2Type<NewOroFix44::QuoteRequestReject>(), "QuoteRequestReject" } },
-   { "AH", { Type2Type<NewOroFix44::RFQRequest>(), "RFQRequest" } },
-   { "AI", { Type2Type<NewOroFix44::QuoteStatusReport>(), "QuoteStatusReport" } },
-   { "AJ", { Type2Type<NewOroFix44::QuoteResponse>(), "QuoteResponse" } },
-   { "AK", { Type2Type<NewOroFix44::Confirmation>(), "Confirmation" } },
-   { "AL", { Type2Type<NewOroFix44::PositionMaintenanceRequest>(), "PositionMaintenanceRequest" } },
-   { "AM", { Type2Type<NewOroFix44::PositionMaintenanceReport>(), "PositionMaintenanceReport" } },
-   { "AN", { Type2Type<NewOroFix44::RequestForPositions>(), "RequestForPositions" } },
-   { "AO", { Type2Type<NewOroFix44::RequestForPositionsAck>(), "RequestForPositionsAck" } },
-   { "AP", { Type2Type<NewOroFix44::PositionReport>(), "PositionReport" } },
-   { "AQ", { Type2Type<NewOroFix44::TradeCaptureReportRequestAck>(), "TradeCaptureReportRequestAck" } },
-   { "AR", { Type2Type<NewOroFix44::TradeCaptureReportAck>(), "TradeCaptureReportAck" } },
-   { "AS", { Type2Type<NewOroFix44::AllocationReport>(), "AllocationReport" } },
-   { "AT", { Type2Type<NewOroFix44::AllocationReportAck>(), "AllocationReportAck" } },
-   { "AU", { Type2Type<NewOroFix44::ConfirmationAck>(), "ConfirmationAck" } },
-   { "AV", { Type2Type<NewOroFix44::SettlementInstructionRequest>(), "SettlementInstructionRequest" } },
-   { "AW", { Type2Type<NewOroFix44::AssignmentReport>(), "AssignmentReport" } },
-   { "AX", { Type2Type<NewOroFix44::CollateralRequest>(), "CollateralRequest" } },
-   { "AY", { Type2Type<NewOroFix44::CollateralAssignment>(), "CollateralAssignment" } },
-   { "AZ", { Type2Type<NewOroFix44::CollateralResponse>(), "CollateralResponse" } },
    { "B", { Type2Type<NewOroFix44::News>(), "News" } },
-   { "BA", { Type2Type<NewOroFix44::CollateralReport>(), "CollateralReport" } },
-   { "BB", { Type2Type<NewOroFix44::CollateralInquiry>(), "CollateralInquiry" } },
-   { "BC", { Type2Type<NewOroFix44::NetworkCounterpartySystemStatusRequest>(), "NetworkCounterpartySystemStatusRequest" } },
-   { "BD", { Type2Type<NewOroFix44::NetworkCounterpartySystemStatusResponse>(), "NetworkCounterpartySystemStatusResponse" } },
-   { "BE", { Type2Type<NewOroFix44::UserRequest>(), "UserRequest" } },
-   { "BF", { Type2Type<NewOroFix44::UserResponse>(), "UserResponse" } },
-   { "BG", { Type2Type<NewOroFix44::CollateralInquiryAck>(), "CollateralInquiryAck" } },
-   { "BH", { Type2Type<NewOroFix44::ConfirmationRequest>(), "ConfirmationRequest" } },
-   { "C", { Type2Type<NewOroFix44::Email>(), "Email" } },
    { "D", { Type2Type<NewOroFix44::NewOrderSingle>(), "NewOrderSingle" } },
    { "E", { Type2Type<NewOroFix44::NewOrderList>(), "NewOrderList" } },
    { "F", { Type2Type<NewOroFix44::OrderCancelRequest>(), "OrderCancelRequest" } },
-   { "G", { Type2Type<NewOroFix44::OrderCancelReplaceRequest>(), "OrderCancelReplaceRequest" } },
-   { "H", { Type2Type<NewOroFix44::OrderStatusRequest>(), "OrderStatusRequest" } },
-   { "J", { Type2Type<NewOroFix44::AllocationInstruction>(), "AllocationInstruction" } },
-   { "K", { Type2Type<NewOroFix44::ListCancelRequest>(), "ListCancelRequest" } },
-   { "L", { Type2Type<NewOroFix44::ListExecute>(), "ListExecute" } },
-   { "M", { Type2Type<NewOroFix44::ListStatusRequest>(), "ListStatusRequest" } },
    { "N", { Type2Type<NewOroFix44::ListStatus>(), "ListStatus" } },
-   { "P", { Type2Type<NewOroFix44::AllocationInstructionAck>(), "AllocationInstructionAck" } },
-   { "Q", { Type2Type<NewOroFix44::DontKnowTrade>(), "DontKnowTrade" } },
-   { "R", { Type2Type<NewOroFix44::QuoteRequest>(), "QuoteRequest" } },
-   { "S", { Type2Type<NewOroFix44::Quote>(), "Quote" } },
-   { "T", { Type2Type<NewOroFix44::SettlementInstructions>(), "SettlementInstructions" } },
    { "V", { Type2Type<NewOroFix44::MarketDataRequest>(), "MarketDataRequest" } },
-   { "W", { Type2Type<NewOroFix44::MarketDataSnapshotFullRefresh>(), "MarketDataSnapshotFullRefresh" } },
+   { "W", { Type2Type<NewOroFix44::MarketDataSnapshot>(), "MarketDataSnapshot" } },
    { "X", { Type2Type<NewOroFix44::MarketDataIncrementalRefresh>(), "MarketDataIncrementalRefresh" } },
+   { "XAK", { Type2Type<NewOroFix44::OrderAmendKeepPriorityRequest>(), "OrderAmendKeepPriorityRequest" } },
+   { "XAR", { Type2Type<NewOroFix44::OrderAmendReject>(), "OrderAmendReject" } },
+   { "XCN", { Type2Type<NewOroFix44::OrderCancelRequestAndNewOrderSingle>(), "OrderCancelRequestAndNewOrderSingle" } },
+   { "XLQ", { Type2Type<NewOroFix44::LimitQuery>(), "LimitQuery" } },
+   { "XLR", { Type2Type<NewOroFix44::LimitResponse>(), "LimitResponse" } },
    { "Y", { Type2Type<NewOroFix44::MarketDataRequestReject>(), "MarketDataRequestReject" } },
-   { "Z", { Type2Type<NewOroFix44::QuoteCancel>(), "QuoteCancel" } },
-   { "a", { Type2Type<NewOroFix44::QuoteStatusRequest>(), "QuoteStatusRequest" } },
-   { "b", { Type2Type<NewOroFix44::MassQuoteAcknowledgement>(), "MassQuoteAcknowledgement" } },
-   { "c", { Type2Type<NewOroFix44::SecurityDefinitionRequest>(), "SecurityDefinitionRequest" } },
-   { "d", { Type2Type<NewOroFix44::SecurityDefinition>(), "SecurityDefinition" } },
-   { "e", { Type2Type<NewOroFix44::SecurityStatusRequest>(), "SecurityStatusRequest" } },
-   { "f", { Type2Type<NewOroFix44::SecurityStatus>(), "SecurityStatus" } },
-   { "g", { Type2Type<NewOroFix44::TradingSessionStatusRequest>(), "TradingSessionStatusRequest" } },
-   { "h", { Type2Type<NewOroFix44::TradingSessionStatus>(), "TradingSessionStatus" } },
    { "header", { Type2Type<NewOroFix44::header, bool>(), "header" } },
-   { "i", { Type2Type<NewOroFix44::MassQuote>(), "MassQuote" } },
-   { "j", { Type2Type<NewOroFix44::BusinessMessageReject>(), "BusinessMessageReject" } },
-   { "k", { Type2Type<NewOroFix44::BidRequest>(), "BidRequest" } },
-   { "l", { Type2Type<NewOroFix44::BidResponse>(), "BidResponse" } },
-   { "m", { Type2Type<NewOroFix44::ListStrikePrice>(), "ListStrikePrice" } },
-   { "o", { Type2Type<NewOroFix44::RegistrationInstructions>(), "RegistrationInstructions" } },
-   { "p", { Type2Type<NewOroFix44::RegistrationInstructionsResponse>(), "RegistrationInstructionsResponse" } },
    { "q", { Type2Type<NewOroFix44::OrderMassCancelRequest>(), "OrderMassCancelRequest" } },
    { "r", { Type2Type<NewOroFix44::OrderMassCancelReport>(), "OrderMassCancelReport" } },
-   { "s", { Type2Type<NewOroFix44::NewOrderCross>(), "NewOrderCross" } },
-   { "t", { Type2Type<NewOroFix44::CrossOrderCancelReplaceRequest>(), "CrossOrderCancelReplaceRequest" } },
    { "trailer", { Type2Type<NewOroFix44::trailer, bool>(), "trailer" } },
-   { "u", { Type2Type<NewOroFix44::CrossOrderCancelRequest>(), "CrossOrderCancelRequest" } },
-   { "v", { Type2Type<NewOroFix44::SecurityTypeRequest>(), "SecurityTypeRequest" } },
-   { "w", { Type2Type<NewOroFix44::SecurityTypes>(), "SecurityTypes" } },
-   { "x", { Type2Type<NewOroFix44::SecurityListRequest>(), "SecurityListRequest" } },
-   { "y", { Type2Type<NewOroFix44::SecurityList>(), "SecurityList" } },
-   { "z", { Type2Type<NewOroFix44::DerivativeSecurityListRequest>(), "DerivativeSecurityListRequest" } }
-}; // 94
+   { "x", { Type2Type<NewOroFix44::InstrumentListRequest>(), "InstrumentListRequest" } },
+   { "y", { Type2Type<NewOroFix44::InstrumentList>(), "InstrumentList" } }
+}; // 27
 
 extern const NewOroFix44_BaseEntry::Pair fldpairs[];
 
 /// Compiler generated metadata object, accessed through this function.
 const F8MetaCntx& ctx() // avoid SIOF
 {
-   static const NewOroFix44_BaseMsgEntry bme(msgpairs, 94);
-   static const NewOroFix44_BaseEntry be(fldpairs, 912);
+   static const NewOroFix44_BaseMsgEntry bme(msgpairs, 27);
+   static const NewOroFix44_BaseEntry be(fldpairs, 134);
    static const F8MetaCntx _ctx(4400, bme, be, cn, "FIX.4.4");
    return _ctx;
 }

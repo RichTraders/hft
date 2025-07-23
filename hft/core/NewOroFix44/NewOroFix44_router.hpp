@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-15 18:57:49 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-07-17 17:44:16 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -70,96 +70,29 @@ public:
    virtual bool operator() (const class Message *msg) const { return false; }
    virtual bool operator() (const class Heartbeat *msg) const { return true; }
    virtual bool operator() (const class TestRequest *msg) const { return true; }
-   virtual bool operator() (const class ResendRequest *msg) const { return true; }
    virtual bool operator() (const class Reject *msg) const { return true; }
-   virtual bool operator() (const class SequenceReset *msg) const { return true; }
    virtual bool operator() (const class Logout *msg) const { return true; }
-   virtual bool operator() (const class IOI *msg) const { return false; }
-   virtual bool operator() (const class Advertisement *msg) const { return false; }
    virtual bool operator() (const class ExecutionReport *msg) const { return false; }
    virtual bool operator() (const class OrderCancelReject *msg) const { return false; }
    virtual bool operator() (const class Logon *msg) const { return true; }
-   virtual bool operator() (const class DerivativeSecurityList *msg) const { return false; }
-   virtual bool operator() (const class NewOrderMultileg *msg) const { return false; }
-   virtual bool operator() (const class MultilegOrderCancelReplace *msg) const { return false; }
-   virtual bool operator() (const class TradeCaptureReportRequest *msg) const { return false; }
-   virtual bool operator() (const class TradeCaptureReport *msg) const { return false; }
-   virtual bool operator() (const class OrderMassStatusRequest *msg) const { return false; }
-   virtual bool operator() (const class QuoteRequestReject *msg) const { return false; }
-   virtual bool operator() (const class RFQRequest *msg) const { return false; }
-   virtual bool operator() (const class QuoteStatusReport *msg) const { return false; }
-   virtual bool operator() (const class QuoteResponse *msg) const { return false; }
-   virtual bool operator() (const class Confirmation *msg) const { return false; }
-   virtual bool operator() (const class PositionMaintenanceRequest *msg) const { return false; }
-   virtual bool operator() (const class PositionMaintenanceReport *msg) const { return false; }
-   virtual bool operator() (const class RequestForPositions *msg) const { return false; }
-   virtual bool operator() (const class RequestForPositionsAck *msg) const { return false; }
-   virtual bool operator() (const class PositionReport *msg) const { return false; }
-   virtual bool operator() (const class TradeCaptureReportRequestAck *msg) const { return false; }
-   virtual bool operator() (const class TradeCaptureReportAck *msg) const { return false; }
-   virtual bool operator() (const class AllocationReport *msg) const { return false; }
-   virtual bool operator() (const class AllocationReportAck *msg) const { return false; }
-   virtual bool operator() (const class ConfirmationAck *msg) const { return false; }
-   virtual bool operator() (const class SettlementInstructionRequest *msg) const { return false; }
-   virtual bool operator() (const class AssignmentReport *msg) const { return false; }
-   virtual bool operator() (const class CollateralRequest *msg) const { return false; }
-   virtual bool operator() (const class CollateralAssignment *msg) const { return false; }
-   virtual bool operator() (const class CollateralResponse *msg) const { return false; }
    virtual bool operator() (const class News *msg) const { return false; }
-   virtual bool operator() (const class CollateralReport *msg) const { return false; }
-   virtual bool operator() (const class CollateralInquiry *msg) const { return false; }
-   virtual bool operator() (const class NetworkCounterpartySystemStatusRequest *msg) const { return false; }
-   virtual bool operator() (const class NetworkCounterpartySystemStatusResponse *msg) const { return false; }
-   virtual bool operator() (const class UserRequest *msg) const { return false; }
-   virtual bool operator() (const class UserResponse *msg) const { return false; }
-   virtual bool operator() (const class CollateralInquiryAck *msg) const { return false; }
-   virtual bool operator() (const class ConfirmationRequest *msg) const { return false; }
-   virtual bool operator() (const class Email *msg) const { return false; }
    virtual bool operator() (const class NewOrderSingle *msg) const { return false; }
    virtual bool operator() (const class NewOrderList *msg) const { return false; }
    virtual bool operator() (const class OrderCancelRequest *msg) const { return false; }
-   virtual bool operator() (const class OrderCancelReplaceRequest *msg) const { return false; }
-   virtual bool operator() (const class OrderStatusRequest *msg) const { return false; }
-   virtual bool operator() (const class AllocationInstruction *msg) const { return false; }
-   virtual bool operator() (const class ListCancelRequest *msg) const { return false; }
-   virtual bool operator() (const class ListExecute *msg) const { return false; }
-   virtual bool operator() (const class ListStatusRequest *msg) const { return false; }
    virtual bool operator() (const class ListStatus *msg) const { return false; }
-   virtual bool operator() (const class AllocationInstructionAck *msg) const { return false; }
-   virtual bool operator() (const class DontKnowTrade *msg) const { return false; }
-   virtual bool operator() (const class QuoteRequest *msg) const { return false; }
-   virtual bool operator() (const class Quote *msg) const { return false; }
-   virtual bool operator() (const class SettlementInstructions *msg) const { return false; }
    virtual bool operator() (const class MarketDataRequest *msg) const { return false; }
-   virtual bool operator() (const class MarketDataSnapshotFullRefresh *msg) const { return false; }
+   virtual bool operator() (const class MarketDataSnapshot *msg) const { return false; }
    virtual bool operator() (const class MarketDataIncrementalRefresh *msg) const { return false; }
+   virtual bool operator() (const class OrderAmendKeepPriorityRequest *msg) const { return false; }
+   virtual bool operator() (const class OrderAmendReject *msg) const { return false; }
+   virtual bool operator() (const class OrderCancelRequestAndNewOrderSingle *msg) const { return false; }
+   virtual bool operator() (const class LimitQuery *msg) const { return false; }
+   virtual bool operator() (const class LimitResponse *msg) const { return false; }
    virtual bool operator() (const class MarketDataRequestReject *msg) const { return false; }
-   virtual bool operator() (const class QuoteCancel *msg) const { return false; }
-   virtual bool operator() (const class QuoteStatusRequest *msg) const { return false; }
-   virtual bool operator() (const class MassQuoteAcknowledgement *msg) const { return false; }
-   virtual bool operator() (const class SecurityDefinitionRequest *msg) const { return false; }
-   virtual bool operator() (const class SecurityDefinition *msg) const { return false; }
-   virtual bool operator() (const class SecurityStatusRequest *msg) const { return false; }
-   virtual bool operator() (const class SecurityStatus *msg) const { return false; }
-   virtual bool operator() (const class TradingSessionStatusRequest *msg) const { return false; }
-   virtual bool operator() (const class TradingSessionStatus *msg) const { return false; }
-   virtual bool operator() (const class MassQuote *msg) const { return false; }
-   virtual bool operator() (const class BusinessMessageReject *msg) const { return false; }
-   virtual bool operator() (const class BidRequest *msg) const { return false; }
-   virtual bool operator() (const class BidResponse *msg) const { return false; }
-   virtual bool operator() (const class ListStrikePrice *msg) const { return false; }
-   virtual bool operator() (const class RegistrationInstructions *msg) const { return false; }
-   virtual bool operator() (const class RegistrationInstructionsResponse *msg) const { return false; }
    virtual bool operator() (const class OrderMassCancelRequest *msg) const { return false; }
    virtual bool operator() (const class OrderMassCancelReport *msg) const { return false; }
-   virtual bool operator() (const class NewOrderCross *msg) const { return false; }
-   virtual bool operator() (const class CrossOrderCancelReplaceRequest *msg) const { return false; }
-   virtual bool operator() (const class CrossOrderCancelRequest *msg) const { return false; }
-   virtual bool operator() (const class SecurityTypeRequest *msg) const { return false; }
-   virtual bool operator() (const class SecurityTypes *msg) const { return false; }
-   virtual bool operator() (const class SecurityListRequest *msg) const { return false; }
-   virtual bool operator() (const class SecurityList *msg) const { return false; }
-   virtual bool operator() (const class DerivativeSecurityListRequest *msg) const { return false; }
+   virtual bool operator() (const class InstrumentListRequest *msg) const { return false; }
+   virtual bool operator() (const class InstrumentList *msg) const { return false; }
 };
 
 } // namespace NewOroFix44

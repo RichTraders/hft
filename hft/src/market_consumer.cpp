@@ -16,20 +16,27 @@
 
 constexpr int kPort = 9000;
 
-MarketConsumer::MarketConsumer()
+namespace trading {
+MarketConsumer::MarketConsumer(
+    common::Logger* logger, TradeEngine* trade_engine,
+    common::MemoryPool<MarketUpdateData>* market_update_data_pool,
+    common::MemoryPool<MarketData>* market_data_pool)
+    : market_update_data_pool_(market_update_data_pool),
+      market_data_pool_(market_data_pool),
+      logger_(logger),
+      trade_engine_(trade_engine),
 #ifdef DEBUG
-    : app_(std::make_unique<core::FixApp<>>("fix-md.testnet.binance.vision",
+      app_(std::make_unique<core::FixApp<>>("fix-md.testnet.binance.vision",
 #else
-    : app_(std::make_unique<core::FixApp<1>>("fix-md.binance.com",
+      app_(std::make_unique<core::FixApp<1>>("fix-md.binance.com",
 #endif
-                                            kPort, "BMDWATCH", "SPOT")),
-      trade_engine_(std::make_unique<TradeEngine>()) {
-  //app(core::FixApp("fix-md.binance.com", 9000)) {
+                                            kPort, "BMDWATCH", "SPOT", logger_,
+                                            market_data_pool_)) {
 
   app_->register_callback(
       "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });
   app_->register_callback("W", [this](auto&& msg) {
-    on_subscribe(std::forward<decltype(msg)>(msg));
+    on_snapshot(std::forward<decltype(msg)>(msg));
   });
   app_->register_callback("X", [this](auto&& msg) {
     on_subscribe(std::forward<decltype(msg)>(msg));
@@ -49,21 +56,36 @@ MarketConsumer::~MarketConsumer() {
   app_->stop();
 }
 
-void MarketConsumer::on_login(FIX8::Message*) {
-  std::cout << "login successful\n";
+void MarketConsumer::on_login(FIX8::Message*) const {
+  logger_->info("login successful");
   const std::string message =
-      app_->create_subscription_message("DEPTH_STREAM", "5000", "BTCUSDT");
-  std::cout << "snapshot : " << message << "\n";
+      app_->create_subscription_message("DEPTH_STREAM", "1000", "BTCUSDT");
   app_->send(message);
+  logger_->info("sent order message");
 }
 
-void MarketConsumer::on_subscribe(FIX8::Message*) {}
+void MarketConsumer::on_snapshot(FIX8::Message* msg) const {
+  auto* snapshot_data = market_update_data_pool_->allocate(
+      app_->create_snapshot_data_message(msg));
+  trade_engine_->on_market_data_updated(snapshot_data);
+}
 
-void MarketConsumer::on_reject(FIX8::Message*) {}
+void MarketConsumer::on_subscribe(FIX8::Message* msg) const {
+  auto* data =
+      market_update_data_pool_->allocate(app_->create_market_data_message(msg));
+  trade_engine_->on_market_data_updated(data);
+}
 
-void MarketConsumer::on_logout(FIX8::Message*) {}
+void MarketConsumer::on_reject(FIX8::Message*) const {
+  logger_->info("reject data");
+}
 
-void MarketConsumer::on_heartbeat(FIX8::Message* msg) {
+void MarketConsumer::on_logout(FIX8::Message*) const {
+  logger_->info("logout");
+}
+
+void MarketConsumer::on_heartbeat(FIX8::Message* msg) const {
   auto message = app_->create_heartbeat_message(msg);
   app_->send(message);
 }
+}  // namespace trading

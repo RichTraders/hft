@@ -31,6 +31,7 @@ add_unit_test(fix_wrapper)
 add_unit_test(logger)
 add_unit_test(mpsc)
 add_unit_test(memory_pool)
+add_unit_test(order_book)
 
 file(GLOB TEST_EXECUTABLES "${CMAKE_BINARY_DIR}/tests/*_tests")
 

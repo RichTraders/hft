@@ -15,6 +15,9 @@
 
 #include <common/thread.hpp>
 
+#include "logger.h"
+#include "market_data.h"
+
 namespace FIX8 {
 class Message;
 }
@@ -22,6 +25,8 @@ class Message;
 namespace common {
 template <typename T>
 class SPSCQueue;
+template <typename T>
+class MemoryPool;
 }
 
 namespace core {
@@ -33,7 +38,8 @@ class FixApp {
 public:
   FixApp(const std::string& address, int port,
          const std::string& sender_comp_id,
-         const std::string& target_comp_id);
+         const std::string& target_comp_id, common::Logger* logger,
+         common::MemoryPool<MarketData>* market_data_pool);
   ~FixApp();
 
   using MsgType = std::string;
@@ -46,24 +52,29 @@ public:
 
   int start();
   int stop();
-  int send(const std::string& msg);
+  bool send(const std::string& msg) const;
   void write_loop();
   void read_loop();
-  void register_callback(MsgType type,
-                         std::function<void(FIX8::Message*)> cb);
+
+  void register_callback(const MsgType& type,
+                         const std::function<void(FIX8::Message*)>& callback);
+#ifdef REPOSITORY
   void register_callback(
       std::function<void(const std::string&)> cb);
+#endif
 
-  std::string create_log_on_message(
+  [[nodiscard]] std::string create_log_on_message(
       const std::string& sig_b64, const std::string& timestamp) const;
 
-  std::string create_log_out_message() const;
-  std::string create_heartbeat_message(FIX8::Message* test_req_id) const;
+  [[nodiscard]] std::string create_log_out_message() const;
+  std::string create_heartbeat_message(FIX8::Message* message) const;
 
-  std::string create_subscription_message(const RequestId& request_id,
+  [[nodiscard]] std::string create_subscription_message(const RequestId& request_id,
                                           const MarketDepthLevel& level,
                                           const SymbolId& symbol) const;
   void encode(std::string& data, FIX8::Message* msg) const;
+  MarketUpdateData create_market_data_message(FIX8::Message* msg) const;
+  MarketUpdateData create_snapshot_data_message(FIX8::Message* msg) const;
 
 protected:
   bool strip_to_header(std::string& buffer);
@@ -71,15 +82,20 @@ protected:
   bool extract_next_message(std::string& buffer, std::string& msg);
   void process_message(const std::string& raw_msg);
 
+  common::MemoryPool<MarketData>* market_data_pool_;
+  common::Logger* logger_;
   std::unique_ptr<Fix> fix_;
   std::unique_ptr<SSLSocket> tls_sock_;
   std::map<std::string, std::function<void(FIX8::Message*)>> callbacks_;
-  std::function<void(const std::string&)> raw_data_callback;
+
+#ifdef RESPOSITORY
+  std::function<void(const std::string&)> raw_data_callback_;
+#endif
   std::unique_ptr<common::SPSCQueue<std::string>> queue_;
 
   common::Thread<common::AffinityTag<Cpu>> write_thread_;
   common::Thread<common::AffinityTag<Cpu>> read_thread_;
-  bool thread_running{true};
+  bool thread_running_{true};
 
   bool log_on_{false};
   const std::string sender_id_;

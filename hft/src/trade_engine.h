@@ -13,17 +13,43 @@
 #ifndef TRADE_ENGINE_H
 #define TRADE_ENGINE_H
 
-#include "common/spsc_queue.h"
+#include "market_data.h"
+#include "memory_pool.hpp"
+#include "spsc_queue.h"
+#include "thread.hpp"
+#include "types.h"
 
+#include "order_book.h"
+
+namespace trading {
 class TradeEngine {
  public:
-  TradeEngine();
+  explicit TradeEngine(
+      common::Logger* logger,
+      common::MemoryPool<MarketUpdateData>* market_update_data_pool,
+      common::MemoryPool<MarketData>* market_data_pool);
   ~TradeEngine();
 
-  void push();
+  void stop();
+  void on_market_data_updated(MarketUpdateData* data);
+  void on_order_book_updated(common::Price price, common::Side side,
+                             MarketOrderBook* market_order_book);
+  void on_trade_updated(const MarketData* market_data,
+                        MarketOrderBook* market_order_book);
 
  private:
-  std::unique_ptr<common::SPSCQueue<int>> queue_;
+  common::Logger* logger_;
+  common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
+  common::MemoryPool<MarketData>* market_data_pool_;
+  std::unique_ptr<common::SPSCQueue<MarketUpdateData*>> queue_;
+  common::Thread<common::AffinityTag<2>, common::PriorityTag<1>> thread_;
+
+  MarketOrderBookHashMap ticker_order_book_;
+
+  bool running_{true};
+
+  void run();
 };
+}  // namespace trading
 
 #endif  //TRADE_ENGINE_H

@@ -13,10 +13,6 @@
 #include "broker.h"
 #include "common/logger.h"
 
-#ifndef LOGGER_PREFIX_DISABLED
-#define LOGGER_PREFIX_DISABLED
-#endif
-
 constexpr int kPort = 9000;
 constexpr int kKilo = 1024;
 constexpr int kThirty = 30;
@@ -26,13 +22,20 @@ using common::LogLevel;
 using core::FixApp;
 
 Broker::Broker()
-    :
+    : pool_(std::make_unique<common::MemoryPool<MarketData>>(kMemoryPoolSize)),
+      log_(std::make_unique<common::Logger>()),
 #ifdef DEBUG
-      app_(std::make_unique<FixLoggerApp>("fix-md.testnet.binance.vision",
+      app_(std::make_unique<FixApp<>>("fix-md.testnet.binance.vision",
 #else
       app_(std::make_unique<FixApp<>>("fix-md.binance.com",
 #endif
-                                          kPort, "BMDWATCH", "SPOT")) {
+                                      kPort, "BMDWATCH", "SPOT", log_.get(),
+                                      pool_.get())) {
+  log_->setLevel(LogLevel::kInfo);
+  log_->clearSink();
+  log_->addSink(
+      std::make_unique<FileSink>("repository", kKilo * kKilo * kThirty));
+
   app_->register_callback(
       "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });
   app_->register_callback([this](auto&& msg) { on_subscribe(msg); });
@@ -41,10 +44,6 @@ Broker::Broker()
   });
 
   app_->start();
-  log_.setLevel(LogLevel::kInfo);
-  log_.clearSink();
-  log_.addSink(
-      std::make_unique<FileSink>("repository", kKilo * kKilo * kThirty));
 }
 
 void Broker::on_login(FIX8::Message*) const {
@@ -61,5 +60,5 @@ void Broker::on_heartbeat(FIX8::Message* msg) const {
 }
 
 void Broker::on_subscribe(const std::string& msg) {
-  log_.info(msg);
+  log_->info(msg);
 }

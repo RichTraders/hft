@@ -2,9 +2,10 @@
 
 CLANG_FORMAT=clang-format
 CLANG_TIDY=clang-tidy
+CACHE_FILE=".clang-tidy-cache"
 
 if ! command -v "$CLANG_FORMAT" &> /dev/null; then
-  echo "clang format not found"
+  echo "clang-format not found"
   exit 1
 fi
 if ! command -v "$CLANG_TIDY" > /dev/null; then
@@ -13,33 +14,45 @@ if ! command -v "$CLANG_TIDY" > /dev/null; then
 fi
 
 EXTENSIONS="h cpp cc cxx c hpp"
-
-FILES=$(git diff --cached --name-only --diff-filter=ACM |grep -Ev "test|Fix44" |grep -E "\.(${EXTENSIONS// /|})$")
+FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -Ev "test|NewOroFix44_|fix_[app|wrapper]" | grep -E "\.(${EXTENSIONS// /|})$")
 
 if [ -z "$FILES" ]; then
   exit 0
 fi
 
-COMPILER_FLAGS=(-xc++ -std=c++20 -I./include -I./hft -include include/pch.h)
+[ -e "$CACHE_FILE" ] || touch "$CACHE_FILE"
+
+if [ ! -e build/compile_commands.json ]; then
+  echo "build/compile_commands.json not found, running cmake..."
+  cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON || exit 1
+fi
 
 FAIL=0
 for file in $FILES; do
-  echo "  • $file"
+  HASH=$(git hash-object "$file")
+  CACHED=$(grep "$file $HASH" "$CACHE_FILE")
+
+  echo "• $file"
   $CLANG_FORMAT -i "$file"
   git add "$file"
   echo "formatted: $file"
 
-  if [ ! -e build/compile_commands.json ]; then
-    echo "make build folder and run cmake"
-    cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+  if [ -n "$CACHED" ]; then
+    echo "skipped clang-tidy (cached): $file"
+    continue
   fi
 
   "$CLANG_TIDY" "$file" -p build
   if [ $? -ne 0 ]; then
-      echo "clang-tidy found issues in $file"
-      FAIL=1
-      break
-    fi
+    echo "clang-tidy found issues in $file"
+    FAIL=1
+    break
+  else
+    # update cache
+    grep -v "^$file " "$CACHE_FILE" > "$CACHE_FILE.tmp"
+    echo "$file $HASH" >> "$CACHE_FILE.tmp"
+    mv "$CACHE_FILE.tmp" "$CACHE_FILE"
+  fi
 done
 
 if [ "$FAIL" -ne 0 ]; then
@@ -48,4 +61,3 @@ if [ "$FAIL" -ne 0 ]; then
 fi
 
 exit 0
-

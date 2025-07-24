@@ -11,11 +11,59 @@
  */
 
 #include "trade_engine.h"
+#include "performance.h"
+
 constexpr std::size_t kCapacity = 64;
 
-TradeEngine::TradeEngine()
-    : queue_(std::make_unique<common::SPSCQueue<int>>(kCapacity)) {}
+namespace trading {
+TradeEngine::TradeEngine(
+    common::Logger* logger,
+    common::MemoryPool<MarketUpdateData>* market_update_data_pool,
+    common::MemoryPool<MarketData>* market_data_pool)
+    : logger_(logger),
+      market_update_data_pool_(market_update_data_pool),
+      market_data_pool_(market_data_pool),
+      queue_(
+          std::make_unique<common::SPSCQueue<MarketUpdateData*>>(kCapacity)) {
+  auto orderbook = std::make_unique<MarketOrderBook>("BTCUSDT", logger);
+  orderbook->set_trade_engine(this);
+  ticker_order_book_.insert({"BTCUSDT", std::move(orderbook)});
+  thread_.start(&TradeEngine::run, this);
+}
 
 TradeEngine::~TradeEngine() = default;
 
-void TradeEngine::push() {}
+void TradeEngine::on_market_data_updated(MarketUpdateData* data) {
+  queue_->enqueue(data);
+}
+
+void TradeEngine::stop() {
+  running_ = false;
+}
+
+// TODO(jb): call feature engine
+void TradeEngine::on_order_book_updated(common::Price, common::Side,
+                                        MarketOrderBook*) {}
+
+void TradeEngine::on_trade_updated(const MarketData*, MarketOrderBook*) {}
+
+void TradeEngine::run() {
+  while (running_) {
+    MarketUpdateData* message;
+    while (queue_->dequeue(message)) {
+      START_MEASURE(MAKE_ORDERBOOK);
+      for (auto& market_data : message->data) {
+        ticker_order_book_[market_data->ticker_id]->on_market_data_updated(
+            market_data);
+        market_data_pool_->deallocate(market_data);
+      }
+
+      if (message) {
+        market_update_data_pool_->deallocate(message);
+      }
+      END_MEASURE(MAKE_ORDERBOOK, logger_);
+    }
+    std::this_thread::yield();
+  }
+}
+}  // namespace trading

@@ -16,16 +16,21 @@
 #include "NewOroFix44_router.hpp"
 #include "NewOroFix44_classes.hpp"
 
+#include "logger.h"
+#include "memory_pool.hpp"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 using namespace core;
-
+using namespace common;
 
 TEST(FixAppTest, CallbackRegistration) {
+  auto pool = std::make_unique<MemoryPool<MarketData>>(1024);
+  auto logger = std::make_unique<Logger>();
   auto app = FixApp("fix-md.testnet.binance.vision",
                     9000,
                     "BMDWATCH",
-                    "SPOT");
+                    "SPOT", logger.get(), pool.get());
   bool called = false;
 
   app.register_callback( //log on
@@ -33,13 +38,13 @@ TEST(FixAppTest, CallbackRegistration) {
         called = true;
         std::string result;
         m->encode(result);
-        std::cout <<result << std::endl;
+        std::cout << result << std::endl;
       });
   app.register_callback( //log out
       "5", [&](FIX8::Message* m) {
         std::string result;
         m->encode(result);
-        std::cout <<result << std::endl;
+        std::cout << result << std::endl;
       });
   app.start();
   sleep(3);

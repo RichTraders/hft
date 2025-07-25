@@ -14,6 +14,7 @@
 #include "order_book.h"
 
 using namespace trading;
+using namespace common;
 
 class MarketOrderBookTest : public ::testing::Test {
 protected:
@@ -31,6 +32,7 @@ protected:
     book_ = new MarketOrderBook{"TEST_TICKER", &logger_};
     book_->set_trade_engine(nullptr);
   }
+
   void TearDown() override {
     if (book_)
       delete book_;
@@ -39,8 +41,9 @@ protected:
 
 // Clear
 TEST_F(MarketOrderBookTest, ClearResetsOrderBookAndUpdatesBBO) {
-  const MarketData md(MarketUpdateType::kClear, kOrderIdInvalid, "BTCUSDT",
-                      Side::kBuy, 0.0, 0.0);
+  const MarketData md(MarketUpdateType::kClear, OrderId{kOrderIdInvalid},
+                      "BTCUSDT",
+                      Side::kBuy, Price{0.0}, Qty{0.0});
 
   book_->on_market_data_updated(&md);
 
@@ -55,32 +58,34 @@ TEST_F(MarketOrderBookTest, ClearResetsOrderBookAndUpdatesBBO) {
 // Trade
 TEST_F(MarketOrderBookTest, TradeInvokesTradeEngineAndSkipsOrderBookUpdate) {
 
-  const Price price = 100000.00;
-  const Qty qty = 5.0;
-  const MarketData md(MarketUpdateType::kAdd, kOrderIdInvalid, "BTCUSDT",
+  const Price price = Price{100000.00};
+  const Qty qty = Qty{5.0};
+  const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
+                      "BTCUSDT",
                       Side::kBuy, price, qty);
 
   book_->on_market_data_updated(&md);
 
-  const Price trade_price = 100000.00;
-  const Qty trade_qty = 4.0;
+  const Price trade_price = Price{100000.00};
+  const Qty trade_qty = Qty{4.0};
   const MarketData trade_md = MarketData(MarketUpdateType::kTrade,
-                                         kOrderIdInvalid, "BTCUSDT",
+                                         OrderId{kOrderIdInvalid}, "BTCUSDT",
                                          Side::kBuy, trade_price, trade_qty);
   book_->on_market_data_updated(&trade_md);
 
   const BBO* bbo = book_->get_bbo();
   EXPECT_EQ(bbo->bid_price, price);
   EXPECT_EQ(bbo->ask_price, kPriceInvalid);
-  EXPECT_EQ(bbo->bid_qty, qty-trade_qty);
+  EXPECT_EQ(bbo->bid_qty, qty.value-trade_qty.value);
   EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
 }
 
 // Add
 TEST_F(MarketOrderBookTest, AddOrder) {
-  const Price price = 100000.00;
-  const Qty qty = 5.0;
-  const MarketData md(MarketUpdateType::kAdd, kOrderIdInvalid, "BTCUSDT",
+  const Price price = Price{100000.00};
+  const Qty qty = Qty{5.0};
+  const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
+                      "BTCUSDT",
                       Side::kBuy, price, qty);
 
   book_->on_market_data_updated(&md);
@@ -94,9 +99,10 @@ TEST_F(MarketOrderBookTest, AddOrder) {
 
 TEST_F(MarketOrderBookTest, AddOrders) {
   {
-    const Price price = 100000.00;
-    const Qty qty = 5.0;
-    const MarketData md(MarketUpdateType::kAdd, kOrderIdInvalid, "BTCUSDT",
+    const Price price = Price{100000.00};
+    const Qty qty = Qty{5.0};
+    const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
+                        "BTCUSDT",
                         Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
@@ -108,9 +114,10 @@ TEST_F(MarketOrderBookTest, AddOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
-    const Price price = 100001.00;
-    const Qty qty = 4.0;
-    const MarketData md(MarketUpdateType::kAdd, kOrderIdInvalid, "BTCUSDT",
+    const Price price = Price{100001.00};
+    const Qty qty = Qty{4.0};
+    const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
+                        "BTCUSDT",
                         Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
@@ -122,9 +129,10 @@ TEST_F(MarketOrderBookTest, AddOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
-    const Price price = 100001.00;
-    const Qty qty = 3.0;
-    const MarketData md(MarketUpdateType::kModify, kOrderIdInvalid, "BTCUSDT",
+    const Price price = Price{100001.00};
+    const Qty qty = Qty{3.0};
+    const MarketData md(MarketUpdateType::kModify, OrderId{kOrderIdInvalid},
+                        "BTCUSDT",
                         Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
@@ -136,9 +144,10 @@ TEST_F(MarketOrderBookTest, AddOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
-    const Price price = 100001.00;
-    const Qty qty = 2.0;
-    const MarketData md(MarketUpdateType::kTrade, kOrderIdInvalid, "BTCUSDT",
+    const Price price = Price{100001.00};
+    const Qty qty = Qty{2.0};
+    const MarketData md(MarketUpdateType::kTrade, OrderId{kOrderIdInvalid},
+                        "BTCUSDT",
                         Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
@@ -153,9 +162,10 @@ TEST_F(MarketOrderBookTest, AddOrders) {
 
 TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
   {
-    const Price price = 100000.00;
-    const Qty qty = 5.0;
-    const MarketData md(MarketUpdateType::kAdd, kOrderIdInvalid, "BTCUSDT",
+    const Price price = Price{100000.00};
+    const Qty qty = Qty{5.0};
+    const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
+                        "BTCUSDT",
                         Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
@@ -167,9 +177,10 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
-    const Price price = 100001.00;
-    const Qty qty = 4.0;
-    const MarketData md(MarketUpdateType::kAdd, kOrderIdInvalid, "BTCUSDT",
+    const Price price = Price{100001.00};
+    const Qty qty = Qty{4.0};
+    const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
+                        "BTCUSDT",
                         Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
@@ -181,9 +192,10 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
-    const Price price = 100001.00;
-    const Qty qty = 3.0;
-    const MarketData md(MarketUpdateType::kModify, kOrderIdInvalid, "BTCUSDT",
+    const Price price = Price{100001.00};
+    const Qty qty = Qty{3.0};
+    const MarketData md(MarketUpdateType::kModify, OrderId{kOrderIdInvalid},
+                        "BTCUSDT",
                         Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
@@ -195,9 +207,10 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
-    const Price price = 100000.50;
-    const Qty qty = 14.0;
-    const MarketData md(MarketUpdateType::kAdd, kOrderIdInvalid, "BTCUSDT",
+    const Price price = Price{100000.50};
+    const Qty qty = Qty{14.0};
+    const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
+                        "BTCUSDT",
                         Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
@@ -209,9 +222,10 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
-    const Price price = 100000.00;
-    const Qty qty = 2.0;
-    const MarketData md(MarketUpdateType::kAdd, kOrderIdInvalid, "BTCUSDT",
+    const Price price = Price{100000.00};
+    const Qty qty = Qty{2.0};
+    const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
+                        "BTCUSDT",
                         Side::kSell, price, qty);
 
     book_->on_market_data_updated(&md);
@@ -223,9 +237,10 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, qty);
   }
   {
-    const Price price = 99999.00;
-    const Qty qty = 3.0;
-    const MarketData md(MarketUpdateType::kAdd, kOrderIdInvalid, "BTCUSDT",
+    const Price price = Price{99999.00};
+    const Qty qty = Qty{3.0};
+    const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
+                        "BTCUSDT",
                         Side::kSell, price, qty);
 
     book_->on_market_data_updated(&md);
@@ -237,9 +252,10 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, qty);
   }
   {
-    const Price price = 100001.00;
-    const Qty qty = 3.0;
-    const MarketData md(MarketUpdateType::kModify, kOrderIdInvalid, "BTCUSDT",
+    const Price price = Price{100001.00};
+    const Qty qty = Qty{3.0};
+    const MarketData md(MarketUpdateType::kModify, OrderId{kOrderIdInvalid},
+                        "BTCUSDT",
                         Side::kSell, price, qty);
 
     book_->on_market_data_updated(&md);
@@ -255,9 +271,10 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
 // Delete
 TEST_F(MarketOrderBookTest, DeleteOrder) {
   {
-    const Price price = 100000.00;
-    const Qty qty = 5.0;
-    const MarketData md(MarketUpdateType::kAdd, kOrderIdInvalid, "BTCUSDT",
+    const Price price = Price{100000.00};
+    const Qty qty = Qty{5.0};
+    const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
+                        "BTCUSDT",
                         Side::kSell, price, qty);
     book_->on_market_data_updated(&md);
     const BBO* bbo = book_->get_bbo();
@@ -267,9 +284,10 @@ TEST_F(MarketOrderBookTest, DeleteOrder) {
     EXPECT_EQ(bbo->ask_qty, qty);
   }
   {
-    const Price cancel_price = 100000.00;
-    const Qty cancel_qty = kQtyInvalid;
-    const MarketData cancel_md(MarketUpdateType::kCancel, kOrderIdInvalid,
+    const Price cancel_price = Price{100000.00};
+    const Qty cancel_qty = Qty{kQtyInvalid};
+    const MarketData cancel_md(MarketUpdateType::kCancel,
+                               OrderId{kOrderIdInvalid},
                                "BTCUSDT",
                                Side::kSell, cancel_price, cancel_qty);
 

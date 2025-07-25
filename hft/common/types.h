@@ -14,63 +14,118 @@
 #define TYPES_H
 
 namespace common {
-using OrderId = uint64_t;
-constexpr auto kOrderIdInvalid = std::numeric_limits<OrderId>::max();
+struct OrderId {
+  uint64_t value{std::numeric_limits<uint64_t>::max()};
 
-inline auto orderIdToString(OrderId order_id) -> std::string {
-  if (UNLIKELY(order_id == kOrderIdInvalid)) {
-    return "INVALID";
+  explicit OrderId(uint64_t data) : value(data) {}
+
+  [[nodiscard]] bool is_valid() const {
+    return value != std::numeric_limits<uint64_t>::max();
   }
 
-  return std::to_string(order_id);
+  bool operator==(uint64_t other) const { return value == other; }
+  explicit operator uint64_t() const { return value; }
+};
+
+inline auto toString(OrderId order_id) -> std::string {
+  return UNLIKELY(!order_id.is_valid())
+             ? "INVALID"
+             : std::to_string(static_cast<uint64_t>(order_id));
 }
+
+constexpr auto kOrderIdInvalid = std::numeric_limits<uint64_t>::max();
 
 using TickerId = const std::string;
 constexpr auto kTickerIdInvalid = "";
 
-using ClientId = uint32_t;
-constexpr auto kClientIdInvalid = std::numeric_limits<ClientId>::max();
+struct ClientId {
+  uint32_t value{std::numeric_limits<uint32_t>::max()};
 
-inline auto clientIdToString(ClientId client_id) -> std::string {
-  if (UNLIKELY(client_id == kClientIdInvalid)) {
-    return "INVALID";
+  explicit ClientId(uint32_t data) : value(data) {}
+
+  [[nodiscard]] bool is_valid() const {
+    return value != std::numeric_limits<uint32_t>::max();
   }
 
-  return std::to_string(client_id);
+  bool operator==(uint32_t other) const { return value == other; }
+  explicit operator uint32_t() const { return value; }
+};
+
+inline auto toString(ClientId client_id) -> std::string {
+  return UNLIKELY(!client_id.is_valid())
+             ? "INVALID"
+             : std::to_string(static_cast<uint32_t>(client_id));
 }
 
-using Price = float;
-constexpr auto kPriceInvalid = std::numeric_limits<Price>::max();
+constexpr auto kClientIdInvalid = std::numeric_limits<uint32_t>::max();
 
-inline auto priceToString(Price price) -> std::string {
-  if (UNLIKELY(price == kPriceInvalid)) {
-    return "INVALID";
+struct Price {
+  float value{std::numeric_limits<float>::max()};
+
+  explicit Price(float data) : value(data) {}
+
+  bool operator==(float other) const { return value == other; }
+
+  bool operator!=(float other) const { return value != other; }
+  bool operator<(const Price& other) const { return value < other.value; }
+  bool operator==(const Price& other) const { return value == other.value; }
+
+  [[nodiscard]] bool isValid() const {
+    return value != std::numeric_limits<float>::max();
   }
 
-  return std::to_string(price);
+  explicit operator float() const { return value; }
+};
+
+constexpr auto kPriceInvalid = std::numeric_limits<float>::max();
+
+inline auto toString(Price price) -> std::string {
+  return price.isValid() ? std::to_string(static_cast<float>(price))
+                         : "INVALID";
 }
 
-using Qty = float;
-constexpr auto kQtyInvalid = std::numeric_limits<Qty>::max();
+struct Qty {
+  float value{std::numeric_limits<float>::max()};
 
-inline auto qtyToString(Qty qty) -> std::string {
-  if (UNLIKELY(qty == kQtyInvalid)) {
-    return "INVALID";
+  explicit Qty(float data) : value(data) {}
+
+  [[nodiscard]] bool is_valid() const {
+    return value != std::numeric_limits<float>::max();
   }
 
-  return std::to_string(qty);
+  bool operator==(float other) const { return value == other; }
+  bool operator<(const Qty& other) const { return value < other.value; }
+  bool operator==(const Qty& other) const { return value == other.value; }
+  explicit operator float() const { return value; }
+};
+
+inline auto toString(Qty qty) -> std::string {
+  return UNLIKELY(!qty.is_valid()) ? "INVALID"
+                                   : std::to_string(static_cast<float>(qty));
 }
 
-using Priority = uint64_t;
-constexpr auto kPriorityInvalid = std::numeric_limits<Priority>::max();
+constexpr auto kQtyInvalid = std::numeric_limits<float>::max();
 
-inline auto priorityToString(Priority priority) -> std::string {
-  if (UNLIKELY(priority == kPriorityInvalid)) {
-    return "INVALID";
+struct Priority {
+  uint64_t value{std::numeric_limits<uint64_t>::max()};
+
+  explicit Priority(uint64_t data) : value(data) {}
+
+  [[nodiscard]] bool is_valid() const {
+    return value != std::numeric_limits<uint64_t>::max();
   }
 
-  return std::to_string(priority);
+  bool operator==(uint64_t other) const { return value == other; }
+  explicit operator uint64_t() const { return value; }
+};
+
+inline auto toString(Priority priority) -> std::string {
+  return UNLIKELY(!priority.is_valid())
+             ? "INVALID"
+             : std::to_string(static_cast<uint64_t>(priority));
 }
+
+constexpr auto kPriorityInvalid = std::numeric_limits<uint64_t>::max();
 
 enum class Side : char {
   kInvalid = '\0',
@@ -79,7 +134,7 @@ enum class Side : char {
   kTrade = '2',
 };
 
-inline auto sideToString(const Side side) -> std::string {
+inline auto toString(const Side side) -> std::string {
   switch (side) {
     case Side::kBuy:
       return "BUY";
@@ -137,7 +192,7 @@ inline MarketUpdateType charToMarketUpdateType(const char character) {
   }
 }
 
-inline std::string marketUpdateTypeToString(MarketUpdateType type) {
+inline std::string toString(MarketUpdateType type) {
   switch (type) {
     case MarketUpdateType::kClear:
       return "CLEAR";

@@ -76,7 +76,7 @@ public:
   MarketUpdateData create_market_data_message(FIX8::Message* msg) const;
   MarketUpdateData create_snapshot_data_message(FIX8::Message* msg) const;
 
-protected:
+private:
   bool strip_to_header(std::string& buffer);
   bool peek_full_message_len(const std::string& buffer, size_t& msg_len) const;
   bool extract_next_message(std::string& buffer, std::string& msg);
@@ -88,7 +88,7 @@ protected:
   std::unique_ptr<SSLSocket> tls_sock_;
   std::map<std::string, std::function<void(FIX8::Message*)>> callbacks_;
 
-#ifdef RESPOSITORY
+#ifdef REPOSITORY
   std::function<void(const std::string&)> raw_data_callback_;
 #endif
   std::unique_ptr<common::SPSCQueue<std::string>> queue_;

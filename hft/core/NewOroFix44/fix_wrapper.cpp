@@ -217,11 +217,13 @@ MarketUpdateData Fix::create_market_data(FIX8::Message* msg) const {
             (charToSide(side->get()) == common::Side::kTrade)
               ? MarketUpdateType::kTrade
               : charToMarketUpdateType(action->get()),
-            kOrderIdInvalid,
+            OrderId{kOrderIdInvalid},
             symbol->get(),
             side->get(),
-            static_cast<float>(price->get()),
-            qty == nullptr ? kQtyInvalid : static_cast<float>(qty->get()));
+            common::Price{static_cast<float>(price->get())},
+            qty == nullptr
+              ? Qty{kQtyInvalid}
+              : Qty{static_cast<float>(qty->get())});
   }
   return MarketUpdateData(std::move(data));
 }
@@ -235,11 +237,11 @@ MarketUpdateData Fix::create_snapshot_data_message(FIX8::Message* msg) const {
   data[index++] =
       market_data_pool_->allocate(
           MarketUpdateType::kClear,
-          kOrderIdInvalid,
-          symbol->get(),
+          OrderId{kOrderIdInvalid},
+          TickerId{symbol->get()},
           common::Side::kInvalid,
-          kPriceInvalid,
-          kQtyInvalid);
+          common::Price{kPriceInvalid},
+          Qty{kQtyInvalid});
 
   for (size_t i = 0; i < entries->size(); ++i) {
     const FIX8::MessageBase* entry = entries->get_element(i);
@@ -251,11 +253,11 @@ MarketUpdateData Fix::create_snapshot_data_message(FIX8::Message* msg) const {
     data[index++] =
         market_data_pool_->allocate(
             MarketUpdateType::kAdd,
-            kOrderIdInvalid,
-            symbol->get(),
-            side->get(),
-            static_cast<float>(price->get()),
-            static_cast<float>(qty->get()));
+            OrderId{kOrderIdInvalid},
+            TickerId{symbol->get()},
+            common::Side{side->get()},
+            common::Price{static_cast<float>(price->get())},
+            Qty{static_cast<float>(qty->get())});
   }
   return MarketUpdateData(std::move(data));
 }

@@ -19,6 +19,7 @@
 
 constexpr int kQueueSize = 8;
 constexpr int kReadBufferSize = 1024;
+constexpr int kWriteThreadSleep = 100;
 
 using namespace common;
 
@@ -95,7 +96,7 @@ void FixApp<Cpu>::write_loop() {
       END_MEASURE(TLS_WRITE, logger_);
 #endif
     }
-    std::this_thread::yield();
+    std::this_thread::sleep_for(std::chrono::milliseconds(kWriteThreadSleep));
   }
 }
 
@@ -199,8 +200,8 @@ void FixApp<Cpu>::process_message(const std::string& raw_msg) {
     callbacks_[type](msg);
   }
 #ifdef REPOSITORY
-  if (raw_data_callback) {
-    raw_data_callback(raw_msg);
+  if (raw_data_callback_) {
+    raw_data_callback_(raw_msg);
   }
 #endif
   delete msg;
@@ -245,7 +246,7 @@ void FixApp<Cpu>::register_callback(
 template <int Cpu>
 void FixApp<Cpu>::register_callback(
     std::function<void(const std::string&)> cb) {
-  raw_data_callback = std::move(cb);
+  raw_data_callback_ = std::move(cb);
 }
 #endif
 

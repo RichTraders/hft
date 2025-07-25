@@ -19,6 +19,7 @@
 
 #include "gtest/gtest.h"
 using namespace core;
+using namespace common;
 using namespace FIX8::NewOroFix44;
 
 class FixTest : public ::testing::Test {

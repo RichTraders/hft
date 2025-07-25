@@ -17,16 +17,15 @@
 
 struct MarketData {
   common::MarketUpdateType type = common::MarketUpdateType::kInvalid;
-  common::OrderId order_id = common::kOrderIdInvalid;
+  common::OrderId order_id = common::OrderId{common::kOrderIdInvalid};
   common::TickerId ticker_id = common::kTickerIdInvalid;
   common::Side side = common::Side::kInvalid;
-  common::Price price = common::kPriceInvalid;
-  common::Qty qty = common::kQtyInvalid;
+  common::Price price = common::Price{common::kPriceInvalid};
+  common::Qty qty = common::Qty{common::kQtyInvalid};
 
   //For MemoryPool allocation
   MarketData() = default;
 
-  // NOLINTBEGIN(bugprone-easily-swappable-parameters)
   MarketData(const char _type, const common::OrderId _order_id,
              common::TickerId& _ticker_id, const char _side,
              const common::Price _price,
@@ -58,17 +57,14 @@ struct MarketData {
         side(common::charToSide(side)),
         price(price),
         qty(qty) {}
-  // NOLINTEND(bugprone-easily-swappable-parameters)
 
   [[nodiscard]] auto toString() const noexcept {
     std::stringstream stream;
-    stream << "MarketUpdate" << " ["
-           << " type:" << common::marketUpdateTypeToString(type)
-           << " ticker:" << ticker_id
-           << " oid:" << common::orderIdToString(order_id)
-           << " side:" << common::sideToString(side)
-           << " qty:" << common::qtyToString(qty)
-           << " price:" << common::priceToString(price) << "]";
+    stream << "MarketUpdate" << " [" << " type:" << common::toString(type)
+           << " ticker:" << ticker_id << " oid:" << common::toString(order_id)
+           << " side:" << common::toString(side)
+           << " qty:" << common::toString(qty)
+           << " price:" << common::toString(price) << "]";
     return stream.str();
   }
 };

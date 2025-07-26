@@ -96,8 +96,21 @@ class MarketOrderBook final {
   }
 
   [[nodiscard]] auto get_bbo() noexcept -> const BBO*;
-  static void on_trade_update(MarketData* market_data);
   [[nodiscard]] std::string print_active_levels(bool is_bid) const;
+
+  // is_bid=true => Price iterate direction High->Low, false => Price iterate direction Low->High
+  [[nodiscard]] int next_active_idx(const bool is_bid,
+                                    const int start_idx) const noexcept {
+    return is_bid ? next_active_bid(start_idx) : next_active_ask(start_idx);
+  }
+
+  [[nodiscard]] int next_active_bid(int start_idx) const noexcept;
+  [[nodiscard]] int next_active_ask(int start_idx) const noexcept;
+  [[nodiscard]] std::vector<int> peek_levels(bool is_bid, int level) const;
+  [[nodiscard]] static int find_in_bucket(const Bucket* bucket,
+                                          bool highest) noexcept;
+
+  static void on_trade_update(MarketData* market_data);
 
   MarketOrderBook() = delete;
   MarketOrderBook(const MarketOrderBook&) = delete;

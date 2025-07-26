@@ -53,7 +53,7 @@ MarketOrderBook::~MarketOrderBook() {
   logger_ = nullptr;
 }
 
-void MarketOrderBook::update_bid(int idx, common::Qty qty) {
+void MarketOrderBook::update_bid(int idx, Qty qty) {
   const int bucket_idx = idx / kBucketSize;
   const int off = idx & (kBucketSize - 1);
 
@@ -87,7 +87,7 @@ void MarketOrderBook::update_bid(int idx, common::Qty qty) {
   }
 }
 
-void MarketOrderBook::update_ask(int idx, common::Qty qty) {
+void MarketOrderBook::update_ask(const int idx, const Qty qty) {
   const int bidx = idx / kBucketSize;
   const int off = idx & (kBucketSize - 1);
 
@@ -335,5 +335,144 @@ std::string MarketOrderBook::print_active_levels(bool is_bid) const {
   }
 
   return stream.str();
+}
+
+int MarketOrderBook::next_active_bid(const int start_idx) const noexcept {
+  const auto& summary_bitmap = bidSummary_;
+  const auto& buckets = bidBuckets_;
+
+  const int bucket_index = start_idx / kBucketSize;
+  const int level_offset = start_idx & (kBucketSize - 1);
+
+  if (const Bucket* bucket = buckets[bucket_index]) {
+    const int word_index = level_offset >> kWordShift;
+    const int bit_offset = level_offset & kWordMask;
+
+    const uint64_t mask = (bit_offset == 0 ? 0ULL : (1ULL << bit_offset) - 1);
+    if (const uint64_t word = bucket->bitmap[word_index] & mask) {
+      const int bit_index = kWordMask - __builtin_clzll(word);
+      return bucket_index * kBucketSize +
+             (word_index * kBitsPerWord + bit_index);
+    }
+
+    for (int wi = word_index - 1; wi >= 0; --wi) {
+      if (const uint64_t word = bucket->bitmap[wi]) {
+        const int bit_index = kWordMask - __builtin_clzll(word);
+        return bucket_index * kBucketSize + (wi * kBitsPerWord + bit_index);
+      }
+    }
+  }
+
+  const int summary_word_index = bucket_index >> kWordShift;
+  const int summary_bit_offset = bucket_index & kWordMask;
+  const uint64_t sb_word =
+      summary_bitmap[summary_word_index] &
+      (summary_bit_offset == 0 ? 0ULL : ((1ULL << summary_bit_offset) - 1));
+  if (sb_word) {
+    const int bit = kWordMask - __builtin_clzll(sb_word);
+    const int next_bucket_index = (summary_word_index << kWordShift) + bit;
+    const int off_in_bucket =
+        find_in_bucket(buckets[next_bucket_index], /*highest=*/true);
+    return next_bucket_index * kBucketSize + off_in_bucket;
+  }
+
+  for (int swi = summary_word_index - 1; swi >= 0; --swi) {
+    if (const uint64_t summary_word = summary_bitmap[swi]) {
+      const int bit = kWordMask - __builtin_clzll(summary_word);
+      const int next_bucket_index = (swi << kWordShift) + bit;
+      const int off_in_bucket =
+          find_in_bucket(buckets[next_bucket_index], /*highest=*/true);
+      return next_bucket_index * kBucketSize + off_in_bucket;
+    }
+  }
+
+  return -1;
+}
+
+int MarketOrderBook::next_active_ask(const int start_idx) const noexcept {
+  const auto& summary_bitmap = askSummary_;
+  const auto& buckets = askBuckets_;
+
+  const int bucket_index = start_idx / kBucketSize;
+  const int level_offset = start_idx & (kBucketSize - 1);
+
+  if (const Bucket* bucket = buckets[bucket_index]) {
+    const int word_index = level_offset >> kWordShift;
+    const int bit_offset = level_offset & kWordMask;
+    const uint64_t mask =
+        (bit_offset == kWordMask ? 0ULL : ~((1ULL << (bit_offset + 1)) - 1));
+    if (const uint64_t word = bucket->bitmap[word_index] & mask) {
+      const int bit_index = __builtin_ctzll(word);
+      return bucket_index * kBucketSize +
+             (word_index * kBitsPerWord + bit_index);
+    }
+
+    for (int iter = word_index + 1; iter < kBucketBitmapWords; ++iter) {
+      if (const uint64_t word = bucket->bitmap[iter]) {
+        const int bit_index = __builtin_ctzll(word);
+        return bucket_index * kBucketSize + (iter * kBitsPerWord + bit_index);
+      }
+    }
+  }
+
+  const int summary_word_index = bucket_index >> kWordShift;
+  const int summary_bit_offset = bucket_index & kWordMask;
+  const uint64_t sb_word = summary_bitmap[summary_word_index] &
+                           (summary_bit_offset == kWordMask
+                                ? 0ULL
+                                : ~((1ULL << (summary_bit_offset + 1)) - 1));
+  if (sb_word) {
+    const int bit = __builtin_ctzll(sb_word);
+    const int next_bucket_index = (summary_word_index << kWordShift) + bit;
+    const int off_in_bucket =
+        find_in_bucket(buckets[next_bucket_index], /*highest=*/false);
+    return next_bucket_index * kBucketSize + off_in_bucket;
+  }
+
+  for (int iter = summary_word_index + 1; iter < kSummaryWords; ++iter) {
+    if (const uint64_t summary_word = summary_bitmap[iter]) {
+      const int bit = __builtin_ctzll(summary_word);
+      const int next_bucket_index = (iter << kWordShift) + bit;
+      const int off_in_bucket =
+          find_in_bucket(buckets[next_bucket_index], /*highest=*/false);
+      return next_bucket_index * kBucketSize + off_in_bucket;
+    }
+  }
+
+  return -1;
+}
+
+std::vector<int> MarketOrderBook::peek_levels(const bool is_bid,
+                                              const int level) const {
+  std::vector<int> output;
+  int idx = is_bid ? best_bid_idx() : best_ask_idx();
+  while (idx >= 0 && output.size() < static_cast<size_t>(level)) {
+    idx = next_active_idx(is_bid, idx);
+    if (idx >= 0)
+      output.push_back(idx);
+  }
+  return output;
+}
+
+// highest=true  => 버킷 내에서 가장 큰(High‑우선) 레벨 오프셋
+// highest=false => 버킷 내에서 가장 작은(Low‑우선) 레벨 오프셋
+int MarketOrderBook::find_in_bucket(const Bucket* bucket,
+                                    const bool highest) noexcept {
+  if (highest) {
+    for (int iter = kBucketBitmapWords - 1; iter >= 0; --iter) {
+      if (const uint64_t word = bucket->bitmap[iter]) {
+        const int bit = kWordMask - __builtin_clzll(word);
+        return iter * kBitsPerWord + bit;
+      }
+    }
+  } else {
+    for (int iter = 0; iter < kBucketBitmapWords; ++iter) {
+      if (const uint64_t word = bucket->bitmap[iter]) {
+        const int bit = __builtin_ctzll(word);
+        return iter * kBitsPerWord + bit;
+      }
+    }
+  }
+  return -1;
 }
 }  // namespace trading

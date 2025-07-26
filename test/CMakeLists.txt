@@ -27,7 +27,7 @@ add_definitions(-DGOOGLEMOCK_INCLUDE_GMOCK_INTERNAL_GMOCK_GENERATED_FUNCTION_MOC
 add_unit_test(spsc)
 add_unit_test(thread)
 add_unit_test(fix_app)
-add_unit_test(fix_wrapper)
+add_unit_test(fix_md_core)
 add_unit_test(logger)
 add_unit_test(mpsc)
 add_unit_test(memory_pool)

@@ -11,23 +11,23 @@
  */
 
 
-#include "fix_wrapper.h"
+#include "fix_md_core.h"
 #include <fix8/f8includes.hpp>
-#include "NewOroFix44_types.hpp"
-#include "NewOroFix44_router.hpp"
-#include "NewOroFix44_classes.hpp"
+#include "NewOroFix44MD_types.hpp"
+#include "NewOroFix44MD_router.hpp"
+#include "NewOroFix44MD_classes.hpp"
 
 #include "gtest/gtest.h"
 using namespace core;
-using namespace FIX8::NewOroFix44;
+using namespace FIX8::NewOroFix44MD;
 
 class FixTest : public ::testing::Test {
 protected:
   void SetUp() override {
-    fix = std::make_unique<Fix>("SENDER", "TARGET");
+    fix = std::make_unique<FixMdCore>("SENDER", "TARGET");
   }
 
-  std::unique_ptr<Fix> fix;
+  std::unique_ptr<FixMdCore> fix;
 };
 
 TEST_F(FixTest, CreateLogOnMessageProducesValidFixMessage) {
@@ -108,9 +108,9 @@ TEST_F(FixTest, CreateHeartbeatMessage_ContainsCorrectFields) {
 }
 
 TEST_F(FixTest, CreateSubscriptionMessage_ContainsCorrectFields) {
-  Fix::RequestId req_id = "REQ-123";
-  Fix::MarketDepthLevel depth = "1";
-  Fix::SymbolId symbol = "BTCUSD";
+  FixMdCore::RequestId req_id = "REQ-123";
+  FixMdCore::MarketDepthLevel depth = "1";
+  FixMdCore::SymbolId symbol = "BTCUSD";
 
   std::string msg_str = fix->create_market_data_subscription_message(
       req_id, depth, symbol);

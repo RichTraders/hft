@@ -25,7 +25,7 @@ class SPSCQueue;
 }
 
 namespace core {
-class Fix;
+class FixMdCore;
 class SSLSocket;
 
 template <int Cpu = 1>
@@ -71,7 +71,7 @@ protected:
   bool extract_next_message(std::string& buffer, std::string& msg);
   void process_message(const std::string& raw_msg);
 
-  std::unique_ptr<Fix> fix_;
+  std::unique_ptr<FixMdCore> fix_;
   std::unique_ptr<SSLSocket> tls_sock_;
   std::map<std::string, std::function<void(FIX8::Message*)>> callbacks_;
   std::function<void(const std::string&)> raw_data_callback;

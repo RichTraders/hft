@@ -11,10 +11,10 @@
  */
 
 #include "fix_app.h"
-#include "ssl_socket.h"
-#include "fix_wrapper.h"
-#include "common/spsc_queue.h"
 #include <fix8/f8includes.hpp>
+#include "common/spsc_queue.h"
+#include "fix_md_core.h"
+#include "ssl_socket.h"
 
 #include "performance.h"
 
@@ -25,12 +25,12 @@ namespace core {
 template <int Cpu>
 FixApp<Cpu>::FixApp(const std::string& address, const int port,
                     const std::string& sender_comp_id,
-                    const std::string& target_comp_id):
-  fix_(std::make_unique<Fix>(sender_comp_id, target_comp_id)),
-  tls_sock_(std::make_unique<SSLSocket>(address, port)),
-  queue_(std::make_unique<common::SPSCQueue<std::string>>(SPSCQueueSize)),
-  sender_id_(sender_comp_id),
-  target_id_(target_comp_id) {
+                    const std::string& target_comp_id)
+    : fix_(std::make_unique<FixMdCore>(sender_comp_id, target_comp_id)),
+      tls_sock_(std::make_unique<SSLSocket>(address, port)),
+      queue_(std::make_unique<common::SPSCQueue<std::string>>(SPSCQueueSize)),
+      sender_id_(sender_comp_id),
+      target_id_(target_comp_id) {
 
   write_thread_.start(&FixApp::write_loop, this);
   read_thread_.start(&FixApp::read_loop, this);
@@ -78,8 +78,8 @@ void FixApp<Cpu>::write_loop() {
 #ifdef DEBUG
       START_MEASURE(TLS_WRITE);
 #endif
-      ssize_t result = tls_sock_->write(msg.data(),
-                                        static_cast<int>(msg.size()));
+      ssize_t result =
+          tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
       if (result < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
           queue_->enqueue(msg);
@@ -99,9 +99,7 @@ void FixApp<Cpu>::write_loop() {
 
 template <int Cpu>
 std::string FixApp<Cpu>::create_log_on_message(
-    const std::string& sig_b64,
-    const std::string& timestamp)
-const {
+    const std::string& sig_b64, const std::string& timestamp) const {
   return fix_->create_log_on_message(sig_b64, timestamp);
 }
 
@@ -111,23 +109,21 @@ std::string FixApp<Cpu>::create_log_out_message() const {
 }
 
 template <int Cpu>
-std::string FixApp<
-  Cpu>::create_heartbeat_message(FIX8::Message* message) const {
+std::string FixApp<Cpu>::create_heartbeat_message(
+    FIX8::Message* message) const {
   return fix_->create_heartbeat_message(message);
 }
 
 template <int Cpu>
 std::string FixApp<Cpu>::create_subscription_message(
-    const RequestId& request_id,
-    const MarketDepthLevel& level,
+    const RequestId& request_id, const MarketDepthLevel& level,
     const SymbolId& symbol) const {
-  return fix_->create_market_data_subscription_message(
-      request_id, level, symbol);
+  return fix_->create_market_data_subscription_message(request_id, level,
+                                                       symbol);
 }
 
 template <int Cpu>
-void FixApp<Cpu>::encode(std::string& data,
-                         FIX8::Message* msg) const {
+void FixApp<Cpu>::encode(std::string& data, FIX8::Message* msg) const {
   return fix_->encode(data, msg);
 }
 
@@ -148,7 +144,7 @@ bool FixApp<Cpu>::strip_to_header(std::string& buffer) {
 template <int Cpu>
 bool FixApp<Cpu>::peek_full_message_len(const std::string& buffer,
                                         size_t& msg_len) const {
-  constexpr size_t kBegin = 0; // strip_to_header() 후라면 항상 0
+  constexpr size_t kBegin = 0;  // strip_to_header() 후라면 항상 0
   const size_t body_start = buffer.find("9=", kBegin);
   if (body_start == std::string::npos)
     return false;
@@ -157,16 +153,15 @@ bool FixApp<Cpu>::peek_full_message_len(const std::string& buffer,
   if (body_end == std::string::npos)
     return false;
 
-  int body_len = std::stoi(
-      buffer.substr(body_start + 2, body_end - (body_start + 2)));
+  int body_len =
+      std::stoi(buffer.substr(body_start + 2, body_end - (body_start + 2)));
   const size_t header_len = (body_end + 1) - kBegin;
-  msg_len = header_len + body_len + 7; // 7 = "10=" + 3bytes + SOH
+  msg_len = header_len + body_len + 7;  // 7 = "10=" + 3bytes + SOH
   return buffer.size() >= msg_len;
 }
 
 template <int Cpu>
-bool FixApp<Cpu>::extract_next_message(std::string& buffer,
-                                       std::string& msg) {
+bool FixApp<Cpu>::extract_next_message(std::string& buffer, std::string& msg) {
   if (!strip_to_header(buffer))
     return false;
 
@@ -229,12 +224,12 @@ void FixApp<Cpu>::register_callback(MsgType type,
 }
 
 template <int Cpu>
-void FixApp<
-  Cpu>::register_callback(std::function<void(const std::string&)> cb) {
+void FixApp<Cpu>::register_callback(
+    std::function<void(const std::string&)> cb) {
   raw_data_callback = std::move(cb);
 }
 
 template class FixApp<1>;
 template class FixApp<2>;
 template class FixApp<3>;
-}
+}  // namespace core

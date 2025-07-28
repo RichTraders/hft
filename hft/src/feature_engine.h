@@ -24,6 +24,7 @@ namespace common {
 class Logger;
 }
 
+namespace trading {
 class FeatureEngine {
  public:
   explicit FeatureEngine(common::Logger* logger) : logger_(logger) {}
@@ -54,5 +55,6 @@ class FeatureEngine {
   double mkt_price_ = common::kPriceInvalid;
   double agg_trade_qty_ratio_ = common::kQtyInvalid;
 };
+}  // namespace trading
 
 #endif  //FEATURE_ENGIN_H

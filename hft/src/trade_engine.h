@@ -21,9 +21,9 @@
 
 #include "order_book.h"
 
+namespace trading {
 class FeatureEngine;
 
-namespace trading {
 class TradeEngine {
  public:
   explicit TradeEngine(

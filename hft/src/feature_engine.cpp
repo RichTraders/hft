@@ -19,6 +19,7 @@ using common::Price;
 using common::Side;
 using common::TickerId;
 
+namespace trading {
 void FeatureEngine::on_trade_updated(const MarketData* market_update,
                                      trading::MarketOrderBook* book) noexcept {
   const auto* bbo = book->get_bbo();
@@ -50,3 +51,4 @@ void FeatureEngine::on_order_book_updated(
                             common::toString(price), common::toString(side),
                             mkt_price_, agg_trade_qty_ratio_));
 }
+}  // namespace trading

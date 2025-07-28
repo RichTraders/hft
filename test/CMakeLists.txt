@@ -17,7 +17,7 @@ macro(add_unit_test _TEST_NAME)
     target_precompile_headers(${_TEST_NAME}_tests PRIVATE
             ${CMAKE_SOURCE_DIR}/include/pch.h
             ${CMAKE_SOURCE_DIR}/hft/hft_lib.h)
-    add_test(NAME rc_${_TEST_NAME}_tests COMMAND ${_TEST_NAME}_tests WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+    add_test(NAME ${_TEST_NAME}_tests COMMAND ${_TEST_NAME}_tests WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
     target_compile_definitions(${_TEST_NAME}_tests PRIVATE UNIT_TEST)
     target_compile_options(${_TEST_NAME}_tests PRIVATE -Wno-missing-field-initializers -Wno-error=unused-parameter)
 endmacro()
@@ -31,6 +31,7 @@ add_unit_test(fix_md_core)
 add_unit_test(logger)
 add_unit_test(mpsc)
 add_unit_test(memory_pool)
+add_unit_test(order_book)
 
 file(GLOB TEST_EXECUTABLES "${CMAKE_BINARY_DIR}/tests/*_tests")
 

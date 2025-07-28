@@ -14,6 +14,7 @@
 #define PCH_H
 
 #include <algorithm>
+#include <cassert>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>

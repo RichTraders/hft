@@ -12,6 +12,9 @@
 
 #ifndef MARKET_CONSUMER_H
 #define MARKET_CONSUMER_H
+#include "logger.h"
+#include "market_data.h"
+#include "memory_pool.hpp"
 
 namespace core {
 template <int>
@@ -22,22 +25,30 @@ namespace FIX8 {  // NOLINT(readability-identifier-naming)
 class Message;
 }
 
+namespace trading {
 class TradeEngine;
 
 class MarketConsumer {
  public:
-  MarketConsumer();
+  MarketConsumer(common::Logger* logger, TradeEngine* trade_engine,
+                 common::MemoryPool<MarketUpdateData>* market_update_data_pool,
+                 common::MemoryPool<MarketData>* market_data_pool);
   ~MarketConsumer();
 
-  void on_login(FIX8::Message*);
-  void on_subscribe(FIX8::Message* msg);
-  void on_reject(FIX8::Message*);
-  void on_logout(FIX8::Message*);
-  void on_heartbeat(FIX8::Message* msg);
+  void on_login(FIX8::Message*) const;
+  void on_snapshot(FIX8::Message* msg) const;
+  void on_subscribe(FIX8::Message* msg) const;
+  void on_reject(FIX8::Message*) const;
+  void on_logout(FIX8::Message*) const;
+  void on_heartbeat(FIX8::Message* msg) const;
 
  private:
+  common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
+  common::MemoryPool<MarketData>* market_data_pool_;
+  common::Logger* logger_;
+  TradeEngine* trade_engine_;
   std::unique_ptr<core::FixApp<1>> app_;
-  std::unique_ptr<TradeEngine> trade_engine_;
 };
+}  // namespace trading
 
 #endif  //MARKET_CONSUMER_H

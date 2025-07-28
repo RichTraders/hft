@@ -11,29 +11,28 @@
  */
 
 
-#include "fix_wrapper.h"
+#include "fix_md_core.h"
 #include <fix8/f8includes.hpp>
-#include "NewOroFix44_types.hpp"
-#include "NewOroFix44_router.hpp"
-#include "NewOroFix44_classes.hpp"
+#include "NewOroFix44MD_types.hpp"
+#include "NewOroFix44MD_router.hpp"
+#include "NewOroFix44MD_classes.hpp"
 
 #include "gtest/gtest.h"
 using namespace core;
-using namespace common;
-using namespace FIX8::NewOroFix44;
+using namespace FIX8::NewOroFix44MD;
 
 class FixTest : public ::testing::Test {
 protected:
   void SetUp() override {
-    logger = std::make_unique<Logger>();
-    memory_pool = std::make_unique<MemoryPool<MarketData>>(1024);
-    fix = std::make_unique<Fix>("SENDER", "TARGET", logger.get(),
-                                memory_pool.get());
+    logger_ = std::make_unique<common::Logger>();
+    pool_ = std::make_unique<common::MemoryPool<MarketData>>(1024);
+    fix = std::make_unique<FixMdCore>("SENDER", "TARGET", logger_.get(),
+                                      pool_.get());
   }
 
-  std::unique_ptr<Fix> fix;
-  std::unique_ptr<Logger> logger;
-  std::unique_ptr<MemoryPool<MarketData>> memory_pool;
+  std::unique_ptr<FixMdCore> fix;
+  std::unique_ptr<common::Logger> logger_;
+  std::unique_ptr<common::MemoryPool<MarketData>> pool_;
 };
 
 TEST_F(FixTest, CreateLogOnMessageProducesValidFixMessage) {
@@ -114,9 +113,9 @@ TEST_F(FixTest, CreateHeartbeatMessage_ContainsCorrectFields) {
 }
 
 TEST_F(FixTest, CreateSubscriptionMessage_ContainsCorrectFields) {
-  Fix::RequestId const req_id = "REQ-123";
-  Fix::MarketDepthLevel const depth = "1";
-  Fix::SymbolId const symbol = "BTCUSD";
+  FixMdCore::RequestId req_id = "REQ-123";
+  FixMdCore::MarketDepthLevel depth = "1";
+  FixMdCore::SymbolId symbol = "BTCUSD";
 
   std::string const msg_str = fix->create_market_data_subscription_message(
       req_id, depth, symbol);

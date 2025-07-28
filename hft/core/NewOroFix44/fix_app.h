@@ -30,7 +30,7 @@ class MemoryPool;
 }
 
 namespace core {
-class Fix;
+class FixMdCore;
 class SSLSocket;
 
 template <int Cpu = 1>
@@ -84,7 +84,7 @@ private:
 
   common::MemoryPool<MarketData>* market_data_pool_;
   common::Logger* logger_;
-  std::unique_ptr<Fix> fix_;
+  std::unique_ptr<FixMdCore> fix_;
   std::unique_ptr<SSLSocket> tls_sock_;
   std::map<std::string, std::function<void(FIX8::Message*)>> callbacks_;
 

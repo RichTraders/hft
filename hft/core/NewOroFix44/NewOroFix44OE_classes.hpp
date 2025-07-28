@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-17 17:44:16 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-07-26 15:49:19 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -49,51 +49,51 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 //-------------------------------------------------------------------------------------------------
 #include <fix8/f8config.h>
 #if defined FIX8_MAGIC_NUM && FIX8_MAGIC_NUM > 16793603L
-#error NewOroFix44_classes.hpp version 1.4.3 is out of date. Please regenerate with f8c.
+#error NewOroFix44OE_classes.hpp version 1.4.3 is out of date. Please regenerate with f8c.
 #endif
 //-------------------------------------------------------------------------------------------------
-// NewOroFix44_classes.hpp
+// NewOroFix44OE_classes.hpp
 //-------------------------------------------------------------------------------------------------
-#ifndef FIX8_4E65774F726F46697834345F636C61737365732E687070_
-#define FIX8_4E65774F726F46697834345F636C61737365732E687070_
+#ifndef FIX8_4E65774F726F46697834344F455F636C61737365732E687070_
+#define FIX8_4E65774F726F46697834344F455F636C61737365732E687070_
 
-#if defined(_MSC_VER) && defined(F8_NewOroFix44_API_SHARED)
-    #if defined(BUILD_F8_NewOroFix44_API)
-        #define F8_NewOroFix44_API __declspec(dllexport)
+#if defined(_MSC_VER) && defined(F8_NewOroFix44OE_API_SHARED)
+    #if defined(BUILD_F8_NewOroFix44OE_API)
+        #define F8_NewOroFix44OE_API __declspec(dllexport)
     #else
-        #define F8_NewOroFix44_API __declspec(dllimport)
+        #define F8_NewOroFix44OE_API __declspec(dllimport)
     #endif
 #else
-    #define F8_NewOroFix44_API
+    #define F8_NewOroFix44OE_API
 #endif
 namespace FIX8 {
 
 extern "C"
 {
-   F8_NewOroFix44_API const F8MetaCntx& NewOroFix44_ctx();
+   F8_NewOroFix44OE_API const F8MetaCntx& NewOroFix44OE_ctx();
 }
 
-namespace NewOroFix44 {
+namespace NewOroFix44OE {
 
 //-------------------------------------------------------------------------------------------------
-using NewOroFix44_BaseMsgEntry = MsgTable;
+using NewOroFix44OE_BaseMsgEntry = MsgTable;
 /// Compiler generated metadata object, accessed through this function.
-F8_NewOroFix44_API const F8MetaCntx& ctx();
-class NewOroFix44_Router;
+F8_NewOroFix44OE_API const F8MetaCntx& ctx();
+class NewOroFix44OE_Router;
 
 //-------------------------------------------------------------------------------------------------
 /// Heartbeat (0), admin, 1 field, 0 groups.
 class Heartbeat : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 1;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 1;
 
 public:
    explicit Heartbeat(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~Heartbeat() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
    bool is_admin() const { return true; }
 
    static const MsgType& get_msgtype() { return _msgtype; }
@@ -103,15 +103,15 @@ public:
 /// TestRequest (1), admin, 1 field, 0 groups.
 class TestRequest : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 1;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 1;
 
 public:
    explicit TestRequest(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~TestRequest() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
    bool is_admin() const { return true; }
 
    static const MsgType& get_msgtype() { return _msgtype; }
@@ -121,15 +121,15 @@ public:
 /// Reject (3), admin, 6 fields, 0 groups.
 class Reject : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 6;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 6;
 
 public:
    explicit Reject(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~Reject() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
    bool is_admin() const { return true; }
 
    static const MsgType& get_msgtype() { return _msgtype; }
@@ -139,15 +139,15 @@ public:
 /// Logout (5), admin, 1 field, 0 groups.
 class Logout : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 1;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 1;
 
 public:
    explicit Logout(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~Logout() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
    bool is_admin() const { return true; }
 
    static const MsgType& get_msgtype() { return _msgtype; }
@@ -157,10 +157,10 @@ public:
 /// ExecutionReport (8), application, 53 fields, 1 group.
 class ExecutionReport : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 53;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 53;
 
 public:
    explicit ExecutionReport(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha)
@@ -169,7 +169,7 @@ public:
          _groups.insert({136, new NoMiscFees });
    }
    ~ExecutionReport() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
    GroupBase *create_nested_group(unsigned short fnum) const
@@ -179,9 +179,9 @@ public:
    // ExecutionReport::NoMiscFees
    class NoMiscFees : public GroupBase // depth: 1
    {
-      static F8_NewOroFix44_API const FieldTrait _traits[];
-      static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha;
-      static F8_NewOroFix44_API const MsgType _msgtype;
+      static F8_NewOroFix44OE_API const FieldTrait _traits[];
+      static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha;
+      static F8_NewOroFix44OE_API const MsgType _msgtype;
       static const unsigned _fieldcnt = 3;
 
    public:
@@ -199,15 +199,15 @@ public:
 /// OrderCancelReject (9), application, 10 fields, 0 groups.
 class OrderCancelReject : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 10;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 10;
 
 public:
    explicit OrderCancelReject(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~OrderCancelReject() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
 };
@@ -216,15 +216,15 @@ public:
 /// Logon (A), admin, 10 fields, 0 groups.
 class Logon : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 10;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 10;
 
 public:
    explicit Logon(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~Logon() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
    bool is_admin() const { return true; }
 
    static const MsgType& get_msgtype() { return _msgtype; }
@@ -234,15 +234,15 @@ public:
 /// News (B), application, 1 field, 0 groups.
 class News : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 1;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 1;
 
 public:
    explicit News(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~News() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
 };
@@ -251,15 +251,15 @@ public:
 /// NewOrderSingle (D), application, 20 fields, 0 groups.
 class NewOrderSingle : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 20;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 20;
 
 public:
    explicit NewOrderSingle(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~NewOrderSingle() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
 };
@@ -268,10 +268,10 @@ public:
 /// NewOrderList (E), application, 3 fields, 1 group.
 class NewOrderList : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 3;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 3;
 
 public:
    explicit NewOrderList(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha)
@@ -280,7 +280,7 @@ public:
          _groups.insert({73, new NoOrders });
    }
    ~NewOrderList() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
    GroupBase *create_nested_group(unsigned short fnum) const
@@ -290,9 +290,9 @@ public:
    // NewOrderList::NoOrders
    class NoOrders : public GroupBase // depth: 1
    {
-      static F8_NewOroFix44_API const FieldTrait _traits[];
-      static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha;
-      static F8_NewOroFix44_API const MsgType _msgtype;
+      static F8_NewOroFix44OE_API const FieldTrait _traits[];
+      static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha;
+      static F8_NewOroFix44OE_API const MsgType _msgtype;
       static const unsigned _fieldcnt = 20;
 
    public:
@@ -317,9 +317,9 @@ public:
       // NewOrderList::NoOrders::NoListTriggeringInstructions
       class NoListTriggeringInstructions : public GroupBase // depth: 2
       {
-         static F8_NewOroFix44_API const FieldTrait *_traits;
-         static F8_NewOroFix44_API const FieldTrait_Hash_Array& _ftha;
-         static F8_NewOroFix44_API const MsgType& _msgtype;
+         static F8_NewOroFix44OE_API const FieldTrait *_traits;
+         static F8_NewOroFix44OE_API const FieldTrait_Hash_Array& _ftha;
+         static F8_NewOroFix44OE_API const MsgType& _msgtype;
          static const unsigned _fieldcnt = 3;
 
       public:
@@ -338,15 +338,15 @@ public:
 /// OrderCancelRequest (F), application, 7 fields, 0 groups.
 class OrderCancelRequest : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 7;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 7;
 
 public:
    explicit OrderCancelRequest(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~OrderCancelRequest() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
 };
@@ -355,10 +355,10 @@ public:
 /// ListStatus (N), application, 10 fields, 1 group.
 class ListStatus : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 10;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 10;
 
 public:
    explicit ListStatus(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha)
@@ -367,7 +367,7 @@ public:
          _groups.insert({73, new NoOrders });
    }
    ~ListStatus() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
    GroupBase *create_nested_group(unsigned short fnum) const
@@ -377,9 +377,9 @@ public:
    // ListStatus::NoOrders
    class NoOrders : public GroupBase // depth: 1
    {
-      static F8_NewOroFix44_API const FieldTrait _traits[];
-      static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha;
-      static F8_NewOroFix44_API const MsgType _msgtype;
+      static F8_NewOroFix44OE_API const FieldTrait _traits[];
+      static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha;
+      static F8_NewOroFix44OE_API const MsgType _msgtype;
       static const unsigned _fieldcnt = 7;
 
    public:
@@ -404,9 +404,9 @@ public:
       // ListStatus::NoOrders::NoListTriggeringInstructions
       class NoListTriggeringInstructions : public GroupBase // depth: 2
       {
-         static F8_NewOroFix44_API const FieldTrait *_traits;
-         static F8_NewOroFix44_API const FieldTrait_Hash_Array& _ftha;
-         static F8_NewOroFix44_API const MsgType& _msgtype;
+         static F8_NewOroFix44OE_API const FieldTrait *_traits;
+         static F8_NewOroFix44OE_API const FieldTrait_Hash_Array& _ftha;
+         static F8_NewOroFix44OE_API const MsgType& _msgtype;
          static const unsigned _fieldcnt = 3;
 
       public:
@@ -422,173 +422,18 @@ public:
 };
 
 //-------------------------------------------------------------------------------------------------
-/// MarketDataRequest (V), application, 6 fields, 2 groups.
-class MarketDataRequest : public Message
-{
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 6;
-
-public:
-   explicit MarketDataRequest(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha)
-   {
-      if (deepctor)
-         _groups.insert({
-            { 146, new NoRelatedSym },
-            { 267, new NoMDEntryTypes },
-         });
-   }
-   ~MarketDataRequest() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
-
-   static const MsgType& get_msgtype() { return _msgtype; }
-   GroupBase *create_nested_group(unsigned short fnum) const
-   {
-      switch(fnum)
-      {
-      case 146: return new NoRelatedSym;
-      case 267: return new NoMDEntryTypes;
-      default: return nullptr;
-      }
-   }
-
-   /// NoRelatedSym (146), application, 1 field, 0 groups, is unique, hash: 0x80001836
-   // MarketDataRequest::NoRelatedSym
-   class NoRelatedSym : public GroupBase // depth: 1
-   {
-      static F8_NewOroFix44_API const FieldTrait _traits[];
-      static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha;
-      static F8_NewOroFix44_API const MsgType _msgtype;
-      static const unsigned _fieldcnt = 1;
-
-   public:
-      enum { _fnum = 146 };
-
-      NoRelatedSym() : GroupBase(_fnum) {}
-      ~NoRelatedSym() = default;
-      MessageBase *create_group(bool) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
-
-      static const MsgType& get_msgtype() { return _msgtype; }
-   };
-
-   /// NoMDEntryTypes (267), application, 1 field, 0 groups, is unique, hash: 0x8000190c
-   // MarketDataRequest::NoMDEntryTypes
-   class NoMDEntryTypes : public GroupBase // depth: 1
-   {
-      static F8_NewOroFix44_API const FieldTrait _traits[];
-      static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha;
-      static F8_NewOroFix44_API const MsgType _msgtype;
-      static const unsigned _fieldcnt = 1;
-
-   public:
-      enum { _fnum = 267 };
-
-      NoMDEntryTypes() : GroupBase(_fnum) {}
-      ~NoMDEntryTypes() = default;
-      MessageBase *create_group(bool) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
-
-      static const MsgType& get_msgtype() { return _msgtype; }
-   };
-};
-
-//-------------------------------------------------------------------------------------------------
-/// MarketDataSnapshot (W), application, 4 fields, 1 group.
-class MarketDataSnapshot : public Message
-{
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 4;
-
-public:
-   explicit MarketDataSnapshot(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha)
-   {
-      if (deepctor)
-         _groups.insert({268, new NoMDEntries });
-   }
-   ~MarketDataSnapshot() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
-
-   static const MsgType& get_msgtype() { return _msgtype; }
-   GroupBase *create_nested_group(unsigned short fnum) const
-      { return fnum == 268 ? new NoMDEntries : nullptr; }
-
-   /// NoMDEntries (268), application, 3 fields, 0 groups, is unique, hash: 0x9b46ef3e
-   // MarketDataSnapshot::NoMDEntries
-   class NoMDEntries : public GroupBase // depth: 1
-   {
-      static F8_NewOroFix44_API const FieldTrait _traits[];
-      static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha;
-      static F8_NewOroFix44_API const MsgType _msgtype;
-      static const unsigned _fieldcnt = 3;
-
-   public:
-      enum { _fnum = 268 };
-
-      NoMDEntries() : GroupBase(_fnum) {}
-      ~NoMDEntries() = default;
-      MessageBase *create_group(bool) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
-
-      static const MsgType& get_msgtype() { return _msgtype; }
-   };
-};
-
-//-------------------------------------------------------------------------------------------------
-/// MarketDataIncrementalRefresh (X), application, 3 fields, 1 group.
-class MarketDataIncrementalRefresh : public Message
-{
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 3;
-
-public:
-   explicit MarketDataIncrementalRefresh(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha)
-   {
-      if (deepctor)
-         _groups.insert({268, new NoMDEntries });
-   }
-   ~MarketDataIncrementalRefresh() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
-
-   static const MsgType& get_msgtype() { return _msgtype; }
-   GroupBase *create_nested_group(unsigned short fnum) const
-      { return fnum == 268 ? new NoMDEntries : nullptr; }
-
-   /// NoMDEntries (268), application, 10 fields, 0 groups, is unique, hash: 0xca4606b6
-   // MarketDataIncrementalRefresh::NoMDEntries
-   class NoMDEntries : public GroupBase // depth: 1
-   {
-      static F8_NewOroFix44_API const FieldTrait _traits[];
-      static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha;
-      static F8_NewOroFix44_API const MsgType _msgtype;
-      static const unsigned _fieldcnt = 10;
-
-   public:
-      enum { _fnum = 268 };
-
-      NoMDEntries() : GroupBase(_fnum) {}
-      ~NoMDEntries() = default;
-      MessageBase *create_group(bool) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
-
-      static const MsgType& get_msgtype() { return _msgtype; }
-   };
-};
-
-//-------------------------------------------------------------------------------------------------
 /// OrderAmendKeepPriorityRequest (XAK), application, 5 fields, 0 groups.
 class OrderAmendKeepPriorityRequest : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 5;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 5;
 
 public:
    explicit OrderAmendKeepPriorityRequest(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~OrderAmendKeepPriorityRequest() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
 };
@@ -597,15 +442,15 @@ public:
 /// OrderAmendReject (XAR), application, 7 fields, 0 groups.
 class OrderAmendReject : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 7;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 7;
 
 public:
    explicit OrderAmendReject(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~OrderAmendReject() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
 };
@@ -614,15 +459,15 @@ public:
 /// OrderCancelRequestAndNewOrderSingle (XCN), application, 25 fields, 0 groups.
 class OrderCancelRequestAndNewOrderSingle : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 25;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 25;
 
 public:
    explicit OrderCancelRequestAndNewOrderSingle(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~OrderCancelRequestAndNewOrderSingle() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
 };
@@ -631,15 +476,15 @@ public:
 /// LimitQuery (XLQ), application, 1 field, 0 groups.
 class LimitQuery : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 1;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 1;
 
 public:
    explicit LimitQuery(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~LimitQuery() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
 };
@@ -648,10 +493,10 @@ public:
 /// LimitResponse (XLR), application, 2 fields, 1 group.
 class LimitResponse : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 2;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 2;
 
 public:
    explicit LimitResponse(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha)
@@ -660,7 +505,7 @@ public:
          _groups.insert({25003, new NoLimitIndicators });
    }
    ~LimitResponse() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
    GroupBase *create_nested_group(unsigned short fnum) const
@@ -670,9 +515,9 @@ public:
    // LimitResponse::NoLimitIndicators
    class NoLimitIndicators : public GroupBase // depth: 1
    {
-      static F8_NewOroFix44_API const FieldTrait _traits[];
-      static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha;
-      static F8_NewOroFix44_API const MsgType _msgtype;
+      static F8_NewOroFix44OE_API const FieldTrait _traits[];
+      static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha;
+      static F8_NewOroFix44OE_API const MsgType _msgtype;
       static const unsigned _fieldcnt = 5;
 
    public:
@@ -687,30 +532,13 @@ public:
 };
 
 //-------------------------------------------------------------------------------------------------
-/// MarketDataRequestReject (Y), application, 4 fields, 0 groups.
-class MarketDataRequestReject : public Message
-{
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 4;
-
-public:
-   explicit MarketDataRequestReject(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
-   ~MarketDataRequestReject() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
-
-   static const MsgType& get_msgtype() { return _msgtype; }
-};
-
-//-------------------------------------------------------------------------------------------------
 /// header (header), application, 8 fields, 0 groups.
 class header : public MessageBase
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 8;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 8;
 
    begin_string *_begin_string;
    body_length *_body_length;
@@ -739,15 +567,15 @@ public:
 /// OrderMassCancelRequest (q), application, 3 fields, 0 groups.
 class OrderMassCancelRequest : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 3;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 3;
 
 public:
    explicit OrderMassCancelRequest(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~OrderMassCancelRequest() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
 };
@@ -756,15 +584,15 @@ public:
 /// OrderMassCancelReport (r), application, 8 fields, 0 groups.
 class OrderMassCancelReport : public Message
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 8;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 8;
 
 public:
    explicit OrderMassCancelReport(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
    ~OrderMassCancelReport() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
+   bool process(Router& rt) const { return (static_cast<NewOroFix44OE_Router&>(rt))(this); }
 
    static const MsgType& get_msgtype() { return _msgtype; }
 };
@@ -773,10 +601,10 @@ public:
 /// trailer (trailer), application, 1 field, 0 groups.
 class trailer : public MessageBase
 {
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 1;
+   static F8_NewOroFix44OE_API const FieldTrait _traits[];
+   static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
+   static F8_NewOroFix44OE_API const MsgType _msgtype;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 1;
 
    check_sum *_check_sum;
 
@@ -796,66 +624,7 @@ public:
 };
 
 //-------------------------------------------------------------------------------------------------
-/// InstrumentListRequest (x), application, 3 fields, 0 groups.
-class InstrumentListRequest : public Message
-{
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 3;
 
-public:
-   explicit InstrumentListRequest(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
-   ~InstrumentListRequest() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
-
-   static const MsgType& get_msgtype() { return _msgtype; }
-};
-
-//-------------------------------------------------------------------------------------------------
-/// InstrumentList (y), application, 2 fields, 1 group.
-class InstrumentList : public Message
-{
-   static F8_NewOroFix44_API const FieldTrait _traits[];
-   static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha; 
-   static F8_NewOroFix44_API const MsgType _msgtype;
-   static F8_NewOroFix44_API const unsigned _fieldcnt = 2;
-
-public:
-   explicit InstrumentList(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha)
-   {
-      if (deepctor)
-         _groups.insert({146, new NoRelatedSym });
-   }
-   ~InstrumentList() = default;
-   bool process(Router& rt) const { return (static_cast<NewOroFix44_Router&>(rt))(this); }
-
-   static const MsgType& get_msgtype() { return _msgtype; }
-   GroupBase *create_nested_group(unsigned short fnum) const
-      { return fnum == 146 ? new NoRelatedSym : nullptr; }
-
-   /// NoRelatedSym (146), application, 9 fields, 0 groups, is unique, hash: 0xa7bc7e19
-   // InstrumentList::NoRelatedSym
-   class NoRelatedSym : public GroupBase // depth: 1
-   {
-      static F8_NewOroFix44_API const FieldTrait _traits[];
-      static F8_NewOroFix44_API const FieldTrait_Hash_Array _ftha;
-      static F8_NewOroFix44_API const MsgType _msgtype;
-      static const unsigned _fieldcnt = 9;
-
-   public:
-      enum { _fnum = 146 };
-
-      NoRelatedSym() : GroupBase(_fnum) {}
-      ~NoRelatedSym() = default;
-      MessageBase *create_group(bool) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
-
-      static const MsgType& get_msgtype() { return _msgtype; }
-   };
-};
-
-//-------------------------------------------------------------------------------------------------
-
-} // namespace NewOroFix44
+} // namespace NewOroFix44OE
 } // namespace FIX8
-#endif // FIX8_4E65774F726F46697834345F636C61737365732E687070_
+#endif // FIX8_4E65774F726F46697834344F455F636C61737365732E687070_

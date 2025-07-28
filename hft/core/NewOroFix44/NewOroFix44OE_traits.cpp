@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-17 17:44:16 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-07-26 15:49:19 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -49,10 +49,10 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 //-------------------------------------------------------------------------------------------------
 #include <fix8/f8config.h>
 #if defined FIX8_MAGIC_NUM && FIX8_MAGIC_NUM > 16793603L
-#error NewOroFix44_traits.cpp version 1.4.3 is out of date. Please regenerate with f8c.
+#error NewOroFix44OE_traits.cpp version 1.4.3 is out of date. Please regenerate with f8c.
 #endif
 //-------------------------------------------------------------------------------------------------
-// NewOroFix44_traits.cpp
+// NewOroFix44OE_traits.cpp
 //-------------------------------------------------------------------------------------------------
 #include <iostream>
 #include <fstream>
@@ -78,12 +78,12 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 #include <fix8/traits.hpp>
 #include <fix8/field.hpp>
 #include <fix8/message.hpp>
-#include "NewOroFix44_types.hpp"
-#include "NewOroFix44_router.hpp"
-#include "NewOroFix44_classes.hpp"
+#include "NewOroFix44OE_types.hpp"
+#include "NewOroFix44OE_router.hpp"
+#include "NewOroFix44OE_classes.hpp"
 //-------------------------------------------------------------------------------------------------
 namespace FIX8 {
-namespace NewOroFix44 {
+namespace NewOroFix44OE {
 
 //-------------------------------------------------------------------------------------------------
 // Common group traits
@@ -246,62 +246,6 @@ const FieldTrait *ListStatus::NoOrders::NoListTriggeringInstructions::_traits(No
 const FieldTrait_Hash_Array& ListStatus::NoOrders::NoListTriggeringInstructions::_ftha(NoListTriggeringInstructionsV1_ftha);
 const MsgType& ListStatus::NoOrders::NoListTriggeringInstructions::_msgtype(NoListTriggeringInstructionsV1_msgtype);
 //-------------------------------------------------------------------------------------------------
-const FieldTrait MarketDataRequest::_traits[]
-{
-   { 146, 1,  4,  0,0x0c}, { 262,15,  1,  0,0x05}, { 263, 7,  2,  0,0x05}, { 264, 1,  3,  0,0x04},
-   { 266, 8,  6,  0,0x04}, { 267, 1,  5,  0,0x0c}
-};
-const FieldTrait_Hash_Array MarketDataRequest::_ftha(MarketDataRequest::_traits, MarketDataRequest::_fieldcnt);
-const MsgType MarketDataRequest::_msgtype("V");
-//-------------------------------------------------------------------------------------------------
-const FieldTrait MarketDataRequest::NoRelatedSym::_traits[]
-{
-   {  55,15,  1,  0,0x05}
-};
-const FieldTrait_Hash_Array 
-   MarketDataRequest::NoRelatedSym::_ftha(MarketDataRequest::NoRelatedSym::_traits, NoRelatedSym::_fieldcnt);
-const MsgType MarketDataRequest::NoRelatedSym::_msgtype("NoRelatedSym");
-//-------------------------------------------------------------------------------------------------
-const FieldTrait MarketDataRequest::NoMDEntryTypes::_traits[]
-{
-   { 269, 7,  1,  0,0x05}
-};
-const FieldTrait_Hash_Array 
-   MarketDataRequest::NoMDEntryTypes::_ftha(MarketDataRequest::NoMDEntryTypes::_traits, NoMDEntryTypes::_fieldcnt);
-const MsgType MarketDataRequest::NoMDEntryTypes::_msgtype("NoMDEntryTypes");
-//-------------------------------------------------------------------------------------------------
-const FieldTrait MarketDataSnapshot::_traits[]
-{
-   {  55,15,  2,  0,0x05}, { 262,15,  1,  0,0x05}, { 268, 1,  4,  0,0x0d}, {25044, 1,  3,  0,0x04}
-};
-const FieldTrait_Hash_Array MarketDataSnapshot::_ftha(MarketDataSnapshot::_traits, MarketDataSnapshot::_fieldcnt);
-const MsgType MarketDataSnapshot::_msgtype("W");
-//-------------------------------------------------------------------------------------------------
-const FieldTrait MarketDataSnapshot::NoMDEntries::_traits[]
-{
-   { 269, 7,  1,  0,0x05}, { 270,11,  2,  0,0x05}, { 271,10,  3,  0,0x05}
-};
-const FieldTrait_Hash_Array 
-   MarketDataSnapshot::NoMDEntries::_ftha(MarketDataSnapshot::NoMDEntries::_traits, NoMDEntries::_fieldcnt);
-const MsgType MarketDataSnapshot::NoMDEntries::_msgtype("NoMDEntries");
-//-------------------------------------------------------------------------------------------------
-const FieldTrait MarketDataIncrementalRefresh::_traits[]
-{
-   { 262,15,  1,  0,0x05}, { 268, 1,  3,  0,0x0d}, { 893, 8,  2,  0,0x04}
-};
-const FieldTrait_Hash_Array MarketDataIncrementalRefresh::_ftha(MarketDataIncrementalRefresh::_traits, MarketDataIncrementalRefresh::_fieldcnt);
-const MsgType MarketDataIncrementalRefresh::_msgtype("X");
-//-------------------------------------------------------------------------------------------------
-const FieldTrait MarketDataIncrementalRefresh::NoMDEntries::_traits[]
-{
-   {  55,15,  5,  0,0x04}, {  60,22,  6,  0,0x04}, { 269, 7,  4,  0,0x05}, { 270,11,  2,  0,0x05},
-   { 271,10,  3,  0,0x04}, { 279, 7,  1,  0,0x05}, {1003, 1,  7,  0,0x04}, {2446, 7,  8,  0,0x04},
-   {25043, 1,  9,  0,0x04}, {25044, 1, 10,  0,0x04}
-};
-const FieldTrait_Hash_Array 
-   MarketDataIncrementalRefresh::NoMDEntries::_ftha(MarketDataIncrementalRefresh::NoMDEntries::_traits, NoMDEntries::_fieldcnt);
-const MsgType MarketDataIncrementalRefresh::NoMDEntries::_msgtype("NoMDEntries");
-//-------------------------------------------------------------------------------------------------
 const FieldTrait OrderAmendKeepPriorityRequest::_traits[]
 {
    {  11,15,  1,  0,0x05}, {  37, 1,  3,  0,0x04}, {  38,10,  5,  0,0x05}, {  41,15,  2,  0,0x04},
@@ -354,13 +298,6 @@ const FieldTrait_Hash_Array
    LimitResponse::NoLimitIndicators::_ftha(LimitResponse::NoLimitIndicators::_traits, NoLimitIndicators::_fieldcnt);
 const MsgType LimitResponse::NoLimitIndicators::_msgtype("NoLimitIndicators");
 //-------------------------------------------------------------------------------------------------
-const FieldTrait MarketDataRequestReject::_traits[]
-{
-   {  58,15,  4,  0,0x04}, { 262,15,  1,  0,0x05}, { 281, 7,  2,  0,0x04}, {25016, 1,  3,  0,0x04}
-};
-const FieldTrait_Hash_Array MarketDataRequestReject::_ftha(MarketDataRequestReject::_traits, MarketDataRequestReject::_fieldcnt);
-const MsgType MarketDataRequestReject::_msgtype("Y");
-//-------------------------------------------------------------------------------------------------
 const FieldTrait header::_traits[]
 {
    {   8,15,  1,  0,0x64}, {   9, 2,  2,  0,0x64}, {  34, 4,  6,  0,0x05}, {  35,15,  3,  0,0x44},
@@ -390,30 +327,6 @@ const FieldTrait trailer::_traits[]
 };
 const FieldTrait_Hash_Array trailer::_ftha(trailer::_traits, trailer::_fieldcnt);
 const MsgType trailer::_msgtype("trailer");
-//-------------------------------------------------------------------------------------------------
-const FieldTrait InstrumentListRequest::_traits[]
-{
-   {  55,15,  3,  0,0x04}, { 320,15,  1,  0,0x05}, { 559, 1,  2,  0,0x05}
-};
-const FieldTrait_Hash_Array InstrumentListRequest::_ftha(InstrumentListRequest::_traits, InstrumentListRequest::_fieldcnt);
-const MsgType InstrumentListRequest::_msgtype("x");
-//-------------------------------------------------------------------------------------------------
-const FieldTrait InstrumentList::_traits[]
-{
-   { 146, 1,  2,  0,0x0d}, { 320,15,  1,  0,0x05}
-};
-const FieldTrait_Hash_Array InstrumentList::_ftha(InstrumentList::_traits, InstrumentList::_fieldcnt);
-const MsgType InstrumentList::_msgtype("y");
-//-------------------------------------------------------------------------------------------------
-const FieldTrait InstrumentList::NoRelatedSym::_traits[]
-{
-   {  15,15,  2,  0,0x05}, {  55,15,  1,  0,0x05}, { 562,10,  3,  0,0x05}, { 969,11,  9,  0,0x05},
-   {1140,10,  4,  0,0x05}, {25039,10,  5,  0,0x05}, {25040,10,  6,  0,0x05}, {25041,10,  7,  0,0x05},
-   {25042,10,  8,  0,0x05}
-};
-const FieldTrait_Hash_Array 
-   InstrumentList::NoRelatedSym::_ftha(InstrumentList::NoRelatedSym::_traits, NoRelatedSym::_fieldcnt);
-const MsgType InstrumentList::NoRelatedSym::_msgtype("NoRelatedSym");
 
-} // namespace NewOroFix44
+} // namespace NewOroFix44OE
 } // namespace FIX8

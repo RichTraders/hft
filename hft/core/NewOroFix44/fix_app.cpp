@@ -13,9 +13,10 @@
 #include "fix_app.h"
 #include <fix8/f8includes.hpp>
 #include "common/spsc_queue.h"
-#include "fix_wrapper.h"
-#include "performance.h"
+#include "fix_md_core.h"
 #include "ssl_socket.h"
+
+#include "performance.h"
 
 constexpr int kQueueSize = 8;
 constexpr int kReadBufferSize = 1024;
@@ -31,7 +32,7 @@ FixApp<Cpu>::FixApp(const std::string& address, const int port,
                     MemoryPool<MarketData>* market_data_pool)
     : market_data_pool_(market_data_pool),
       logger_(logger),
-      fix_(std::make_unique<Fix>(sender_comp_id, target_comp_id, logger,
+      fix_(std::make_unique<FixMdCore>(sender_comp_id, target_comp_id, logger,
                                  market_data_pool)),
       tls_sock_(std::make_unique<SSLSocket>(address, port)),
       queue_(std::make_unique<common::SPSCQueue<std::string>>(kQueueSize)),
@@ -54,9 +55,11 @@ template <int Cpu>
 int FixApp<Cpu>::start() {
   const auto timestamp = fix_->timestamp();
   const std::string sig_b64 = fix_->get_signature_base64(timestamp);
+
   const std::string fixmsg = fix_->create_log_on_message(sig_b64, timestamp);
 
   send(fixmsg);
+  std::cout <<"log on sent\n";
   return 0;
 }
 
@@ -150,7 +153,6 @@ bool FixApp<Cpu>::strip_to_header(std::string& buffer) {
     buffer.clear();
     return false;
   }
-
   if (pos > 0) {
     buffer.erase(0, pos);
   }

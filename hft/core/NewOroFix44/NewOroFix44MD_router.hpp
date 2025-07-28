@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-17 17:44:16 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-07-26 15:49:21 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -49,52 +49,41 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 //-------------------------------------------------------------------------------------------------
 #include <fix8/f8config.h>
 #if defined FIX8_MAGIC_NUM && FIX8_MAGIC_NUM > 16793603L
-#error NewOroFix44_router.hpp version 1.4.3 is out of date. Please regenerate with f8c.
+#error NewOroFix44MD_router.hpp version 1.4.3 is out of date. Please regenerate with f8c.
 #endif
 //-------------------------------------------------------------------------------------------------
-// NewOroFix44_router.hpp
+// NewOroFix44MD_router.hpp
 //-------------------------------------------------------------------------------------------------
-#ifndef FIX8_4E65774F726F46697834345F726F757465722E687070_
-#define FIX8_4E65774F726F46697834345F726F757465722E687070_
+#ifndef FIX8_4E65774F726F46697834344D445F726F757465722E687070_
+#define FIX8_4E65774F726F46697834344D445F726F757465722E687070_
 
 namespace FIX8 {
-namespace NewOroFix44 {
+namespace NewOroFix44MD {
 
 //-------------------------------------------------------------------------------------------------
-class NewOroFix44_Router : public Router
+class NewOroFix44MD_Router : public Router
 {
 public:
-   NewOroFix44_Router() {}
-   virtual ~NewOroFix44_Router() {}
+   NewOroFix44MD_Router() {}
+   virtual ~NewOroFix44MD_Router() {}
 
    virtual bool operator() (const class Message *msg) const { return false; }
    virtual bool operator() (const class Heartbeat *msg) const { return true; }
    virtual bool operator() (const class TestRequest *msg) const { return true; }
    virtual bool operator() (const class Reject *msg) const { return true; }
    virtual bool operator() (const class Logout *msg) const { return true; }
-   virtual bool operator() (const class ExecutionReport *msg) const { return false; }
-   virtual bool operator() (const class OrderCancelReject *msg) const { return false; }
    virtual bool operator() (const class Logon *msg) const { return true; }
    virtual bool operator() (const class News *msg) const { return false; }
-   virtual bool operator() (const class NewOrderSingle *msg) const { return false; }
-   virtual bool operator() (const class NewOrderList *msg) const { return false; }
-   virtual bool operator() (const class OrderCancelRequest *msg) const { return false; }
-   virtual bool operator() (const class ListStatus *msg) const { return false; }
    virtual bool operator() (const class MarketDataRequest *msg) const { return false; }
    virtual bool operator() (const class MarketDataSnapshot *msg) const { return false; }
    virtual bool operator() (const class MarketDataIncrementalRefresh *msg) const { return false; }
-   virtual bool operator() (const class OrderAmendKeepPriorityRequest *msg) const { return false; }
-   virtual bool operator() (const class OrderAmendReject *msg) const { return false; }
-   virtual bool operator() (const class OrderCancelRequestAndNewOrderSingle *msg) const { return false; }
    virtual bool operator() (const class LimitQuery *msg) const { return false; }
    virtual bool operator() (const class LimitResponse *msg) const { return false; }
    virtual bool operator() (const class MarketDataRequestReject *msg) const { return false; }
-   virtual bool operator() (const class OrderMassCancelRequest *msg) const { return false; }
-   virtual bool operator() (const class OrderMassCancelReport *msg) const { return false; }
    virtual bool operator() (const class InstrumentListRequest *msg) const { return false; }
    virtual bool operator() (const class InstrumentList *msg) const { return false; }
 };
 
-} // namespace NewOroFix44
+} // namespace NewOroFix44MD
 } // namespace FIX8
-#endif // FIX8_4E65774F726F46697834345F726F757465722E687070_
+#endif // FIX8_4E65774F726F46697834344D445F726F757465722E687070_

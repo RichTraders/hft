@@ -12,9 +12,9 @@
 
 #include "NewOroFix44/fix_app.h"
 #include <fix8/f8includes.hpp>
-#include "NewOroFix44_types.hpp"
-#include "NewOroFix44_router.hpp"
-#include "NewOroFix44_classes.hpp"
+#include "NewOroFix44MD_types.hpp"
+#include "NewOroFix44MD_router.hpp"
+#include "NewOroFix44MD_classes.hpp"
 
 #include "logger.h"
 #include "memory_pool.hpp"
@@ -31,11 +31,12 @@ TEST(FixAppTest, CallbackRegistration) {
                     9000,
                     "BMDWATCH",
                     "SPOT", logger.get(), pool.get());
-  bool called = false;
+  bool login_success = false;
+  bool logout_success = false;
 
   app.register_callback( //log on
       "A", [&](FIX8::Message* m) {
-        called = true;
+        login_success = true;
         std::string result;
         m->encode(result);
         std::cout << result << std::endl;
@@ -44,11 +45,14 @@ TEST(FixAppTest, CallbackRegistration) {
       "5", [&](FIX8::Message* m) {
         std::string result;
         m->encode(result);
+        logout_success = true;
         std::cout << result << std::endl;
       });
   app.start();
   sleep(3);
-  EXPECT_TRUE(called);
+  EXPECT_TRUE(login_success);
 
   app.stop();
+  sleep(3);
+  EXPECT_TRUE(logout_success);
 }

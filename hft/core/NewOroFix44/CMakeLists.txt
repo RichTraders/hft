@@ -1,13 +1,20 @@
 set(FIX8_SRC
-        NewOroFix44_types.hpp
-        NewOroFix44_types.cpp
-        NewOroFix44_traits.cpp
-        NewOroFix44_router.hpp
-        NewOroFix44_classes.hpp
-        NewOroFix44_classes.cpp
+        NewOroFix44MD_types.hpp
+        NewOroFix44MD_types.cpp
+        NewOroFix44MD_traits.cpp
+        NewOroFix44MD_router.hpp
+        NewOroFix44MD_classes.hpp
+        NewOroFix44MD_classes.cpp
+
+        NewOroFix44OE_types.hpp
+        NewOroFix44OE_types.cpp
+        NewOroFix44OE_traits.cpp
+        NewOroFix44OE_router.hpp
+        NewOroFix44OE_classes.hpp
+        NewOroFix44OE_classes.cpp
         signature.cpp
         ssl_socket.cpp
-        fix_wrapper.cpp
+        fix_md_core.cpp
         fix_app.cpp
 )
 

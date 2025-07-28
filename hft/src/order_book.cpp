@@ -254,6 +254,13 @@ void MarketOrderBook::add_order(const MarketData* market_update, const int idx,
 /// Process market data update and update the limit order book.
 auto MarketOrderBook::on_market_data_updated(
     const MarketData* market_update) noexcept -> void {
+  if (UNLIKELY(indexToPrice(kMaxPriceInt) < market_update->price ||
+               market_update->price < indexToPrice(kMinPriceInt))) {
+    logger_->error(
+        std::format("Price[{}] is invalid", market_update->price.value));
+    return;
+  }
+
   const int idx = priceToIndex(market_update->price);
   const Qty qty = market_update->qty;
 

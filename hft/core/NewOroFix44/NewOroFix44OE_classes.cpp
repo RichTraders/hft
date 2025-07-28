@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-17 17:44:16 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-07-26 15:49:19 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -49,10 +49,10 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 //-------------------------------------------------------------------------------------------------
 #include <fix8/f8config.h>
 #if defined FIX8_MAGIC_NUM && FIX8_MAGIC_NUM > 16793603L
-#error NewOroFix44_classes.cpp version 1.4.3 is out of date. Please regenerate with f8c.
+#error NewOroFix44OE_classes.cpp version 1.4.3 is out of date. Please regenerate with f8c.
 #endif
 //-------------------------------------------------------------------------------------------------
-// NewOroFix44_classes.cpp
+// NewOroFix44OE_classes.cpp
 //-------------------------------------------------------------------------------------------------
 #include <iostream>
 #include <fstream>
@@ -78,12 +78,12 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 #include <fix8/traits.hpp>
 #include <fix8/field.hpp>
 #include <fix8/message.hpp>
-#include "NewOroFix44_types.hpp"
-#include "NewOroFix44_router.hpp"
-#include "NewOroFix44_classes.hpp"
+#include "NewOroFix44OE_types.hpp"
+#include "NewOroFix44OE_router.hpp"
+#include "NewOroFix44OE_classes.hpp"
 //-------------------------------------------------------------------------------------------------
 namespace FIX8 {
-namespace NewOroFix44 {
+namespace NewOroFix44OE {
 
 namespace {
 
@@ -100,54 +100,48 @@ const char *cn[] // Component names
 } // namespace
 
 //-------------------------------------------------------------------------------------------------
-const NewOroFix44::NewOroFix44_BaseMsgEntry::Pair msgpairs[] 
+const NewOroFix44OE::NewOroFix44OE_BaseMsgEntry::Pair msgpairs[] 
 {
-   { "0", { Type2Type<NewOroFix44::Heartbeat>(), "Heartbeat" } },
-   { "1", { Type2Type<NewOroFix44::TestRequest>(), "TestRequest" } },
-   { "3", { Type2Type<NewOroFix44::Reject>(), "Reject" } },
-   { "5", { Type2Type<NewOroFix44::Logout>(), "Logout" } },
-   { "8", { Type2Type<NewOroFix44::ExecutionReport>(), "ExecutionReport" } },
-   { "9", { Type2Type<NewOroFix44::OrderCancelReject>(), "OrderCancelReject" } },
-   { "A", { Type2Type<NewOroFix44::Logon>(), "Logon" } },
-   { "B", { Type2Type<NewOroFix44::News>(), "News" } },
-   { "D", { Type2Type<NewOroFix44::NewOrderSingle>(), "NewOrderSingle" } },
-   { "E", { Type2Type<NewOroFix44::NewOrderList>(), "NewOrderList" } },
-   { "F", { Type2Type<NewOroFix44::OrderCancelRequest>(), "OrderCancelRequest" } },
-   { "N", { Type2Type<NewOroFix44::ListStatus>(), "ListStatus" } },
-   { "V", { Type2Type<NewOroFix44::MarketDataRequest>(), "MarketDataRequest" } },
-   { "W", { Type2Type<NewOroFix44::MarketDataSnapshot>(), "MarketDataSnapshot" } },
-   { "X", { Type2Type<NewOroFix44::MarketDataIncrementalRefresh>(), "MarketDataIncrementalRefresh" } },
-   { "XAK", { Type2Type<NewOroFix44::OrderAmendKeepPriorityRequest>(), "OrderAmendKeepPriorityRequest" } },
-   { "XAR", { Type2Type<NewOroFix44::OrderAmendReject>(), "OrderAmendReject" } },
-   { "XCN", { Type2Type<NewOroFix44::OrderCancelRequestAndNewOrderSingle>(), "OrderCancelRequestAndNewOrderSingle" } },
-   { "XLQ", { Type2Type<NewOroFix44::LimitQuery>(), "LimitQuery" } },
-   { "XLR", { Type2Type<NewOroFix44::LimitResponse>(), "LimitResponse" } },
-   { "Y", { Type2Type<NewOroFix44::MarketDataRequestReject>(), "MarketDataRequestReject" } },
-   { "header", { Type2Type<NewOroFix44::header, bool>(), "header" } },
-   { "q", { Type2Type<NewOroFix44::OrderMassCancelRequest>(), "OrderMassCancelRequest" } },
-   { "r", { Type2Type<NewOroFix44::OrderMassCancelReport>(), "OrderMassCancelReport" } },
-   { "trailer", { Type2Type<NewOroFix44::trailer, bool>(), "trailer" } },
-   { "x", { Type2Type<NewOroFix44::InstrumentListRequest>(), "InstrumentListRequest" } },
-   { "y", { Type2Type<NewOroFix44::InstrumentList>(), "InstrumentList" } }
-}; // 27
+   { "0", { Type2Type<NewOroFix44OE::Heartbeat>(), "Heartbeat" } },
+   { "1", { Type2Type<NewOroFix44OE::TestRequest>(), "TestRequest" } },
+   { "3", { Type2Type<NewOroFix44OE::Reject>(), "Reject" } },
+   { "5", { Type2Type<NewOroFix44OE::Logout>(), "Logout" } },
+   { "8", { Type2Type<NewOroFix44OE::ExecutionReport>(), "ExecutionReport" } },
+   { "9", { Type2Type<NewOroFix44OE::OrderCancelReject>(), "OrderCancelReject" } },
+   { "A", { Type2Type<NewOroFix44OE::Logon>(), "Logon" } },
+   { "B", { Type2Type<NewOroFix44OE::News>(), "News" } },
+   { "D", { Type2Type<NewOroFix44OE::NewOrderSingle>(), "NewOrderSingle" } },
+   { "E", { Type2Type<NewOroFix44OE::NewOrderList>(), "NewOrderList" } },
+   { "F", { Type2Type<NewOroFix44OE::OrderCancelRequest>(), "OrderCancelRequest" } },
+   { "N", { Type2Type<NewOroFix44OE::ListStatus>(), "ListStatus" } },
+   { "XAK", { Type2Type<NewOroFix44OE::OrderAmendKeepPriorityRequest>(), "OrderAmendKeepPriorityRequest" } },
+   { "XAR", { Type2Type<NewOroFix44OE::OrderAmendReject>(), "OrderAmendReject" } },
+   { "XCN", { Type2Type<NewOroFix44OE::OrderCancelRequestAndNewOrderSingle>(), "OrderCancelRequestAndNewOrderSingle" } },
+   { "XLQ", { Type2Type<NewOroFix44OE::LimitQuery>(), "LimitQuery" } },
+   { "XLR", { Type2Type<NewOroFix44OE::LimitResponse>(), "LimitResponse" } },
+   { "header", { Type2Type<NewOroFix44OE::header, bool>(), "header" } },
+   { "q", { Type2Type<NewOroFix44OE::OrderMassCancelRequest>(), "OrderMassCancelRequest" } },
+   { "r", { Type2Type<NewOroFix44OE::OrderMassCancelReport>(), "OrderMassCancelReport" } },
+   { "trailer", { Type2Type<NewOroFix44OE::trailer, bool>(), "trailer" } }
+}; // 21
 
-extern const NewOroFix44_BaseEntry::Pair fldpairs[];
+extern const NewOroFix44OE_BaseEntry::Pair fldpairs[];
 
 /// Compiler generated metadata object, accessed through this function.
 const F8MetaCntx& ctx() // avoid SIOF
 {
-   static const NewOroFix44_BaseMsgEntry bme(msgpairs, 27);
-   static const NewOroFix44_BaseEntry be(fldpairs, 134);
+   static const NewOroFix44OE_BaseMsgEntry bme(msgpairs, 21);
+   static const NewOroFix44OE_BaseEntry be(fldpairs, 108);
    static const F8MetaCntx _ctx(4400, bme, be, cn, "FIX.4.4");
    return _ctx;
 }
 
-} // namespace NewOroFix44
+} // namespace NewOroFix44OE
 
 // Compiler generated metadata object accessible outside namespace through this function.
 extern "C"
 {
-   const F8MetaCntx& NewOroFix44_ctx() { return NewOroFix44::ctx(); }
+   const F8MetaCntx& NewOroFix44OE_ctx() { return NewOroFix44OE::ctx(); }
 }
 
 } // namespace FIX8

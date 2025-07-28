@@ -10,22 +10,22 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "fix_wrapper.h"
+#include "fix_md_core.h"
 #include "signature.h"
 
 #include <fix8/f8includes.hpp>
-#include "NewOroFix44_types.hpp"
-#include "NewOroFix44_router.hpp"
-#include "NewOroFix44_classes.hpp"
+#include "NewOroFix44MD_types.hpp"
+#include "NewOroFix44MD_router.hpp"
+#include "NewOroFix44MD_classes.hpp"
 #include "performance.h"
 
 namespace core {
-using namespace FIX8::NewOroFix44;
+using namespace FIX8::NewOroFix44MD;
 using namespace common;
 constexpr int kMarketDataPoolSize = 2048;
 constexpr int kEntries = 268;
 
-Fix::Fix(SendId sender_comp_id,
+FixMdCore::FixMdCore(SendId sender_comp_id,
          TargetId target_comp_id,
          Logger* logger,
          MemoryPool<MarketData>* pool)
@@ -34,9 +34,9 @@ Fix::Fix(SendId sender_comp_id,
     target_comp_id_(std::move(target_comp_id)),
     market_data_pool_(pool) {}
 
-std::string Fix::create_log_on_message(const std::string& sig_b64,
+std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
                                        const std::string& timestamp) {
-  FIX8::NewOroFix44_ctx();
+  FIX8::NewOroFix44MD_ctx();
   Logon request;
 
   FIX8::MessageBase* header = request.Header();
@@ -67,7 +67,7 @@ std::string Fix::create_log_on_message(const std::string& sig_b64,
   return wire;
 }
 
-std::string Fix::create_log_out_message() {
+std::string FixMdCore::create_log_out_message() {
   Logout request;
   request.Header()->add_field(new SenderCompID(sender_comp_id_));
   request.Header()->add_field(new TargetCompID(target_comp_id_));
@@ -81,7 +81,7 @@ std::string Fix::create_log_out_message() {
   return wire;
 }
 
-std::string Fix::create_heartbeat_message(FIX8::Message* message) {
+std::string FixMdCore::create_heartbeat_message(FIX8::Message* message) {
   auto test_req_id = message->get<TestReqID>();
 
   Heartbeat request;
@@ -98,7 +98,7 @@ std::string Fix::create_heartbeat_message(FIX8::Message* message) {
   return wire;
 }
 
-std::string Fix::create_market_data_subscription_message(
+std::string FixMdCore::create_market_data_subscription_message(
     const RequestId& request_id,
     const MarketDepthLevel& level,
     const SymbolId& symbol) {
@@ -155,7 +155,7 @@ std::string Fix::create_market_data_subscription_message(
 }
 
 //Does it really need?
-std::string Fix::create_trade_data_subscription_message(
+std::string FixMdCore::create_trade_data_subscription_message(
     const RequestId& request_id,
     const MarketDepthLevel& level,
     const SymbolId& symbol) {
@@ -199,7 +199,7 @@ std::string Fix::create_trade_data_subscription_message(
   return wire;
 }
 
-MarketUpdateData Fix::create_market_data(FIX8::Message* msg) const {
+MarketUpdateData FixMdCore::create_market_data(FIX8::Message* msg) const {
   auto* entries = msg->find_group(kEntries);
   std::vector<MarketData*> data(entries->size());
   const auto* symbol = entries->get_element(0)->get<Symbol>(); //55
@@ -228,7 +228,7 @@ MarketUpdateData Fix::create_market_data(FIX8::Message* msg) const {
   return MarketUpdateData(std::move(data));
 }
 
-MarketUpdateData Fix::create_snapshot_data_message(FIX8::Message* msg) const {
+MarketUpdateData FixMdCore::create_snapshot_data_message(FIX8::Message* msg) const {
   const auto* symbol = msg->get<Symbol>();
   auto* entries = msg->find_group(kEntries);
 
@@ -262,7 +262,7 @@ MarketUpdateData Fix::create_snapshot_data_message(FIX8::Message* msg) const {
   return MarketUpdateData(std::move(data));
 }
 
-std::string Fix::timestamp() {
+std::string FixMdCore::timestamp() {
   using std::chrono::duration_cast;
   using std::chrono::system_clock;
   using std::chrono::year_month_day;
@@ -297,7 +297,7 @@ std::string Fix::timestamp() {
   return std::string(buf);
 }
 
-FIX8::Message* Fix::decode(const std::string& message) {
+FIX8::Message* FixMdCore::decode(const std::string& message) {
 #ifdef DEBUG
   START_MEASURE(Convert_Message);
 #endif
@@ -313,7 +313,7 @@ FIX8::Message* Fix::decode(const std::string& message) {
 }
 
 const std::string
-Fix::get_signature_base64(const std::string& timestamp) const {
+FixMdCore::get_signature_base64(const std::string& timestamp) const {
   // TODO(jb): use config reader
   EVP_PKEY* private_key = Util::load_ed25519(
       "/home/neworo/CLionProjects/hft/resources/private.pem", "akaj124!");
@@ -328,7 +328,7 @@ Fix::get_signature_base64(const std::string& timestamp) const {
   return Util::sign_and_base64(private_key, payload);
 }
 
-void Fix::encode(std::string& data, FIX8::Message* msg) {
+void FixMdCore::encode(std::string& data, FIX8::Message* msg) {
   auto* ptr = data.data();
   msg->encode(&ptr);
 }

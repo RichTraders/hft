@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-17 17:44:16 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-07-26 15:49:19 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -49,16 +49,16 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 //-------------------------------------------------------------------------------------------------
 #include <fix8/f8config.h>
 #if defined FIX8_MAGIC_NUM && FIX8_MAGIC_NUM > 16793603L
-#error NewOroFix44_types.hpp version 1.4.3 is out of date. Please regenerate with f8c.
+#error NewOroFix44OE_types.hpp version 1.4.3 is out of date. Please regenerate with f8c.
 #endif
 //-------------------------------------------------------------------------------------------------
-// NewOroFix44_types.hpp
+// NewOroFix44OE_types.hpp
 //-------------------------------------------------------------------------------------------------
-#ifndef FIX8_4E65774F726F46697834345F74797065732E687070_
-#define FIX8_4E65774F726F46697834345F74797065732E687070_
+#ifndef FIX8_4E65774F726F46697834344F455F74797065732E687070_
+#define FIX8_4E65774F726F46697834344F455F74797065732E687070_
 
 namespace FIX8 {
-namespace NewOroFix44 {
+namespace NewOroFix44OE {
 
 //-------------------------------------------------------------------------------------------------
 using BeginString = Field<f8String, 8>;
@@ -72,8 +72,6 @@ using CheckSum = Field<f8String, 10>;
 using ClOrdID = Field<f8String, 11>;
 //-------------------------------------------------------------------------------------------------
 using CumQty = Field<Qty, 14>;
-//-------------------------------------------------------------------------------------------------
-using Currency = Field<f8String, 15>;
 //-------------------------------------------------------------------------------------------------
 using ExecID = Field<int, 17>;
 //-------------------------------------------------------------------------------------------------
@@ -100,20 +98,14 @@ const f8String MsgType_NEW_ORDER_SINGLE("D");
 const f8String MsgType_NEW_ORDER_LIST("E");
 const f8String MsgType_ORDER_CANCEL_REQUEST("F");
 const f8String MsgType_LIST_STATUS("N");
-const f8String MsgType_MARKET_DATA_REQUEST("V");
-const f8String MsgType_MARKET_DATA_SNAPSHOT("W");
-const f8String MsgType_MARKET_DATA_INCREMENTAL_REFRESH("X");
 const f8String MsgType_ORDER_AMEND_KEEP_PRIORITY_REQUEST("XAK");
 const f8String MsgType_ORDER_AMEND_REJECT("XAR");
 const f8String MsgType_ORDER_CANCEL_REQUEST_AND_NEW_ORDER_SINGLE("XCN");
 const f8String MsgType_LIMIT_QUERY("XLQ");
 const f8String MsgType_LIMIT_RESPONSE("XLR");
-const f8String MsgType_MARKET_DATA_REQUEST_REJECT("Y");
 const f8String MsgType_ORDER_MASS_CANCEL_REQUEST("q");
 const f8String MsgType_ORDER_MASS_CANCEL_REPORT("r");
-const f8String MsgType_INSTRUMENT_LIST_REQUEST("x");
-const f8String MsgType_INSTRUMENT_LIST("y");
-const size_t MsgType_realm_els(25);
+const size_t MsgType_realm_els(19);
 //-------------------------------------------------------------------------------------------------
 using OrderID = Field<int, 37>;
 //-------------------------------------------------------------------------------------------------
@@ -205,8 +197,6 @@ const char ResetSeqNumFlag_NO('N');
 const char ResetSeqNumFlag_YES('Y');
 const size_t ResetSeqNumFlag_realm_els(2);
 //-------------------------------------------------------------------------------------------------
-using NoRelatedSym = Field<NumInGroup, 146>;
-//-------------------------------------------------------------------------------------------------
 using Headline = Field<f8String, 148>;
 //-------------------------------------------------------------------------------------------------
 using ExecType = Field<char, 150>;
@@ -221,46 +211,6 @@ const size_t ExecType_realm_els(6);
 using LeavesQty = Field<Qty, 151>;
 //-------------------------------------------------------------------------------------------------
 using CashOrderQty = Field<Qty, 152>;
-//-------------------------------------------------------------------------------------------------
-using MDReqID = Field<f8String, 262>;
-//-------------------------------------------------------------------------------------------------
-using SubscriptionRequestType = Field<char, 263>;
-const char SubscriptionRequestType_Subscribe('1');
-const char SubscriptionRequestType_Unsubscribe('2');
-const size_t SubscriptionRequestType_realm_els(2);
-//-------------------------------------------------------------------------------------------------
-using MarketDepth = Field<int, 264>;
-//-------------------------------------------------------------------------------------------------
-using AggregatedBook = Field<Boolean, 266>;
-const char AggregatedBook_BOOK_ENTRIES_TO_BE_AGGREGATED('Y');
-const size_t AggregatedBook_realm_els(1);
-//-------------------------------------------------------------------------------------------------
-using NoMDEntryTypes = Field<NumInGroup, 267>;
-//-------------------------------------------------------------------------------------------------
-using NoMDEntries = Field<NumInGroup, 268>;
-//-------------------------------------------------------------------------------------------------
-using MDEntryType = Field<char, 269>;
-const char MDEntryType_BID('0');
-const char MDEntryType_OFFER('1');
-const char MDEntryType_TRADE('2');
-const size_t MDEntryType_realm_els(3);
-//-------------------------------------------------------------------------------------------------
-using MDEntryPx = Field<price, 270>;
-//-------------------------------------------------------------------------------------------------
-using MDEntrySize = Field<Qty, 271>;
-//-------------------------------------------------------------------------------------------------
-using MDUpdateAction = Field<char, 279>;
-const char MDUpdateAction_NEW('0');
-const char MDUpdateAction_CHANGE('1');
-const char MDUpdateAction_DELETE('2');
-const size_t MDUpdateAction_realm_els(3);
-//-------------------------------------------------------------------------------------------------
-using MDReqRejReason = Field<char, 281>;
-const char MDReqRejReason_DUPLICATE_MDREQID('1');
-const char MDReqRejReason_TOO_MANY_SUBSCRIPTIONS('2');
-const size_t MDReqRejReason_realm_els(2);
-//-------------------------------------------------------------------------------------------------
-using InstrumentReqID = Field<f8String, 320>;
 //-------------------------------------------------------------------------------------------------
 using RefTagID = Field<int, 371>;
 //-------------------------------------------------------------------------------------------------
@@ -316,13 +266,6 @@ using TotalAffectedOrders = Field<int, 533>;
 //-------------------------------------------------------------------------------------------------
 using Username = Field<f8String, 553>;
 //-------------------------------------------------------------------------------------------------
-using InstrumentListRequestType = Field<int, 559>;
-const int InstrumentListRequestType_SINGLE_INSTRUMENT(0);
-const int InstrumentListRequestType_ALL_INSTRUMENTS(4);
-const size_t InstrumentListRequestType_realm_els(2);
-//-------------------------------------------------------------------------------------------------
-using MinTradeVol = Field<Qty, 562>;
-//-------------------------------------------------------------------------------------------------
 using MatchType = Field<f8String, 574>;
 const f8String MatchType_ONE_PARTY_TRADE_REPORT("1");
 const f8String MatchType_AUTO_MATCH("4");
@@ -331,13 +274,6 @@ const size_t MatchType_realm_els(2);
 using WorkingIndicator = Field<Boolean, 636>;
 //-------------------------------------------------------------------------------------------------
 using TargetStrategy = Field<int, 847>;
-//-------------------------------------------------------------------------------------------------
-using LastFragment = Field<Boolean, 893>;
-const char LastFragment_NOT_LAST_MESSAGE('N');
-const char LastFragment_LAST_MESSAGE('Y');
-const size_t LastFragment_realm_els(2);
-//-------------------------------------------------------------------------------------------------
-using MinPriceIncrement = Field<price, 969>;
 //-------------------------------------------------------------------------------------------------
 using TradeID = Field<int, 1003>;
 //-------------------------------------------------------------------------------------------------
@@ -365,8 +301,6 @@ const char TriggerPriceDirection_TRIGGER_IF_THE_PRICE_OF_THE_SPECIFIED_TYPE_GOES
 const char TriggerPriceDirection_TRIGGER_IF_THE_PRICE_OF_THE_SPECIFIED_TYPE_GOES_UP_TO_OR_THROUGH_THE_SPECIFIED_TRIGGER_PRICE('U');
 const size_t TriggerPriceDirection_realm_els(2);
 //-------------------------------------------------------------------------------------------------
-using MaxTradeVol = Field<Qty, 1140>;
-//-------------------------------------------------------------------------------------------------
 using ContingencyType = Field<int, 1385>;
 const int ContingencyType_ONE_CANCELS_THE_OTHER(1);
 const int ContingencyType_ONE_TRIGGERS_THE_OTHER(2);
@@ -375,11 +309,6 @@ const size_t ContingencyType_realm_els(2);
 using ListRejectReason = Field<int, 1386>;
 const int ListRejectReason_OTHER(99);
 const size_t ListRejectReason_realm_els(1);
-//-------------------------------------------------------------------------------------------------
-using AggressorSide = Field<char, 2446>;
-const char AggressorSide_BUY('1');
-const char AggressorSide_SELL('2');
-const size_t AggressorSide_realm_els(2);
 //-------------------------------------------------------------------------------------------------
 using ReqID = Field<f8String, 6136>;
 //-------------------------------------------------------------------------------------------------
@@ -501,20 +430,8 @@ const int OrderRateLimitExceededMode_DO_NOTHING(1);
 const int OrderRateLimitExceededMode_CANCEL_ONLY(2);
 const size_t OrderRateLimitExceededMode_realm_els(2);
 //-------------------------------------------------------------------------------------------------
-using MinQtyIncrement = Field<Qty, 25039>;
-//-------------------------------------------------------------------------------------------------
-using MarketMinTradeVol = Field<Qty, 25040>;
-//-------------------------------------------------------------------------------------------------
-using MarketMaxTradeVol = Field<Qty, 25041>;
-//-------------------------------------------------------------------------------------------------
-using MarketMinQtyIncrement = Field<Qty, 25042>;
-//-------------------------------------------------------------------------------------------------
-using FirstBookUpdateID = Field<int, 25043>;
-//-------------------------------------------------------------------------------------------------
-using LastBookUpdateID = Field<int, 25044>;
-//-------------------------------------------------------------------------------------------------
-using NewOroFix44_BaseEntry = FieldTable;
+using NewOroFix44OE_BaseEntry = FieldTable;
 
-} // namespace NewOroFix44
+} // namespace NewOroFix44OE
 } // namespace FIX8
-#endif // FIX8_4E65774F726F46697834345F74797065732E687070_
+#endif // FIX8_4E65774F726F46697834344F455F74797065732E687070_

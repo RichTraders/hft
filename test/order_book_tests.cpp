@@ -19,14 +19,8 @@ using namespace common;
 class MarketOrderBookTest : public ::testing::Test {
 protected:
   Logger logger_;
-  //TradeEngine engine_;
   MarketOrderBook* book_;
 
-public:
-  // MarketOrderBookTest()
-  //   : engine_(&logger_){}
-
-protected:
   void SetUp() override {
     // trade_engine_ 주입
     book_ = new MarketOrderBook{"TEST_TICKER", &logger_};

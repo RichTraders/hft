@@ -275,12 +275,12 @@ auto MarketOrderBook::on_market_data_updated(
       break;
     }
     case MarketUpdateType::kTrade: {
-      trade_order(market_update, idx);
-
-      if (trade_engine_) {
+      if (LIKELY(trade_engine_)) {
         trade_engine_->on_trade_updated(market_update, this);
       }
-      return;  // trade만 예외 처리
+
+      trade_order(market_update, idx);
+      return;
     }
     case MarketUpdateType::kClear: {
       for (int i = 0; i < kBucketCount; ++i) {
@@ -310,8 +310,10 @@ auto MarketOrderBook::on_market_data_updated(
                              __FUNCTION__, market_update->toString(),
                              bbo_.toString()));
 
-  trade_engine_->on_order_book_updated(market_update->price,
-                                       market_update->side, this);
+  if (LIKELY(trade_engine_)) {
+    trade_engine_->on_order_book_updated(market_update->price,
+                                         market_update->side, this);
+  }
 }
 
 auto MarketOrderBook::get_bbo() noexcept -> const BBO* {

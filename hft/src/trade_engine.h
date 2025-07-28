@@ -21,6 +21,8 @@
 
 #include "order_book.h"
 
+class FeatureEngine;
+
 namespace trading {
 class TradeEngine {
  public:
@@ -31,11 +33,11 @@ class TradeEngine {
   ~TradeEngine();
 
   void stop();
-  void on_market_data_updated(MarketUpdateData* data);
+  void on_market_data_updated(MarketUpdateData* data) const;
   void on_order_book_updated(common::Price price, common::Side side,
                              MarketOrderBook* market_order_book);
   void on_trade_updated(const MarketData* market_data,
-                        MarketOrderBook* market_order_book);
+                        MarketOrderBook* order_book) const;
 
  private:
   common::Logger* logger_;
@@ -47,6 +49,7 @@ class TradeEngine {
   MarketOrderBookHashMap ticker_order_book_;
 
   bool running_{true};
+  std::unique_ptr<FeatureEngine> feature_engine_;
 
   void run();
 };

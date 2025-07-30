@@ -56,7 +56,7 @@ TEST_F(PositionKeeperTest, AddFillIncreasesPosition) {
   ASSERT_NE(pos_info, nullptr);
   EXPECT_DOUBLE_EQ(pos_info->position_, 1.0);
   EXPECT_DOUBLE_EQ(pos_info->volume_.value, 1.0);
-  EXPECT_GE(pos_info->total_pnl_, 0.0); // 초기 체결은 PnL 0
+  EXPECT_GE(pos_info->total_pnl_, 0.0);
 }
 
 TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
@@ -78,7 +78,7 @@ TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
   EXPECT_DOUBLE_EQ(pos.position_, 2.0);
   EXPECT_DOUBLE_EQ(pos.real_pnl_, 0.0);
 
-  // 2. Sell 3 BTC @ 110 (롱 2 BTC 청산 + 1 BTC 숏 전환)
+  // 2. Sell 3 BTC @ 110
   ExecutionReport sell1{
     .execution_id = "2",
     .order_id = 2,
@@ -121,16 +121,12 @@ TEST_F(PositionKeeperTest, UnrealPnL_PositiveCase) {
   EXPECT_DOUBLE_EQ(pos.real_pnl_, 0.0);
   EXPECT_DOUBLE_EQ(pos.unreal_pnl_, 0.0);
 
-  // 2. BBO 업데이트 (bid=110, ask=112) → mid=111
   BBO bbo{
     .bid_price = Price{110},
     .ask_price = Price{112}};
   pos.update_bbo(&bbo, logger);
 
-  // 미실현 손익 = (현재가(mid=111) - 진입 VWAP 100) * 2 BTC
   EXPECT_NEAR(pos.unreal_pnl_, (111.0 - 100.0) * 2.0, 1e-6);
-
-  // 총손익 = 미실현 + 실현
   EXPECT_NEAR(pos.total_pnl_, pos.unreal_pnl_ + pos.real_pnl_, 1e-6);
 }
 
@@ -192,7 +188,7 @@ TEST_F(PositionKeeperTest, AddFill_FullCloseRealizesPnL) {
 };
   pos.add_fill(&buy, logger);
 
-  // 2. Sell 2 BTC @ 70 (포지션 완전 청산)
+  // 2. Sell 2 BTC @ 70
   ExecutionReport sell{
     .execution_id = "2",
     .order_id = 2,
@@ -237,7 +233,7 @@ TEST_F(PositionKeeperTest, UpdateBboUpdatesUnrealPnl) {
 
   auto pos_info = keeper->get_position_info(report.symbol);
   ASSERT_NE(pos_info, nullptr);
-  EXPECT_GT(pos_info->unreal_pnl_, 0.0); // 매수 후 가격 상승 → 평가손익 +
+  EXPECT_GT(pos_info->unreal_pnl_, 0.0);
 }
 
 TEST_F(PositionKeeperTest, ToStringPrintsPositions) {

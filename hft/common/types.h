@@ -96,6 +96,27 @@ struct Qty {
   bool operator==(float other) const { return value == other; }
   bool operator<(const Qty& other) const { return value < other.value; }
   bool operator==(const Qty& other) const { return value == other.value; }
+
+  Qty& operator+=(const Qty& other) {
+    value += other.value;
+    return *this;
+  }
+
+  Qty& operator+=(float other) {
+    value += other;
+    return *this;
+  }
+
+  Qty& operator-=(const Qty& other) {
+    value -= other.value;
+    return *this;
+  }
+
+  Qty& operator-=(float other) {
+    value -= other;
+    return *this;
+  }
+
   explicit operator float() const { return value; }
 };
 
@@ -127,11 +148,12 @@ inline auto toString(Priority priority) -> std::string {
 
 constexpr auto kPriorityInvalid = std::numeric_limits<uint64_t>::max();
 
-enum class Side : char {
-  kInvalid = '\0',
-  kBuy = '0',
-  kSell = '1',
-  kTrade = '2',
+enum class Side : int8_t {
+  kInvalid = 0,
+  kBuy = 1,
+  kSell = -1,
+  kTrade = 2,
+  kMax = 3,
 };
 
 inline auto toString(const Side side) -> std::string {
@@ -144,6 +166,8 @@ inline auto toString(const Side side) -> std::string {
       return "INVALID";
     case Side::kTrade:
       return "TRADE";
+    case Side::kMax:
+      return "MAX";
   }
 
   return "UNKNOWN";

@@ -11,8 +11,8 @@
  */
 
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>     // Logger를 mock하기 위해 사용
-#include "feature_engine.h"   // 실제 헤더 경로에 맞게 수정
+#include <gmock/gmock.h>
+#include "feature_engine.h"
 
 #include "logger.h"
 #include "order_book.h"

@@ -34,6 +34,7 @@ add_unit_test(mpsc)
 add_unit_test(memory_pool)
 add_unit_test(order_book)
 add_unit_test(feature_engine)
+add_unit_test(position_keeper)
 
 file(GLOB TEST_EXECUTABLES "${CMAKE_BINARY_DIR}/tests/*_tests")
 

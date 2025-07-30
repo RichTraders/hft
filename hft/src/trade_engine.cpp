@@ -11,8 +11,10 @@
  */
 
 #include "trade_engine.h"
+#include "execution_report.h"
 #include "feature_engine.h"
 #include "performance.h"
+#include "position_keeper.h"
 
 constexpr std::size_t kCapacity = 64;
 
@@ -25,7 +27,8 @@ TradeEngine::TradeEngine(
       market_update_data_pool_(market_update_data_pool),
       market_data_pool_(market_data_pool),
       queue_(std::make_unique<common::SPSCQueue<MarketUpdateData*>>(kCapacity)),
-      feature_engine_(std::make_unique<FeatureEngine>(logger)) {
+      feature_engine_(std::make_unique<FeatureEngine>(logger)),
+      position_keeper_(std::make_unique<PositionKeeper>(logger)) {
   auto orderbook = std::make_unique<MarketOrderBook>("BTCUSDT", logger);
   orderbook->set_trade_engine(this);
   ticker_order_book_.insert({"BTCUSDT", std::move(orderbook)});
@@ -45,13 +48,18 @@ void TradeEngine::stop() {
 
 // TODO(jb): call feature engine
 void TradeEngine::on_order_book_updated(common::Price price, common::Side side,
-                                        MarketOrderBook* order_book) {
+                                        MarketOrderBook* order_book) const {
   feature_engine_->on_order_book_updated(price, side, order_book);
 }
 
 void TradeEngine::on_trade_updated(const MarketData* market_data,
                                    MarketOrderBook* order_book) const {
   feature_engine_->on_trade_updated(market_data, order_book);
+}
+
+void TradeEngine::on_order_updated(
+    const ExecutionReport* report) const noexcept {
+  position_keeper_->add_fill(report);
 }
 
 void TradeEngine::run() {

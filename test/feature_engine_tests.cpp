@@ -28,7 +28,16 @@ protected:
   void SetUp() override {
     market_pool = new MemoryPool<MarketData>(8);
     market_update_pool = new MemoryPool<MarketUpdateData>(8);
-    trade_engine = new TradeEngine(&logger, market_update_pool, market_pool);
+
+    TradeEngineCfg cfg;
+    cfg.risk_cfg_.max_order_size_ = Qty{10};
+    cfg.risk_cfg_.max_position_ = Qty{50};
+    cfg.risk_cfg_.max_loss_ = -1000;
+
+    ticker_cfg = new TradeEngineCfgHashMap{{"BTCUSDT", cfg}};
+
+    trade_engine = new TradeEngine(&logger, market_update_pool, market_pool,
+                                   *ticker_cfg);
     trade_engine->stop();
   }
 
@@ -42,6 +51,7 @@ protected:
   Logger logger;
   MemoryPool<MarketData>* market_pool;
   MemoryPool<MarketUpdateData>* market_update_pool;
+  TradeEngineCfgHashMap* ticker_cfg;
 };
 
 

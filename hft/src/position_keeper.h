@@ -31,7 +31,7 @@ struct PositionInfo {
   common::Qty volume_ = common::Qty{0};
   const BBO* bbo_ = nullptr;
 
-  [[nodiscard]] auto toString() const;
+  [[nodiscard]] std::string toString() const;
 
   void add_fill(const ExecutionReport* report, common::Logger* logger) noexcept;
 

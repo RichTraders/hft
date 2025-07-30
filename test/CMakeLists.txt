@@ -17,7 +17,7 @@ macro(add_unit_test _TEST_NAME)
     target_precompile_headers(${_TEST_NAME}_tests PRIVATE
             ${CMAKE_SOURCE_DIR}/include/pch.h
             ${CMAKE_SOURCE_DIR}/hft/hft_lib.h)
-    add_test(NAME ${_TEST_NAME}_tests COMMAND ${_TEST_NAME}_tests WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+    add_test(NAME ${_TEST_NAME}_tests COMMAND ${_TEST_NAME}_tests WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test)
     target_compile_definitions(${_TEST_NAME}_tests PRIVATE UNIT_TEST)
     target_compile_options(${_TEST_NAME}_tests PRIVATE -Wno-missing-field-initializers -Wno-error=unused-parameter)
 endmacro()
@@ -35,13 +35,15 @@ add_unit_test(memory_pool)
 add_unit_test(order_book)
 add_unit_test(feature_engine)
 add_unit_test(position_keeper)
+add_unit_test(risk_manager)
+add_unit_test(ini_config)
+
+set(RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+file(COPY ${RESOURCE_DIR} DESTINATION ${CMAKE_BINARY_DIR}/test)
 
 file(GLOB TEST_EXECUTABLES "${CMAKE_BINARY_DIR}/tests/*_tests")
 
 add_custom_target(RUN_ALL_TESTS
-        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+        COMMAND sudo ${CMAKE_CTEST_COMMAND} --output-on-failure
         DEPENDS ${TEST_EXECUTABLES}
 )
-
-set(TEST_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/data")
-install(DIRECTORY ${TEST_DATA_DIR} DESTINATION ${CMAKE_BINARY_DIR}/bin COMPONENT test_data)

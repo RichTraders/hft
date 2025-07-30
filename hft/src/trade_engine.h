@@ -28,13 +28,15 @@ struct ExecutionReport;
 
 namespace trading {
 class FeatureEngine;
+class RiskManager;
 
 class TradeEngine {
  public:
   explicit TradeEngine(
       common::Logger* logger,
       common::MemoryPool<MarketUpdateData>* market_update_data_pool,
-      common::MemoryPool<MarketData>* market_data_pool);
+      common::MemoryPool<MarketData>* market_data_pool,
+      const common::TradeEngineCfgHashMap& ticker_cfg);
   ~TradeEngine();
 
   void stop();
@@ -57,6 +59,7 @@ class TradeEngine {
   bool running_{true};
   std::unique_ptr<FeatureEngine> feature_engine_;
   std::unique_ptr<PositionKeeper> position_keeper_;
+  std::unique_ptr<RiskManager> risk_manager_;
 
   void run();
 };

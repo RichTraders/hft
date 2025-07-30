@@ -15,7 +15,7 @@
 #include "logger.h"
 #include "memory_pool.hpp"
 
-namespace FIX8 {  // NOLINT(readability-identifier-naming)
+namespace FIX8 { // NOLINT(readability-identifier-naming)
 class Message;
 }
 
@@ -23,8 +23,10 @@ namespace trading {
 class TradeEngine;
 
 class OrderGateway {
- public:
-  OrderGateway(common::Logger* logger, TradeEngine* trade_engine,
+public:
+  OrderGateway(const Authorization& authorization,
+               common::Logger* logger,
+               TradeEngine* trade_engine,
                common::MemoryPool<OrderData>* order_data_pool);
   ~OrderGateway();
 
@@ -36,11 +38,11 @@ class OrderGateway {
   void on_logout(FIX8::Message*);
   void on_heartbeat(FIX8::Message* msg);
 
- private:
+private:
   common::Logger* logger_;
   TradeEngine* trade_engine_;
   common::MemoryPool<OrderData>*
-      order_data_pool_;  // <- spsc로 수정 필요 구조체는 큰 구조체로 사용
+  order_data_pool_; // <- spsc로 수정 필요 구조체는 큰 구조체로 사용
   std::unique_ptr<core::FixOrderEntryApp> app_;
 };
-}  // namespace trading
+} // namespace trading

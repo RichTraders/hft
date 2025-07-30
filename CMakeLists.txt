@@ -17,3 +17,6 @@ target_link_libraries(HFT PRIVATE HftLib)
 
 add_subdirectory(repository)
 add_subdirectory(test)
+
+set(RESOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+file(COPY ${RESOURCES_DIR} DESTINATION ${CMAKE_BINARY_DIR})

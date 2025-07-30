@@ -16,6 +16,7 @@
 #include "NewOroFix44MD_types.hpp"
 #include "NewOroFix44MD_router.hpp"
 #include "NewOroFix44MD_classes.hpp"
+#include "ini_config.hpp"
 
 #include "gtest/gtest.h"
 using namespace core;
@@ -59,10 +60,19 @@ std::string timestamp() {
 class FixTest : public ::testing::Test {
 protected:
   void SetUp() override {
+    IniConfig config;
+    config.load("resources/config.ini");
+    Authorization authorization{
+        .md_address = config.get("auth", "md_address"),
+        .port = config.get_int("auth", "port"),
+        .api_key = config.get("auth", "api_key"),
+        .pem_file_path = config.get("auth", "pem_file_path"),
+        .private_password = config.get("auth", "private_password")};
+
     logger_ = std::make_unique<common::Logger>();
     pool_ = std::make_unique<common::MemoryPool<MarketData>>(1024);
     fix = std::make_unique<FixMdCore>("SENDER", "TARGET", logger_.get(),
-                                      pool_.get());
+                                      pool_.get(), authorization);
   }
 
   std::unique_ptr<FixMdCore> fix;

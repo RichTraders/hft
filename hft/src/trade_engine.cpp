@@ -15,6 +15,7 @@
 #include "feature_engine.h"
 #include "performance.h"
 #include "position_keeper.h"
+#include "risk_manager.h"
 
 constexpr std::size_t kCapacity = 64;
 
@@ -22,13 +23,16 @@ namespace trading {
 TradeEngine::TradeEngine(
     common::Logger* logger,
     common::MemoryPool<MarketUpdateData>* market_update_data_pool,
-    common::MemoryPool<MarketData>* market_data_pool)
+    common::MemoryPool<MarketData>* market_data_pool,
+    const common::TradeEngineCfgHashMap& ticker_cfg)
     : logger_(logger),
       market_update_data_pool_(market_update_data_pool),
       market_data_pool_(market_data_pool),
       queue_(std::make_unique<common::SPSCQueue<MarketUpdateData*>>(kCapacity)),
       feature_engine_(std::make_unique<FeatureEngine>(logger)),
-      position_keeper_(std::make_unique<PositionKeeper>(logger)) {
+      position_keeper_(std::make_unique<PositionKeeper>(logger)),
+      risk_manager_(std::make_unique<RiskManager>(
+          logger, position_keeper_.get(), ticker_cfg)) {
   auto orderbook = std::make_unique<MarketOrderBook>("BTCUSDT", logger);
   orderbook->set_trade_engine(this);
   ticker_order_book_.insert({"BTCUSDT", std::move(orderbook)});

@@ -15,6 +15,7 @@
 #include "NewOroFix44OE_types.hpp"
 #include "NewOroFix44OE_router.hpp"
 #include "NewOroFix44OE_classes.hpp"
+#include "performance.h"
 #include "signature.h"
 
 namespace core {
@@ -179,7 +180,7 @@ FIX8::Message* FixOeCore::decode(const std::string& message) {
   FIX8::Message* msg(
       FIX8::Message::factory(ctx(), message, true, true));
 #ifdef DEBUG
-  END_MEASURE(Convert_Message);
+  END_MEASURE(Convert_Message, logger_);
 #endif
   if (likely(msg)) {
     return msg;

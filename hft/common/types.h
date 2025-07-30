@@ -233,5 +233,39 @@ inline std::string toString(MarketUpdateType type) {
   }
   return "UNKNOWN";
 }
+
+struct RiskCfg {
+  Qty max_order_size_ = Qty{0};
+  Qty max_position_ = Qty{0};
+  double max_loss_ = 0;
+
+  [[nodiscard]] auto toString() const {
+    std::stringstream stream;
+
+    stream << "RiskCfg{"
+           << "max-order-size:" << common::toString(max_order_size_) << " "
+           << "max-position:" << common::toString(max_position_) << " "
+           << "max-loss:" << max_loss_ << "}";
+
+    return stream.str();
+  }
+};
+
+struct TradeEngineCfg {
+  Qty clip_ = Qty{0};
+  double threshold_ = 0;
+  RiskCfg risk_cfg_;
+
+  [[nodiscard]] auto toString() const {
+    std::stringstream stream;
+    stream << "TradeEngineCfg{" << "clip:" << common::toString(clip_) << " "
+           << "thresh:" << threshold_ << " " << "risk:" << risk_cfg_.toString()
+           << "}";
+
+    return stream.str();
+  }
+};
+
+using TradeEngineCfgHashMap = std::unordered_map<std::string, TradeEngineCfg>;
 }  // namespace common
 #endif  //TYPES_H

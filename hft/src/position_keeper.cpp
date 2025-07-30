@@ -20,7 +20,7 @@ using common::Side;
 using common::sideToIndex;
 
 namespace trading {
-auto PositionInfo::toString() const {
+std::string PositionInfo::toString() const {
   std::stringstream stream;
   stream << "Position{" << "pos:" << position_ << " u-pnl:" << unreal_pnl_
          << " r-pnl:" << real_pnl_ << " t-pnl:" << total_pnl_

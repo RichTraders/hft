@@ -21,6 +21,41 @@
 using namespace core;
 using namespace FIX8::NewOroFix44MD;
 
+std::string timestamp() {
+  using std::chrono::duration_cast;
+  using std::chrono::system_clock;
+  using std::chrono::year_month_day;
+  using std::chrono::days;
+
+  using std::chrono::hours;
+  using std::chrono::minutes;
+  using std::chrono::seconds;
+  using std::chrono::milliseconds;
+
+  const auto now = system_clock::now();
+  //FIX8 only supports ms
+  const auto t = floor<milliseconds>(now);
+
+  const auto dp = floor<days>(t);
+  const auto ymd = year_month_day{dp};
+  const auto time = t - dp;
+
+  const auto h = duration_cast<hours>(time);
+  const auto m = duration_cast<minutes>(time - h);
+  const auto s = duration_cast<seconds>(time - h - m);
+  const auto ms = duration_cast<milliseconds>(time - h - m - s);
+
+  char buf[64];
+  std::snprintf(buf, sizeof(buf), "%04d%02d%02d-%02d:%02d:%02d.%03ld",
+                static_cast<int>(ymd.year()),
+                static_cast<unsigned>(ymd.month()),
+                static_cast<unsigned>(ymd.day()),
+                static_cast<int>(h.count()), static_cast<int>(m.count()),
+                static_cast<int>(s.count()),
+                ms.count());
+  return std::string(buf);
+}
+
 class FixTest : public ::testing::Test {
 protected:
   void SetUp() override {
@@ -36,7 +71,7 @@ protected:
 };
 
 TEST_F(FixTest, CreateLogOnMessageProducesValidFixMessage) {
-  const std::string sig = fix->timestamp();
+  const std::string sig = timestamp();
   const std::string timestamp = "20250101-01:01:12.123";
 
   const std::string msg_str = fix->create_log_on_message(sig, timestamp);

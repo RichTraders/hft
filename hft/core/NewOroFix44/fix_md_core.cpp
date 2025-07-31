@@ -53,7 +53,7 @@ std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
       << new RawData(sig_b64)
       << new Username(
 #ifdef DEBUG
-          "XMJMVrlohHOtkzAn6WyiRQngkEqiSgJwacbMX3J5k0YwJx8Y7S0jE9xUsvwNclO9")
+          "psxtGrh4X1aLsBVoMn3NCEuHDns78Yie9BMO0TIJEJvLFpZKk86guB7aOqsYTVk2")
 #else
           "cJHjHNqHUG1nhTs0YPEKlmxoXokNomptrrilcGzrhoqhd8S9kEFfcJg2YQjVKgGw")
 #endif
@@ -199,7 +199,7 @@ std::string FixMdCore::create_trade_data_subscription_message(
   return wire;
 }
 
-MarketUpdateData FixMdCore::create_market_data(FIX8::Message* msg) const {
+MarketUpdateData FixMdCore::create_market_data_message(FIX8::Message* msg) {
   auto* entries = msg->find_group(kEntries);
   std::vector<MarketData*> data(entries->size());
   const auto* symbol = entries->get_element(0)->get<Symbol>(); //55
@@ -228,7 +228,7 @@ MarketUpdateData FixMdCore::create_market_data(FIX8::Message* msg) const {
   return MarketUpdateData(std::move(data));
 }
 
-MarketUpdateData FixMdCore::create_snapshot_data_message(FIX8::Message* msg) const {
+MarketUpdateData FixMdCore::create_snapshot_data_message(FIX8::Message* msg) {
   const auto* symbol = msg->get<Symbol>();
   auto* entries = msg->find_group(kEntries);
 
@@ -262,41 +262,6 @@ MarketUpdateData FixMdCore::create_snapshot_data_message(FIX8::Message* msg) con
   return MarketUpdateData(std::move(data));
 }
 
-std::string FixMdCore::timestamp() {
-  using std::chrono::duration_cast;
-  using std::chrono::system_clock;
-  using std::chrono::year_month_day;
-  using std::chrono::days;
-
-  using std::chrono::hours;
-  using std::chrono::minutes;
-  using std::chrono::seconds;
-  using std::chrono::milliseconds;
-
-  const auto now = system_clock::now();
-  //FIX8 only supports ms
-  const auto t = floor<milliseconds>(now);
-
-  const auto dp = floor<days>(t);
-  const auto ymd = year_month_day{dp};
-  const auto time = t - dp;
-
-  const auto h = duration_cast<hours>(time);
-  const auto m = duration_cast<minutes>(time - h);
-  const auto s = duration_cast<seconds>(time - h - m);
-  const auto ms = duration_cast<milliseconds>(time - h - m - s);
-
-  char buf[64];
-  std::snprintf(buf, sizeof(buf), "%04d%02d%02d-%02d:%02d:%02d.%03ld",
-                static_cast<int>(ymd.year()),
-                static_cast<unsigned>(ymd.month()),
-                static_cast<unsigned>(ymd.day()),
-                static_cast<int>(h.count()), static_cast<int>(m.count()),
-                static_cast<int>(s.count()),
-                ms.count());
-  return std::string(buf);
-}
-
 FIX8::Message* FixMdCore::decode(const std::string& message) {
 #ifdef DEBUG
   START_MEASURE(Convert_Message);
@@ -312,24 +277,4 @@ FIX8::Message* FixMdCore::decode(const std::string& message) {
   return nullptr;
 }
 
-const std::string
-FixMdCore::get_signature_base64(const std::string& timestamp) const {
-  // TODO(jb): use config reader
-  EVP_PKEY* private_key = Util::load_ed25519(
-      "/home/neworo/CLionProjects/hft/resources/private.pem", "akaj124!");
-
-  // payload = "A<SOH>Sender<SOH>Target<SOH>1<SOH>20250709-00:49:41.041346"
-  const std::string payload = std::string("A") + SOH
-                              + sender_comp_id_ + SOH
-                              + target_comp_id_ + SOH
-                              + "1" + SOH
-                              + timestamp;
-
-  return Util::sign_and_base64(private_key, payload);
-}
-
-void FixMdCore::encode(std::string& data, FIX8::Message* msg) {
-  auto* ptr = data.data();
-  msg->encode(&ptr);
-}
 }

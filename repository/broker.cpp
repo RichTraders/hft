@@ -11,7 +11,9 @@
  */
 
 #include "broker.h"
+
 #include "common/logger.h"
+#include "fix_md_app.h"
 
 constexpr int kPort = 9000;
 constexpr int kKilo = 1024;
@@ -19,7 +21,6 @@ constexpr int kThirty = 30;
 
 using common::FileSink;
 using common::LogLevel;
-using core::FixApp;
 
 Broker::Broker()
     : pool_(std::make_unique<common::MemoryPool<MarketData>>(kMemoryPoolSize)),
@@ -27,7 +28,8 @@ Broker::Broker()
 #ifdef DEBUG
       app_(std::make_unique<FixApp<>>("fix-md.testnet.binance.vision",
 #else
-      app_(std::make_unique<FixApp<>>("fix-md.binance.com",
+      app_(std::make_unique<core::FixMarketDataApp>(
+          "fix-md.binance.com",
 #endif
                                       kPort, "BMDWATCH", "SPOT", log_.get(),
                                       pool_.get())) {
@@ -46,15 +48,15 @@ Broker::Broker()
   app_->start();
 }
 
-void Broker::on_login(FIX8::Message*) const {
+void Broker::on_login(FIX8::Message*) {
   std::cout << "login successful\n";
-  const std::string message =
-      app_->create_subscription_message("DEPTH_STREAM", "5000", "BTCUSDT");
+  const std::string message = app_->create_market_data_subscription_message(
+      "DEPTH_STREAM", "5000", "BTCUSDT");
   std::cout << "snapshot : " << message << "\n";
   app_->send(message);
 }
 
-void Broker::on_heartbeat(FIX8::Message* msg) const {
+void Broker::on_heartbeat(FIX8::Message* msg) {
   auto message = app_->create_heartbeat_message(msg);
   app_->send(message);
 }

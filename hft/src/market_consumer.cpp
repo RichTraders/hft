@@ -1,17 +1,17 @@
 /*
  * MIT License
- * 
+ *
  * Copyright (c) 2025 NewOro Corporation
- * 
- * Permission is hereby granted, free of charge, to use, copy, modify, and distribute 
- * this software for any purpose with or without fee, provided that the above 
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
  * copyright notice appears in all copies.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
 #include "market_consumer.h"
-#include "core/NewOroFix44/fix_app.h"
+#include "fix_md_app.h"
 #include "trade_engine.h"
 
 constexpr int kPort = 9000;
@@ -26,12 +26,13 @@ MarketConsumer::MarketConsumer(
       logger_(logger),
       trade_engine_(trade_engine),
 #ifdef DEBUG
-      app_(std::make_unique<core::FixApp<>>("fix-md.testnet.binance.vision",
+      app_(std::make_unique<core::FixMarketDataApp>(
+          "fix-md.testnet.binance.vision",
 #else
-      app_(std::make_unique<core::FixApp<1>>("fix-md.binance.com",
+      app_(std::make_unique<core::FixMarketDataApp>(
+          "fix-md.binance.com",
 #endif
-                                            kPort, "BMDWATCH", "SPOT", logger_,
-                                            market_data_pool_)) {
+          kPort, "BMDWATCH", "SPOT", logger_, market_data_pool_)) {
 
   app_->register_callback(
       "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });
@@ -58,8 +59,8 @@ MarketConsumer::~MarketConsumer() {
 
 void MarketConsumer::on_login(FIX8::Message*) const {
   logger_->info("login successful");
-  const std::string message =
-      app_->create_subscription_message("DEPTH_STREAM", "1000", "BTCUSDT");
+  const std::string message = app_->create_market_data_subscription_message(
+      "DEPTH_STREAM", "1000", "BTCUSDT");
   app_->send(message);
   logger_->info("sent order message");
 }

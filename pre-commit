@@ -14,7 +14,7 @@ if ! command -v "$CLANG_TIDY" > /dev/null; then
 fi
 
 EXTENSIONS="h cpp cc cxx c hpp"
-FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -Ev "test|NewOroFix44MD_|NewOroFix44OE_|fix_[app|wrapper]" | grep -E "\.(${EXTENSIONS// /|})$")
+FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -Ev "test|NewOroFix44MD_|NewOroFix44OE_|fix_[?:app|m_appd|oe_app]" | grep -E "\.(${EXTENSIONS// /|})$")
 
 if [ -z "$FILES" ]; then
   exit 0

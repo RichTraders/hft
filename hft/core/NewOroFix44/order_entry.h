@@ -1,0 +1,146 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2025 NewOro Corporation
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
+ * copyright notice appears in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ */
+
+#pragma once
+#include "types.h"
+
+namespace trading {
+enum class OrderType : char {
+  kMarket = '1',
+  kLimit = '2',
+  kStopLoss = '3',
+  kStopLimit = '4',
+};
+
+enum class TimeInForce : char {
+  kGoodTillCancel = '1',
+  kImmediateOrCancel = '3',
+  kFillOrKill = '4',
+};
+
+template <typename T>
+constexpr char to_char(T text) noexcept {
+  return static_cast<char>(text);
+}
+
+enum class Side : char {
+  kBuy = '1',  // 매수
+  kSell = '2'  // 매도
+};
+
+enum class SelfTradePreventionMode : char {
+  kNone = '1',
+  kExpireTaker = '2',
+  kExpireMaker = '3',
+  kExpireBoth = '4',
+  kDecrement = '5',
+};
+
+struct NewSingleOrderData {
+  std::string cl_order_id;  // Tag 11: 고객 지정 주문 ID (유니크)
+  std::string symbol;       // Tag 55: 종목 (예: "BTCUSDT")
+  Side side;                // Tag 54: 매매 방향 ('1' = Buy, '2' = Sell)
+  double order_qty;         // Tag 38: 주문 수량
+  OrderType ord_type;       // Tag 40: 주문 유형 ('1' = Market, '2' = Limit)
+  double price;             // Tag 44: 지정가 (Limit 주문일 때만 사용)
+  TimeInForce
+      time_in_force;  // Tag 59: 주문 유효 기간 ('0' = Day, '1' = GTC 등)
+  std::string transact_time;  // Tag 60: 전송 시간 (YYYYMMDD‑HH:MM:SS.sss)
+  SelfTradePreventionMode self_trade_prevention_mode =
+      SelfTradePreventionMode::kExpireTaker;
+};
+
+enum class ExecType : char {
+  kNew = '0',
+  kCanceled = '4',
+  kReplaced = '5',
+  kRejected = '8',
+  kSuspended = '9',
+  kTrade = 'F',
+  kExpired = 'C',
+};
+
+inline const char* to_string(ExecType execType) {
+  switch (execType) {
+    case ExecType::kNew:
+      return "New";
+    case ExecType::kCanceled:
+      return "Canceled";
+    case ExecType::kReplaced:
+      return "Replaced";
+    case ExecType::kRejected:
+      return "Rejected";
+    case ExecType::kSuspended:
+      return "Suspended";
+    case ExecType::kTrade:
+      return "Trade";
+    case ExecType::kExpired:
+      return "Expired";
+    default:
+      return "Unknown";
+  }
+}
+
+enum class OrdStatus : char {
+  kNew = '0',
+  kPartiallyFilled = '1',
+  kFilled = '2',
+  kCanceled = '4',
+  kPendingCancel = '6',
+  kRejected = '8',
+  kPendingNew = 'A',
+  kExpired = 'C'
+};
+
+inline const char* to_string(OrdStatus status) {
+  switch (status) {
+    case OrdStatus::kNew:
+      return "New";
+    case OrdStatus::kPartiallyFilled:
+      return "PartiallyFilled";
+    case OrdStatus::kFilled:
+      return "Filled";
+    case OrdStatus::kCanceled:
+      return "Canceled";
+    case OrdStatus::kPendingCancel:
+      return "PendingCancel";
+    case OrdStatus::kRejected:
+      return "Rejected";
+    case OrdStatus::kPendingNew:
+      return "PendingNew";
+    case OrdStatus::kExpired:
+      return "Expired";
+    default:
+      return "Unknown";
+  }
+}
+
+inline ExecType exec_type_from_char(char text) {
+  return static_cast<ExecType>(text);
+}
+inline OrdStatus ord_status_from_char(char text) {
+  return static_cast<OrdStatus>(text);
+}
+
+struct ExecutionReport {
+  std::string cl_ord_id;
+  common::OrderId order_id = common::OrderId(0);
+  std::string symbol;
+  ExecType exec_type;
+  OrdStatus ord_status;
+  common::Qty cum_qty = common::Qty{.0f};
+  common::Qty leaves_qty = common::Qty{.0f};
+  common::Qty last_qty = common::Qty{.0f};
+  int reason;
+  common::Price price = common::Price{.0f};
+};
+}  // namespace trading

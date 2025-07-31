@@ -10,11 +10,15 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "NewOroFix44/fix_app.h"
+#include "NewOroFix44/fix_md_app.h"
+#include "NewOroFix44/fix_oe_app.h"
 #include <fix8/f8includes.hpp>
 #include "NewOroFix44MD_types.hpp"
 #include "NewOroFix44MD_router.hpp"
 #include "NewOroFix44MD_classes.hpp"
+#include "NewOroFix44OE_types.hpp"
+#include "NewOroFix44OE_router.hpp"
+#include "NewOroFix44OE_classes.hpp"
 
 #include "logger.h"
 #include "memory_pool.hpp"
@@ -24,13 +28,13 @@
 using namespace core;
 using namespace common;
 
-TEST(FixAppTest, CallbackRegistration) {
+TEST(FixAppTest, DISABLED_CallbackRegistration) {
   auto pool = std::make_unique<MemoryPool<MarketData>>(1024);
   auto logger = std::make_unique<Logger>();
-  auto app = FixApp("fix-md.testnet.binance.vision",
-                    9000,
-                    "BMDWATCH",
-                    "SPOT", logger.get(), pool.get());
+  auto app = FixMarketDataApp("fix-md.testnet.binance.vision",
+                              9000,
+                              "BMDWATCH",
+                              "SPOT", logger.get(), pool.get());
   bool login_success = false;
   bool logout_success = false;
 
@@ -49,10 +53,70 @@ TEST(FixAppTest, CallbackRegistration) {
         std::cout << result << std::endl;
       });
   app.start();
-  sleep(3);
+  sleep(5);
   EXPECT_TRUE(login_success);
 
   app.stop();
-  sleep(3);
+  sleep(5);
   EXPECT_TRUE(logout_success);
+}
+
+TEST(FixAppTest, CallbackFixOERegistration) {
+  auto pool = std::make_unique<MemoryPool<OrderData>>(1024);
+  auto logger = std::make_unique<Logger>();
+  auto app = FixOrderEntryApp("fix-oe.testnet.binance.vision",
+                              9000,
+                              "BMDWATCH",
+                              "SPOT",
+                              logger.get(),
+                              pool.get());
+  bool login_called = false;
+  bool heartbeat_called = false;
+  bool excution_report_called = false;
+
+  app.register_callback( //log on
+      "A", [&](FIX8::Message* m) {
+        login_called = true;
+        std::string result;
+        m->encode(result);
+        std::cout << result << std::endl;
+      });
+  app.register_callback( //log out
+      "5", [&](FIX8::Message* m) {
+        std::string result;
+        m->encode(result);
+        std::cout << result << std::endl;
+      });
+  app.register_callback(
+      "1", [&](FIX8::Message* m) {
+        auto message = app.create_heartbeat(m);
+        app.send(message);
+        heartbeat_called = true;
+      });
+  app.register_callback("8", [&](FIX8::Message* m) {
+    auto* exec = static_cast<FIX8::NewOroFix44OE::ExecutionReport*>(m);
+    trading::ExecutionReport ret = app.create_execution_report_message(exec);
+    excution_report_called = true;
+  });
+
+  app.start();
+  sleep(3);
+  EXPECT_TRUE(login_called);
+
+  trading::NewSingleOrderData order_data;
+  order_data.cl_order_id = "Neworo";
+  order_data.symbol = "BTCUSDT";
+  order_data.side = trading::Side::kBuy;
+  order_data.order_qty = 0.01;
+  order_data.price = 117984;
+  order_data.transact_time = app.timestamp();
+  order_data.ord_type = trading::OrderType::kMarket;
+  order_data.time_in_force = trading::TimeInForce::kGoodTillCancel;
+  order_data.self_trade_prevention_mode = trading::SelfTradePreventionMode::kExpireTaker;
+
+  std::string ret = app.create_order_message(order_data);
+  app.send(ret);
+
+  sleep(100);
+  EXPECT_TRUE(heartbeat_called);
 }

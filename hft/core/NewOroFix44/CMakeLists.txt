@@ -15,7 +15,10 @@ set(FIX8_SRC
         signature.cpp
         ssl_socket.cpp
         fix_md_core.cpp
+        fix_oe_core.cpp
         fix_app.cpp
+        fix_md_app.cpp
+        fix_oe_app.cpp
 )
 
 add_library(Fix8Schema STATIC ${FIX8_SRC})

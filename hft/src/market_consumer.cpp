@@ -53,7 +53,7 @@ MarketConsumer::MarketConsumer(
   app_->start();
 }
 
-MarketConsumer::~MarketConsumer() {  // NOLINT(modernize-use-equals-default)
+MarketConsumer::~MarketConsumer() {
   app_->stop();
 }
 

@@ -11,6 +11,7 @@
  */
 
 #pragma once
+#include "types.h"
 
 namespace trading {
 enum class OrderType : char {
@@ -18,11 +19,9 @@ enum class OrderType : char {
   kLimit = '2',
   kStopLoss = '3',
   kStopLimit = '4',
-  kMax
 };
 
 enum class TimeInForce : char {
-  kDay = '0',
   kGoodTillCancel = '1',
   kImmediateOrCancel = '3',
   kFillOrKill = '4',
@@ -49,14 +48,13 @@ enum class SelfTradePreventionMode : char {
 struct NewSingleOrderData {
   std::string cl_order_id;  // Tag 11: 고객 지정 주문 ID (유니크)
   std::string symbol;       // Tag 55: 종목 (예: "BTCUSDT")
-  char handl_inst = '1';
-  Side side;           // Tag 54: 매매 방향 ('1' = Buy, '2' = Sell)
-  double order_qty;    // Tag 38: 주문 수량
-  OrderType ord_type;  // Tag 40: 주문 유형 ('1' = Market, '2' = Limit)
-  double price;        // Tag 44: 지정가 (Limit 주문일 때만 사용)
+  Side side;                // Tag 54: 매매 방향 ('1' = Buy, '2' = Sell)
+  double order_qty;         // Tag 38: 주문 수량
+  OrderType ord_type;       // Tag 40: 주문 유형 ('1' = Market, '2' = Limit)
+  double price;             // Tag 44: 지정가 (Limit 주문일 때만 사용)
   TimeInForce
       time_in_force;  // Tag 59: 주문 유효 기간 ('0' = Day, '1' = GTC 등)
-  std::string transactTime;  // Tag 60: 전송 시간 (YYYYMMDD‑HH:MM:SS.sss)
+  std::string transact_time;  // Tag 60: 전송 시간 (YYYYMMDD‑HH:MM:SS.sss)
   SelfTradePreventionMode self_trade_prevention_mode =
       SelfTradePreventionMode::kExpireTaker;
 };
@@ -135,14 +133,14 @@ inline OrdStatus ord_status_from_char(char text) {
 
 struct ExecutionReport {
   std::string cl_ord_id;
-  int order_id;
+  common::OrderId order_id = common::OrderId(0);
   std::string symbol;
   ExecType exec_type;
   OrdStatus ord_status;
-  double cum_qty;
-  double leaves_qty;
-  double last_qty;
+  common::Qty cum_qty = common::Qty{.0f};
+  common::Qty leaves_qty = common::Qty{.0f};
+  common::Qty last_qty = common::Qty{.0f};
   int reason;
-  double price;
+  common::Price price = common::Price{.0f};
 };
 }  // namespace trading

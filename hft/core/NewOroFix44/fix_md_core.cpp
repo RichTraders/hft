@@ -52,7 +52,7 @@ std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
       << new RawDataLength(static_cast<int>(sig_b64.size()))
       << new RawData(sig_b64)
       << new Username(
-#ifndef DEBUG
+#ifdef DEBUG
           "psxtGrh4X1aLsBVoMn3NCEuHDns78Yie9BMO0TIJEJvLFpZKk86guB7aOqsYTVk2")
 #else
           "cJHjHNqHUG1nhTs0YPEKlmxoXokNomptrrilcGzrhoqhd8S9kEFfcJg2YQjVKgGw")

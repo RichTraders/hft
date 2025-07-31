@@ -41,8 +41,7 @@ public:
 
   FixOeCore(SendId sender_comp_id,
       TargetId target_comp_id,
-      common::Logger* logger,
-      common::MemoryPool<OrderData>* pool);
+      common::Logger* logger);
   std::string create_log_on_message(
       const std::string& sig_b64, const std::string& timestamp);
   std::string create_log_out_message();
@@ -56,6 +55,5 @@ private:
   const std::string sender_comp_id_;
   const std::string target_comp_id_;
   common::Logger* logger_;
-  common::MemoryPool<OrderData>* order_data_pool_;
 };
 }

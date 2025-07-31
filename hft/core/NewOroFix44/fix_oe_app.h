@@ -33,7 +33,7 @@ public:
            logger)
     , order_data_pool_(order_data_pool) {
     fix_oe_core_ = std::make_unique<FixOeCore>(sender_comp_id, target_comp_id,
-                                               logger, order_data_pool);
+                                               logger);
   }
 
   std::string create_log_on_message(const std::string& sig_b64,

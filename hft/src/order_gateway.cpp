@@ -24,7 +24,7 @@ OrderGateway::OrderGateway(common::Logger* logger, TradeEngine* trade_engine,
       trade_engine_(trade_engine),
       order_data_pool_(order_data_pool),
 #ifdef DEBUG
-      app_(std::make_unique<core::FixOrderEntryAppApp>(
+      app_(std::make_unique<core::FixOrderEntryApp>(
           "fix-oe.testnet.binance.vision",
 #else
       app_(std::make_unique<core::FixOrderEntryApp>(

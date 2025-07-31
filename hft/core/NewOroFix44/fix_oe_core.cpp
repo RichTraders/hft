@@ -22,13 +22,11 @@ using namespace FIX8::NewOroFix44OE;
 
 FixOeCore::FixOeCore(SendId sender_comp_id,
                      TargetId target_comp_id,
-                     common::Logger* logger,
-                     common::MemoryPool<OrderData>* pool)
+                     common::Logger* logger)
   :
   sender_comp_id_(std::move(sender_comp_id)),
   target_comp_id_(std::move(target_comp_id)),
-  logger_(logger),
-  order_data_pool_(pool) {}
+  logger_(logger) {}
 
 std::string FixOeCore::create_log_on_message(const std::string& sig_b64,
                                              const std::string& timestamp) {
@@ -98,7 +96,8 @@ std::string FixOeCore::create_heartbeat_message(FIX8::Message* message) {
   return wire;
 }
 
-std::string FixOeCore::create_order_message(const trading::NewSingleOrderData& order_data) {
+std::string FixOeCore::create_order_message(
+    const trading::NewSingleOrderData& order_data) {
   NewOrderSingle request;
 
   FIX8::MessageBase* header = request.Header();
@@ -106,19 +105,22 @@ std::string FixOeCore::create_order_message(const trading::NewSingleOrderData& o
       << new SenderCompID(sender_comp_id_)
       << new TargetCompID(target_comp_id_)
       << new MsgSeqNum(sequence_++)
-      << new SendingTime(order_data.transactTime);
+      << new SendingTime(order_data.transact_time);
 
   request.add_field(new ClOrdID(order_data.cl_order_id));
   request.add_field(new Symbol(order_data.symbol));
   request.add_field(new Side(trading::to_char(order_data.side)));
   request.add_field(new OrdType(trading::to_char(order_data.ord_type)));
   request.add_field(new OrderQty(order_data.order_qty));
-  request.add_field(new SelfTradePreventionMode(trading::to_char(order_data.self_trade_prevention_mode)));
+  request.add_field(
+      new SelfTradePreventionMode(
+          trading::to_char(order_data.self_trade_prevention_mode)));
 
   if (order_data.ord_type == trading::OrderType::kLimit) {
     // Limit 주문일 때만
     request.add_field(new Price(order_data.price));
-    request.add_field(new TimeInForce(trading::to_char(order_data.time_in_force)));
+    request.add_field(
+        new TimeInForce(trading::to_char(order_data.time_in_force)));
   }
 
   /*
@@ -152,19 +154,19 @@ trading::ExecutionReport FixOeCore::create_excution_report_message(
 
   ret.symbol = symbol->get();
   ret.cl_ord_id = clOrdId->get();
-  ret.cum_qty = cumQty->get();
+  ret.cum_qty.value = cumQty->get();
   ret.exec_type = trading::exec_type_from_char(execType->get());
-  ret.last_qty = lastQty->get();
-  ret.leaves_qty = leavesQty->get();
+  ret.last_qty.value = lastQty->get();
+  ret.leaves_qty.value = leavesQty->get();
   ret.ord_status = trading::ord_status_from_char(ordStatus->get());
 
-  if (orderId != nullptr)
-    ret.order_id = orderId->get();
+  if (likely(orderId != nullptr))
+    ret.order_id.value = orderId->get();
 
-  if (price != nullptr)
-    ret.price = price->get();
+  if (likely(price != nullptr))
+    ret.price.value = price->get();
 
-  if (reason != nullptr)
+  if (likely(reason != nullptr))
     ret.reason = reason->get();
 
   return ret;

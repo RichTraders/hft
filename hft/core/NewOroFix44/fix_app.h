@@ -79,7 +79,7 @@ public:
 
   std::string timestamp();
 
-protected:
+private:
   bool strip_to_header(std::string& buffer) {
     const size_t pos = buffer.find("8=FIX");
     if (pos == std::string::npos) {

@@ -94,11 +94,8 @@ TEST(FixAppTest, CallbackFixOERegistration) {
         heartbeat_called = true;
       });
   app.register_callback("8", [&](FIX8::Message* m) {
-    // 원형이 MessageBase* 이므로, 구체 타입으로 캐스트
     auto* exec = static_cast<FIX8::NewOroFix44OE::ExecutionReport*>(m);
-    // 문자열 포맷 함수 호출
     trading::ExecutionReport ret = app.create_execution_report_message(exec);
-    // 로그 출력 혹은 화면에 표시
     excution_report_called = true;
   });
 
@@ -112,10 +109,10 @@ TEST(FixAppTest, CallbackFixOERegistration) {
   order_data.side = trading::Side::kBuy;
   order_data.order_qty = 0.01;
   order_data.price = 117984;
-  order_data.transactTime = app.timestamp();
+  order_data.transact_time = app.timestamp();
   order_data.ord_type = trading::OrderType::kMarket;
   order_data.time_in_force = trading::TimeInForce::kGoodTillCancel;
-  order_data.self_trade_prevention_mode = trading::SelfTradePreventionMode::kExpire_Taker;
+  order_data.self_trade_prevention_mode = trading::SelfTradePreventionMode::kExpireTaker;
 
   std::string ret = app.create_order_message(order_data);
   app.send(ret);

@@ -39,7 +39,8 @@ class OrderGateway {
  private:
   common::Logger* logger_;
   TradeEngine* trade_engine_;
-  common::MemoryPool<OrderData>* order_data_pool_;
+  common::MemoryPool<OrderData>*
+      order_data_pool_;  // <- spsc로 수정 필요 구조체는 큰 구조체로 사용
   std::unique_ptr<core::FixOrderEntryApp> app_;
 };
 }  // namespace trading

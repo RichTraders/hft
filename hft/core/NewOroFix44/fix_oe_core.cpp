@@ -1,6 +1,14 @@
-//
-// Created by neworo2 on 25. 7. 26.
-//
+/*
+* MIT License
+ *
+ * Copyright (c) 2025 NewOro Corporation
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
+ * copyright notice appears in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ */
 
 #include "fix_oe_core.h"
 #include <fix8/f8includes.hpp>
@@ -102,14 +110,15 @@ std::string FixOeCore::create_order_message(const trading::NewSingleOrderData& o
 
   request.add_field(new ClOrdID(order_data.cl_order_id));
   request.add_field(new Symbol(order_data.symbol));
-  request.add_field(new Side(trading::toChar(order_data.side)));
-  request.add_field(new OrdType(trading::toChar(order_data.ord_type)));
+  request.add_field(new Side(trading::to_char(order_data.side)));
+  request.add_field(new OrdType(trading::to_char(order_data.ord_type)));
   request.add_field(new OrderQty(order_data.order_qty));
+  request.add_field(new SelfTradePreventionMode(trading::to_char(order_data.self_trade_prevention_mode)));
 
   if (order_data.ord_type == trading::OrderType::kLimit) {
     // Limit 주문일 때만
     request.add_field(new Price(order_data.price));
-    request.add_field(new TimeInForce(trading::toChar(order_data.time_in_force)));
+    request.add_field(new TimeInForce(trading::to_char(order_data.time_in_force)));
   }
 
   /*
@@ -138,17 +147,16 @@ trading::ExecutionReport FixOeCore::create_excution_report_message(
   auto lastQty = msg->get<LastQty>();
   auto price = msg->get<Price>();
   auto reason = msg->get<OrdRejReason>();
-  auto txt = msg->get<Text>();
 
   trading::ExecutionReport ret;
 
   ret.symbol = symbol->get();
   ret.cl_ord_id = clOrdId->get();
   ret.cum_qty = cumQty->get();
-  ret.exec_type = trading::execTypeFromChar(execType->get());
+  ret.exec_type = trading::exec_type_from_char(execType->get());
   ret.last_qty = lastQty->get();
   ret.leaves_qty = leavesQty->get();
-  ret.ord_status = trading::ordStatusFromChar(ordStatus->get());
+  ret.ord_status = trading::ord_status_from_char(ordStatus->get());
 
   if (orderId != nullptr)
     ret.order_id = orderId->get();
@@ -158,9 +166,6 @@ trading::ExecutionReport FixOeCore::create_excution_report_message(
 
   if (reason != nullptr)
     ret.reason = reason->get();
-
-  if (txt != nullptr)
-    ret.text = txt->get();
 
   return ret;
 }

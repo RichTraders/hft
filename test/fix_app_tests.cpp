@@ -89,7 +89,7 @@ TEST(FixAppTest, CallbackFixOERegistration) {
       });
   app.register_callback(
       "1", [&](FIX8::Message* m) {
-        auto message = app.create_heartbeat_message(m);
+        auto message = app.create_heartbeat(m);
         app.send(message);
         heartbeat_called = true;
       });
@@ -115,6 +115,7 @@ TEST(FixAppTest, CallbackFixOERegistration) {
   order_data.transactTime = app.timestamp();
   order_data.ord_type = trading::OrderType::kMarket;
   order_data.time_in_force = trading::TimeInForce::kGoodTillCancel;
+  order_data.self_trade_prevention_mode = trading::SelfTradePreventionMode::kExpire_Taker;
 
   std::string ret = app.create_order_message(order_data);
   app.send(ret);

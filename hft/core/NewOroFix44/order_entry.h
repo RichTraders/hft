@@ -11,9 +11,6 @@
  */
 
 #pragma once
-#include <cstdint>
-
-#include "types.h"
 
 namespace trading {
 enum class OrderType : char {
@@ -32,13 +29,21 @@ enum class TimeInForce : char {
 };
 
 template <typename T>
-constexpr char toChar(T text) noexcept {
+constexpr char to_char(T text) noexcept {
   return static_cast<char>(text);
 }
 
 enum class Side : char {
   kBuy = '1',  // 매수
   kSell = '2'  // 매도
+};
+
+enum class SelfTradePreventionMode : char {
+  kNone = '1',
+  kExpireTaker = '2',
+  kExpireMaker = '3',
+  kExpireBoth = '4',
+  kDecrement = '5',
 };
 
 struct NewSingleOrderData {
@@ -52,59 +57,36 @@ struct NewSingleOrderData {
   TimeInForce
       time_in_force;  // Tag 59: 주문 유효 기간 ('0' = Day, '1' = GTC 등)
   std::string transactTime;  // Tag 60: 전송 시간 (YYYYMMDD‑HH:MM:SS.sss)
+  SelfTradePreventionMode self_trade_prevention_mode =
+      SelfTradePreventionMode::kExpireTaker;
 };
 
-// enum class 정의 (필요시)
 enum class ExecType : char {
   kNew = '0',
-  kPartialFill = '1',
-  kFill = '2',
-  kDoneForDay = '3',
   kCanceled = '4',
   kReplaced = '5',
-  kPendingCancel = '6',
-  kStopped = '7',
   kRejected = '8',
   kSuspended = '9',
-  kPendingNew = 'A',
-  kCalculated = 'B',
+  kTrade = 'F',
   kExpired = 'C',
-  kRestated = 'D',
-  kPendingReplace = 'E'
 };
 
-inline const char* toString(ExecType execType) {
+inline const char* to_string(ExecType execType) {
   switch (execType) {
     case ExecType::kNew:
       return "New";
-    case ExecType::kPartialFill:
-      return "PartialFill";
-    case ExecType::kFill:
-      return "Fill";
-    case ExecType::kDoneForDay:
-      return "DoneForDay";
     case ExecType::kCanceled:
       return "Canceled";
     case ExecType::kReplaced:
       return "Replaced";
-    case ExecType::kPendingCancel:
-      return "PendingCancel";
-    case ExecType::kStopped:
-      return "Stopped";
     case ExecType::kRejected:
       return "Rejected";
     case ExecType::kSuspended:
       return "Suspended";
-    case ExecType::kPendingNew:
-      return "PendingNew";
-    case ExecType::kCalculated:
-      return "Calculated";
+    case ExecType::kTrade:
+      return "Trade";
     case ExecType::kExpired:
       return "Expired";
-    case ExecType::kRestated:
-      return "Restated";
-    case ExecType::kPendingReplace:
-      return "PendingReplace";
     default:
       return "Unknown";
   }
@@ -114,19 +96,14 @@ enum class OrdStatus : char {
   kNew = '0',
   kPartiallyFilled = '1',
   kFilled = '2',
-  kDoneForDay = '3',
   kCanceled = '4',
-  kReplaced = '5',
   kPendingCancel = '6',
-  kStopped = '7',
   kRejected = '8',
-  kSuspended = '9',
   kPendingNew = 'A',
-  kCalculated = 'B',
   kExpired = 'C'
 };
 
-inline const char* toString(OrdStatus status) {
+inline const char* to_string(OrdStatus status) {
   switch (status) {
     case OrdStatus::kNew:
       return "New";
@@ -134,24 +111,14 @@ inline const char* toString(OrdStatus status) {
       return "PartiallyFilled";
     case OrdStatus::kFilled:
       return "Filled";
-    case OrdStatus::kDoneForDay:
-      return "DoneForDay";
     case OrdStatus::kCanceled:
       return "Canceled";
-    case OrdStatus::kReplaced:
-      return "Replaced";
     case OrdStatus::kPendingCancel:
       return "PendingCancel";
-    case OrdStatus::kStopped:
-      return "Stopped";
     case OrdStatus::kRejected:
       return "Rejected";
-    case OrdStatus::kSuspended:
-      return "Suspended";
     case OrdStatus::kPendingNew:
       return "PendingNew";
-    case OrdStatus::kCalculated:
-      return "Calculated";
     case OrdStatus::kExpired:
       return "Expired";
     default:
@@ -159,10 +126,10 @@ inline const char* toString(OrdStatus status) {
   }
 }
 
-inline ExecType execTypeFromChar(char text) {
+inline ExecType exec_type_from_char(char text) {
   return static_cast<ExecType>(text);
 }
-inline OrdStatus ordStatusFromChar(char text) {
+inline OrdStatus ord_status_from_char(char text) {
   return static_cast<OrdStatus>(text);
 }
 
@@ -177,6 +144,5 @@ struct ExecutionReport {
   double last_qty;
   int reason;
   double price;
-  std::string text;
 };
 }  // namespace trading

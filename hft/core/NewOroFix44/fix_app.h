@@ -28,12 +28,6 @@ namespace FIX8::NewOroFix44OE {
 class ExecutionReport;
 }
 
-template <typename T>
-concept HasIndividualA = requires(T t)
-{
-  { t.individualA() };
-};
-
 namespace FIX8 {
 class Message;
 }
@@ -44,22 +38,9 @@ template <typename Derived, int Cpu = 1>
 class FixApp {
 public:
   FixApp(const std::string& address, int port, std::string sender_comp_id,
-         std::string target_comp_id, common::Logger* logger)
-    : logger_(logger),
-      tls_sock_(std::make_unique<SSLSocket>(address, port)),
-      queue_(std::make_unique<common::SPSCQueue<std::string>>(kQueueSize)),
-      sender_id_(std::move(sender_comp_id)),
-      target_id_(std::move(target_comp_id)) {
-    write_thread_.start(&FixApp::write_loop, this);
-    read_thread_.start(&FixApp::read_loop, this);
-  }
+         std::string target_comp_id, common::Logger* logger);
 
-  ~FixApp() {
-    const auto msg = static_cast<Derived*>(this)->create_log_out_message();
-    tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
-
-    thread_running_ = false;
-  }
+  ~FixApp();
 
   using MsgType = std::string;
   using SendId = std::string;
@@ -88,25 +69,14 @@ public:
   }
 #endif
 
-  [[nodiscard]] std::string create_log_on_message(
+  [[nodiscard]] std::string create_log_on(
       const std::string& sig_b64, const std::string& timestamp);
 
-  [[nodiscard]] std::string create_log_out_message();
+  [[nodiscard]] std::string create_log_out();
 
-  std::string create_heartbeat_message(FIX8::Message* message);
-  [[nodiscard]] std::string create_market_data_subscription_message(
-      const RequestId& request_id, const MarketDepthLevel& level,
-      const SymbolId& symbol) requires HasIndividualA<Derived>;
+  std::string create_heartbeat(FIX8::Message* message);
   void encode(std::string& data, FIX8::Message* msg) const;
 
-  MarketUpdateData create_market_data_message(FIX8::Message* msg)
-    requires HasIndividualA<Derived>;
-  MarketUpdateData create_snapshot_data_message(FIX8::Message* msg)
-    requires HasIndividualA<Derived>;
-
-  std::string create_execution_report_message(
-      FIX8::NewOroFix44OE::ExecutionReport* msg)
-    requires HasIndividualA<Derived>;
   std::string timestamp();
 
 protected:

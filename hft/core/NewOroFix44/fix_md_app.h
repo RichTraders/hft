@@ -1,12 +1,21 @@
-//
-// Created by neworo2 on 25. 7. 29.
-//
+/*
+* MIT License
+ *
+ * Copyright (c) 2025 NewOro Corporation
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
+ * copyright notice appears in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ */
+
 #pragma once
 #include "fix_app.h"
 #include "fix_md_core.h"
 
 namespace core {
-class FixMarketDataApp : public FixApp<FixMarketDataApp> {
+class FixMarketDataApp : public FixApp<FixMarketDataApp, 1> {
 public:
   FixMarketDataApp(const std::string& address, int port,
                    const std::string& sender_comp_id,

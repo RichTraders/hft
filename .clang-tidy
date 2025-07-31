@@ -45,7 +45,6 @@ Checks: >
   -modernize-use-trailing-return-type,
   -readability-braces-around-statements,
   -readability-redundant-declaration
-  -readability-convert-member-functions-to-static
 
 # Turn all the warnings from the checks above into errors.
 WarningsAsErrors: "*"

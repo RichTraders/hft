@@ -18,13 +18,32 @@
 namespace core {
 
 template <typename Derived, int Cpu>
+FixApp<Derived, Cpu>::FixApp(const std::string& address, int port,
+                             std::string sender_comp_id,
+                             std::string target_comp_id, common::Logger* logger)
+  : logger_(logger),
+    tls_sock_(std::make_unique<SSLSocket>(address, port)),
+    queue_(std::make_unique<common::SPSCQueue<std::string>>(kQueueSize)),
+    sender_id_(std::move(sender_comp_id)),
+    target_id_(std::move(target_comp_id)) {
+  write_thread_.start(&FixApp::write_loop, this);
+  read_thread_.start(&FixApp::read_loop, this);
+}
+
+template <typename Derived, int Cpu>
+FixApp<Derived, Cpu>::~FixApp() {
+  const auto msg = static_cast<Derived*>(this)->create_log_out_message();
+  tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
+
+  thread_running_ = false;
+}
+
+template <typename Derived, int Cpu>
 int FixApp<Derived, Cpu>::start() {
   const std::string cur_timestamp = timestamp();
   const std::string sig_b64 = get_signature_base64(cur_timestamp);
 
-  const std::string fixmsg =
-      static_cast<Derived*>(this)->create_log_on_message(sig_b64,
-        cur_timestamp);
+  const std::string fixmsg = create_log_on(sig_b64, cur_timestamp);
 
   send(fixmsg);
   std::cout << "log on sent\n";
@@ -33,7 +52,7 @@ int FixApp<Derived, Cpu>::start() {
 
 template <typename Derived, int Cpu>
 int FixApp<Derived, Cpu>::stop() {
-  const auto msg = static_cast<Derived*>(this)->create_log_out_message();
+  const auto msg = create_log_out();
   tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
   thread_running_ = false;
   return 0;
@@ -109,55 +128,27 @@ void FixApp<Derived, Cpu>::register_callback(const MsgType& type,
 }
 
 template <typename Derived, int Cpu>
-[[nodiscard]] std::string FixApp<Derived, Cpu>::create_log_on_message(
+[[nodiscard]] std::string FixApp<Derived, Cpu>::create_log_on(
     const std::string& sig_b64, const std::string& timestamp) {
   return static_cast<Derived*>(this)->create_log_on_message(sig_b64,
     timestamp);
 }
 
 template <typename Derived, int Cpu>
-[[nodiscard]] std::string FixApp<Derived, Cpu>::create_log_out_message() {
+[[nodiscard]] std::string FixApp<Derived, Cpu>::create_log_out() {
   return static_cast<Derived*>(this)->create_log_out_message();
 }
 
 template <typename Derived, int Cpu>
-std::string FixApp<Derived, Cpu>::create_heartbeat_message(
+std::string FixApp<Derived, Cpu>::create_heartbeat(
     FIX8::Message* message) {
   return static_cast<Derived*>(this)->create_heartbeat_message(message);
-}
-
-template <typename Derived, int Cpu>
-[[nodiscard]] std::string FixApp<Derived, Cpu>::create_market_data_subscription_message(
-    const RequestId& request_id, const MarketDepthLevel& level,
-    const SymbolId& symbol) requires HasIndividualA<Derived> {
-  return static_cast<Derived*>(this)->create_market_data_subscription_message(
-      request_id, level, symbol);
 }
 
 template <typename Derived, int Cpu>
 void FixApp<Derived, Cpu>::encode(std::string& data, FIX8::Message* msg) const {
   auto* ptr = data.data();
   msg->encode(&ptr);
-}
-
-template <typename Derived, int Cpu>
-MarketUpdateData FixApp<Derived, Cpu>::create_market_data_message(
-    FIX8::Message* msg) requires HasIndividualA<Derived> {
-  return static_cast<Derived*>(this)->create_market_data(msg);
-}
-
-template <typename Derived, int Cpu>
-MarketUpdateData FixApp<Derived, Cpu>::create_snapshot_data_message(
-    FIX8::Message* msg)
-  requires HasIndividualA<Derived> {
-  return static_cast<Derived*>(this)->create_snapshot_data_message(msg);
-}
-
-template <typename Derived, int Cpu>
-std::string FixApp<Derived, Cpu>::create_execution_report_message(
-    FIX8::NewOroFix44OE::ExecutionReport* msg)
-  requires HasIndividualA<Derived> {
-  return static_cast<Derived*>(this)->create_execution_report_message(msg);
 }
 
 template <typename Derived, int Cpu>
@@ -212,5 +203,5 @@ void FixApp<Derived, Cpu>::process_message(const std::string& raw_msg) {
 }
 
 template class FixApp<FixMarketDataApp>;
-template class FixApp<FixOrderEntryApp>;
+template class FixApp<FixOrderEntryApp, 3>;
 }

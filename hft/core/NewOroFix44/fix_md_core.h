@@ -13,6 +13,7 @@
 #ifndef FIX_MD_CORE_H
 #define FIX_MD_CORE_H
 
+#include "authorization.h"
 #include "logger.h"
 #include "market_data.h"
 #include "memory_pool.hpp"
@@ -33,9 +34,10 @@ public:
   using SymbolId = std::string;
 
   FixMdCore(SendId sender_comp_id,
-      TargetId target_comp_id,
-      common::Logger* logger,
-      common::MemoryPool<MarketData>* pool);
+            TargetId target_comp_id,
+            common::Logger* logger,
+            common::MemoryPool<MarketData>* pool,
+            const Authorization& authorization);
 
   std::string create_log_on_message(
       const std::string& sig_b64, const std::string& timestamp);
@@ -59,6 +61,7 @@ private:
   const std::string sender_comp_id_;
   const std::string target_comp_id_;
   common::MemoryPool<MarketData>* market_data_pool_;
+  Authorization authorization_;
 };
 }
 

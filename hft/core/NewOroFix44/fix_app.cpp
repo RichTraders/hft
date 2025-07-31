@@ -14,28 +14,38 @@
 
 #include "fix_oe_app.h"
 #include "fix_md_app.h"
+#include "performance.h"
+#include "signature.h"
+#include "ssl_socket.h"
 
 namespace core {
 
 template <typename Derived, int Cpu>
-FixApp<Derived, Cpu>::FixApp(const std::string& address, int port,
+FixApp<Derived, Cpu>::FixApp(const std::string& address,
+                             int port,
                              std::string sender_comp_id,
-                             std::string target_comp_id, common::Logger* logger)
+                             std::string target_comp_id,
+                             common::Logger* logger,
+                             const Authorization& authorization)
   : logger_(logger),
     tls_sock_(std::make_unique<SSLSocket>(address, port)),
     queue_(std::make_unique<common::SPSCQueue<std::string>>(kQueueSize)),
     sender_id_(std::move(sender_comp_id)),
-    target_id_(std::move(target_comp_id)) {
+    target_id_(std::move(target_comp_id)),
+    authorization_(authorization) {
   write_thread_.start(&FixApp::write_loop, this);
   read_thread_.start(&FixApp::read_loop, this);
 }
 
 template <typename Derived, int Cpu>
 FixApp<Derived, Cpu>::~FixApp() {
-  const auto msg = static_cast<Derived*>(this)->create_log_out_message();
-  tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
+  if (log_on_) {
+    const auto msg = static_cast<Derived*>(this)->create_log_out_message();
+    tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
 
-  thread_running_ = false;
+    thread_running_ = false;
+    log_on_ = false;
+  }
 }
 
 template <typename Derived, int Cpu>
@@ -52,9 +62,12 @@ int FixApp<Derived, Cpu>::start() {
 
 template <typename Derived, int Cpu>
 int FixApp<Derived, Cpu>::stop() {
-  const auto msg = create_log_out();
-  tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
-  thread_running_ = false;
+  if (log_on_) {
+    const auto msg = create_log_out();
+    tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
+    thread_running_ = false;
+    log_on_ = false;
+  }
   return 0;
 }
 
@@ -70,7 +83,7 @@ void FixApp<Derived, Cpu>::write_loop() {
 
     while (queue_->dequeue(msg)) {
 #ifdef DEBUG
-        START_MEASURE(TLS_WRITE);
+      START_MEASURE(TLS_WRITE);
 #endif
       auto result =
           tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
@@ -84,7 +97,7 @@ void FixApp<Derived, Cpu>::write_loop() {
         break;
       }
 #ifdef DEBUG
-        END_MEASURE(TLS_WRITE, logger_);
+      END_MEASURE(TLS_WRITE, logger_);
 #endif
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(kWriteThreadSleep));
@@ -96,12 +109,12 @@ void FixApp<Derived, Cpu>::read_loop() {
   std::string received_buffer;
   while (thread_running_) {
 #ifdef DEBUG
-      START_MEASURE(TLS_READ);
+    START_MEASURE(TLS_READ);
 #endif
     std::array<char, kReadBufferSize> buf;
     const int read = tls_sock_->read(buf.data(), buf.size());
 #ifdef DEBUG
-      END_MEASURE(TLS_READ, logger_);
+    END_MEASURE(TLS_READ, logger_);
 #endif
     if (read <= 0) {
       std::this_thread::yield();
@@ -187,9 +200,77 @@ std::string FixApp<Derived, Cpu>::timestamp() {
 }
 
 template <typename Derived, int Cpu>
+bool FixApp<Derived, Cpu>::strip_to_header(std::string& buffer) {
+  const size_t pos = buffer.find("8=FIX");
+  if (pos == std::string::npos) {
+    // 헤더가 없으면 entire buffer 가 garbage
+    buffer.clear();
+    return false;
+  }
+  if (pos > 0) {
+    buffer.erase(0, pos);
+  }
+  return true;
+}
+
+template <typename Derived, int Cpu>
+std::string FixApp<Derived, Cpu>::get_signature_base64(
+    const std::string& timestamp) const {
+  // TODO(jb): use config reader
+  EVP_PKEY* private_key = Util::load_ed25519(
+      authorization_.pem_file_path,
+      authorization_.private_password.c_str());
+
+  // payload = "A<SOH>Sender<SOH>Target<SOH>1<SOH>20250709-00:49:41.041346"
+  const std::string payload = std::string("A") + SOH + sender_id_ + SOH +
+                              target_id_ + SOH + "1" + SOH + timestamp;
+
+  return Util::sign_and_base64(private_key, payload);
+}
+
+template <typename Derived, int Cpu>
+bool FixApp<Derived, Cpu>::peek_full_message_len(const std::string& buffer,
+                                                 size_t& msg_len) {
+  constexpr size_t kBegin = 0;
+  const size_t body_start = buffer.find("9=", kBegin);
+  if (body_start == std::string::npos)
+    return false;
+
+  const size_t body_end = buffer.find('\x01', body_start);
+  if (body_end == std::string::npos)
+    return false;
+
+  const int body_len =
+      std::stoi(buffer.substr(body_start + 2, body_end - (body_start + 2)));
+  const size_t header_len = (body_end + 1) - kBegin;
+  msg_len = header_len + body_len +
+            7; // NOLINT(readability-magic-numbers) 7 = "10=" + 3bytes + SOH
+  return buffer.size() >= msg_len;
+}
+
+template <typename Derived, int Cpu>
+bool FixApp<Derived, Cpu>::extract_next_message(std::string& buffer,
+                                                std::string& msg) {
+  if (!strip_to_header(buffer))
+    return false;
+
+  size_t msg_len = 0;
+  if (!peek_full_message_len(buffer, msg_len))
+    return false;
+
+  msg = buffer.substr(0, msg_len);
+  buffer.erase(0, msg_len);
+  return true;
+}
+
+template <typename Derived, int Cpu>
 void FixApp<Derived, Cpu>::process_message(const std::string& raw_msg) {
   auto* msg = static_cast<Derived*>(this)->decode(raw_msg);
   const auto type = msg->get_msgtype();
+
+  if (UNLIKELY(type == "A")) {
+    log_on_ = true;
+  }
 
   if (callbacks_.contains(type)) {
     callbacks_[type](msg);

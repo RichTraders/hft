@@ -53,7 +53,7 @@ protected:
   void SetUp() override {
     auto pool = std::make_unique<common::MemoryPool<OrderData>>(1024);
     auto logger = std::make_unique<common::Logger>();
-    fix = std::make_unique<FixOeCore>("SENDER", "TARGET", logger.get(), pool.get());
+    fix = std::make_unique<FixOeCore>("SENDER", "TARGET", logger.get());
   }
 
   std::unique_ptr<FixOeCore> fix;

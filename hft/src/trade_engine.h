@@ -22,20 +22,30 @@
 #include "order_book.h"
 
 namespace trading {
+class PositionKeeper;
+struct ExecutionReport;
+}  // namespace trading
+
+namespace trading {
+class FeatureEngine;
+class RiskManager;
+
 class TradeEngine {
  public:
   explicit TradeEngine(
       common::Logger* logger,
       common::MemoryPool<MarketUpdateData>* market_update_data_pool,
-      common::MemoryPool<MarketData>* market_data_pool);
+      common::MemoryPool<MarketData>* market_data_pool,
+      const common::TradeEngineCfgHashMap& ticker_cfg);
   ~TradeEngine();
 
   void stop();
-  void on_market_data_updated(MarketUpdateData* data);
+  void on_market_data_updated(MarketUpdateData* data) const;
   void on_order_book_updated(common::Price price, common::Side side,
-                             MarketOrderBook* market_order_book);
+                             MarketOrderBook* market_order_book) const;
   void on_trade_updated(const MarketData* market_data,
-                        MarketOrderBook* market_order_book);
+                        MarketOrderBook* order_book) const;
+  void on_order_updated(const ExecutionReport* report) const noexcept;
 
  private:
   common::Logger* logger_;
@@ -47,6 +57,9 @@ class TradeEngine {
   MarketOrderBookHashMap ticker_order_book_;
 
   bool running_{true};
+  std::unique_ptr<FeatureEngine> feature_engine_;
+  std::unique_ptr<PositionKeeper> position_keeper_;
+  std::unique_ptr<RiskManager> risk_manager_;
 
   void run();
 };

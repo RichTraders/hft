@@ -19,6 +19,7 @@
 #include "NewOroFix44OE_types.hpp"
 #include "NewOroFix44OE_router.hpp"
 #include "NewOroFix44OE_classes.hpp"
+#include "ini_config.hpp"
 
 #include "logger.h"
 #include "memory_pool.hpp"
@@ -28,13 +29,23 @@
 using namespace core;
 using namespace common;
 
-TEST(FixAppTest, DISABLED_CallbackRegistration) {
+TEST(FixAppTest, CallbackRegistration) {
+  IniConfig config;
+  config.load("resources/config.ini");
+  const Authorization authorization{
+      .md_address = config.get("auth", "md_address"),
+      .port = config.get_int("auth", "port"),
+      .api_key = config.get("auth", "api_key"),
+      .pem_file_path = config.get("auth", "pem_file_path"),
+      .private_password = config.get("auth", "private_password")};
+
   auto pool = std::make_unique<MemoryPool<MarketData>>(1024);
   auto logger = std::make_unique<Logger>();
-  auto app = FixMarketDataApp("fix-md.testnet.binance.vision",
-                              9000,
+  auto app = FixMarketDataApp(authorization,
                               "BMDWATCH",
-                              "SPOT", logger.get(), pool.get());
+                              "SPOT",
+                              logger.get(),
+                              pool.get());
   bool login_success = false;
   bool logout_success = false;
 
@@ -53,19 +64,27 @@ TEST(FixAppTest, DISABLED_CallbackRegistration) {
         std::cout << result << std::endl;
       });
   app.start();
-  sleep(5);
+  sleep(2);
   EXPECT_TRUE(login_success);
 
   app.stop();
-  sleep(5);
+  sleep(2);
   EXPECT_TRUE(logout_success);
 }
 
 TEST(FixAppTest, CallbackFixOERegistration) {
+  IniConfig config;
+  config.load("resources/config.ini");
+  const Authorization authorization{
+    .oe_address = config.get("auth", "oe_address"),
+    .port = config.get_int("auth", "port"),
+    .api_key = config.get("auth", "api_key"),
+    .pem_file_path = config.get("auth", "pem_file_path"),
+    .private_password = config.get("auth", "private_password")};
+
   auto pool = std::make_unique<MemoryPool<OrderData>>(1024);
   auto logger = std::make_unique<Logger>();
-  auto app = FixOrderEntryApp("fix-oe.testnet.binance.vision",
-                              9000,
+  auto app = FixOrderEntryApp(authorization,
                               "BMDWATCH",
                               "SPOT",
                               logger.get(),
@@ -100,7 +119,7 @@ TEST(FixAppTest, CallbackFixOERegistration) {
   });
 
   app.start();
-  sleep(3);
+  sleep(2);
   EXPECT_TRUE(login_called);
 
   trading::NewSingleOrderData order_data;
@@ -112,11 +131,12 @@ TEST(FixAppTest, CallbackFixOERegistration) {
   order_data.transact_time = app.timestamp();
   order_data.ord_type = trading::OrderType::kMarket;
   order_data.time_in_force = trading::TimeInForce::kGoodTillCancel;
-  order_data.self_trade_prevention_mode = trading::SelfTradePreventionMode::kExpireTaker;
+  order_data.self_trade_prevention_mode =
+      trading::SelfTradePreventionMode::kExpireTaker;
 
   std::string ret = app.create_order_message(order_data);
   app.send(ret);
 
-  sleep(100);
+  sleep(2);
   EXPECT_TRUE(heartbeat_called);
 }

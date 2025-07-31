@@ -25,17 +25,17 @@ using namespace common;
 constexpr int kMarketDataPoolSize = 2048;
 constexpr int kEntries = 268;
 
-FixMdCore::FixMdCore(SendId sender_comp_id,
-         TargetId target_comp_id,
-         Logger* logger,
-         MemoryPool<MarketData>* pool)
+FixMdCore::FixMdCore(SendId sender_comp_id, TargetId target_comp_id,
+                     Logger* logger, MemoryPool<MarketData>* pool,
+                     const Authorization& authorization)
   : logger_(logger),
     sender_comp_id_(std::move(sender_comp_id)),
     target_comp_id_(std::move(target_comp_id)),
-    market_data_pool_(pool) {}
+    market_data_pool_(pool),
+    authorization_(authorization) {}
 
 std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
-                                       const std::string& timestamp) {
+                                             const std::string& timestamp) {
   FIX8::NewOroFix44MD_ctx();
   Logon request;
 
@@ -50,13 +50,7 @@ std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
       << new HeartBtInt(30)
       << new ResetSeqNumFlag(true)
       << new RawDataLength(static_cast<int>(sig_b64.size()))
-      << new RawData(sig_b64)
-      << new Username(
-#ifdef DEBUG
-          "psxtGrh4X1aLsBVoMn3NCEuHDns78Yie9BMO0TIJEJvLFpZKk86guB7aOqsYTVk2")
-#else
-          "cJHjHNqHUG1nhTs0YPEKlmxoXokNomptrrilcGzrhoqhd8S9kEFfcJg2YQjVKgGw")
-#endif
+      << new RawData(sig_b64) << new Username(authorization_.api_key)
       << new MessageHandling(2);
 
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))
@@ -266,8 +260,7 @@ FIX8::Message* FixMdCore::decode(const std::string& message) {
 #ifdef DEBUG
   START_MEASURE(Convert_Message);
 #endif
-  FIX8::Message* msg(
-      FIX8::Message::factory(ctx(), message, true, true));
+  FIX8::Message* msg(FIX8::Message::factory(ctx(), message, true, true));
 #ifdef DEBUG
   END_MEASURE(Convert_Message, logger_);
 #endif

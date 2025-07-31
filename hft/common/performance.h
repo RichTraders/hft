@@ -25,9 +25,9 @@ inline auto rdtsc() noexcept {
 }  // namespace common
 
 #define START_MEASURE(TAG) const auto TAG = common::rdtsc()
-#define END_MEASURE(TAG, log)                                           \
-  do {                                                                  \
-    const auto end = common::rdtsc();                                   \
-    (log)->info(std::format("[RDTSC]: {}: {}\n", #TAG, (end - (TAG)))); \
+#define END_MEASURE(TAG, log)                                         \
+  do {                                                                \
+    const auto end = common::rdtsc();                                 \
+    (log)->info(std::format("[RDTSC]: {}: {}", #TAG, (end - (TAG)))); \
   } while (false)
 #endif  //PERFORMANCE_H

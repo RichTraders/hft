@@ -14,11 +14,11 @@
 #define FIX_PROTOCOL_H
 
 #include "common/spsc_queue.h"
+#include <common/thread.hpp>
+
+#include "authorization.h"
 #include "logger.h"
 #include "market_data.h"
-#include "performance.h"
-#include "signature.h"
-#include "ssl_socket.h"
 
 constexpr int kQueueSize = 8;
 constexpr int kReadBufferSize = 1024;
@@ -33,12 +33,17 @@ class Message;
 }
 
 namespace core {
+class SSLSocket;
 
 template <typename Derived, int Cpu = 1>
 class FixApp {
 public:
-  FixApp(const std::string& address, int port, std::string sender_comp_id,
-         std::string target_comp_id, common::Logger* logger);
+  FixApp(const std::string& address,
+         int port,
+         std::string sender_comp_id,
+         std::string target_comp_id,
+         common::Logger* logger,
+         const Authorization& authorization);
 
   ~FixApp();
 
@@ -80,61 +85,13 @@ public:
   std::string timestamp();
 
 private:
-  bool strip_to_header(std::string& buffer) {
-    const size_t pos = buffer.find("8=FIX");
-    if (pos == std::string::npos) {
-      // 헤더가 없으면 entire buffer 가 garbage
-      buffer.clear();
-      return false;
-    }
-    if (pos > 0) {
-      buffer.erase(0, pos);
-    }
-    return true;
-  }
+  static bool strip_to_header(std::string& buffer);
 
-  const std::string get_signature_base64(const std::string& timestamp) const {
-    // TODO(jb): use config reader
-    EVP_PKEY* private_key = Util::load_ed25519(
-        "/home/neworo2/neworo_hft/hft/resources/private.pem", "neworo");
+  std::string get_signature_base64(const std::string& timestamp) const;
 
-    // payload = "A<SOH>Sender<SOH>Target<SOH>1<SOH>20250709-00:49:41.041346"
-    const std::string payload = std::string("A") + SOH + sender_id_ + SOH +
-                                target_id_ + SOH + "1" + SOH + timestamp;
+  static bool peek_full_message_len(const std::string& buffer, size_t& msg_len);
 
-    return Util::sign_and_base64(private_key, payload);
-  }
-
-  bool peek_full_message_len(const std::string& buffer, size_t& msg_len) const {
-    constexpr size_t kBegin = 0;
-    const size_t body_start = buffer.find("9=", kBegin);
-    if (body_start == std::string::npos)
-      return false;
-
-    const size_t body_end = buffer.find('\x01', body_start);
-    if (body_end == std::string::npos)
-      return false;
-
-    const int body_len =
-        std::stoi(buffer.substr(body_start + 2, body_end - (body_start + 2)));
-    const size_t header_len = (body_end + 1) - kBegin;
-    msg_len = header_len + body_len +
-              7; // NOLINT(readability-magic-numbers) 7 = "10=" + 3bytes + SOH
-    return buffer.size() >= msg_len;
-  }
-
-  bool extract_next_message(std::string& buffer, std::string& msg) {
-    if (!strip_to_header(buffer))
-      return false;
-
-    size_t msg_len = 0;
-    if (!peek_full_message_len(buffer, msg_len))
-      return false;
-
-    msg = buffer.substr(0, msg_len);
-    buffer.erase(0, msg_len);
-    return true;
-  }
+  static bool extract_next_message(std::string& buffer, std::string& msg);
 
   void process_message(const std::string& raw_msg);
 
@@ -154,6 +111,7 @@ private:
   bool log_on_{false};
   const std::string sender_id_;
   const std::string target_id_;
+  const Authorization authorization_;
 };
 } // namespace core
 

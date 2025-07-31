@@ -16,14 +16,15 @@
 #include "market_data.h"
 #include "memory_pool.hpp"
 
-namespace core {
-template <int>
-class FixApp;
-}
-
 namespace FIX8 {  // NOLINT(readability-identifier-naming)
 class Message;
 }
+
+namespace core {
+template <typename Derived, int Cpu>
+class FixApp;
+class FixMarketDataApp;
+}  // namespace core
 
 namespace trading {
 class TradeEngine;
@@ -47,7 +48,7 @@ class MarketConsumer {
   common::MemoryPool<MarketData>* market_data_pool_;
   common::Logger* logger_;
   TradeEngine* trade_engine_;
-  std::unique_ptr<core::FixApp<1>> app_;
+  std::unique_ptr<core::FixMarketDataApp> app_;
 };
 }  // namespace trading
 

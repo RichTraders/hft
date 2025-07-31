@@ -49,16 +49,10 @@ public:
   std::string create_trade_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
       const SymbolId& symbol);
-  MarketUpdateData create_market_data(FIX8::Message* msg) const;
-  MarketUpdateData create_snapshot_data_message(FIX8::Message* msg) const;
+  MarketUpdateData create_market_data_message(FIX8::Message* msg);
+  MarketUpdateData create_snapshot_data_message(FIX8::Message* msg);
 
   FIX8::Message* decode(const std::string& message);
-  [[nodiscard]] const std::string get_signature_base64(
-      const std::string& timestamp) const;
-  static std::string timestamp();
-
-  static void encode(std::string& data, FIX8::Message* msg);
-
 private:
   int64_t sequence_{1};
   common::Logger* logger_;

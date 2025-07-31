@@ -25,6 +25,10 @@
 #include "core/NewOroFix44/fix_app.h"
 #include "memory_pool.hpp"
 
+namespace core {
+class FixMarketDataApp;
+}
+
 class Broker {
  public:
   Broker();
@@ -34,10 +38,10 @@ class Broker {
 
   std::unique_ptr<common::MemoryPool<MarketData>> pool_;
   std::unique_ptr<common::Logger> log_;
-  std::unique_ptr<core::FixApp<>> app_;
+  std::unique_ptr<core::FixMarketDataApp> app_;
 
-  void on_login(FIX8::Message*) const;
-  void on_heartbeat(FIX8::Message*) const;
+  void on_login(FIX8::Message*);
+  void on_heartbeat(FIX8::Message*);
   void on_subscribe(const std::string& msg);
 };
 

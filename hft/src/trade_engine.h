@@ -20,15 +20,14 @@
 #include "types.h"
 
 #include "order_book.h"
+#include "order_request.h"
 
 namespace trading {
 class PositionKeeper;
 struct ExecutionReport;
-}  // namespace trading
-
-namespace trading {
 class FeatureEngine;
 class RiskManager;
+class OrderManager;
 
 class TradeEngine {
  public:
@@ -47,6 +46,8 @@ class TradeEngine {
                         MarketOrderBook* order_book) const;
   void on_order_updated(const ExecutionReport* report) const noexcept;
 
+  void send_request(const RequestCommon& request);
+
  private:
   common::Logger* logger_;
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
@@ -60,6 +61,7 @@ class TradeEngine {
   std::unique_ptr<FeatureEngine> feature_engine_;
   std::unique_ptr<PositionKeeper> position_keeper_;
   std::unique_ptr<RiskManager> risk_manager_;
+  std::unique_ptr<OrderManager> order_manager_;
 
   void run();
 };

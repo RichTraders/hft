@@ -15,17 +15,47 @@
 
 namespace trading {
 enum class OrderType : char {
+  kInvalid = '0',
   kMarket = '1',
   kLimit = '2',
   kStopLoss = '3',
   kStopLimit = '4',
 };
 
+inline std::string toString(OrderType type) {
+  switch (type) {
+    case OrderType::kMarket:
+      return "Market";
+    case OrderType::kLimit:
+      return "Limit";
+    case OrderType::kStopLoss:
+      return "StopLoss";
+    case OrderType::kStopLimit:
+      return "StopLimit";
+    default:
+      return "Unknown";
+  }
+}
+
 enum class TimeInForce : char {
+  kInvalid = '0',
   kGoodTillCancel = '1',
   kImmediateOrCancel = '3',
   kFillOrKill = '4',
 };
+
+inline std::string toString(TimeInForce time_in_force) {
+  switch (time_in_force) {
+    case TimeInForce::kGoodTillCancel:
+      return "GTC";
+    case TimeInForce::kImmediateOrCancel:
+      return "IOC";
+    case TimeInForce::kFillOrKill:
+      return "FOK";
+    default:
+      return "Unknown";
+  }
+}
 
 template <typename T>
 constexpr char to_char(T text) noexcept {
@@ -37,6 +67,17 @@ enum class OrderSide : char {
   kSell = '2'  // 매도
 };
 
+inline std::string toString(OrderSide side) {
+  switch (side) {
+    case OrderSide::kBuy:
+      return "Buy";
+    case OrderSide::kSell:
+      return "Sell";
+    default:
+      return "Unknown";
+  }
+}
+
 enum class SelfTradePreventionMode : char {
   kNone = '1',
   kExpireTaker = '2',
@@ -44,6 +85,23 @@ enum class SelfTradePreventionMode : char {
   kExpireBoth = '4',
   kDecrement = '5',
 };
+
+inline std::string toString(SelfTradePreventionMode mode) {
+  switch (mode) {
+    case SelfTradePreventionMode::kNone:
+      return "None";
+    case SelfTradePreventionMode::kExpireTaker:
+      return "ExpireTaker";
+    case SelfTradePreventionMode::kExpireMaker:
+      return "ExpireMaker";
+    case SelfTradePreventionMode::kExpireBoth:
+      return "ExpireBoth";
+    case SelfTradePreventionMode::kDecrement:
+      return "Decrement";
+    default:
+      return "Unknown";
+  }
+}
 
 struct NewSingleOrderData {
   std::string cl_order_id;  // Tag 11: 고객 지정 주문 ID (유니크)
@@ -133,8 +191,7 @@ inline OrdStatus ord_status_from_char(char text) {
 }
 
 struct ExecutionReport {
-  std::string cl_ord_id;
-  common::OrderId order_id = common::OrderId(0);
+  common::OrderId order_id = common::OrderId(common::kOrderIdInvalid);
   std::string symbol;
   ExecType exec_type;
   OrdStatus ord_status;
@@ -147,8 +204,8 @@ struct ExecutionReport {
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
-    stream << "ExecutionReport{" << "cl_ord_id=" << cl_ord_id
-           << ", order_id=" << order_id.value << ", symbol=" << symbol
+    stream << "ExecutionReport{" << ", order_id=" << order_id.value
+           << ", symbol=" << symbol
            << ", exec_type=" << trading::toString(exec_type)
            << ", ord_status=" << trading::toString(ord_status)
            << ", cum_qty=" << cum_qty.value

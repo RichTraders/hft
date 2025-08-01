@@ -139,7 +139,7 @@ trading::ExecutionReport FixOeCore::create_excution_report_message(
   trading::ExecutionReport ret;
 
   ret.symbol = symbol->get();
-  ret.cl_ord_id = clOrdId->get();
+  ret.order_id = common::OrderId{std::stoul(clOrdId->get())};
   ret.cum_qty.value = cumQty->get();
   ret.exec_type = trading::exec_type_from_char(execType->get());
   ret.last_qty.value = lastQty->get();

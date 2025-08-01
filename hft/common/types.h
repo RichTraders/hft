@@ -24,6 +24,18 @@ struct OrderId {
   }
 
   bool operator==(uint64_t other) const { return value == other; }
+  bool operator==(const OrderId& other) const { return value == other.value; }
+
+  OrderId& operator++(int) {
+    value++;
+    return (*this);
+  }
+
+  template <typename H>
+  friend H AbslHashValue(H hash_state, const OrderId& oid) {
+    return H::combine(std::move(hash_state, oid.value));
+  }
+
   explicit operator uint64_t() const { return value; }
 };
 
@@ -35,7 +47,7 @@ inline auto toString(OrderId order_id) -> std::string {
 
 constexpr auto kOrderIdInvalid = std::numeric_limits<uint64_t>::max();
 
-using TickerId = const std::string;
+using TickerId = std::string;
 constexpr auto kTickerIdInvalid = "";
 
 struct ClientId {

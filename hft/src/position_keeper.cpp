@@ -113,7 +113,7 @@ void PositionKeeper::add_fill(const ExecutionReport* report) noexcept {
   ticker_position_.at(report->symbol).add_fill(report, logger_);
 }
 
-void PositionKeeper::update_bbo(common::TickerId& ticker_id,
+void PositionKeeper::update_bbo(const common::TickerId& ticker_id,
                                 const BBO* bbo) noexcept {
   ticker_position_.at(ticker_id).update_bbo(bbo, logger_);
 }

@@ -12,9 +12,9 @@
 
 #include "fix_oe_core.h"
 #include <fix8/f8includes.hpp>
-#include "NewOroFix44OE_classes.hpp"
-#include "NewOroFix44OE_router.hpp"
 #include "NewOroFix44OE_types.hpp"
+#include "NewOroFix44OE_router.hpp"
+#include "NewOroFix44OE_classes.hpp"
 #include "performance.h"
 #include "signature.h"
 

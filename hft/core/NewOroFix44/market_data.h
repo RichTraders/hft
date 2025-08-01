@@ -59,7 +59,7 @@ struct MarketData {
         qty(qty) {}
 
   [[nodiscard]] auto toString() const noexcept {
-    std::stringstream stream;
+    std::ostringstream stream;
     stream << "MarketUpdate" << " [" << " type:" << common::toString(type)
            << " ticker:" << ticker_id << " oid:" << common::toString(order_id)
            << " side:" << common::toString(side)

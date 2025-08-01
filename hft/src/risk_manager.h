@@ -62,7 +62,7 @@ struct RiskInfo {
   }
 
   [[nodiscard]] auto toString() const {
-    std::stringstream stream;
+    std::ostringstream stream;
     stream << "RiskInfo" << "[" << "pos:" << position_info_->toString() << " "
            << risk_cfg_.toString() << "]";
 

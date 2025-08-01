@@ -11,8 +11,8 @@
  */
 
 #include "trade_engine.h"
-#include "execution_report.h"
 #include "feature_engine.h"
+#include "order_entry.h"
 #include "performance.h"
 #include "position_keeper.h"
 #include "risk_manager.h"
@@ -50,7 +50,6 @@ void TradeEngine::stop() {
   running_ = false;
 }
 
-// TODO(jb): call feature engine
 void TradeEngine::on_order_book_updated(common::Price price, common::Side side,
                                         MarketOrderBook* order_book) const {
   feature_engine_->on_order_book_updated(price, side, order_book);

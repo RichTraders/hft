@@ -240,7 +240,7 @@ struct RiskCfg {
   double max_loss_ = 0;
 
   [[nodiscard]] auto toString() const {
-    std::stringstream stream;
+    std::ostringstream stream;
 
     stream << "RiskCfg{"
            << "max-order-size:" << common::toString(max_order_size_) << " "
@@ -257,7 +257,7 @@ struct TradeEngineCfg {
   RiskCfg risk_cfg_;
 
   [[nodiscard]] auto toString() const {
-    std::stringstream stream;
+    std::ostringstream stream;
     stream << "TradeEngineCfg{" << "clip:" << common::toString(clip_) << " "
            << "thresh:" << threshold_ << " " << "risk:" << risk_cfg_.toString()
            << "}";

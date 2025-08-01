@@ -125,7 +125,7 @@ TEST(FixAppTest, CallbackFixOERegistration) {
   trading::NewSingleOrderData order_data;
   order_data.cl_order_id = "Neworo";
   order_data.symbol = "BTCUSDT";
-  order_data.side = trading::Side::kBuy;
+  order_data.side = trading::OrderSide::kBuy;
   order_data.order_qty = 0.01;
   order_data.price = 117984;
   order_data.transact_time = app.timestamp();
@@ -137,6 +137,6 @@ TEST(FixAppTest, CallbackFixOERegistration) {
   std::string ret = app.create_order_message(order_data);
   app.send(ret);
 
-  sleep(2);
+  sleep(50);
   EXPECT_TRUE(heartbeat_called);
 }

@@ -17,8 +17,8 @@
 #include "thread.hpp"
 #include "trade_engine.h"
 
-constexpr int kMarketUpdateDataPoolSize = 128;
-constexpr int kMarketDataPoolSize = 2048;
+constexpr int kMarketUpdateDataPoolSize = 64;
+constexpr int kMarketDataPoolSize = 16384;
 
 int main() {
   try {
@@ -73,7 +73,8 @@ int main() {
     consumer_thread.start([&]() {
       try {
         const Authorization authorization{
-            .md_address = config.get("auth", "address"),
+            .md_address = config.get("auth", "md_address"),
+            .oe_address = config.get("auth", "oe_address"),
             .port = config.get_int("auth", "port"),
             .api_key = config.get("auth", "api_key"),
             .pem_file_path = config.get("auth", "pem_file_path"),

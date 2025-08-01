@@ -21,20 +21,16 @@ class Message;
 namespace core {
 
 class FixOrderEntryApp : public FixApp<FixOrderEntryApp, 3> {
-public:
+ public:
   FixOrderEntryApp(const Authorization& authorization,
                    const std::string& sender_comp_id,
                    const std::string& target_comp_id, common::Logger* logger,
-                   common::MemoryPool<OrderData>* order_data_pool):
-    FixApp(authorization.oe_address,
-           authorization.port,
-           sender_comp_id,
-           target_comp_id,
-           logger,
-           authorization)
-    , order_data_pool_(order_data_pool) {
+                   common::MemoryPool<OrderData>* order_data_pool)
+      : FixApp(authorization.oe_address, authorization.port, sender_comp_id,
+               target_comp_id, logger, authorization),
+        order_data_pool_(order_data_pool) {
     fix_oe_core_ = std::make_unique<FixOeCore>(sender_comp_id, target_comp_id,
-                                               logger);
+                                               logger, authorization);
   }
 
   std::string create_log_on_message(const std::string& sig_b64,
@@ -47,8 +43,8 @@ public:
       FIX8::NewOroFix44OE::ExecutionReport* msg);
   FIX8::Message* decode(const std::string& message);
 
-private:
+ private:
   common::MemoryPool<OrderData>* order_data_pool_;
   std::unique_ptr<FixOeCore> fix_oe_core_;
 };
-}
+}  // namespace core

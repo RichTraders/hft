@@ -30,7 +30,7 @@ MarketOrder::MarketOrder(const Qty qty_, const bool active_ = false) noexcept
     : qty(qty_), active(active_) {}
 
 auto MarketOrder::toString() const -> std::string {
-  std::stringstream stream;
+  std::ostringstream stream;
   stream << "[MarketOrder]" << "[" << "qty:" << qty.value << " "
          << "active:" << active << " ";
 
@@ -306,14 +306,11 @@ auto MarketOrderBook::on_market_data_updated(
       break;
   }
 
-  logger_->debug(std::format("{}:{} {}() {} {}\n", __FILE__, __LINE__,
-                             __FUNCTION__, market_update->toString(),
-                             bbo_.toString()));
+  logger_->debug(
+      std::format("{} {}", market_update->toString(), bbo_.toString()));
 
-  if (LIKELY(trade_engine_)) {
-    trade_engine_->on_order_book_updated(market_update->price,
-                                         market_update->side, this);
-  }
+  trade_engine_->on_order_book_updated(market_update->price,
+                                       market_update->side, this);
 }
 
 auto MarketOrderBook::get_bbo() noexcept -> const BBO* {
@@ -323,7 +320,7 @@ auto MarketOrderBook::get_bbo() noexcept -> const BBO* {
 void MarketOrderBook::on_trade_update(MarketData*) {}
 
 std::string MarketOrderBook::print_active_levels(bool is_bid) const {
-  std::stringstream stream;
+  std::ostringstream stream;
   const auto& buckets = is_bid ? bidBuckets_ : askBuckets_;
 
   for (int bucket_idx = 0; bucket_idx < kBucketCount; ++bucket_idx) {

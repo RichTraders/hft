@@ -32,7 +32,7 @@ struct BBO {
   common::Qty ask_qty = common::Qty{common::kQtyInvalid};
 
   [[nodiscard]] auto toString() const {
-    std::stringstream stream;
+    std::ostringstream stream;
     stream << "BBO{" << common::toString(bid_qty) << "@"
            << common::toString(bid_price) << "X" << common::toString(ask_price)
            << "@" << common::toString(ask_qty) << "}";

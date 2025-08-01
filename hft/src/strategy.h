@@ -15,15 +15,29 @@
 
 #include <types.h>
 
+#include "market_data.h"
+#include "order_entry.h"
+
 namespace trading {
 class MarketOrderBook;
 
 template <typename Derived>
 class BaseStrategy {
-  void onOrderBookUpdate(common::TickerId ticker_id, common::Price price,
-                         common::Side side,
-                         const MarketOrderBook* book) noexcept {
-    static_cast<Derived>(this)->onOrderBookUpdate(ticker_id, price, side, book);
+  void on_orderbook_updated(common::TickerId ticker_id, common::Price price,
+                            common::Side side,
+                            const MarketOrderBook* book) noexcept {
+    static_cast<Derived>(this)->on_orderbook_updated(ticker_id, price, side,
+                                                     book);
+  }
+
+  auto on_trade_updated(const MarketData* market_update,
+                        MarketOrderBook* order_book) noexcept -> void {
+    static_cast<Derived>(this)->on_trade_updated(market_update, order_book);
+  }
+
+  auto on_order_updated(const ExecutionReport* client_response) noexcept
+      -> void {
+    static_cast<Derived>(this)->on_order_updated(client_response);
   }
 };
 }  // namespace trading

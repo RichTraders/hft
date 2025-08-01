@@ -32,7 +32,7 @@ constexpr char to_char(T text) noexcept {
   return static_cast<char>(text);
 }
 
-enum class Side : char {
+enum class OrderSide : char {
   kBuy = '1',  // 매수
   kSell = '2'  // 매도
 };
@@ -48,7 +48,7 @@ enum class SelfTradePreventionMode : char {
 struct NewSingleOrderData {
   std::string cl_order_id;  // Tag 11: 고객 지정 주문 ID (유니크)
   std::string symbol;       // Tag 55: 종목 (예: "BTCUSDT")
-  Side side;                // Tag 54: 매매 방향 ('1' = Buy, '2' = Sell)
+  OrderSide side;           // Tag 54: 매매 방향 ('1' = Buy, '2' = Sell)
   double order_qty;         // Tag 38: 주문 수량
   OrderType ord_type;       // Tag 40: 주문 유형 ('1' = Market, '2' = Limit)
   double price;             // Tag 44: 지정가 (Limit 주문일 때만 사용)
@@ -69,7 +69,7 @@ enum class ExecType : char {
   kExpired = 'C',
 };
 
-inline const char* to_string(ExecType execType) {
+inline const char* toString(ExecType execType) {
   switch (execType) {
     case ExecType::kNew:
       return "New";
@@ -101,7 +101,7 @@ enum class OrdStatus : char {
   kExpired = 'C'
 };
 
-inline const char* to_string(OrdStatus status) {
+inline const char* toString(OrdStatus status) {
   switch (status) {
     case OrdStatus::kNew:
       return "New";
@@ -127,6 +127,7 @@ inline const char* to_string(OrdStatus status) {
 inline ExecType exec_type_from_char(char text) {
   return static_cast<ExecType>(text);
 }
+
 inline OrdStatus ord_status_from_char(char text) {
   return static_cast<OrdStatus>(text);
 }
@@ -142,5 +143,20 @@ struct ExecutionReport {
   common::Qty last_qty = common::Qty{.0f};
   int reason;
   common::Price price = common::Price{.0f};
+  common::Side side;
+
+  [[nodiscard]] std::string toString() const {
+    std::ostringstream stream;
+    stream << "ExecutionReport{" << "cl_ord_id=" << cl_ord_id
+           << ", order_id=" << order_id.value << ", symbol=" << symbol
+           << ", exec_type=" << trading::toString(exec_type)
+           << ", ord_status=" << trading::toString(ord_status)
+           << ", cum_qty=" << cum_qty.value
+           << ", leaves_qty=" << leaves_qty.value
+           << ", last_qty=" << last_qty.value << ", reason=" << reason
+           << ", price=" << price.value << ", side=" << common::toString(side)
+           << "}";
+    return stream.str();
+  }
 };
 }  // namespace trading

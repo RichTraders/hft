@@ -121,15 +121,14 @@ inline std::string toString(SelfTradePreventionMode mode) {
 }
 
 struct NewSingleOrderData {
-  std::string cl_order_id;  // Tag 11: 고객 지정 주문 ID (유니크)
-  std::string symbol;       // Tag 55: 종목 (예: "BTCUSDT")
-  OrderSide side;           // Tag 54: 매매 방향 ('1' = Buy, '2' = Sell)
-  double order_qty;         // Tag 38: 주문 수량
-  OrderType ord_type;       // Tag 40: 주문 유형 ('1' = Market, '2' = Limit)
-  double price;             // Tag 44: 지정가 (Limit 주문일 때만 사용)
+  common::OrderId cl_order_id;  // Tag 11: 고객 지정 주문 ID (유니크)
+  std::string symbol;           // Tag 55: 종목 (예: "BTCUSDT")
+  OrderSide side;               // Tag 54: 매매 방향 ('1' = Buy, '2' = Sell)
+  double order_qty;             // Tag 38: 주문 수량
+  OrderType ord_type;  // Tag 40: 주문 유형 ('1' = Market, '2' = Limit)
+  double price;        // Tag 44: 지정가 (Limit 주문일 때만 사용)
   TimeInForce
       time_in_force;  // Tag 59: 주문 유효 기간 ('0' = Day, '1' = GTC 등)
-  std::string transact_time;  // Tag 60: 전송 시간 (YYYYMMDD‑HH:MM:SS.sss)
   SelfTradePreventionMode self_trade_prevention_mode =
       SelfTradePreventionMode::kExpireTaker;
 };
@@ -159,45 +158,6 @@ enum class MassCancelResponse : char {
   kCancelRequestRejected = '0',
   kCancelSymbolOrders = '1'
 };
-
-inline std::string toString(OrderType type) {
-  switch (type) {
-    case OrderType::kMarket:
-      return "Market";
-    case OrderType::kLimit:
-      return "Limit";
-    case OrderType::kStopLoss:
-      return "StopLoss";
-    case OrderType::kStopLimit:
-      return "StopLimit";
-    default:
-      return "Unknown";
-  }
-}
-
-inline std::string toString(TimeInForce time_in_force) {
-  switch (time_in_force) {
-    case TimeInForce::kGoodTillCancel:
-      return "GTC";
-    case TimeInForce::kImmediateOrCancel:
-      return "IOC";
-    case TimeInForce::kFillOrKill:
-      return "FOK";
-    default:
-      return "Unknown";
-  }
-}
-
-inline std::string toString(OrderSide side) {
-  switch (side) {
-    case OrderSide::kBuy:
-      return "Buy";
-    case OrderSide::kSell:
-      return "Sell";
-    default:
-      return "Unknown";
-  }
-}
 
 inline const char* toString(ExecType execType) {
   switch (execType) {
@@ -254,28 +214,6 @@ inline auto toString(ReqeustType type) -> std::string {
   }
 }
 
-inline std::string toString(SelfTradePreventionMode mode) {
-  switch (mode) {
-    case SelfTradePreventionMode::kNone:
-      return "None";
-    case SelfTradePreventionMode::kExpireTaker:
-      return "ExpireTaker";
-    case SelfTradePreventionMode::kExpireMaker:
-      return "ExpireMaker";
-    case SelfTradePreventionMode::kExpireBoth:
-      return "ExpireBoth";
-    case SelfTradePreventionMode::kDecrement:
-      return "Decrement";
-    default:
-      return "Unknown";
-  }
-}
-
-template <typename T>
-constexpr char to_char(T text) noexcept {
-  return static_cast<char>(text);
-}
-
 inline ExecType exec_type_from_char(char text) {
   return static_cast<ExecType>(text);
 }
@@ -288,29 +226,28 @@ inline MassCancelResponse mass_cancel_response_from_char(char text) {
   return static_cast<MassCancelResponse>(text);
 }
 
-inline trading::OrderSide to_common_side(common::Side side) noexcept {
+inline OrderSide to_common_side(common::Side side) noexcept {
   switch (side) {
     case common::Side::kBuy:
-      return trading::OrderSide::kBuy;
+      return OrderSide::kBuy;
     case common::Side::kSell:
-      return trading::OrderSide::kSell;
+      return OrderSide::kSell;
     default:
-      return trading::OrderSide::kNone;
+      return OrderSide::kNone;
   }
 }
 
 struct RequestCommon {
   ReqeustType req_type{ReqeustType::kInvalid};
-  std::string order_name;
   common::OrderId cl_order_id{common::OrderId{common::kOrderIdInvalid}};
   std::string symbol{"BTCUSDT"};
   common::Side side{common::Side::kInvalid};
   float order_qty{0.};
-  trading::OrderType ord_type{trading::OrderType::kInvalid};
+  OrderType ord_type{OrderType::kInvalid};
   float price{0.};
-  trading::TimeInForce time_in_force{trading::TimeInForce::kInvalid};
-  trading::SelfTradePreventionMode self_trade_prevention_mode{
-      trading::SelfTradePreventionMode::kExpireTaker};
+  TimeInForce time_in_force{TimeInForce::kInvalid};
+  SelfTradePreventionMode self_trade_prevention_mode{
+      SelfTradePreventionMode::kExpireTaker};
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream oss;
@@ -325,29 +262,15 @@ struct RequestCommon {
   }
 };
 
-struct NewSingleOrderData {
-  std::string cl_order_id;  // Tag 11: 고객 지정 주문 ID (유니크)
-  std::string symbol;       // Tag 55: 종목 (예: "BTCUSDT")
-  OrderSide side;           // Tag 54: 매매 방향 ('1' = Buy, '2' = Sell)
-  float order_qty;          // Tag 38: 주문 수량
-  OrderType ord_type;       // Tag 40: 주문 유형 ('1' = Market, '2' = Limit)
-  float price;              // Tag 44: 지정가 (Limit 주문일 때만 사용)
-  TimeInForce
-      time_in_force;  // Tag 59: 주문 유효 기간 ('0' = Day, '1' = GTC 등)
-  SelfTradePreventionMode self_trade_prevention_mode =
-      SelfTradePreventionMode::kExpireTaker;
-};
-
 struct OrderCancelRequest {
-  std::string cl_ord_id;
-  uint64_t order_id;
+  common::OrderId cl_order_id;
   std::string symbol;
 };
 
 struct OrderCancelRequestAndNewOrderSingle {
   int order_cancel_request_and_new_order_single_mode = 1;
   int cancel_ord_id;
-  std::string cl_order_id;
+  common::OrderId cl_order_id;
   std::string symbol;
   OrderSide side;
   float order_qty;
@@ -359,7 +282,7 @@ struct OrderCancelRequestAndNewOrderSingle {
 };
 
 struct OrderMassCancelRequest {
-  std::string cl_order_id;
+  common::OrderId cl_order_id;
   std::string symbol;
   char mass_cancel_request_type = '1';
 };
@@ -392,14 +315,14 @@ struct ExecutionReport {
 };
 
 struct OrderCancelReject {
-  std::string cl_ord_id;
+  std::string cl_order_id;
   common::OrderId order_id = common::OrderId(0);
   std::string symbol;
   int error_code;
 };
 
 struct OrderMassCancelReport {
-  std::string cl_ord_id;
+  std::string cl_order_id;
   std::string symbol;
   char mass_cancel_request_type;
   MassCancelResponse mass_cancel_response;

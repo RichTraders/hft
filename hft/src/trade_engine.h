@@ -21,7 +21,6 @@
 #include "types.h"
 
 #include "order_book.h"
-#include "order_request.h"
 
 namespace trading {
 class PositionKeeper;

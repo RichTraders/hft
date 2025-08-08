@@ -56,7 +56,7 @@ int FixApp<Derived, Cpu>::start() {
   const std::string fixmsg = create_log_on(sig_b64, cur_timestamp);
 
   send(fixmsg);
-  std::cout << "log on sent\n";
+  logger_->info("log on sent");
   return 0;
 }
 

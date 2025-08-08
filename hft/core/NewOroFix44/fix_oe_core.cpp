@@ -21,41 +21,29 @@
 namespace core {
 using namespace FIX8::NewOroFix44OE;
 
-FixOeCore::FixOeCore(SendId sender_comp_id,
-                     TargetId target_comp_id,
-                     common::Logger* logger)
-  :
-  sender_comp_id_(std::move(sender_comp_id)),
-  target_comp_id_(std::move(target_comp_id)),
-  logger_(logger) {}
+FixOeCore::FixOeCore(SendId sender_comp_id, TargetId target_comp_id,
+                     common::Logger* logger, const Authorization& authorization)
+    : sender_comp_id_(std::move(sender_comp_id)),
+      target_comp_id_(std::move(target_comp_id)),
+      logger_(logger),
+      authorization_(authorization) {}
 
 std::string FixOeCore::create_log_on_message(const std::string& sig_b64,
                                              const std::string& timestamp) {
-  FIX8::NewOroFix44OE_ctx(); // 왜하는겨?
+  FIX8::NewOroFix44OE_ctx();  // 왜하는겨?
   Logon request;
 
   FIX8::MessageBase* header = request.Header();
-  *header
-      << new SenderCompID(sender_comp_id_)
-      << new TargetCompID(target_comp_id_)
-      << new MsgSeqNum(sequence_++)
-      << new SendingTime(timestamp);
+  *header << new SenderCompID(sender_comp_id_)
+          << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
+          << new SendingTime(timestamp);
 
-  request << new EncryptMethod(EncryptMethod_NONE)
-      << new HeartBtInt(30)
-      << new ResetSeqNumFlag(true)
-      << new MessageHandling('0')
-      << new ResponseMode(1)
-      << new DropCopyFlag(false)
-      << new RawDataLength(static_cast<int>(sig_b64.size()))
-      << new RawData(sig_b64)
-      << new Username(
-#ifndef UNIT_TEST
-          "psxtGrh4X1aLsBVoMn3NCEuHDns78Yie9BMO0TIJEJvLFpZKk86guB7aOqsYTVk2")
-#else
-          "cJHjHNqHUG1nhTs0YPEKlmxoXokNomptrrilcGzrhoqhd8S9kEFfcJg2YQjVKgGw")
-#endif
-      << new MessageHandling(2);
+  request << new EncryptMethod(EncryptMethod_NONE) << new HeartBtInt(30)
+          << new ResetSeqNumFlag(true) << new MessageHandling('0')
+          << new ResponseMode(1) << new DropCopyFlag(false)
+          << new RawDataLength(static_cast<int>(sig_b64.size()))
+          << new RawData(sig_b64) << new Username(authorization_.api_key)
+          << new MessageHandling(2);
 
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))
     scid->set("A");
@@ -102,20 +90,17 @@ std::string FixOeCore::create_order_message(
   NewOrderSingle request;
 
   FIX8::MessageBase* header = request.Header();
-  *header
-      << new SenderCompID(sender_comp_id_)
-      << new TargetCompID(target_comp_id_)
-      << new MsgSeqNum(sequence_++)
-      << new SendingTime(order_data.transact_time);
+  *header << new SenderCompID(sender_comp_id_)
+          << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
+          << new SendingTime(order_data.transact_time);
 
   request.add_field(new ClOrdID(order_data.cl_order_id));
   request.add_field(new Symbol(order_data.symbol));
   request.add_field(new Side(trading::to_char(order_data.side)));
   request.add_field(new OrdType(trading::to_char(order_data.ord_type)));
   request.add_field(new OrderQty(order_data.order_qty));
-  request.add_field(
-      new SelfTradePreventionMode(
-          trading::to_char(order_data.self_trade_prevention_mode)));
+  request.add_field(new SelfTradePreventionMode(
+      trading::to_char(order_data.self_trade_prevention_mode)));
 
   if (order_data.ord_type == trading::OrderType::kLimit) {
     // Limit 주문일 때만
@@ -154,7 +139,7 @@ trading::ExecutionReport FixOeCore::create_excution_report_message(
   trading::ExecutionReport ret;
 
   ret.symbol = symbol->get();
-  ret.cl_ord_id = clOrdId->get();
+  ret.order_id = common::OrderId{std::stoul(clOrdId->get())};
   ret.cum_qty.value = cumQty->get();
   ret.exec_type = trading::exec_type_from_char(execType->get());
   ret.last_qty.value = lastQty->get();
@@ -177,8 +162,7 @@ FIX8::Message* FixOeCore::decode(const std::string& message) {
 #ifdef DEBUG
   START_MEASURE(Convert_Message);
 #endif
-  FIX8::Message* msg(
-      FIX8::Message::factory(ctx(), message, true, true));
+  FIX8::Message* msg(FIX8::Message::factory(ctx(), message, true, true));
 #ifdef DEBUG
   END_MEASURE(Convert_Message, logger_);
 #endif
@@ -188,4 +172,4 @@ FIX8::Message* FixOeCore::decode(const std::string& message) {
   return nullptr;
 }
 
-}
+}  // namespace core

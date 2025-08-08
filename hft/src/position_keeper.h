@@ -12,7 +12,6 @@
 
 #ifndef POSITIONKEEPER_H
 #define POSITIONKEEPER_H
-#include "execution_report.h"
 #include "types.h"
 
 namespace common {
@@ -21,6 +20,7 @@ class Logger;
 
 namespace trading {
 struct BBO;
+struct ExecutionReport;
 
 struct PositionInfo {
   double position_ = 0;
@@ -43,9 +43,7 @@ class PositionKeeper {
   explicit PositionKeeper(common::Logger* logger)
       : logger_(logger), ticker_position_{{"BTCUSDT", PositionInfo{}}} {}
 
-  auto add_fill(const ExecutionReport* report) noexcept {
-    ticker_position_.at(report->symbol).add_fill(report, logger_);
-  }
+  void add_fill(const ExecutionReport* report) noexcept;
 
   void update_bbo(const common::TickerId& ticker_id, const BBO* bbo) noexcept;
 

@@ -41,6 +41,8 @@
 #include <variant>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
+
 #define LIKELY(x) __builtin_expect(!!(x), 1)
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 

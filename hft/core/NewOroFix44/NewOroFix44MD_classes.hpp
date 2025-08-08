@@ -234,7 +234,7 @@ public:
 
       NoRelatedSym() : GroupBase(_fnum) {}
       ~NoRelatedSym() = default;
-      MessageBase *create_group(bool) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
+      MessageBase *create_group(bool deepctor=true) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
 
       static const MsgType& get_msgtype() { return _msgtype; }
    };
@@ -253,7 +253,7 @@ public:
 
       NoMDEntryTypes() : GroupBase(_fnum) {}
       ~NoMDEntryTypes() = default;
-      MessageBase *create_group(bool) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
+      MessageBase *create_group(bool deepctor=true) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
 
       static const MsgType& get_msgtype() { return _msgtype; }
    };
@@ -295,7 +295,7 @@ public:
 
       NoMDEntries() : GroupBase(_fnum) {}
       ~NoMDEntries() = default;
-      MessageBase *create_group(bool) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
+      MessageBase *create_group(bool deepctor=true) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
 
       static const MsgType& get_msgtype() { return _msgtype; }
    };
@@ -337,7 +337,7 @@ public:
 
       NoMDEntries() : GroupBase(_fnum) {}
       ~NoMDEntries() = default;
-      MessageBase *create_group(bool) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
+      MessageBase *create_group(bool deepctor=true) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
 
       static const MsgType& get_msgtype() { return _msgtype; }
    };
@@ -396,7 +396,7 @@ public:
 
       NoLimitIndicators() : GroupBase(_fnum) {}
       ~NoLimitIndicators() = default;
-      MessageBase *create_group(bool) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
+      MessageBase *create_group(bool deepctor=true) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
 
       static const MsgType& get_msgtype() { return _msgtype; }
    };
@@ -530,7 +530,7 @@ public:
 
       NoRelatedSym() : GroupBase(_fnum) {}
       ~NoRelatedSym() = default;
-      MessageBase *create_group(bool) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
+      MessageBase *create_group(bool deepctor=true) const { return new MessageBase(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha); }
 
       static const MsgType& get_msgtype() { return _msgtype; }
    };

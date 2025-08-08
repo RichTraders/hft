@@ -12,8 +12,8 @@
 
 #include "position_keeper.h"
 
-#include "execution_report.h"
 #include "order_book.h"
+#include "order_entry.h"
 
 using common::Qty;
 using common::Side;
@@ -21,7 +21,7 @@ using common::sideToIndex;
 
 namespace trading {
 std::string PositionInfo::toString() const {
-  std::stringstream stream;
+  std::ostringstream stream;
   stream << "Position{" << "pos:" << position_ << " u-pnl:" << unreal_pnl_
          << " r-pnl:" << real_pnl_ << " t-pnl:" << total_pnl_
          << " vol:" << common::toString(volume_) << " vwaps:["
@@ -44,7 +44,7 @@ void PositionInfo::add_fill(const ExecutionReport* report,
   const auto side_index = sideToIndex(report->side);
   const auto opp_side_index =
       sideToIndex(report->side == Side::kBuy ? Side::kSell : Side::kBuy);
-  const auto side_value = sideToValue(report->side);
+  const auto side_value = common::sideToValue(report->side);
   position_ += report->last_qty.value * static_cast<double>(side_value);
   volume_.value += report->last_qty.value;
 
@@ -109,7 +109,11 @@ void PositionInfo::update_bbo(const BBO* bbo, common::Logger* logger) noexcept {
   }
 }
 
-void PositionKeeper::update_bbo(common::TickerId& ticker_id,
+void PositionKeeper::add_fill(const ExecutionReport* report) noexcept {
+  ticker_position_.at(report->symbol).add_fill(report, logger_);
+}
+
+void PositionKeeper::update_bbo(const common::TickerId& ticker_id,
                                 const BBO* bbo) noexcept {
   ticker_position_.at(ticker_id).update_bbo(bbo, logger_);
 }
@@ -118,7 +122,7 @@ std::string PositionKeeper::toString() const {
   double total_pnl = 0;
   Qty total_vol = Qty{0};
 
-  std::stringstream stream;
+  std::ostringstream stream;
   for (const auto& position : ticker_position_) {
     const auto& name = position.first;
     const auto& info = position.second;

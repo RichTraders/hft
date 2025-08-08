@@ -11,8 +11,9 @@
  */
 
 #include "trade_engine.h"
-#include "execution_report.h"
 #include "feature_engine.h"
+#include "order_entry.h"
+#include "order_manager.h"
 #include "performance.h"
 #include "position_keeper.h"
 #include "risk_manager.h"
@@ -32,7 +33,9 @@ TradeEngine::TradeEngine(
       feature_engine_(std::make_unique<FeatureEngine>(logger)),
       position_keeper_(std::make_unique<PositionKeeper>(logger)),
       risk_manager_(std::make_unique<RiskManager>(
-          logger, position_keeper_.get(), ticker_cfg)) {
+          logger, position_keeper_.get(), ticker_cfg)),
+      order_manager_(
+          std::make_unique<OrderManager>(logger, this, *risk_manager_)) {
   auto orderbook = std::make_unique<MarketOrderBook>("BTCUSDT", logger);
   orderbook->set_trade_engine(this);
   ticker_order_book_.insert({"BTCUSDT", std::move(orderbook)});
@@ -50,7 +53,6 @@ void TradeEngine::stop() {
   running_ = false;
 }
 
-// TODO(jb): call feature engine
 void TradeEngine::on_order_book_updated(common::Price price, common::Side side,
                                         MarketOrderBook* order_book) const {
   feature_engine_->on_order_book_updated(price, side, order_book);
@@ -65,6 +67,8 @@ void TradeEngine::on_order_updated(
     const ExecutionReport* report) const noexcept {
   position_keeper_->add_fill(report);
 }
+
+void TradeEngine::send_request(const RequestCommon&) {}
 
 void TradeEngine::run() {
   while (running_) {

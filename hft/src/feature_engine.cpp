@@ -21,7 +21,7 @@ using common::TickerId;
 
 namespace trading {
 void FeatureEngine::on_trade_updated(const MarketData* market_update,
-                                     trading::MarketOrderBook* book) noexcept {
+                                     MarketOrderBook* book) noexcept {
   const auto* bbo = book->get_bbo();
   if (LIKELY(bbo->bid_price.value != common::kPriceInvalid &&
              bbo->ask_price.value != common::kPriceInvalid)) {
@@ -36,9 +36,8 @@ void FeatureEngine::on_trade_updated(const MarketData* market_update,
                             agg_trade_qty_ratio_));
 }
 
-void FeatureEngine::on_order_book_updated(
-    const Price price, const Side side,
-    trading::MarketOrderBook* book) noexcept {
+void FeatureEngine::on_order_book_updated(const Price price, const Side side,
+                                          MarketOrderBook* book) noexcept {
   const auto* bbo = book->get_bbo();
   if (LIKELY(bbo->bid_price != common::kPriceInvalid &&
              bbo->ask_price != common::kPriceInvalid)) {

@@ -38,6 +38,21 @@ enum class OrderType : char {
   kStopLimit = '4',
 };
 
+inline std::string toString(OrderType type) {
+  switch (type) {
+    case OrderType::kMarket:
+      return "Market";
+    case OrderType::kLimit:
+      return "Limit";
+    case OrderType::kStopLoss:
+      return "StopLoss";
+    case OrderType::kStopLimit:
+      return "StopLimit";
+    default:
+      return "Unknown";
+  }
+}
+
 enum class TimeInForce : char {
   kInvalid = '0',
   kGoodTillCancel = '1',
@@ -45,11 +60,40 @@ enum class TimeInForce : char {
   kFillOrKill = '4',
 };
 
+inline std::string toString(TimeInForce time_in_force) {
+  switch (time_in_force) {
+    case TimeInForce::kGoodTillCancel:
+      return "GTC";
+    case TimeInForce::kImmediateOrCancel:
+      return "IOC";
+    case TimeInForce::kFillOrKill:
+      return "FOK";
+    default:
+      return "Unknown";
+  }
+}
+
+template <typename T>
+constexpr char to_char(T text) noexcept {
+  return static_cast<char>(text);
+}
+
 enum class OrderSide : char {
   kNone = 0,
   kBuy = '1',  // 매수
   kSell = '2'  // 매도
 };
+
+inline std::string toString(OrderSide side) {
+  switch (side) {
+    case OrderSide::kBuy:
+      return "Buy";
+    case OrderSide::kSell:
+      return "Sell";
+    default:
+      return "Unknown";
+  }
+}
 
 enum class SelfTradePreventionMode : char {
   kNone = '1',
@@ -57,6 +101,37 @@ enum class SelfTradePreventionMode : char {
   kExpireMaker = '3',
   kExpireBoth = '4',
   kDecrement = '5',
+};
+
+inline std::string toString(SelfTradePreventionMode mode) {
+  switch (mode) {
+    case SelfTradePreventionMode::kNone:
+      return "None";
+    case SelfTradePreventionMode::kExpireTaker:
+      return "ExpireTaker";
+    case SelfTradePreventionMode::kExpireMaker:
+      return "ExpireMaker";
+    case SelfTradePreventionMode::kExpireBoth:
+      return "ExpireBoth";
+    case SelfTradePreventionMode::kDecrement:
+      return "Decrement";
+    default:
+      return "Unknown";
+  }
+}
+
+struct NewSingleOrderData {
+  std::string cl_order_id;  // Tag 11: 고객 지정 주문 ID (유니크)
+  std::string symbol;       // Tag 55: 종목 (예: "BTCUSDT")
+  OrderSide side;           // Tag 54: 매매 방향 ('1' = Buy, '2' = Sell)
+  double order_qty;         // Tag 38: 주문 수량
+  OrderType ord_type;       // Tag 40: 주문 유형 ('1' = Market, '2' = Limit)
+  double price;             // Tag 44: 지정가 (Limit 주문일 때만 사용)
+  TimeInForce
+      time_in_force;  // Tag 59: 주문 유효 기간 ('0' = Day, '1' = GTC 등)
+  std::string transact_time;  // Tag 60: 전송 시간 (YYYYMMDD‑HH:MM:SS.sss)
+  SelfTradePreventionMode self_trade_prevention_mode =
+      SelfTradePreventionMode::kExpireTaker;
 };
 
 enum class ExecType : char {
@@ -290,8 +365,7 @@ struct OrderMassCancelRequest {
 };
 
 struct ExecutionReport {
-  std::string cl_ord_id;
-  common::OrderId order_id = common::OrderId(0);
+  common::OrderId order_id = common::OrderId(common::kOrderIdInvalid);
   std::string symbol;
   ExecType exec_type;
   OrdStatus ord_status;
@@ -304,8 +378,8 @@ struct ExecutionReport {
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
-    stream << "ExecutionReport{" << "cl_ord_id=" << cl_ord_id
-           << ", order_id=" << order_id.value << ", symbol=" << symbol
+    stream << "ExecutionReport{" << ", order_id=" << order_id.value
+           << ", symbol=" << symbol
            << ", exec_type=" << trading::toString(exec_type)
            << ", ord_status=" << trading::toString(ord_status)
            << ", cum_qty=" << cum_qty.value

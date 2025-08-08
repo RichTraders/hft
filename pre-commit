@@ -29,13 +29,13 @@ fi
 
 FAIL=0
 for file in $FILES; do
-  HASH=$(git hash-object "$file")
-  CACHED=$(grep "$file $HASH" "$CACHE_FILE")
-
   echo "• $file"
   $CLANG_FORMAT -i "$file"
   git add "$file"
   echo "formatted: $file"
+
+  HASH=$(git hash-object "$file")
+  CACHED=$(grep "$file $HASH" "$CACHE_FILE")
 
   if [ -n "$CACHED" ]; then
     echo "skipped clang-tidy (cached): $file"

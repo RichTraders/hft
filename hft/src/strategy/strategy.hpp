@@ -23,11 +23,11 @@ class MarketOrderBook;
 
 template <typename Derived>
 class BaseStrategy {
-  void on_orderbook_updated(common::TickerId ticker_id, common::Price price,
+  void on_orderbook_updated(common::TickerId& ticker_id, common::Price price,
                             common::Side side,
                             const MarketOrderBook* book) noexcept {
     static_cast<Derived>(this)->on_orderbook_updated(ticker_id, price, side,
-                                                     book);
+      book);
   }
 
   auto on_trade_updated(const MarketData* market_update,
@@ -36,10 +36,10 @@ class BaseStrategy {
   }
 
   auto on_order_updated(const ExecutionReport* client_response) noexcept
-      -> void {
+    -> void {
     static_cast<Derived>(this)->on_order_updated(client_response);
   }
 };
-}  // namespace trading
+} // namespace trading
 
 #endif  //BASE_STRATEGY_H

@@ -213,7 +213,7 @@ trading::ExecutionReport* FixOeCore::create_excution_report_message(
 
   if (likely(leaves_qty != nullptr))
     ret->leaves_qty.value = leaves_qty->get();
-
+  
   if (likely(order_id != nullptr))
     ret->order_id.value = order_id->get();
 

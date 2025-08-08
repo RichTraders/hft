@@ -13,6 +13,7 @@
 #include "trade_engine.h"
 #include "feature_engine.h"
 #include "order_entry.h"
+#include "order_manager.h"
 #include "performance.h"
 #include "position_keeper.h"
 #include "risk_manager.h"
@@ -32,7 +33,9 @@ TradeEngine::TradeEngine(
       feature_engine_(std::make_unique<FeatureEngine>(logger)),
       position_keeper_(std::make_unique<PositionKeeper>(logger)),
       risk_manager_(std::make_unique<RiskManager>(
-          logger, position_keeper_.get(), ticker_cfg)) {
+          logger, position_keeper_.get(), ticker_cfg)),
+      order_manager_(
+          std::make_unique<OrderManager>(logger, this, *risk_manager_)) {
   auto orderbook = std::make_unique<MarketOrderBook>("BTCUSDT", logger);
 
   constexpr int kResponseQueueSize = 64;
@@ -80,6 +83,8 @@ ResponseCommon TradeEngine::dequeue_response() {
 
   return res;
 }
+
+void TradeEngine::send_request(const RequestCommon&) {}
 
 void TradeEngine::run() {
   while (running_) {

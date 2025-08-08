@@ -37,6 +37,8 @@ add_unit_test(feature_engine)
 add_unit_test(position_keeper)
 add_unit_test(risk_manager)
 add_unit_test(ini_config)
+add_unit_test(order_gateway)
+
 
 set(RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 file(COPY ${RESOURCE_DIR} DESTINATION ${CMAKE_BINARY_DIR}/test)

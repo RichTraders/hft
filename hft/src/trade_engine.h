@@ -15,6 +15,7 @@
 
 #include "market_data.h"
 #include "memory_pool.hpp"
+#include "order_entry.h"
 #include "spsc_queue.h"
 #include "thread.hpp"
 #include "types.h"
@@ -46,6 +47,8 @@ class TradeEngine {
   void on_trade_updated(const MarketData* market_data,
                         MarketOrderBook* order_book) const;
   void on_order_updated(const ExecutionReport* report) const noexcept;
+  void enqueue_response(const ResponseCommon& response);
+  ResponseCommon dequeue_response();
 
  private:
   common::Logger* logger_;
@@ -53,6 +56,7 @@ class TradeEngine {
   common::MemoryPool<MarketData>* market_data_pool_;
   std::unique_ptr<common::SPSCQueue<MarketUpdateData*>> queue_;
   common::Thread<common::AffinityTag<2>, common::PriorityTag<1>> thread_;
+  std::unique_ptr<common::SPSCQueue<ResponseCommon>> response_queue_;
 
   MarketOrderBookHashMap ticker_order_book_;
 

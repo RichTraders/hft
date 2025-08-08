@@ -26,12 +26,39 @@ std::string FixOrderEntryApp::create_heartbeat_message(FIX8::Message* message) {
   return fix_oe_core_->create_heartbeat_message(message);
 }
 
-std::string FixOrderEntryApp::create_order_message(const trading::NewSingleOrderData& order_data) {
+std::string FixOrderEntryApp::create_order_message(
+    const trading::NewSingleOrderData& order_data) {
   return fix_oe_core_->create_order_message(order_data);
 }
 
-trading::ExecutionReport FixOrderEntryApp::create_execution_report_message(FIX8::NewOroFix44OE::ExecutionReport* msg) {
+std::string FixOrderEntryApp::create_cancel_order_message(
+    const trading::OrderCancelRequest& cancel_request) {
+  return fix_oe_core_->create_cancel_order_message(cancel_request);
+}
+
+std::string FixOrderEntryApp::create_cancel_and_reorder_message(
+    const trading::OrderCancelRequestAndNewOrderSingle&
+    cancel_and_re_order) {
+  return fix_oe_core_->create_cancel_and_reorder_message(
+      cancel_and_re_order);
+}
+
+std::string FixOrderEntryApp::create_order_all_cancel(const trading::OrderMassCancelRequest& all_order_cancel) {
+  return fix_oe_core_->create_order_all_cancel(
+      all_order_cancel);
+}
+
+trading::ExecutionReport* FixOrderEntryApp::create_execution_report_message(
+    FIX8::NewOroFix44OE::ExecutionReport* msg) {
   return fix_oe_core_->create_excution_report_message(msg);
+}
+
+trading::OrderCancelReject* FixOrderEntryApp::create_order_cancel_reject_message(FIX8::NewOroFix44OE::OrderCancelReject* msg) {
+  return fix_oe_core_->create_order_cancel_reject_message(msg);
+}
+
+trading::OrderMassCancelReport* FixOrderEntryApp::create_order_mass_cancel_report_message(FIX8::NewOroFix44OE::OrderMassCancelReport* msg) {
+  return fix_oe_core_->create_order_mass_cancel_report_message(msg);
 }
 
 FIX8::Message* FixOrderEntryApp::decode(const std::string& message) {

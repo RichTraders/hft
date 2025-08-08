@@ -34,6 +34,11 @@ TradeEngine::TradeEngine(
       risk_manager_(std::make_unique<RiskManager>(
           logger, position_keeper_.get(), ticker_cfg)) {
   auto orderbook = std::make_unique<MarketOrderBook>("BTCUSDT", logger);
+
+  constexpr int kResponseQueueSize = 64;
+  response_queue_ =
+      std::make_unique<common::SPSCQueue<trading::ResponseCommon>>(
+          kResponseQueueSize);
   orderbook->set_trade_engine(this);
   ticker_order_book_.insert({"BTCUSDT", std::move(orderbook)});
 
@@ -63,6 +68,17 @@ void TradeEngine::on_trade_updated(const MarketData* market_data,
 void TradeEngine::on_order_updated(
     const ExecutionReport* report) const noexcept {
   position_keeper_->add_fill(report);
+}
+
+void TradeEngine::enqueue_response(const ResponseCommon& response) {
+  response_queue_->enqueue(response);
+}
+
+ResponseCommon TradeEngine::dequeue_response() {
+  ResponseCommon res;
+  response_queue_->dequeue(res);
+
+  return res;
 }
 
 void TradeEngine::run() {

@@ -23,27 +23,27 @@ using namespace FIX8::NewOroFix44OE;
 
 FixOeCore::FixOeCore(SendId sender_comp_id, TargetId target_comp_id,
                      common::Logger* logger, const Authorization& authorization)
-    : sender_comp_id_(std::move(sender_comp_id)),
-      target_comp_id_(std::move(target_comp_id)),
-      logger_(logger),
-      authorization_(authorization) {}
+  : sender_comp_id_(std::move(sender_comp_id)),
+    target_comp_id_(std::move(target_comp_id)),
+    logger_(logger),
+    authorization_(authorization) {}
 
 std::string FixOeCore::create_log_on_message(const std::string& sig_b64,
                                              const std::string& timestamp) {
-  FIX8::NewOroFix44OE_ctx();  // 왜하는겨?
+  FIX8::NewOroFix44OE_ctx(); // 왜하는겨?
   Logon request;
 
   FIX8::MessageBase* header = request.Header();
   *header << new SenderCompID(sender_comp_id_)
-          << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
-          << new SendingTime(timestamp);
+      << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
+      << new SendingTime(timestamp);
 
   request << new EncryptMethod(EncryptMethod_NONE) << new HeartBtInt(30)
-          << new ResetSeqNumFlag(true) << new MessageHandling('0')
-          << new ResponseMode(1) << new DropCopyFlag(false)
-          << new RawDataLength(static_cast<int>(sig_b64.size()))
-          << new RawData(sig_b64) << new Username(authorization_.api_key)
-          << new MessageHandling(2);
+      << new ResetSeqNumFlag(true) << new MessageHandling('0')
+      << new ResponseMode(1) << new DropCopyFlag(false)
+      << new RawDataLength(static_cast<int>(sig_b64.size()))
+      << new RawData(sig_b64) << new Username(authorization_.api_key)
+      << new MessageHandling(2);
 
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))
     scid->set("A");
@@ -91,8 +91,9 @@ std::string FixOeCore::create_order_message(
 
   FIX8::MessageBase* header = request.Header();
   *header << new SenderCompID(sender_comp_id_)
-          << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
-          << new SendingTime(order_data.transact_time);
+      << new TargetCompID(target_comp_id_)
+      << new MsgSeqNum(sequence_++)
+  << new SendingTime();
 
   request.add_field(new ClOrdID(order_data.cl_order_id));
   request.add_field(new Symbol(order_data.symbol));
@@ -123,37 +124,147 @@ std::string FixOeCore::create_order_message(
   return wire;
 }
 
-trading::ExecutionReport FixOeCore::create_excution_report_message(
+std::string FixOeCore::create_cancel_order_message(const trading::OrderCancelRequest& cancel_request) {
+  OrderCancelRequest request;
+
+  FIX8::MessageBase* header = request.Header();
+  *header << new SenderCompID(sender_comp_id_)
+      << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
+  << new SendingTime();
+
+  request.add_field(new ClOrdID(cancel_request.cl_ord_id));
+  request.add_field(new Symbol(cancel_request.symbol));
+  request.add_field(new OrderID(cancel_request.order_id));
+
+  std::string wire;
+  request.encode(wire);
+  return wire;
+}
+
+std::string FixOeCore::create_cancel_and_reorder_message(const trading::OrderCancelRequestAndNewOrderSingle& cancel_and_re_order) {
+  OrderCancelRequestAndNewOrderSingle request;
+
+  FIX8::MessageBase* header = request.Header();
+  *header << new SenderCompID(sender_comp_id_)
+      << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
+  << new SendingTime();
+
+  request.add_field(new OrderID(cancel_and_re_order.cancel_ord_id));
+  request.add_field(new ClOrdID(cancel_and_re_order.cl_order_id));
+  request.add_field(new Symbol(cancel_and_re_order.symbol));
+  request.add_field(new Side(trading::to_char(cancel_and_re_order.side)));
+  request.add_field(new OrdType(trading::to_char(cancel_and_re_order.ord_type)));
+  request.add_field(new OrderQty(cancel_and_re_order.order_qty));
+  request.add_field(new SelfTradePreventionMode(
+      trading::to_char(cancel_and_re_order.self_trade_prevention_mode)));
+  request.add_field(new OrderCancelRequestAndNewOrderSingleMode(
+      trading::to_char(cancel_and_re_order.order_cancel_request_and_new_order_single_mode)));
+
+  if (cancel_and_re_order.ord_type == trading::OrderType::kLimit) {
+    // Limit 주문일 때만
+    request.add_field(new Price(cancel_and_re_order.price));
+    request.add_field(
+        new TimeInForce(trading::to_char(cancel_and_re_order.time_in_force)));
+  }
+
+  std::string wire;
+  request.encode(wire);
+  return wire;
+}
+
+std::string FixOeCore::create_order_all_cancel(const trading::OrderMassCancelRequest& all_order_cancel) {
+  OrderMassCancelRequest request;
+
+  FIX8::MessageBase* header = request.Header();
+  *header << new SenderCompID(sender_comp_id_)
+      << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
+  << new SendingTime();
+
+  request.add_field(new ClOrdID(all_order_cancel.cl_order_id));
+  request.add_field(new Symbol(all_order_cancel.symbol));
+  request.add_field(new MassCancelRequestType(all_order_cancel.mass_cancel_request_type));
+
+  std::string wire;
+  request.encode(wire);
+  return wire;
+}
+
+trading::ExecutionReport* FixOeCore::create_excution_report_message(
     FIX8::NewOroFix44OE::ExecutionReport* msg) {
-  auto clOrdId = msg->get<ClOrdID>();
-  auto orderId = msg->get<OrderID>();
+  auto cl_ord_id = msg->get<ClOrdID>();
+  auto order_id = msg->get<OrderID>();
   auto symbol = msg->get<Symbol>();
-  auto execType = msg->get<ExecType>();
-  auto ordStatus = msg->get<OrdStatus>();
-  auto cumQty = msg->get<CumQty>();
-  auto leavesQty = msg->get<LeavesQty>();
-  auto lastQty = msg->get<LastQty>();
+  auto exec_type = msg->get<ExecType>();
+  auto ord_status = msg->get<OrdStatus>();
+  auto cum_qty = msg->get<CumQty>();
+  auto leaves_qty = msg->get<LeavesQty>();
+  auto last_qty = msg->get<LastQty>();
   auto price = msg->get<Price>();
   auto reason = msg->get<OrdRejReason>();
 
-  trading::ExecutionReport ret;
+  trading::ExecutionReport* ret = new trading::ExecutionReport;
 
-  ret.symbol = symbol->get();
-  ret.cl_ord_id = clOrdId->get();
-  ret.cum_qty.value = cumQty->get();
-  ret.exec_type = trading::exec_type_from_char(execType->get());
-  ret.last_qty.value = lastQty->get();
-  ret.leaves_qty.value = leavesQty->get();
-  ret.ord_status = trading::ord_status_from_char(ordStatus->get());
+  ret->symbol = symbol->get();
+  ret->cl_ord_id = cl_ord_id->get();
+  ret->cum_qty.value = cum_qty->get();
+  ret->exec_type = trading::exec_type_from_char(exec_type->get());
+  ret->last_qty.value = last_qty->get();
+  ret->ord_status = trading::ord_status_from_char(ord_status->get());
 
-  if (likely(orderId != nullptr))
-    ret.order_id.value = orderId->get();
+  if (likely(leaves_qty != nullptr))
+    ret->leaves_qty.value = leaves_qty->get();
+
+  if (likely(order_id != nullptr))
+    ret->order_id.value = order_id->get();
 
   if (likely(price != nullptr))
-    ret.price.value = price->get();
+    ret->price.value = price->get();
 
   if (likely(reason != nullptr))
-    ret.reason = reason->get();
+    ret->reason = reason->get();
+
+  return ret;
+}
+
+trading::OrderCancelReject* FixOeCore::create_order_cancel_reject_message(FIX8::NewOroFix44OE::OrderCancelReject* msg) {
+  auto cl_ord_id = msg->get<ClOrdID>();
+  auto orderId = msg->get<OrderID>();
+  auto symbol = msg->get<Symbol>();
+  auto error_code = msg->get<ErrorCode>();
+
+  trading::OrderCancelReject* ret = new trading::OrderCancelReject;
+
+  ret->cl_ord_id = cl_ord_id->get();
+  ret->order_id.value = orderId->get();
+  ret->symbol = symbol->get();
+
+  if (error_code != nullptr)
+    ret->error_code = error_code->get();
+
+  return ret;
+}
+
+trading::OrderMassCancelReport* FixOeCore::create_order_mass_cancel_report_message(FIX8::NewOroFix44OE::OrderMassCancelReport* msg) {
+  auto cl_ord_id = msg->get<ClOrdID>();
+  auto symbol = msg->get<Symbol>();
+  auto error_code = msg->get<ErrorCode>();
+  auto response = msg->get<MassCancelResponse>();
+  auto mass_cancel_request_type = msg->get<MassCancelRequestType>();
+  auto total_affected_orders = msg->get<TotalAffectedOrders>();
+
+  trading::OrderMassCancelReport* ret = new trading::OrderMassCancelReport;
+
+  ret->cl_ord_id = cl_ord_id->get();
+  ret->symbol = symbol->get();
+
+  if (error_code != nullptr)
+    ret->error_code = error_code->get();
+
+  ret->mass_cancel_response = trading::mass_cancel_response_from_char(response->get());
+  ret->mass_cancel_request_type = mass_cancel_request_type->get();
+
+  if (total_affected_orders != nullptr)
+    ret->total_affected_orders = total_affected_orders->get();
 
   return ret;
 }
@@ -172,4 +283,4 @@ FIX8::Message* FixOeCore::decode(const std::string& message) {
   return nullptr;
 }
 
-}  // namespace core
+} // namespace core

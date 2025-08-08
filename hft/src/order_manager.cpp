@@ -62,7 +62,6 @@ void OrderManager::on_order_updated(
           std::format("Expired report:{}", client_response->toString()));
       order->order_state = OMOrderState::kDead;
     } break;
-      break;
   }
 }
 

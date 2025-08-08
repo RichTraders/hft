@@ -33,7 +33,7 @@ struct OrderId {
 
   template <typename H>
   friend H AbslHashValue(H hash_state, const OrderId& oid) {
-    return H::combine(std::move(hash_state, oid.value));
+    return H::combine(std::move(hash_state), oid.value);
   }
 
   explicit operator uint64_t() const { return value; }

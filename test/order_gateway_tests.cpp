@@ -202,6 +202,7 @@ TEST(OrderGatewayTest, DISABLED_OrderMassCancel) {
   ResponseCommon response;
   response = trade_engine_->dequeue_response();
 
-  EXPECT_EQ(response.res_type, ResponseType::kOrderMassCancelReport);
+  ASSERT_EQ(response.res_type, ResponseType::kOrderMassCancelReport);
+  EXPECT_EQ(response.order_mass_cancel_report->mass_cancel_response, MassCancelResponse::kCancelSymbolOrders);
   sleep(1);
 }

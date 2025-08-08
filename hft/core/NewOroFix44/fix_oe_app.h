@@ -13,6 +13,7 @@
 #pragma once
 #include "fix_app.h"
 #include "fix_oe_core.h"
+#include "order_entry.h"
 
 namespace FIX8 {
 class Message;
@@ -21,14 +22,12 @@ class Message;
 namespace core {
 
 class FixOrderEntryApp : public FixApp<FixOrderEntryApp, 3> {
- public:
+public:
   FixOrderEntryApp(const Authorization& authorization,
                    const std::string& sender_comp_id,
-                   const std::string& target_comp_id, common::Logger* logger,
-                   common::MemoryPool<OrderData>* order_data_pool)
-      : FixApp(authorization.oe_address, authorization.port, sender_comp_id,
-               target_comp_id, logger, authorization),
-        order_data_pool_(order_data_pool) {
+                   const std::string& target_comp_id, common::Logger* logger)
+    : FixApp(authorization.oe_address, authorization.port, sender_comp_id,
+             target_comp_id, logger, authorization){
     fix_oe_core_ = std::make_unique<FixOeCore>(sender_comp_id, target_comp_id,
                                                logger, authorization);
   }
@@ -39,12 +38,18 @@ class FixOrderEntryApp : public FixApp<FixOrderEntryApp, 3> {
   std::string create_heartbeat_message(FIX8::Message* message);
   std::string create_order_message(
       const trading::NewSingleOrderData& order_data);
-  trading::ExecutionReport create_execution_report_message(
+  std::string create_cancel_order_message(
+      const trading::OrderCancelRequest& cancel_request);
+  std::string create_cancel_and_reorder_message(
+      const trading::OrderCancelRequestAndNewOrderSingle& cancel_and_re_order);
+  std::string create_order_all_cancel(const trading::OrderMassCancelRequest& all_order_cancel);
+  trading::ExecutionReport* create_execution_report_message(
       FIX8::NewOroFix44OE::ExecutionReport* msg);
+  trading::OrderCancelReject* create_order_cancel_reject_message(FIX8::NewOroFix44OE::OrderCancelReject* msg);
+  trading::OrderMassCancelReport* create_order_mass_cancel_report_message(FIX8::NewOroFix44OE::OrderMassCancelReport* msg);
   FIX8::Message* decode(const std::string& message);
 
- private:
-  common::MemoryPool<OrderData>* order_data_pool_;
+private:
   std::unique_ptr<FixOeCore> fix_oe_core_;
 };
-}  // namespace core
+} // namespace core

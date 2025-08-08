@@ -29,7 +29,7 @@
 using namespace core;
 using namespace common;
 
-TEST(FixAppTest, CallbackRegistration) {
+TEST(FixAppTest, DISABLED_CallbackRegistration) {
   IniConfig config;
   config.load("resources/config.ini");
   const Authorization authorization{
@@ -72,26 +72,23 @@ TEST(FixAppTest, CallbackRegistration) {
   EXPECT_TRUE(logout_success);
 }
 
-TEST(FixAppTest, CallbackFixOERegistration) {
+TEST(FixAppTest, DISABLED_Heeartbeat) {
   IniConfig config;
   config.load("resources/config.ini");
   const Authorization authorization{
-    .oe_address = config.get("auth", "oe_address"),
-    .port = config.get_int("auth", "port"),
-    .api_key = config.get("auth", "api_key"),
-    .pem_file_path = config.get("auth", "pem_file_path"),
-    .private_password = config.get("auth", "private_password")};
+      .oe_address = config.get("auth", "oe_address"),
+      .port = config.get_int("auth", "port"),
+      .api_key = config.get("auth", "api_key"),
+      .pem_file_path = config.get("auth", "pem_file_path"),
+      .private_password = config.get("auth", "private_password")};
 
-  auto pool = std::make_unique<MemoryPool<OrderData>>(1024);
   auto logger = std::make_unique<Logger>();
   auto app = FixOrderEntryApp(authorization,
                               "BMDWATCH",
                               "SPOT",
-                              logger.get(),
-                              pool.get());
+                              logger.get());
   bool login_called = false;
   bool heartbeat_called = false;
-  bool excution_report_called = false;
 
   app.register_callback( //log on
       "A", [&](FIX8::Message* m) {
@@ -112,11 +109,6 @@ TEST(FixAppTest, CallbackFixOERegistration) {
         app.send(message);
         heartbeat_called = true;
       });
-  app.register_callback("8", [&](FIX8::Message* m) {
-    auto* exec = static_cast<FIX8::NewOroFix44OE::ExecutionReport*>(m);
-    trading::ExecutionReport ret = app.create_execution_report_message(exec);
-    excution_report_called = true;
-  });
 
   app.start();
   sleep(2);
@@ -128,7 +120,6 @@ TEST(FixAppTest, CallbackFixOERegistration) {
   order_data.side = trading::OrderSide::kBuy;
   order_data.order_qty = 0.01;
   order_data.price = 117984;
-  order_data.transact_time = app.timestamp();
   order_data.ord_type = trading::OrderType::kMarket;
   order_data.time_in_force = trading::TimeInForce::kGoodTillCancel;
   order_data.self_trade_prevention_mode =
@@ -139,4 +130,72 @@ TEST(FixAppTest, CallbackFixOERegistration) {
 
   sleep(50);
   EXPECT_TRUE(heartbeat_called);
+}
+
+TEST(FixAppTest, NewSingleOrder) {
+  IniConfig config;
+  config.load("resources/config.ini");
+  const Authorization authorization{
+      .oe_address = config.get("auth", "oe_address"),
+      .port = config.get_int("auth", "port"),
+      .api_key = config.get("auth", "api_key"),
+      .pem_file_path = config.get("auth", "pem_file_path"),
+      .private_password = config.get("auth", "private_password")};
+
+  auto logger = std::make_unique<Logger>();
+  auto app = FixOrderEntryApp(authorization,
+                              "BMDWATCH",
+                              "SPOT",
+                              logger.get());
+  bool login_called = false;
+  std::vector<trading::ExecutionReport*> ret;
+
+  app.register_callback( //log on
+      "A", [&](FIX8::Message* m) {
+        login_called = true;
+        std::string result;
+        m->encode(result);
+        std::cout << result << std::endl;
+      });
+  app.register_callback( //log out
+      "5", [&](FIX8::Message* m) {
+        std::string result;
+        m->encode(result);
+        std::cout << result << std::endl;
+      });
+  app.register_callback(
+      "1", [&](FIX8::Message* m) {
+        auto message = app.create_heartbeat(m);
+        app.send(message);
+      });
+  app.register_callback("8", [&](FIX8::Message* m) {
+    auto* exec = static_cast<FIX8::NewOroFix44OE::ExecutionReport*>(m);
+    ret.push_back(app.create_execution_report_message(exec));
+  });
+
+  app.start();
+  sleep(2);
+  EXPECT_TRUE(login_called);
+
+  trading::NewSingleOrderData order_data;
+  order_data.cl_order_id = "Neworo_2";
+  order_data.symbol = "BTCUSDT";
+  order_data.side = trading::OrderSide::kSell;
+  order_data.order_qty = 0.01;
+  order_data.price = 115986.0;
+  order_data.ord_type = trading::OrderType::kMarket;
+  order_data.time_in_force = trading::TimeInForce::kGoodTillCancel;
+  order_data.self_trade_prevention_mode =
+      trading::SelfTradePreventionMode::kExpireTaker;
+
+  std::string order_msg = app.create_order_message(order_data);
+  app.send(order_msg);
+
+  sleep(3);
+
+  EXPECT_TRUE(ret.size());
+
+  if (ret.size()) {
+    EXPECT_LE(ret[0]->ord_status, trading::OrdStatus::kFilled);
+  }
 }

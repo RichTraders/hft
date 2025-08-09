@@ -124,9 +124,9 @@ struct NewSingleOrderData {
   common::OrderId cl_order_id;  // Tag 11: 고객 지정 주문 ID (유니크)
   std::string symbol;           // Tag 55: 종목 (예: "BTCUSDT")
   OrderSide side;               // Tag 54: 매매 방향 ('1' = Buy, '2' = Sell)
-  double order_qty;             // Tag 38: 주문 수량
-  OrderType ord_type;  // Tag 40: 주문 유형 ('1' = Market, '2' = Limit)
-  double price;        // Tag 44: 지정가 (Limit 주문일 때만 사용)
+  common::Qty order_qty;        // Tag 38: 주문 수량
+  OrderType ord_type;   // Tag 40: 주문 유형 ('1' = Market, '2' = Limit)
+  common::Price price;  // Tag 44: 지정가 (Limit 주문일 때만 사용)
   TimeInForce
       time_in_force;  // Tag 59: 주문 유효 기간 ('0' = Day, '1' = GTC 등)
   SelfTradePreventionMode self_trade_prevention_mode =
@@ -240,11 +240,13 @@ inline OrderSide to_common_side(common::Side side) noexcept {
 struct RequestCommon {
   ReqeustType req_type{ReqeustType::kInvalid};
   common::OrderId cl_order_id{common::OrderId{common::kOrderIdInvalid}};
+  common::OrderId orig_cl_order_id{
+      common::OrderId{common::kOrderIdInvalid}};  // 주문 취소할때 사용
   std::string symbol{"BTCUSDT"};
   common::Side side{common::Side::kInvalid};
-  float order_qty{0.};
+  common::Qty order_qty{0.};
   OrderType ord_type{OrderType::kInvalid};
-  float price{0.};
+  common::Price price{0.};
   TimeInForce time_in_force{TimeInForce::kInvalid};
   SelfTradePreventionMode self_trade_prevention_mode{
       SelfTradePreventionMode::kExpireTaker};
@@ -253,8 +255,9 @@ struct RequestCommon {
     std::ostringstream oss;
     oss << "RequestCommon{" << "cl_order_id=" << cl_order_id.value
         << ", symbol=" << symbol << ", side=" << common::toString(side)
-        << ", order_qty=" << order_qty
-        << ", ord_type=" << trading::toString(ord_type) << ", price=" << price
+        << ", order_qty=" << order_qty.value
+        << ", ord_type=" << trading::toString(ord_type)
+        << ", price=" << price.value
         << ", time_in_force=" << trading::toString(time_in_force)
         << ", self_trade_prevention_mode="
         << trading::toString(self_trade_prevention_mode) << "}";
@@ -264,18 +267,18 @@ struct RequestCommon {
 
 struct OrderCancelRequest {
   common::OrderId cl_order_id;
+  common::OrderId orig_cl_order_id;
   std::string symbol;
 };
 
 struct OrderCancelRequestAndNewOrderSingle {
   int order_cancel_request_and_new_order_single_mode = 1;
-  int cancel_ord_id;
   common::OrderId cl_order_id;
   std::string symbol;
   OrderSide side;
-  float order_qty;
+  common::Qty order_qty;
   OrderType ord_type;
-  float price;
+  common::Price price;
   TimeInForce time_in_force;
   SelfTradePreventionMode self_trade_prevention_mode =
       SelfTradePreventionMode::kExpireTaker;
@@ -288,7 +291,7 @@ struct OrderMassCancelRequest {
 };
 
 struct ExecutionReport {
-  common::OrderId order_id = common::OrderId(common::kOrderIdInvalid);
+  common::OrderId cl_order_id = common::OrderId(common::kOrderIdInvalid);
   std::string symbol;
   ExecType exec_type;
   OrdStatus ord_status;
@@ -301,7 +304,7 @@ struct ExecutionReport {
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
-    stream << "ExecutionReport{" << ", order_id=" << order_id.value
+    stream << "ExecutionReport{" << ", order_id=" << cl_order_id.value
            << ", symbol=" << symbol
            << ", exec_type=" << trading::toString(exec_type)
            << ", ord_status=" << trading::toString(ord_status)
@@ -315,14 +318,13 @@ struct ExecutionReport {
 };
 
 struct OrderCancelReject {
-  std::string cl_order_id;
-  common::OrderId order_id = common::OrderId(0);
+  common::OrderId cl_order_id = common::OrderId(common::kOrderIdInvalid);
   std::string symbol;
   int error_code;
 };
 
 struct OrderMassCancelReport {
-  std::string cl_order_id;
+  common::OrderId cl_order_id = common::OrderId(common::kOrderIdInvalid);
   std::string symbol;
   char mass_cancel_request_type;
   MassCancelResponse mass_cancel_response;

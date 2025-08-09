@@ -27,11 +27,12 @@ class Message;
 
 namespace trading {
 class TradeEngine;
+class ResponseManager;
 
 class OrderGateway {
  public:
   OrderGateway(const Authorization& authorization, common::Logger* logger,
-               TradeEngine* trade_engine);
+               TradeEngine* trade_engine, ResponseManager* response_manager);
   ~OrderGateway();
 
   void on_login(FIX8::Message*);

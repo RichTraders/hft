@@ -11,16 +11,18 @@
  */
 
 #include "order_gateway.h"
+#include "response_manager.h"
 #include "trade_engine.h"
 
 namespace trading {
 
 OrderGateway::OrderGateway(const Authorization& authorization,
-                           common::Logger* logger, TradeEngine* trade_engine)
+                           common::Logger* logger, TradeEngine* trade_engine,
+                           ResponseManager* response_manager)
     : logger_(logger),
       trade_engine_(trade_engine),
-      app_(std::make_unique<core::FixOrderEntryApp>(authorization, "BMDWATCH",
-                                                    "SPOT", logger_)) {
+      app_(std::make_unique<core::FixOrderEntryApp>(
+          authorization, "BMDWATCH", "SPOT", logger_, response_manager)) {
 
   constexpr int kRequestQueueSize = 64;
   order_queue_ = std::make_unique<common::SPSCQueue<trading::RequestCommon>>(
@@ -150,8 +152,10 @@ void OrderGateway::new_single_order_data(const RequestCommon& request) {
 }
 
 void OrderGateway::order_cancel_request(const RequestCommon& request) {
-  const OrderCancelRequest cancel_request{.cl_order_id = request.cl_order_id,
-                                          .symbol = request.symbol};
+  const OrderCancelRequest cancel_request{
+      .cl_order_id = request.cl_order_id,
+      .orig_cl_order_id = request.orig_cl_order_id,
+      .symbol = request.symbol};
 
   const std::string msg = app_->create_cancel_order_message(cancel_request);
   app_->send(msg);
@@ -161,7 +165,6 @@ void OrderGateway::order_cancel_request_and_new_order_single(
     const RequestCommon& request) {
   const OrderCancelRequestAndNewOrderSingle cancel_and_reorder{
       .order_cancel_request_and_new_order_single_mode = 1,
-      .cancel_ord_id = 1,
       .cl_order_id = request.cl_order_id,
       .symbol = request.symbol,
       .side = to_common_side(request.side),

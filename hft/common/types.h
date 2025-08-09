@@ -72,40 +72,40 @@ inline auto toString(ClientId client_id) -> std::string {
 constexpr auto kClientIdInvalid = std::numeric_limits<uint32_t>::max();
 
 struct Price {
-  float value{std::numeric_limits<float>::max()};
+  double value{std::numeric_limits<double>::max()};
 
-  explicit Price(float data) : value(data) {}
+  explicit Price(double data) : value(data) {}
 
-  bool operator==(float other) const { return value == other; }
+  bool operator==(double other) const { return value == other; }
 
-  bool operator!=(float other) const { return value != other; }
+  bool operator!=(double other) const { return value != other; }
   bool operator<(const Price& other) const { return value < other.value; }
   bool operator==(const Price& other) const { return value == other.value; }
 
   [[nodiscard]] bool isValid() const {
-    return value != std::numeric_limits<float>::max();
+    return value != std::numeric_limits<double>::max();
   }
 
-  explicit operator float() const { return value; }
+  explicit operator double() const { return value; }
 };
 
-constexpr auto kPriceInvalid = std::numeric_limits<float>::max();
+constexpr auto kPriceInvalid = std::numeric_limits<double>::max();
 
 inline auto toString(Price price) -> std::string {
-  return price.isValid() ? std::to_string(static_cast<float>(price))
+  return price.isValid() ? std::to_string(static_cast<double>(price))
                          : "INVALID";
 }
 
 struct Qty {
-  float value{std::numeric_limits<float>::max()};
+  double value{std::numeric_limits<double>::max()};
 
-  explicit Qty(float data) : value(data) {}
+  explicit Qty(double data) : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
-    return value != std::numeric_limits<float>::max();
+    return value != std::numeric_limits<double>::max();
   }
 
-  bool operator==(float other) const { return value == other; }
+  bool operator==(double other) const { return value == other; }
   bool operator<(const Qty& other) const { return value < other.value; }
   bool operator==(const Qty& other) const { return value == other.value; }
 
@@ -114,7 +114,7 @@ struct Qty {
     return *this;
   }
 
-  Qty& operator+=(float other) {
+  Qty& operator+=(double other) {
     value += other;
     return *this;
   }
@@ -124,20 +124,20 @@ struct Qty {
     return *this;
   }
 
-  Qty& operator-=(float other) {
+  Qty& operator-=(double other) {
     value -= other;
     return *this;
   }
 
-  explicit operator float() const { return value; }
+  explicit operator double() const { return value; }
 };
 
 inline auto toString(Qty qty) -> std::string {
   return UNLIKELY(!qty.is_valid()) ? "INVALID"
-                                   : std::to_string(static_cast<float>(qty));
+                                   : std::to_string(static_cast<double>(qty));
 }
 
-constexpr auto kQtyInvalid = std::numeric_limits<float>::max();
+constexpr auto kQtyInvalid = std::numeric_limits<double>::max();
 
 struct Priority {
   uint64_t value{std::numeric_limits<uint64_t>::max()};

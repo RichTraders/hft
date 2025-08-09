@@ -17,7 +17,6 @@
 #include "logger.h"
 #include "memory_pool.hpp"
 #include "order_entry.h"
-#include "src/response_manager.h"
 
 namespace FIX8 {
 class Message;

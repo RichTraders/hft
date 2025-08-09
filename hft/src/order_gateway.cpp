@@ -17,10 +17,9 @@
 namespace trading {
 
 OrderGateway::OrderGateway(const Authorization& authorization,
-                           common::Logger* logger, TradeEngine* trade_engine,
+                           common::Logger* logger,
                            ResponseManager* response_manager)
     : logger_(logger),
-      trade_engine_(trade_engine),
       app_(std::make_unique<core::FixOrderEntryApp>(
           authorization, "BMDWATCH", "SPOT", logger_, response_manager)) {
 
@@ -54,6 +53,10 @@ OrderGateway::OrderGateway(const Authorization& authorization,
 
 OrderGateway::~OrderGateway() {
   app_->stop();
+}
+
+void OrderGateway::init_trade_engine(TradeEngine* trade_engine) {
+  trade_engine_ = trade_engine;
 }
 
 void OrderGateway::on_login(FIX8::Message*) {

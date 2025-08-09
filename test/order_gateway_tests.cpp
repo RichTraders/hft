@@ -9,6 +9,7 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
+#include "response_manager.h"
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 #include "order_gateway.h"
@@ -25,7 +26,7 @@ using namespace trading;
 
 int cl_order_id = 2065;
 
-TEST(OrderGatewayTest, DISABLED_NewOrderSingle) {
+TEST(OrderGatewayTest, NewOrderSingle) {
   IniConfig config;
   config.load("resources/config.ini");
   const Authorization authorization{
@@ -54,10 +55,11 @@ TEST(OrderGatewayTest, DISABLED_NewOrderSingle) {
   ResponseManager* response_manager = new ResponseManager(
       logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
       order_mass_cancel_report_pool.get());
+  OrderGateway og(authorization, logger.get(), response_manager);
+  TradeEngine* trade_engine = new TradeEngine(logger.get(), pool.get(),
+                                               pool2.get(), response_manager, &og, temp);
 
-  TradeEngine* trade_engine_ = new TradeEngine(logger.get(), pool.get(),
-                                               pool2.get(), response_manager, temp);
-  OrderGateway og(authorization, logger.get(), trade_engine_, response_manager);
+  og.init_trade_engine(trade_engine);
 
   RequestCommon request;
 
@@ -74,7 +76,7 @@ TEST(OrderGatewayTest, DISABLED_NewOrderSingle) {
 
   sleep(5);
 
-  og.order_request(request);
+  trade_engine->send_request(request);
 
   sleep(100);
 }
@@ -110,10 +112,10 @@ TEST(OrderGatewayTest, DISABLED_OrderCancel) {
       logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
       order_mass_cancel_report_pool.get());
 
-  TradeEngine* trade_engine_ = new TradeEngine(logger.get(), pool.get(),
-                                               pool2.get(), response_manager, temp);
-  OrderGateway og(authorization, logger.get(), trade_engine_, response_manager);
-
+  OrderGateway og(authorization, logger.get(), response_manager);
+  TradeEngine* trade_engine = new TradeEngine(logger.get(), pool.get(),
+                                                 pool2.get(), response_manager, &og, temp);
+  og.init_trade_engine(trade_engine);
   RequestCommon request;
 
   request.req_type = ReqeustType::kOrderCancelRequest;
@@ -123,12 +125,12 @@ TEST(OrderGatewayTest, DISABLED_OrderCancel) {
 
   sleep(2);
 
-  og.order_request(request);
+  trade_engine->send_request(request);
 
   sleep(100);
 }
 
-TEST(OrderGatewayTest, OrderMassCancel) {
+TEST(OrderGatewayTest, DISABLED_OrderMassCancel) {
   IniConfig config;
   config.load("resources/config.ini");
   const Authorization authorization{
@@ -157,10 +159,10 @@ TEST(OrderGatewayTest, OrderMassCancel) {
   ResponseManager* response_manager = new ResponseManager(
       logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
       order_mass_cancel_report_pool.get());
-
-  TradeEngine* trade_engine_ = new TradeEngine(logger.get(), pool.get(),
-                                               pool2.get(), response_manager, temp);
-  OrderGateway og(authorization, logger.get(), trade_engine_, response_manager);
+  OrderGateway og(authorization, logger.get(), response_manager);
+  TradeEngine* trade_engine = new TradeEngine(logger.get(), pool.get(),
+                                               pool2.get(), response_manager, &og, temp);
+  og.init_trade_engine(trade_engine);
 
   RequestCommon request;
 
@@ -170,7 +172,7 @@ TEST(OrderGatewayTest, OrderMassCancel) {
 
   sleep(2);
 
-  og.order_request(request);
+  trade_engine->send_request(request);
 
   sleep(100);
 }

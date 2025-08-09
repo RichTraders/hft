@@ -17,6 +17,7 @@
 #include "NewOroFix44OE_classes.hpp"
 #include "performance.h"
 #include "signature.h"
+#include "src/response_manager.h"
 
 namespace core {
 using namespace FIX8::NewOroFix44OE;

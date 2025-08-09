@@ -29,6 +29,7 @@ class FeatureEngine;
 class RiskManager;
 class OrderManager;
 class ResponseManager;
+class OrderGateway;
 
 class TradeEngine {
  public:
@@ -36,7 +37,7 @@ class TradeEngine {
       common::Logger* logger,
       common::MemoryPool<MarketUpdateData>* market_update_data_pool,
       common::MemoryPool<MarketData>* market_data_pool,
-      ResponseManager* response_manager,
+      ResponseManager* response_manager, OrderGateway* order_gateway,
       const common::TradeEngineCfgHashMap& ticker_cfg);
   ~TradeEngine();
 
@@ -56,6 +57,7 @@ class TradeEngine {
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
   ResponseManager* response_manager_;
+  OrderGateway* order_gateway_;
   std::unique_ptr<common::SPSCQueue<MarketUpdateData*>> queue_;
   common::Thread<common::AffinityTag<2>, common::PriorityTag<1>> thread_;
   common::Thread<common::NormalTag> response_thread_;

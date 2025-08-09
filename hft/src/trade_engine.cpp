@@ -13,6 +13,7 @@
 #include "trade_engine.h"
 #include "feature_engine.h"
 #include "order_entry.h"
+#include "order_gateway.h"
 #include "order_manager.h"
 #include "performance.h"
 #include "position_keeper.h"
@@ -26,12 +27,13 @@ TradeEngine::TradeEngine(
     common::Logger* logger,
     common::MemoryPool<MarketUpdateData>* market_update_data_pool,
     common::MemoryPool<MarketData>* market_data_pool,
-    ResponseManager* response_manager,
+    ResponseManager* response_manager, OrderGateway* order_gateway,
     const common::TradeEngineCfgHashMap& ticker_cfg)
     : logger_(logger),
       market_update_data_pool_(market_update_data_pool),
       market_data_pool_(market_data_pool),
       response_manager_(response_manager),
+      order_gateway_(order_gateway),
       queue_(std::make_unique<common::SPSCQueue<MarketUpdateData*>>(kCapacity)),
       feature_engine_(std::make_unique<FeatureEngine>(logger)),
       position_keeper_(std::make_unique<PositionKeeper>(logger)),
@@ -81,7 +83,9 @@ void TradeEngine::enqueue_response(const ResponseCommon& response) {
   response_queue_->enqueue(response);
 }
 
-void TradeEngine::send_request(const RequestCommon&) {}
+void TradeEngine::send_request(const RequestCommon& request) {
+  order_gateway_->order_request(request);
+}
 
 void TradeEngine::run() {
   while (running_) {
@@ -107,10 +111,10 @@ void TradeEngine::response_run() {
   while (response_running_) {
     ResponseCommon response;
     while (response_queue_->dequeue(response)) {
-      START_MEASURE(MAKE_ORDERBOOK);
+      START_MEASURE(RESPONSE_COMMON);
       switch (response.res_type) {
         case ResponseType::kExecutionReport:
-          on_execution_report(response.execution_report);
+          on_order_updated(response.execution_report);
           response_manager_->execution_report_deallocate(
               response.execution_report);
           break;
@@ -129,14 +133,10 @@ void TradeEngine::response_run() {
           break;
       }
 
-      END_MEASURE(MAKE_ORDERBOOK, logger_);
+      END_MEASURE(RESPONSE_COMMON, logger_);
     }
     std::this_thread::yield();
   }
-}
-
-void TradeEngine::on_execution_report(const ExecutionReport*) {
-  logger_->info("on_execution_report");
 }
 
 void TradeEngine::on_order_cancel_reject(const OrderCancelReject*) {

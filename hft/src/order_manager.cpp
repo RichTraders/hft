@@ -32,7 +32,7 @@ void OrderManager::on_order_updated(
     const ExecutionReport* client_response) noexcept {
   Order* order =
       &(ticker_side_order_[client_response->symbol][common::sideToIndex(
-          client_response->side)][client_response->order_id]);
+          client_response->side)][client_response->cl_order_id]);
 
   switch (client_response->ord_status) {
     case OrdStatus::kNew: {
@@ -73,8 +73,8 @@ void OrderManager::new_order(Order* order, common::TickerId& ticker_id,
       .cl_order_id = OrderId{fast_clock_.get_timestamp()},
       .symbol = ticker_id,
       .side = side,
-      .order_qty = qty.value,
-      .price = price.value};
+      .order_qty = qty,
+      .price = price};
   trade_engine_->send_request(new_request);
 
   *order = {ticker_id, new_request.cl_order_id,  side, price,

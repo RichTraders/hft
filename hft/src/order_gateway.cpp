@@ -16,17 +16,11 @@
 namespace trading {
 
 OrderGateway::OrderGateway(const Authorization& authorization,
-                           common::Logger* logger, TradeEngine* trade_engine)
+                           common::Logger* logger,
+                           ResponseManager* response_manager)
     : logger_(logger),
-      trade_engine_(trade_engine),
-      app_(std::make_unique<core::FixOrderEntryApp>(authorization, "BMDWATCH",
-                                                    "SPOT", logger_)) {
-
-  constexpr int kRequestQueueSize = 64;
-  order_queue_ = std::make_unique<common::SPSCQueue<trading::RequestCommon>>(
-      kRequestQueueSize);
-  write_thread_.start(&OrderGateway::write_loop, this);
-
+      app_(std::make_unique<core::FixOrderEntryApp>(
+          authorization, "BMDWATCH", "SPOT", logger_, response_manager)) {
   app_->register_callback(
       "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });
   app_->register_callback("1", [this](auto&& msg) {
@@ -50,13 +44,18 @@ OrderGateway::OrderGateway(const Authorization& authorization,
   app_->start();
 }
 
-OrderGateway::~OrderGateway() {
+OrderGateway::~OrderGateway() = default;
+
+void OrderGateway::stop() {
   app_->stop();
+}
+
+void OrderGateway::init_trade_engine(TradeEngine* trade_engine) {
+  trade_engine_ = trade_engine;
 }
 
 void OrderGateway::on_login(FIX8::Message*) {
   logger_->info("login successful");
-  logger_->info("sent order message");
 }
 
 void OrderGateway::on_execution_report(
@@ -96,7 +95,8 @@ void OrderGateway::on_order_mass_status_response(FIX8::Message* msg) {
 }
 
 void OrderGateway::on_logout(FIX8::Message*) {
-  logger_->info("logout");
+  auto message = app_->create_log_out_message();
+  app_->send(message);
 }
 
 void OrderGateway::on_heartbeat(FIX8::Message* msg) {
@@ -105,57 +105,46 @@ void OrderGateway::on_heartbeat(FIX8::Message* msg) {
 }
 
 void OrderGateway::order_request(const RequestCommon& request) {
-  order_queue_->enqueue(request);
-}
-
-void OrderGateway::write_loop() {
-  while (thread_running_) {
-    RequestCommon request;
-    while (order_queue_->dequeue(request)) {
-      switch (request.req_type) {
-        case ReqeustType::kNewSingleOrderData:
-          new_single_order_data(request);
-          break;
-        case ReqeustType::kOrderCancelRequest:
-          order_cancel_request(request);
-          break;
-        case ReqeustType::kOrderCancelRequestAndNewOrderSingle:
-          order_cancel_request_and_new_order_single(request);
-          break;
-        case ReqeustType::kOrderMassCancelRequest:
-          order_mass_cancel_request(request);
-          break;
-        case ReqeustType::kInvalid:
-        default:
-          break;
-      }
-    }
+  switch (request.req_type) {
+    case ReqeustType::kNewSingleOrderData:
+      new_single_order_data(request);
+      break;
+    case ReqeustType::kOrderCancelRequest:
+      order_cancel_request(request);
+      break;
+    case ReqeustType::kOrderCancelRequestAndNewOrderSingle:
+      order_cancel_request_and_new_order_single(request);
+      break;
+    case ReqeustType::kOrderMassCancelRequest:
+      order_mass_cancel_request(request);
+      break;
+    case ReqeustType::kInvalid:
+    default:
+      logger_->info("[Order_Gateway] invalid request type");
+      break;
   }
-  std::this_thread::sleep_for(std::chrono::milliseconds(kWriteThreadSleep));
 }
 
 void OrderGateway::new_single_order_data(const RequestCommon& request) {
-  NewSingleOrderData order_data;
-
-  order_data.cl_order_id = request.order_name;
-  order_data.symbol = request.symbol;
-  order_data.side = to_common_side(request.side);
-  order_data.order_qty = request.order_qty;
-  order_data.price = request.price;
-  order_data.ord_type = request.ord_type;
-  order_data.time_in_force = request.time_in_force;
-  order_data.self_trade_prevention_mode = request.self_trade_prevention_mode;
+  const NewSingleOrderData order_data{
+      .cl_order_id = request.cl_order_id,
+      .symbol = request.symbol,
+      .side = to_common_side(request.side),
+      .order_qty = request.order_qty,
+      .ord_type = request.ord_type,
+      .price = request.price,
+      .time_in_force = request.time_in_force,
+      .self_trade_prevention_mode = request.self_trade_prevention_mode};
 
   const std::string msg = app_->create_order_message(order_data);
   app_->send(msg);
 }
 
 void OrderGateway::order_cancel_request(const RequestCommon& request) {
-  OrderCancelRequest cancel_request;
-
-  cancel_request.cl_ord_id = request.order_name;
-  cancel_request.order_id = request.cl_order_id.value;
-  cancel_request.symbol = request.symbol;
+  const OrderCancelRequest cancel_request{
+      .cl_order_id = request.cl_order_id,
+      .orig_cl_order_id = request.orig_cl_order_id,
+      .symbol = request.symbol};
 
   const std::string msg = app_->create_cancel_order_message(cancel_request);
   app_->send(msg);
@@ -163,17 +152,16 @@ void OrderGateway::order_cancel_request(const RequestCommon& request) {
 
 void OrderGateway::order_cancel_request_and_new_order_single(
     const RequestCommon& request) {
-  OrderCancelRequestAndNewOrderSingle cancel_and_reorder;
-
-  cancel_and_reorder.cl_order_id = request.order_name;
-  cancel_and_reorder.symbol = request.symbol;
-  cancel_and_reorder.side = to_common_side(request.side);
-  cancel_and_reorder.order_qty = request.order_qty;
-  cancel_and_reorder.price = request.price;
-  cancel_and_reorder.ord_type = request.ord_type;
-  cancel_and_reorder.time_in_force = request.time_in_force;
-  cancel_and_reorder.self_trade_prevention_mode =
-      request.self_trade_prevention_mode;
+  const OrderCancelRequestAndNewOrderSingle cancel_and_reorder{
+      .order_cancel_request_and_new_order_single_mode = 1,
+      .cl_order_id = request.cl_order_id,
+      .symbol = request.symbol,
+      .side = to_common_side(request.side),
+      .order_qty = request.order_qty,
+      .ord_type = request.ord_type,
+      .price = request.price,
+      .time_in_force = request.time_in_force,
+      .self_trade_prevention_mode = request.self_trade_prevention_mode};
 
   const std::string msg =
       app_->create_cancel_and_reorder_message(cancel_and_reorder);
@@ -181,10 +169,8 @@ void OrderGateway::order_cancel_request_and_new_order_single(
 }
 
 void OrderGateway::order_mass_cancel_request(const RequestCommon& request) {
-  OrderMassCancelRequest all_cancel_request;
-
-  all_cancel_request.cl_order_id = request.order_name;
-  all_cancel_request.symbol = request.symbol;
+  const OrderMassCancelRequest all_cancel_request{
+      .cl_order_id = request.cl_order_id, .symbol = request.symbol};
 
   const std::string msg = app_->create_order_all_cancel(all_cancel_request);
   app_->send(msg);

@@ -14,6 +14,7 @@ set(FIX8_SRC
         NewOroFix44OE_classes.cpp
         signature.cpp
         ssl_socket.cpp
+        response_manager.cpp
         fix_md_core.cpp
         fix_oe_core.cpp
         fix_app.cpp

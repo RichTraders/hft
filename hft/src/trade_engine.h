@@ -21,7 +21,6 @@
 #include "types.h"
 
 #include "order_book.h"
-#include "order_request.h"
 
 namespace trading {
 class PositionKeeper;
@@ -29,6 +28,8 @@ struct ExecutionReport;
 class FeatureEngine;
 class RiskManager;
 class OrderManager;
+class ResponseManager;
+class OrderGateway;
 
 class TradeEngine {
  public:
@@ -36,8 +37,10 @@ class TradeEngine {
       common::Logger* logger,
       common::MemoryPool<MarketUpdateData>* market_update_data_pool,
       common::MemoryPool<MarketData>* market_data_pool,
+      ResponseManager* response_manager,
       const common::TradeEngineCfgHashMap& ticker_cfg);
   ~TradeEngine();
+  void init_order_gateway(OrderGateway* order_gateway);
 
   void stop();
   void on_market_data_updated(MarketUpdateData* data) const;
@@ -47,7 +50,6 @@ class TradeEngine {
                         MarketOrderBook* order_book) const;
   void on_order_updated(const ExecutionReport* report) const noexcept;
   void enqueue_response(const ResponseCommon& response);
-  ResponseCommon dequeue_response();
 
   void send_request(const RequestCommon& request);
 
@@ -55,19 +57,26 @@ class TradeEngine {
   common::Logger* logger_;
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
+  ResponseManager* response_manager_;
+  OrderGateway* order_gateway_;
   std::unique_ptr<common::SPSCQueue<MarketUpdateData*>> queue_;
   common::Thread<common::AffinityTag<2>, common::PriorityTag<1>> thread_;
+  common::Thread<common::NormalTag> response_thread_;
   std::unique_ptr<common::SPSCQueue<ResponseCommon>> response_queue_;
-
   MarketOrderBookHashMap ticker_order_book_;
 
   bool running_{true};
+  bool response_running_{true};
   std::unique_ptr<FeatureEngine> feature_engine_;
   std::unique_ptr<PositionKeeper> position_keeper_;
   std::unique_ptr<RiskManager> risk_manager_;
   std::unique_ptr<OrderManager> order_manager_;
 
   void run();
+  void response_run();
+  void on_execution_report(const ExecutionReport*);
+  void on_order_cancel_reject(const OrderCancelReject*);
+  void on_order_mass_cancel_report(const OrderMassCancelReport*);
 };
 }  // namespace trading
 

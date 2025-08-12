@@ -39,13 +39,9 @@ FixApp<Derived, Cpu>::FixApp(const std::string& address,
 
 template <typename Derived, int Cpu>
 FixApp<Derived, Cpu>::~FixApp() {
-  if (log_on_) {
-    const auto msg = static_cast<Derived*>(this)->create_log_out_message();
-    tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
-
-    thread_running_ = false;
-    log_on_ = false;
-  }
+  thread_running_ = false;
+  write_thread_.join();
+  read_thread_.join();
 }
 
 template <typename Derived, int Cpu>
@@ -61,14 +57,9 @@ int FixApp<Derived, Cpu>::start() {
 }
 
 template <typename Derived, int Cpu>
-int FixApp<Derived, Cpu>::stop() {
-  if (log_on_) {
-    const auto msg = create_log_out();
-    tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
-    thread_running_ = false;
-    log_on_ = false;
-  }
-  return 0;
+void FixApp<Derived, Cpu>::stop() {
+  auto msg = static_cast<Derived*>(this)->create_log_out_message();
+  send(msg);
 }
 
 template <typename Derived, int Cpu>
@@ -113,6 +104,7 @@ void FixApp<Derived, Cpu>::read_loop() {
 #endif
     std::array<char, kReadBufferSize> buf;
     const int read = tls_sock_->read(buf.data(), buf.size());
+
 #ifdef DEBUG
     END_MEASURE(TLS_READ, logger_);
 #endif
@@ -145,11 +137,6 @@ template <typename Derived, int Cpu>
     const std::string& sig_b64, const std::string& timestamp) {
   return static_cast<Derived*>(this)->create_log_on_message(sig_b64,
     timestamp);
-}
-
-template <typename Derived, int Cpu>
-[[nodiscard]] std::string FixApp<Derived, Cpu>::create_log_out() {
-  return static_cast<Derived*>(this)->create_log_out_message();
 }
 
 template <typename Derived, int Cpu>

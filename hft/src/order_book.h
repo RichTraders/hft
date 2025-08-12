@@ -79,7 +79,7 @@ inline int priceToIndex(common::Price price_int) noexcept {
 }
 
 inline common::Price indexToPrice(int index) noexcept {
-  return common::Price{static_cast<float>(kMinPriceInt + index) /
+  return common::Price{static_cast<double>(kMinPriceInt + index) /
                        kTickMultiplierInt};
 }
 

@@ -19,19 +19,22 @@ namespace FIX8 {
 class Message;
 }
 
+namespace trading {
+class ResponseManager;
+}
+
 namespace core {
 
 class FixOrderEntryApp : public FixApp<FixOrderEntryApp, 3> {
 public:
   FixOrderEntryApp(const Authorization& authorization,
                    const std::string& sender_comp_id,
-                   const std::string& target_comp_id, common::Logger* logger)
+                   const std::string& target_comp_id, common::Logger* logger, trading::ResponseManager* response_manager)
     : FixApp(authorization.oe_address, authorization.port, sender_comp_id,
              target_comp_id, logger, authorization){
     fix_oe_core_ = std::make_unique<FixOeCore>(sender_comp_id, target_comp_id,
-                                               logger, authorization);
+                                               logger, response_manager, authorization);
   }
-
   std::string create_log_on_message(const std::string& sig_b64,
                                     const std::string& timestamp);
   std::string create_log_out_message();

@@ -20,15 +20,12 @@ MarketConsumer::MarketConsumer(
     common::MemoryPool<MarketUpdateData>* market_update_data_pool,
     common::MemoryPool<MarketData>* market_data_pool,
     const Authorization& authorization)
-  : market_update_data_pool_(market_update_data_pool),
-    market_data_pool_(market_data_pool),
-    logger_(logger),
-    trade_engine_(trade_engine),
-    app_(std::make_unique<core::FixMarketDataApp>(authorization,
-                                                  "BMDWATCH",
-                                                  "SPOT",
-                                                  logger_,
-                                                  market_data_pool_)) {
+    : market_update_data_pool_(market_update_data_pool),
+      market_data_pool_(market_data_pool),
+      logger_(logger),
+      trade_engine_(trade_engine),
+      app_(std::make_unique<core::FixMarketDataApp>(
+          authorization, "BMDWATCH", "SPOT", logger_, market_data_pool_)) {
 
   app_->register_callback(
       "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });
@@ -49,7 +46,9 @@ MarketConsumer::MarketConsumer(
   app_->start();
 }
 
-MarketConsumer::~MarketConsumer() {
+MarketConsumer::~MarketConsumer() = default;
+
+void MarketConsumer::stop() {
   app_->stop();
 }
 
@@ -85,4 +84,4 @@ void MarketConsumer::on_heartbeat(FIX8::Message* msg) const {
   auto message = app_->create_heartbeat_message(msg);
   app_->send(message);
 }
-} // namespace trading
+}  // namespace trading

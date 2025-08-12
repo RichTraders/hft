@@ -36,7 +36,7 @@ protected:
 
     ticker_cfg = new TradeEngineCfgHashMap{{"BTCUSDT", cfg}};
 
-    trade_engine = new TradeEngine(&logger, market_update_pool, market_pool,
+    trade_engine = new TradeEngine(&logger, market_update_pool, market_pool, nullptr,
                                    *ticker_cfg);
     trade_engine->stop();
   }
@@ -58,7 +58,7 @@ protected:
 TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
 
   FeatureEngine engine(&logger);
-
+  std::string symbol = "ETHUSDT";
   // BBO 세팅
   MarketOrderBook book("ETHUSDT", &logger);
   book.set_trade_engine(trade_engine);
@@ -67,7 +67,7 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
         {100'000.};
     const Qty q{20.0};
     const MarketData md{MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                        "ETHUSDT", Side::kBuy, p, q};
+                        symbol, Side::kBuy, p, q};
     book.on_market_data_updated(&md);
   }
   {
@@ -75,7 +75,7 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
         {200'000.};
     const Qty q{80.0};
     const MarketData md{MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                        "ETHUSDT", Side::kSell, p, q};
+                        symbol, Side::kSell, p, q};
     book.on_market_data_updated(&md);
   }
 
@@ -92,15 +92,16 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
 TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
   FeatureEngine engine(&logger);
 
+  std::string symbol = "ETHUSDT";
   // BBO 세팅
-  MarketOrderBook book("ETHUSDT", &logger);
+  MarketOrderBook book(symbol, &logger);
   book.set_trade_engine(trade_engine);
   {
     const Price p = Price
         {100'000.};
     const Qty q{20.0};
     const MarketData md{MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                        "ETHUSDT", Side::kBuy, p, q};
+                        symbol, Side::kBuy, p, q};
     book.on_market_data_updated(&md);
   }
   {
@@ -108,12 +109,12 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
         {200'000.};
     const Qty q{80.0};
     const MarketData md{MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                        "ETHUSDT", Side::kSell, p, q};
+                        symbol, Side::kSell, p, q};
     book.on_market_data_updated(&md);
   }
 
   const MarketData md{MarketUpdateType::kTrade, OrderId{kOrderIdInvalid},
-                      "ETHUSDT", Side::kBuy, Price{200'000}, Qty{10.0}};
+                      symbol, Side::kBuy, Price{200'000}, Qty{10.0}};
   book.on_market_data_updated(&md);
 
   double expected_ratio = md.qty.value / book.get_bbo()->ask_qty.value;

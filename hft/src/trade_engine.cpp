@@ -13,9 +13,11 @@
 #include "trade_engine.h"
 #include "feature_engine.h"
 #include "order_entry.h"
+#include "order_gateway.h"
 #include "order_manager.h"
 #include "performance.h"
 #include "position_keeper.h"
+#include "response_manager.h"
 #include "risk_manager.h"
 
 constexpr std::size_t kCapacity = 64;
@@ -25,10 +27,12 @@ TradeEngine::TradeEngine(
     common::Logger* logger,
     common::MemoryPool<MarketUpdateData>* market_update_data_pool,
     common::MemoryPool<MarketData>* market_data_pool,
+    ResponseManager* response_manager,
     const common::TradeEngineCfgHashMap& ticker_cfg)
     : logger_(logger),
       market_update_data_pool_(market_update_data_pool),
       market_data_pool_(market_data_pool),
+      response_manager_(response_manager),
       queue_(std::make_unique<common::SPSCQueue<MarketUpdateData*>>(kCapacity)),
       feature_engine_(std::make_unique<FeatureEngine>(logger)),
       position_keeper_(std::make_unique<PositionKeeper>(logger)),
@@ -46,9 +50,20 @@ TradeEngine::TradeEngine(
   ticker_order_book_.insert({"BTCUSDT", std::move(orderbook)});
 
   thread_.start(&TradeEngine::run, this);
+  response_thread_.start(&TradeEngine::response_run, this);
 }
 
-TradeEngine::~TradeEngine() = default;
+TradeEngine::~TradeEngine() {
+  running_ = false;
+  response_running_ = false;
+
+  thread_.join();
+  response_thread_.join();
+}
+
+void TradeEngine::init_order_gateway(OrderGateway* order_gateway) {
+  order_gateway_ = order_gateway;
+}
 
 void TradeEngine::on_market_data_updated(MarketUpdateData* data) const {
   queue_->enqueue(data);
@@ -56,6 +71,7 @@ void TradeEngine::on_market_data_updated(MarketUpdateData* data) const {
 
 void TradeEngine::stop() {
   running_ = false;
+  response_running_ = false;
 }
 
 void TradeEngine::on_order_book_updated(common::Price price, common::Side side,
@@ -77,14 +93,9 @@ void TradeEngine::enqueue_response(const ResponseCommon& response) {
   response_queue_->enqueue(response);
 }
 
-ResponseCommon TradeEngine::dequeue_response() {
-  ResponseCommon res;
-  response_queue_->dequeue(res);
-
-  return res;
+void TradeEngine::send_request(const RequestCommon& request) {
+  order_gateway_->order_request(request);
 }
-
-void TradeEngine::send_request(const RequestCommon&) {}
 
 void TradeEngine::run() {
   while (running_) {
@@ -105,4 +116,45 @@ void TradeEngine::run() {
     std::this_thread::yield();
   }
 }
+
+void TradeEngine::response_run() {
+  while (response_running_) {
+    ResponseCommon response;
+    while (response_queue_->dequeue(response)) {
+      START_MEASURE(RESPONSE_COMMON);
+      switch (response.res_type) {
+        case ResponseType::kExecutionReport:
+          on_order_updated(response.execution_report);
+          response_manager_->execution_report_deallocate(
+              response.execution_report);
+          break;
+        case ResponseType::kOrderCancelReject:
+          on_order_cancel_reject(response.order_cancel_reject);
+          response_manager_->order_cancel_reject_deallocate(
+              response.order_cancel_reject);
+          break;
+        case ResponseType::kOrderMassCancelReport:
+          on_order_mass_cancel_report(response.order_mass_cancel_report);
+          response_manager_->order_mass_cancel_report_deallocate(
+              response.order_mass_cancel_report);
+          break;
+        case ResponseType::kInvalid:
+        default:
+          break;
+      }
+
+      END_MEASURE(RESPONSE_COMMON, logger_);
+    }
+    std::this_thread::yield();
+  }
+}
+
+void TradeEngine::on_order_cancel_reject(const OrderCancelReject*) {
+  logger_->info("on_order_cancel_reject");
+}
+
+void TradeEngine::on_order_mass_cancel_report(const OrderMassCancelReport*) {
+  logger_->info("on_order_mass_cancel_report");
+}
+
 }  // namespace trading

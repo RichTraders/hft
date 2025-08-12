@@ -48,6 +48,10 @@ MarketConsumer::MarketConsumer(
 
 MarketConsumer::~MarketConsumer() = default;
 
+void MarketConsumer::stop() {
+  app_->stop();
+}
+
 void MarketConsumer::on_login(FIX8::Message*) const {
   logger_->info("login successful");
   const std::string message = app_->create_market_data_subscription_message(

@@ -49,7 +49,6 @@ class OrderGateway {
   void order_request(const RequestCommon& request);
 
  private:
-  void write_loop();
   void new_single_order_data(const RequestCommon& request);
   void order_cancel_request(const RequestCommon& request);
   void order_cancel_request_and_new_order_single(const RequestCommon& request);
@@ -57,9 +56,6 @@ class OrderGateway {
 
   common::Logger* logger_;
   TradeEngine* trade_engine_;
-  std::unique_ptr<common::SPSCQueue<RequestCommon>> order_queue_;
-  common::Thread<common::NormalTag> write_thread_;
-  bool thread_running_{true};
 
   std::unique_ptr<core::FixOrderEntryApp> app_;
 };

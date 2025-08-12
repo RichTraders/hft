@@ -58,7 +58,8 @@ int FixApp<Derived, Cpu>::start() {
 
 template <typename Derived, int Cpu>
 void FixApp<Derived, Cpu>::stop() {
-  static_cast<Derived*>(this)->create_log_out_message();
+  auto msg = static_cast<Derived*>(this)->create_log_out_message();
+  send(msg);
 }
 
 template <typename Derived, int Cpu>

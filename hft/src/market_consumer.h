@@ -37,7 +37,7 @@ class MarketConsumer {
                  common::MemoryPool<MarketData>* market_data_pool,
                  const Authorization& authorization);
   ~MarketConsumer();
-
+  void stop();
   void on_login(FIX8::Message*) const;
   void on_snapshot(FIX8::Message* msg) const;
   void on_subscribe(FIX8::Message* msg) const;

@@ -11,13 +11,13 @@
  */
 
 #include "trade_engine.h"
-#include "../core/NewOroFix44/response_manager.h"
 #include "feature_engine.h"
 #include "order_entry.h"
 #include "order_gateway.h"
 #include "order_manager.h"
 #include "performance.h"
 #include "position_keeper.h"
+#include "response_manager.h"
 #include "risk_manager.h"
 
 constexpr std::size_t kCapacity = 64;

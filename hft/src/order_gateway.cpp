@@ -11,7 +11,6 @@
  */
 
 #include "order_gateway.h"
-#include "../core/NewOroFix44/response_manager.h"
 #include "trade_engine.h"
 
 namespace trading {
@@ -22,12 +21,6 @@ OrderGateway::OrderGateway(const Authorization& authorization,
     : logger_(logger),
       app_(std::make_unique<core::FixOrderEntryApp>(
           authorization, "BMDWATCH", "SPOT", logger_, response_manager)) {
-
-  constexpr int kRequestQueueSize = 64;
-  order_queue_ = std::make_unique<common::SPSCQueue<trading::RequestCommon>>(
-      kRequestQueueSize);
-  write_thread_.start(&OrderGateway::write_loop, this);
-
   app_->register_callback(
       "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });
   app_->register_callback("1", [this](auto&& msg) {
@@ -51,13 +44,10 @@ OrderGateway::OrderGateway(const Authorization& authorization,
   app_->start();
 }
 
-OrderGateway::~OrderGateway() {
-  thread_running_ = false;
-  write_thread_.join();
-}
+OrderGateway::~OrderGateway() = default;
 
 void OrderGateway::stop() {
-  app_->create_log_out_message();
+  app_->stop();
 }
 
 void OrderGateway::init_trade_engine(TradeEngine* trade_engine) {
@@ -66,7 +56,6 @@ void OrderGateway::init_trade_engine(TradeEngine* trade_engine) {
 
 void OrderGateway::on_login(FIX8::Message*) {
   logger_->info("login successful");
-  logger_->info("sent order message");
 }
 
 void OrderGateway::on_execution_report(
@@ -116,33 +105,24 @@ void OrderGateway::on_heartbeat(FIX8::Message* msg) {
 }
 
 void OrderGateway::order_request(const RequestCommon& request) {
-  order_queue_->enqueue(request);
-}
-
-void OrderGateway::write_loop() {
-  while (thread_running_) {
-    RequestCommon request;
-    while (order_queue_->dequeue(request)) {
-      switch (request.req_type) {
-        case ReqeustType::kNewSingleOrderData:
-          new_single_order_data(request);
-          break;
-        case ReqeustType::kOrderCancelRequest:
-          order_cancel_request(request);
-          break;
-        case ReqeustType::kOrderCancelRequestAndNewOrderSingle:
-          order_cancel_request_and_new_order_single(request);
-          break;
-        case ReqeustType::kOrderMassCancelRequest:
-          order_mass_cancel_request(request);
-          break;
-        case ReqeustType::kInvalid:
-        default:
-          break;
-      }
-    }
+  switch (request.req_type) {
+    case ReqeustType::kNewSingleOrderData:
+      new_single_order_data(request);
+      break;
+    case ReqeustType::kOrderCancelRequest:
+      order_cancel_request(request);
+      break;
+    case ReqeustType::kOrderCancelRequestAndNewOrderSingle:
+      order_cancel_request_and_new_order_single(request);
+      break;
+    case ReqeustType::kOrderMassCancelRequest:
+      order_mass_cancel_request(request);
+      break;
+    case ReqeustType::kInvalid:
+    default:
+      logger_->info("[Order_Gateway] invalid request type");
+      break;
   }
-  std::this_thread::sleep_for(std::chrono::milliseconds(kWriteThreadSleep));
 }
 
 void OrderGateway::new_single_order_data(const RequestCommon& request) {

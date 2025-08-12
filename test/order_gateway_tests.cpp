@@ -68,7 +68,7 @@ protected:
   }
   static void TearDownTestSuite() {
     order_gateway_->stop();
-    sleep(10);
+    sleep(3);
     std::cout << "TearDown OrderGatewayTest" << std::endl;
   }
 
@@ -104,11 +104,9 @@ TEST_F(OrderGatewayTest, NewOrderSingle) {
   request.self_trade_prevention_mode =
       trading::SelfTradePreventionMode::kExpireTaker;
 
-  //sleep(3);
-
   trade_engine_->send_request(request);
 
-  //sleep(3);
+  sleep(3);
 }
 
 
@@ -120,11 +118,9 @@ TEST_F(OrderGatewayTest, OrderCancel) {
   request.orig_cl_order_id.value = cl_order_id;
   request.symbol = "BTCUSDT";
 
-  //sleep(2);
-
   trade_engine_->send_request(request);
 
-  //sleep(3);
+  sleep(3);
 }
 
 TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {

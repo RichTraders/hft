@@ -16,6 +16,7 @@
 #include "logger.h"
 
 #include "order_book.h"
+#include "order_entry.h"
 
 using namespace trading;
 using namespace common;
@@ -26,6 +27,7 @@ protected:
     logger = new Logger();
     keeper = new PositionKeeper(logger);
   }
+
   void TearDown() override {
     delete logger;
     delete keeper;
@@ -38,16 +40,13 @@ protected:
 
 TEST_F(PositionKeeperTest, AddFillIncreasesPosition) {
   ExecutionReport report{
-      .execution_id = "1",
-      .order_id = 100,
-      .price = Price{100000.0},
-      .qty = Qty{1.0},
-      .side = Side::kBuy,
+      .cl_order_id = OrderId{1},
       .symbol = "BTCUSDT",
-      .order_status = OrderStatus::kFilled,
-      .last_price = Price{100000.0},
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{1.0},
       .last_qty = Qty{1.0},
-      .trade_id = "T1"
+      .price = Price{100000.0},
+      .side = Side::kBuy
   };
 
   keeper->add_fill(&report);
@@ -64,32 +63,30 @@ TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
 
   // 1. Long 2 BTC @ 100
   ExecutionReport buy1{
-    .execution_id = "1",
-    .order_id = 1,
-    .price = Price{100},
-    .qty = Qty{2},
-    .side = Side::kBuy,
-    .symbol = "BTCUSDT",
-    .order_status = OrderStatus::kFilled,
-    .last_price = Price{100},
-    .last_qty = Qty{2},
-    .trade_id = "T1"};
+      .cl_order_id = OrderId{1},
+      .symbol = "BTCUSDT",
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{2},
+      .last_qty = Qty{2},
+      .price = Price{100},
+      .side = Side::kBuy
+
+  };
   pos.add_fill(&buy1, logger);
   EXPECT_DOUBLE_EQ(pos.position_, 2.0);
   EXPECT_DOUBLE_EQ(pos.real_pnl_, 0.0);
 
   // 2. Sell 3 BTC @ 110
   ExecutionReport sell1{
-    .execution_id = "2",
-    .order_id = 2,
-    .price = Price{110},
-    .qty = Qty{3},
-    .side = Side::kSell,
-    .symbol = "BTCUSDT",
-    .order_status = OrderStatus::kFilled,
-    .last_price = Price{110},
-    .last_qty = Qty{3},
-    .trade_id = "T2"};
+      .cl_order_id = OrderId{2},
+      .symbol = "BTCUSDT",
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{3},
+      .last_qty = Qty{3},
+      .price = Price{110},
+      .side = Side::kSell,
+
+  };
   pos.add_fill(&sell1, logger);
 
   EXPECT_DOUBLE_EQ(pos.position_, -1.0);
@@ -105,16 +102,15 @@ TEST_F(PositionKeeperTest, UnrealPnL_PositiveCase) {
 
   // 1. 2 BTC 매수 @ 100
   ExecutionReport buy1{
-    .execution_id = "1",
-    .order_id = 1,
-    .price = Price{100},
-    .qty = Qty{2},
-    .side = Side::kBuy,
-    .symbol = "BTCUSDT",
-    .order_status = OrderStatus::kFilled,
-    .last_price = Price{100},
-    .last_qty = Qty{2},
-    .trade_id = "T1"};
+      .cl_order_id = OrderId{1},
+      .symbol = "BTCUSDT",
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{2},
+      .last_qty = Qty{2},
+      .price = Price{100},
+      .side = Side::kBuy,
+
+  };
   pos.add_fill(&buy1, logger);
 
   EXPECT_DOUBLE_EQ(pos.position_, 2.0);
@@ -122,8 +118,8 @@ TEST_F(PositionKeeperTest, UnrealPnL_PositiveCase) {
   EXPECT_DOUBLE_EQ(pos.unreal_pnl_, 0.0);
 
   BBO bbo{
-    .bid_price = Price{110},
-    .ask_price = Price{112}};
+      .bid_price = Price{110},
+      .ask_price = Price{112}};
   pos.update_bbo(&bbo, logger);
 
   EXPECT_NEAR(pos.unreal_pnl_, (111.0 - 100.0) * 2.0, 1e-6);
@@ -137,32 +133,27 @@ TEST_F(PositionKeeperTest, AddFill_AvgPriceCalculation) {
 
   // 1. Buy 1 BTC @ 100
   const ExecutionReport buy1{
-    .execution_id = "1",
-    .order_id = 1,
-    .price = Price{100},
-    .qty = Qty{1},
-    .side = Side::kBuy,
-    .symbol = "BTCUSDT",
-    .order_status = OrderStatus::kFilled,
-    .last_price = Price{100},
-    .last_qty = Qty{1},
-    .trade_id = "T1"
-};
+      .cl_order_id = OrderId{1},
+      .symbol = "BTCUSDT",
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{1},
+      .last_qty = Qty{1},
+      .price = Price{100},
+      .side = Side::kBuy,
+  };
   pos.add_fill(&buy1, &logger);
 
   // 2. Buy 3 BTC @ 110
   const ExecutionReport buy2{
-    .execution_id = "2",
-    .order_id = 2,
-    .price = Price{110},
-    .qty = Qty{3},
-    .side = Side::kBuy,
-    .symbol = "BTCUSDT",
-    .order_status = OrderStatus::kFilled,
-    .last_price = Price{110},
-    .last_qty = Qty{3},
-    .trade_id = "T2"
-};
+      .cl_order_id = OrderId{2},
+      .symbol = "BTCUSDT",
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{3},
+      .last_qty = Qty{3},
+      .price = Price{110},
+      .side = Side::kBuy,
+
+  };
   pos.add_fill(&buy2, &logger);
 
   EXPECT_DOUBLE_EQ(pos.position_, 4.0);
@@ -175,32 +166,26 @@ TEST_F(PositionKeeperTest, AddFill_FullCloseRealizesPnL) {
 
   // 1. Buy 2 BTC @ 50
   ExecutionReport buy{
-    .execution_id = "1",
-    .order_id = 1,
-    .price = Price{50},
-    .qty = Qty{2},
-    .side = Side::kBuy,
-    .symbol = "BTCUSDT",
-    .order_status = OrderStatus::kFilled,
-    .last_price = Price{50},
-    .last_qty = Qty{2},
-    .trade_id = "T1"
-};
+      .cl_order_id = OrderId{1},
+      .symbol = "BTCUSDT",
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{2},
+      .last_qty = Qty{2},
+      .price = Price{50},
+      .side = Side::kBuy,
+  };
   pos.add_fill(&buy, logger);
 
   // 2. Sell 2 BTC @ 70
   ExecutionReport sell{
-    .execution_id = "2",
-    .order_id = 2,
-    .price = Price{70},
-    .qty = Qty{2},
-    .side = Side::kSell,
-    .symbol = "BTCUSDT",
-    .order_status = OrderStatus::kFilled,
-    .last_price = Price{70},
-    .last_qty = Qty{2},
-    .trade_id = "T2"
-};
+      .cl_order_id = OrderId{2},
+      .symbol = "BTCUSDT",
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{2},
+      .last_qty = Qty{2},
+      .price = Price{70},
+      .side = Side::kSell,
+  };
   pos.add_fill(&sell, logger);
 
   EXPECT_DOUBLE_EQ(pos.position_, 0.0);
@@ -211,16 +196,13 @@ TEST_F(PositionKeeperTest, AddFill_FullCloseRealizesPnL) {
 TEST_F(PositionKeeperTest, UpdateBboUpdatesUnrealPnl) {
 
   ExecutionReport report{
-      .execution_id = "1",
-      .order_id = 100,
-      .price = Price{100000.0},
-      .qty = Qty{1.0},
-      .side = Side::kBuy,
+      .cl_order_id = OrderId{1},
       .symbol = "BTCUSDT",
-      .order_status = OrderStatus::kFilled,
-      .last_price = Price{100000.0},
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{1.0},
       .last_qty = Qty{1.0},
-      .trade_id = "T1"
+      .price = Price{100000.0},
+      .side = Side::kBuy,
   };
 
   keeper->add_fill(&report);
@@ -239,16 +221,13 @@ TEST_F(PositionKeeperTest, UpdateBboUpdatesUnrealPnl) {
 TEST_F(PositionKeeperTest, ToStringPrintsPositions) {
 
   ExecutionReport report{
-      .execution_id = "1",
-      .order_id = 100,
-      .price = Price{100000.0},
-      .qty = Qty{1.0},
-      .side = Side::kBuy,
+      .cl_order_id = OrderId{1},
       .symbol = "BTCUSDT",
-      .order_status = OrderStatus::kFilled,
-      .last_price = Price{100000.0},
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{1.0},
       .last_qty = Qty{1.0},
-      .trade_id = "T1"
+      .price = Price{100000.0},
+      .side = Side::kBuy,
   };
 
   keeper->add_fill(&report);

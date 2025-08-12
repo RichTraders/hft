@@ -11,6 +11,7 @@
  */
 #include <gtest/gtest.h>
 
+#include "order_entry.h"
 #include "logger.h"
 #include "risk_manager.h"  // RiskManager 관련 코드
 
@@ -52,11 +53,17 @@ TEST_F(RiskManagerTest, OrderTooLarge) {
 }
 
 TEST_F(RiskManagerTest, PositionTooLarge) {
-  auto* report = new ExecutionReport("1", 1, Price{45}, Qty{45}, Side::kBuy,
-                                     "BTCUSDT", OrderStatus::kFilled, Price{45},
-                                     Qty{45}, "trade_id1");
-  keeper_->add_fill(report);
-  delete report;
+  ExecutionReport report{
+    .cl_order_id = OrderId{1},
+    .symbol = "BTCUSDT",
+    .ord_status = OrdStatus::kFilled,
+    .cum_qty = Qty{45.0},
+    .last_qty = Qty{45.0},
+    .price = Price{45.0},
+    .side = Side::kBuy,
+};
+
+  keeper_->add_fill(&report);
 
   auto result = rm_->checkPreTradeRisk("BTCUSDT", Side::kBuy, Qty{10});
   EXPECT_EQ(result, RiskCheckResult::kPositionTooLarge);
@@ -64,20 +71,29 @@ TEST_F(RiskManagerTest, PositionTooLarge) {
 
 TEST_F(RiskManagerTest, LossTooLarge) {
   {
-    auto* report = new ExecutionReport("1", 1, Price{2000}, Qty{45}, Side::kBuy,
-                                       "BTCUSDT", OrderStatus::kFilled,
-                                       Price{2000},
-                                       Qty{45}, "trade_id1");
-    keeper_->add_fill(report);
-    delete report;
+    ExecutionReport report{
+      .cl_order_id = OrderId{1},
+      .symbol = "BTCUSDT",
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{45.0},
+      .last_qty = Qty{45.0},
+      .price = Price{2000.0},
+      .side = Side::kBuy,
+  };
+    keeper_->add_fill(&report);
   }
   {
-    auto* report = new ExecutionReport("2", 2, Price{900}, Qty{45}, Side::kSell,
-                                       "BTCUSDT", OrderStatus::kFilled,
-                                       Price{900},
-                                       Qty{45}, "trade_id2");
-    keeper_->add_fill(report);
-    delete report;
+    ExecutionReport report{
+      .cl_order_id = OrderId{2},
+      .symbol = "BTCUSDT",
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{45.0},
+      .last_qty = Qty{45.0},
+      .price = Price{900.0},
+      .side = Side::kSell,
+  };
+
+    keeper_->add_fill(&report);
   }
 
   auto result = rm_->checkPreTradeRisk("BTCUSDT", Side::kBuy, Qty{5});
@@ -86,21 +102,31 @@ TEST_F(RiskManagerTest, LossTooLarge) {
 
 TEST_F(RiskManagerTest, AllowedTrade) {
   {
-    auto* report = new ExecutionReport("1", 1, Price{900}, Qty{45}, Side::kBuy,
-                                       "BTCUSDT", OrderStatus::kFilled,
-                                       Price{900},
-                                       Qty{45}, "trade_id1");
-    keeper_->add_fill(report);
-    delete report;
+    ExecutionReport report{
+      .cl_order_id = OrderId{1},
+      .symbol = "BTCUSDT",
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{45.0},
+      .last_qty = Qty{45.0},
+      .price = Price{900.0},
+      .side = Side::kBuy,
+  };
+
+    keeper_->add_fill(&report);
   }
   {
-    auto* report = new ExecutionReport("2", 2, Price{9000}, Qty{45},
-                                       Side::kSell,
-                                       "BTCUSDT", OrderStatus::kFilled,
-                                       Price{9000},
-                                       Qty{45}, "trade_id2");
-    keeper_->add_fill(report);
-    delete report;
+    ExecutionReport report{
+      .cl_order_id = OrderId{2},
+      .symbol = "BTCUSDT",
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{45.0},
+      .last_qty = Qty{45.0},
+      .price = Price{9000.0},
+      .side = Side::kSell,
+  };
+
+    keeper_->add_fill(&report);
+
   }
   auto result = rm_->checkPreTradeRisk("BTCUSDT", Side::kSell, Qty{5});
   EXPECT_EQ(result, RiskCheckResult::kAllowed);

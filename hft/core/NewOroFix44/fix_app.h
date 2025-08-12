@@ -18,15 +18,10 @@
 
 #include "authorization.h"
 #include "logger.h"
-#include "market_data.h"
 
 constexpr int kQueueSize = 8;
 constexpr int kReadBufferSize = 1024;
 constexpr int kWriteThreadSleep = 100;
-
-namespace FIX8::NewOroFix44OE {
-class ExecutionReport;
-}
 
 namespace FIX8 {
 class Message;
@@ -57,7 +52,7 @@ public:
 
   int start();
 
-  int stop();
+  void stop();
 
   bool send(const std::string& msg) const;
 

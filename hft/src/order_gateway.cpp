@@ -11,7 +11,7 @@
  */
 
 #include "order_gateway.h"
-#include "response_manager.h"
+#include "../core/NewOroFix44/response_manager.h"
 #include "trade_engine.h"
 
 namespace trading {
@@ -52,7 +52,12 @@ OrderGateway::OrderGateway(const Authorization& authorization,
 }
 
 OrderGateway::~OrderGateway() {
-  app_->stop();
+  thread_running_ = false;
+  write_thread_.join();
+}
+
+void OrderGateway::stop() {
+  app_->create_log_out_message();
 }
 
 void OrderGateway::init_trade_engine(TradeEngine* trade_engine) {
@@ -101,7 +106,8 @@ void OrderGateway::on_order_mass_status_response(FIX8::Message* msg) {
 }
 
 void OrderGateway::on_logout(FIX8::Message*) {
-  logger_->info("logout");
+  auto message = app_->create_log_out_message();
+  app_->send(message);
 }
 
 void OrderGateway::on_heartbeat(FIX8::Message* msg) {

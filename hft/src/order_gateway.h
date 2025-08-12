@@ -36,6 +36,7 @@ class OrderGateway {
   ~OrderGateway();
 
   void init_trade_engine(TradeEngine* trade_engine);
+  void stop();
 
   void on_login(FIX8::Message*);
   void on_execution_report(FIX8::NewOroFix44OE::ExecutionReport* msg);

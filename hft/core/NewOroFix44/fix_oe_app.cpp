@@ -13,6 +13,7 @@
 #include "fix_oe_app.h"
 
 namespace core {
+
 std::string FixOrderEntryApp::create_log_on_message(
     const std::string& sig_b64, const std::string& timestamp) {
   return fix_oe_core_->create_log_on_message(sig_b64, timestamp);

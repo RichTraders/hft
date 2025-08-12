@@ -9,7 +9,7 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
-#include "response_manager.h"
+#include "../hft/core/NewOroFix44/response_manager.h"
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 #include "order_gateway.h"
@@ -24,12 +24,15 @@ using namespace core;
 using namespace common;
 using namespace trading;
 
-int cl_order_id = 2065;
+int cl_order_id = 2075;
 
-TEST(OrderGatewayTest, NewOrderSingle) {
-  IniConfig config;
-  config.load("resources/config.ini");
-  const Authorization authorization{
+class OrderGatewayTest : public ::testing::Test  {
+protected:
+
+  static void SetUpTestSuite() {
+    IniConfig config;
+    config.load("resources/config.ini");
+    const Authorization authorization{
       .md_address = config.get("auth", "md_address"),
       .oe_address = config.get("auth", "oe_address"),
       .port = config.get_int("auth", "port"),
@@ -37,30 +40,57 @@ TEST(OrderGatewayTest, NewOrderSingle) {
       .pem_file_path = config.get("auth", "pem_file_path"),
       .private_password = config.get("auth", "private_password")};
 
-  auto logger = std::make_unique<Logger>();
+    auto logger = std::make_unique<Logger>();
 
-  TradeEngineCfgHashMap temp;
-  TradeEngineCfg tempcfg;
-  temp.emplace("BTCUSDT", tempcfg);
-  auto pool = std::make_unique<MemoryPool<MarketUpdateData>>(1024);
-  auto pool2 = std::make_unique<MemoryPool<MarketData>>(1024);
+    TradeEngineCfgHashMap temp;
+    TradeEngineCfg tempcfg;
+    temp.emplace("BTCUSDT", tempcfg);
+    market_update_data_pool_ = std::make_unique<MemoryPool<MarketUpdateData>>(1024);
+    market_data_pool_ = std::make_unique<MemoryPool<MarketData>>(1024);
 
-  auto execution_report_pool = std::make_unique<MemoryPool<
-      ExecutionReport>>(1024);
-  auto order_cancel_reject_pool = std::make_unique<MemoryPool<
-    OrderCancelReject>>(1024);
-  auto order_mass_cancel_report_pool = std::make_unique<MemoryPool<
-    OrderMassCancelReport>>(1024);
+    execution_report_pool_ = std::make_unique<MemoryPool<
+        ExecutionReport>>(1024);
+    order_cancel_reject_pool_ = std::make_unique<MemoryPool<
+      OrderCancelReject>>(1024);
+    order_mass_cancel_report_pool_ = std::make_unique<MemoryPool<
+      OrderMassCancelReport>>(1024);
 
-  ResponseManager* response_manager = new ResponseManager(
-      logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
-      order_mass_cancel_report_pool.get());
-  OrderGateway og(authorization, logger.get(), response_manager);
-  TradeEngine* trade_engine = new TradeEngine(logger.get(), pool.get(),
-                                               pool2.get(), response_manager, &og, temp);
+    response_manager_ = std::make_unique<ResponseManager>(
+        logger.get(), execution_report_pool_.get(), order_cancel_reject_pool_.get(),
+        order_mass_cancel_report_pool_.get());
 
-  og.init_trade_engine(trade_engine);
+    order_gateway_= std::make_unique<trading::OrderGateway>(authorization, logger.get(), response_manager_.get());
+    trade_engine_ = std::make_unique<TradeEngine>(logger.get(), market_update_data_pool_.get(),
+                                                 market_data_pool_.get(), response_manager_.get(), temp);
 
+    order_gateway_->init_trade_engine(trade_engine_.get());
+    trade_engine_->init_order_gateway(order_gateway_.get());
+  }
+  static void TearDownTestSuite() {
+    order_gateway_->stop();
+    sleep(10);
+    std::cout << "TearDown OrderGatewayTest" << std::endl;
+  }
+
+public:
+  static std::unique_ptr<MemoryPool<
+          MarketUpdateData>> market_update_data_pool_;
+  static std::unique_ptr<MemoryPool<
+        MarketData>> market_data_pool_;
+
+  static std::unique_ptr<MemoryPool<
+        ExecutionReport>> execution_report_pool_;
+  static std::unique_ptr<MemoryPool<
+        OrderCancelReject>> order_cancel_reject_pool_;
+  static std::unique_ptr<MemoryPool<
+        OrderMassCancelReport>> order_mass_cancel_report_pool_;
+  static std::unique_ptr<ResponseManager> response_manager_;
+  static std::unique_ptr<TradeEngine> trade_engine_;
+  static std::unique_ptr<OrderGateway> order_gateway_;
+
+};
+
+TEST_F(OrderGatewayTest, NewOrderSingle) {
   RequestCommon request;
 
   request.req_type = ReqeustType::kNewSingleOrderData;
@@ -74,48 +104,15 @@ TEST(OrderGatewayTest, NewOrderSingle) {
   request.self_trade_prevention_mode =
       trading::SelfTradePreventionMode::kExpireTaker;
 
-  sleep(5);
+  //sleep(3);
 
-  trade_engine->send_request(request);
+  trade_engine_->send_request(request);
 
-  sleep(100);
+  //sleep(3);
 }
 
 
-TEST(OrderGatewayTest, DISABLED_OrderCancel) {
-  IniConfig config;
-  config.load("resources/config.ini");
-  const Authorization authorization{
-      .md_address = config.get("auth", "md_address"),
-      .oe_address = config.get("auth", "oe_address"),
-      .port = config.get_int("auth", "port"),
-      .api_key = config.get("auth", "api_key"),
-      .pem_file_path = config.get("auth", "pem_file_path"),
-      .private_password = config.get("auth", "private_password")};
-
-  auto logger = std::make_unique<Logger>();
-
-  TradeEngineCfgHashMap temp;
-  TradeEngineCfg tempcfg;
-  temp.emplace("BTCUSDT", tempcfg);
-  auto pool = std::make_unique<MemoryPool<MarketUpdateData>>(1024);
-  auto pool2 = std::make_unique<MemoryPool<MarketData>>(1024);
-
-  auto execution_report_pool = std::make_unique<MemoryPool<
-      ExecutionReport>>(1024);
-  auto order_cancel_reject_pool = std::make_unique<MemoryPool<
-    OrderCancelReject>>(1024);
-  auto order_mass_cancel_report_pool = std::make_unique<MemoryPool<
-    OrderMassCancelReport>>(1024);
-
-  ResponseManager* response_manager = new ResponseManager(
-      logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
-      order_mass_cancel_report_pool.get());
-
-  OrderGateway og(authorization, logger.get(), response_manager);
-  TradeEngine* trade_engine = new TradeEngine(logger.get(), pool.get(),
-                                                 pool2.get(), response_manager, &og, temp);
-  og.init_trade_engine(trade_engine);
+TEST_F(OrderGatewayTest, OrderCancel) {
   RequestCommon request;
 
   request.req_type = ReqeustType::kOrderCancelRequest;
@@ -123,14 +120,14 @@ TEST(OrderGatewayTest, DISABLED_OrderCancel) {
   request.orig_cl_order_id.value = cl_order_id;
   request.symbol = "BTCUSDT";
 
-  sleep(2);
+  //sleep(2);
 
-  trade_engine->send_request(request);
+  trade_engine_->send_request(request);
 
-  sleep(100);
+  //sleep(3);
 }
 
-TEST(OrderGatewayTest, DISABLED_OrderMassCancel) {
+TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
   IniConfig config;
   config.load("resources/config.ini");
   const Authorization authorization{
@@ -156,13 +153,14 @@ TEST(OrderGatewayTest, DISABLED_OrderMassCancel) {
   auto order_mass_cancel_report_pool = std::make_unique<MemoryPool<
     OrderMassCancelReport>>(1024);
 
-  ResponseManager* response_manager = new ResponseManager(
+  auto response_manager = std::make_unique<ResponseManager>(
       logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
       order_mass_cancel_report_pool.get());
-  OrderGateway og(authorization, logger.get(), response_manager);
-  TradeEngine* trade_engine = new TradeEngine(logger.get(), pool.get(),
-                                               pool2.get(), response_manager, &og, temp);
+  OrderGateway og(authorization, logger.get(), response_manager.get());
+  auto trade_engine = new TradeEngine(logger.get(), pool.get(),
+                                               pool2.get(), response_manager.get(), temp);
   og.init_trade_engine(trade_engine);
+  trade_engine->init_order_gateway(&og);
 
   RequestCommon request;
 
@@ -174,5 +172,23 @@ TEST(OrderGatewayTest, DISABLED_OrderMassCancel) {
 
   trade_engine->send_request(request);
 
-  sleep(100);
+  sleep(3);
 }
+
+// stop 구현 필요
+
+
+std::unique_ptr<MemoryPool<
+        MarketUpdateData>> OrderGatewayTest::market_update_data_pool_;
+std::unique_ptr<MemoryPool<
+      MarketData>> OrderGatewayTest::market_data_pool_;
+
+std::unique_ptr<MemoryPool<
+      ExecutionReport>> OrderGatewayTest::execution_report_pool_;
+std::unique_ptr<MemoryPool<
+      OrderCancelReject>> OrderGatewayTest::order_cancel_reject_pool_;
+std::unique_ptr<MemoryPool<
+      OrderMassCancelReport>> OrderGatewayTest::order_mass_cancel_report_pool_;
+std::unique_ptr<ResponseManager> OrderGatewayTest::response_manager_;
+std::unique_ptr<TradeEngine> OrderGatewayTest::trade_engine_;
+std::unique_ptr<OrderGateway> OrderGatewayTest::order_gateway_;

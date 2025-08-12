@@ -37,9 +37,10 @@ class TradeEngine {
       common::Logger* logger,
       common::MemoryPool<MarketUpdateData>* market_update_data_pool,
       common::MemoryPool<MarketData>* market_data_pool,
-      ResponseManager* response_manager, OrderGateway* order_gateway,
+      ResponseManager* response_manager,
       const common::TradeEngineCfgHashMap& ticker_cfg);
   ~TradeEngine();
+  void init_order_gateway(OrderGateway* order_gateway);
 
   void stop();
   void on_market_data_updated(MarketUpdateData* data) const;

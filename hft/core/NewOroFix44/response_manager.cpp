@@ -11,7 +11,6 @@
  */
 
 #include "response_manager.h"
-
 #include "logger.h"
 
 namespace trading {

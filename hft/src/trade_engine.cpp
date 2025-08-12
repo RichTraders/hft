@@ -11,13 +11,13 @@
  */
 
 #include "trade_engine.h"
+#include "../core/NewOroFix44/response_manager.h"
 #include "feature_engine.h"
 #include "order_entry.h"
 #include "order_gateway.h"
 #include "order_manager.h"
 #include "performance.h"
 #include "position_keeper.h"
-#include "response_manager.h"
 #include "risk_manager.h"
 
 constexpr std::size_t kCapacity = 64;
@@ -27,13 +27,12 @@ TradeEngine::TradeEngine(
     common::Logger* logger,
     common::MemoryPool<MarketUpdateData>* market_update_data_pool,
     common::MemoryPool<MarketData>* market_data_pool,
-    ResponseManager* response_manager, OrderGateway* order_gateway,
+    ResponseManager* response_manager,
     const common::TradeEngineCfgHashMap& ticker_cfg)
     : logger_(logger),
       market_update_data_pool_(market_update_data_pool),
       market_data_pool_(market_data_pool),
       response_manager_(response_manager),
-      order_gateway_(order_gateway),
       queue_(std::make_unique<common::SPSCQueue<MarketUpdateData*>>(kCapacity)),
       feature_engine_(std::make_unique<FeatureEngine>(logger)),
       position_keeper_(std::make_unique<PositionKeeper>(logger)),
@@ -54,7 +53,17 @@ TradeEngine::TradeEngine(
   response_thread_.start(&TradeEngine::response_run, this);
 }
 
-TradeEngine::~TradeEngine() = default;
+TradeEngine::~TradeEngine() {
+  running_ = false;
+  response_running_ = false;
+
+  thread_.join();
+  response_thread_.join();
+}
+
+void TradeEngine::init_order_gateway(OrderGateway* order_gateway) {
+  order_gateway_ = order_gateway;
+}
 
 void TradeEngine::on_market_data_updated(MarketUpdateData* data) const {
   queue_->enqueue(data);
@@ -62,6 +71,7 @@ void TradeEngine::on_market_data_updated(MarketUpdateData* data) const {
 
 void TradeEngine::stop() {
   running_ = false;
+  response_running_ = false;
 }
 
 void TradeEngine::on_order_book_updated(common::Price price, common::Side side,

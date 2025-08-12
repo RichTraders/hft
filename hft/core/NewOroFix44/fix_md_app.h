@@ -12,26 +12,24 @@
 
 #pragma once
 #include "fix_app.h"
-#include "fix_md_core.h"
+#include "memory_pool.hpp"
+#include "market_data.h"
+
+namespace FIX8 {
+class Message;
+}
 
 namespace core {
+class FixMdCore;
+
 class FixMarketDataApp : public FixApp<FixMarketDataApp, 1> {
 public:
   FixMarketDataApp(const Authorization& authorization,
                    const std::string& sender_comp_id,
                    const std::string& target_comp_id, common::Logger* logger,
-                   common::MemoryPool<MarketData>* market_data_pool):
-    FixApp(authorization.md_address,
-           authorization.port,
-           sender_comp_id,
-           target_comp_id,
-           logger,
-           authorization)
-    , market_data_pool_(market_data_pool) {
-    fix_md_core_ = std::make_unique<FixMdCore>(sender_comp_id, target_comp_id,
-                                               logger, market_data_pool,
-                                               authorization);
-  }
+                   common::MemoryPool<MarketData>* market_data_pool);
+
+  ~FixMarketDataApp();
 
   std::string create_log_on_message(const std::string& sig_b64,
                                     const std::string& timestamp);

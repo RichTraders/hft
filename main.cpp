@@ -10,6 +10,7 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
+#include "cpu_manager.h"
 #include "hft/core/NewOroFix44/response_manager.h"
 #include "ini_config.hpp"
 #include "logger.h"
@@ -26,7 +27,7 @@ constexpr int kMarketDataPoolSize = 16384;
 int main() {
   try {
     IniConfig config;
-#ifdef TEST_NET
+#ifndef TEST_NET
     config.load("resources/test_config.ini");
 #else
     config.load("resources/config.ini");
@@ -63,61 +64,51 @@ int main() {
         std::make_unique<common::MemoryPool<trading::OrderMassCancelReport>>(
             kResponseMemoryPoolSize);
 
-    std::promise<trading::TradeEngine*> engine_promise;
-    std::future<trading::TradeEngine*> engine_future =
-        engine_promise.get_future();
+    common::TradeEngineCfgHashMap config_map;
+    config_map["BTCUSDT"] = {.clip_ = common::Qty{0},
+                             .threshold_ = 0,
+                             .risk_cfg_ = common::RiskCfg(
+                                 common::Qty{static_cast<float>(
+                                     config.get_int("risk", "max_order_size"))},
+                                 common::Qty{static_cast<float>(
+                                     config.get_int("risk", "max_position"))},
+                                 config.get_int("risk", "max_loss"))};
 
-    common::Thread<common::PriorityTag<1>, common::AffinityTag<2>>
-        trade_engine_thread;
-    trade_engine_thread.start([&]() {
-      try {
-        common::TradeEngineCfgHashMap config_map;
-        config_map["BTCUSDT"] = {
-            .clip_ = common::Qty{0},
-            .threshold_ = 0,
-            .risk_cfg_ = common::RiskCfg(
-                common::Qty{static_cast<float>(
-                    config.get_int("risk", "max_order_size"))},
-                common::Qty{
-                    static_cast<float>(config.get_int("risk", "max_position"))},
-                config.get_int("risk", "max_loss"))};
+    auto response_manager = std::make_unique<trading::ResponseManager>(
+        logger.get(), execution_report_pool.get(),
+        order_cancel_reject_pool.get(), order_mass_cancel_report_pool.get());
 
-        auto response_manager = std::make_unique<trading::ResponseManager>(
-            logger.get(), execution_report_pool.get(),
-            order_cancel_reject_pool.get(),
-            order_mass_cancel_report_pool.get());
+    auto order_gateway = std::make_unique<trading::OrderGateway>(
+        authorization, logger.get(), response_manager.get());
 
-        auto order_gateway = std::make_unique<trading::OrderGateway>(
-            authorization, logger.get(), response_manager.get());
+    auto engine = std::make_unique<trading::TradeEngine>(
+        logger.get(), market_update_data_pool.get(), market_data_pool.get(),
+        response_manager.get(), config_map);
 
-        auto engine = std::make_unique<trading::TradeEngine>(
-            logger.get(), market_update_data_pool.get(), market_data_pool.get(),
-            response_manager.get(), config_map);
-        engine_promise.set_value(engine.get());
-        while (true) {}
-      } catch (std::exception& e) {
-        std::cerr << e.what() << "\n";
-      }
-    });
+    const trading::MarketConsumer consumer(
+        logger.get(), engine.get(), market_update_data_pool.get(),
+        market_data_pool.get(), authorization);
 
-    common::Thread<common::PriorityTag<1>, common::AffinityTag<1>>
-        consumer_thread;
-    consumer_thread.start([&]() {
-      try {
-        auto* engine = engine_future.get();
-        const trading::MarketConsumer consumer(
-            logger.get(), engine, market_update_data_pool.get(),
-            market_data_pool.get(), authorization);
-        while (true) {}
-      } catch (std::exception& e) {
-        std::cerr << e.what() << "\n";
-      }
-    });
+    std::unique_ptr<common::CpuManager> cpu_manager =
+        std::make_unique<common::CpuManager>(logger.get());
 
-    consumer_thread.join();
-    trade_engine_thread.join();
+    std::string cpu_init_resulit;
+    if (cpu_manager->init_cpu_group(cpu_init_resulit)) {
+      logger->info("failed to init cpu group" + cpu_init_resulit);
+      return -1;
+    }
+
+    if (cpu_manager->init_cpu_to_tid()) {
+      logger->info("failed to init cpu to tid");
+      return -1;
+    }
   } catch (std::exception& e) {
     std::cerr << e.what() << "\n";
   }
+
+  constexpr int kSleepCount = 10;
+  while (true)
+    sleep(kSleepCount);  // 얘 어떻게 무한 루프 돌아야할 지 확인 필요
+
   return 0;
 }

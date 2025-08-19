@@ -30,7 +30,7 @@ class Message;
 namespace core {
 class SSLSocket;
 
-template <typename Derived, int Cpu = 1>
+template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
 class FixApp {
 public:
   FixApp(const std::string& address,
@@ -99,8 +99,8 @@ private:
 #endif
   std::unique_ptr<common::SPSCQueue<std::string>> queue_;
 
-  common::Thread<common::AffinityTag<Cpu>> write_thread_;
-  common::Thread<common::AffinityTag<Cpu>> read_thread_;
+  common::Thread<WriteThreadName> write_thread_;
+  common::Thread<ReadThreadName> read_thread_;
   bool thread_running_{true};
 
   bool log_on_{false};

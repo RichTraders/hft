@@ -43,6 +43,77 @@
 
 #include "absl/container/flat_hash_map.h"
 
+template <std::size_t N>
+struct FixedString {
+  char v[N];
+
+  constexpr FixedString(const char (&s)[N]) { std::copy_n(s, N, v); }
+
+  constexpr bool operator==(const FixedString&) const = default;
+
+  // 편의 API들
+  constexpr const char* c_str() const { return v; }  // N>=1 가정
+  constexpr std::size_t size() const {
+    return N > 0 ? N - 1 : 0;
+  }  // 널 제외 길이
+  std::string_view view() const { return std::string_view(v, size()); }
+  std::string str() const { return std::string(v, size()); }
+};
+
+// ---- 자유 함수 연산자들 ----
+
+// std::string + FixedString
+template <std::size_t N>
+std::string operator+(const std::string& lhs, const FixedString<N>& rhs) {
+  std::string out;
+  out.reserve(lhs.size() + rhs.size());
+  out += lhs;
+  out.append(rhs.c_str(), rhs.size());
+  return out;
+}
+
+// FixedString + std::string
+template <std::size_t N>
+std::string operator+(const FixedString<N>& lhs, const std::string& rhs) {
+  std::string out;
+  out.reserve(lhs.size() + rhs.size());
+  out.append(lhs.c_str(), lhs.size());
+  out += rhs;
+  return out;
+}
+
+// const char* + FixedString
+template <std::size_t N>
+std::string operator+(const char* lhs, const FixedString<N>& rhs) {
+  std::string out(lhs);
+  out.append(rhs.c_str(), rhs.size());
+  return out;
+}
+
+// FixedString + const char*
+template <std::size_t N>
+std::string operator+(const FixedString<N>& lhs, const char* rhs) {
+  std::string out(lhs.c_str(), lhs.size());
+  out += rhs;
+  return out;
+}
+
+// (선택) FixedString + FixedString
+template <std::size_t A, std::size_t B>
+std::string operator+(const FixedString<A>& lhs, const FixedString<B>& rhs) {
+  std::string out;
+  out.reserve(lhs.size() + rhs.size());
+  out.append(lhs.c_str(), lhs.size());
+  out.append(rhs.c_str(), rhs.size());
+  return out;
+}
+
+// (선택) ostream 출력
+template <std::size_t N>
+std::ostream& operator<<(std::ostream& os, const FixedString<N>& s) {
+  return os.write(s.c_str(), static_cast<std::streamsize>(s.size()));
+}
+
 #define LIKELY(x) __builtin_expect(!!(x), 1)
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 

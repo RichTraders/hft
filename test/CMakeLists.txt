@@ -13,6 +13,7 @@ macro(add_unit_test _TEST_NAME)
             GTest::gtest_main
             gmock
             gmock_main
+            cap
     )
     target_precompile_headers(${_TEST_NAME}_tests PRIVATE
             ${CMAKE_SOURCE_DIR}/include/pch.h
@@ -38,9 +39,11 @@ add_unit_test(risk_manager)
 add_unit_test(ini_config)
 add_unit_test(order_gateway)
 add_unit_test(fix_md_app)
+add_unit_test(cpu_priority)
 
 set(RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 file(COPY ${RESOURCE_DIR} DESTINATION ${CMAKE_BINARY_DIR}/test)
+file(COPY set_cpu.sh DESTINATION ${CMAKE_BINARY_DIR}/test)
 
 file(GLOB TEST_EXECUTABLES "${CMAKE_BINARY_DIR}/tests/*_tests")
 

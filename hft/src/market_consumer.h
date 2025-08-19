@@ -22,7 +22,8 @@ class Message;
 }
 
 namespace core {
-template <typename Derived, int Cpu>
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
 class FixApp;
 class FixMarketDataApp;
 }  // namespace core

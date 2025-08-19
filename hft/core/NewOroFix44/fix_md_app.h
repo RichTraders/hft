@@ -22,7 +22,7 @@ class Message;
 namespace core {
 class FixMdCore;
 
-class FixMarketDataApp : public FixApp<FixMarketDataApp, 1> {
+class FixMarketDataApp : public FixApp<FixMarketDataApp,"MDRead", "MDWrite"> {
 public:
   FixMarketDataApp(const Authorization& authorization,
                    const std::string& sender_comp_id,

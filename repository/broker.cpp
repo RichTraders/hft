@@ -14,8 +14,8 @@
 
 #include "common/logger.h"
 #include "fix_md_app.h"
+#include "ini_config.hpp"
 
-constexpr int kPort = 9000;
 constexpr int kKilo = 1024;
 constexpr int kThirty = 30;
 
@@ -24,15 +24,26 @@ using common::LogLevel;
 
 Broker::Broker()
     : pool_(std::make_unique<common::MemoryPool<MarketData>>(kMemoryPoolSize)),
-      log_(std::make_unique<common::Logger>()),
-#ifdef DEBUG
-      app_(std::make_unique<FixApp<>>("fix-md.testnet.binance.vision",
+      log_(std::make_unique<common::Logger>()) {
+
+  IniConfig config;
+#ifdef TEST_NET
+  config.load("resources/test_config.ini");
 #else
-      app_(std::make_unique<core::FixMarketDataApp>(
-          "fix-md.binance.com",
+  config.load("resources/config.ini");
 #endif
-                                      kPort, "BMDWATCH", "SPOT", log_.get(),
-                                      pool_.get())) {
+
+  const Authorization authorization{
+      .md_address = config.get("auth", "md_address"),
+      .oe_address = config.get("auth", "oe_address"),
+      .port = config.get_int("auth", "port"),
+      .api_key = config.get("auth", "api_key"),
+      .pem_file_path = config.get("auth", "pem_file_path"),
+      .private_password = config.get("auth", "private_password")};
+
+  app_ = std::make_unique<core::FixMarketDataApp>(
+      authorization, "BMDWATCH", "SPOT", log_.get(), pool_.get());
+
   log_->setLevel(LogLevel::kInfo);
   log_->clearSink();
   log_->addSink(
@@ -47,7 +58,6 @@ Broker::Broker()
 
   app_->start();
 }
-
 void Broker::on_login(FIX8::Message*) {
   std::cout << "login successful\n";
   const std::string message = app_->create_market_data_subscription_message(

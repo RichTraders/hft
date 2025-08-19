@@ -13,21 +13,9 @@
 #ifndef BROKER_H
 #define BROKER_H
 
-#ifndef LOGGER_PREFIX_DISABLED
-#define LOGGER_PREFIX_DISABLED
-#endif
-
-#ifndef REPOSITORY
-#define REPOSITORY
-#endif
-
 #include "common/logger.h"
-#include "core/NewOroFix44/fix_app.h"
+#include "core/NewOroFix44/fix_md_app.h"
 #include "memory_pool.hpp"
-
-namespace core {
-class FixMarketDataApp;
-}
 
 class Broker {
  public:

@@ -311,12 +311,9 @@ auto MarketOrderBook::on_market_data_updated(
   logger_->debug(
       std::format("{} {}", market_update->toString(), bbo_.toString()));
 
-  trade_engine_->on_order_book_updated(market_update->price,
-                                       market_update->side, this);
-}
-
-auto MarketOrderBook::get_bbo() noexcept -> const BBO* {
-  return &bbo_;
+  trade_engine_->on_orderbook_updated(market_update->ticker_id,
+                                      market_update->price, market_update->side,
+                                      this);
 }
 
 void MarketOrderBook::on_trade_update(MarketData*) {}
@@ -336,7 +333,7 @@ std::string MarketOrderBook::print_active_levels(bool is_bid) const {
         const int global_idx = bucket_idx * kBucketSize + off;
         const Price price = indexToPrice(global_idx);
         stream << (is_bid ? "[BID]" : "[ASK]") << " idx:" << global_idx
-               << " px:" << common::toString(price)
+               << " price:" << common::toString(price)
                << " qty:" << common::toString(order.qty) << "\n";
       }
     }
@@ -483,4 +480,123 @@ int MarketOrderBook::find_in_bucket(const Bucket* bucket,
   }
   return -1;
 }
+
+//NOLINTBEGIN(readability-function-cognitive-complexity)
+int MarketOrderBook::peek_levels_with_qty(
+    bool is_bid, int level, std::vector<LevelView>& out) const noexcept {
+  out.clear();
+  out.reserve(level);
+  if (level <= 0)
+    return 0;
+
+  const auto& summary = is_bid ? bidSummary_ : askSummary_;
+  const auto& buckets = is_bid ? bidBuckets_ : askBuckets_;
+
+  const int idx = is_bid ? best_bid_idx() : best_ask_idx();
+  if (idx < 0)
+    return 0;
+
+  int bucket_idx = bucket_of(idx);
+  int off = offset_of(idx);
+
+  auto price_of = [&](int gidx) -> Price {
+    return indexToPrice(gidx);
+  };
+
+  while (bucket_idx >= 0 && bucket_idx < kBucketCount &&
+         static_cast<int>(out.size()) < level) {
+    const Bucket* bucket = buckets[bucket_idx];
+
+    if (!bucket) {
+      bucket_idx = is_bid ? jump_next_bucket_impl<true>(summary, bucket_idx,
+                                                        kWordShift, kWordMask)
+                          : jump_next_bucket_impl<false>(summary, bucket_idx,
+                                                         kWordShift, kWordMask);
+      if (bucket_idx < 0)
+        break;
+      off = is_bid ? (kBucketSize - 1) : 0;
+      continue;
+    }
+
+    if (is_bid) {
+      consume_levels_in_bucket<true>(bucket, bucket_idx, off, kWordShift,
+                                     kWordMask, kBucketBitmapWords, kBucketSize,
+                                     price_of, out, level);
+    } else {
+      consume_levels_in_bucket<false>(bucket, bucket_idx, off, kWordShift,
+                                      kWordMask, kBucketBitmapWords,
+                                      kBucketSize, price_of, out, level);
+    }
+    if (static_cast<int>(out.size()) >= level)
+      break;
+
+    bucket_idx = is_bid ? jump_next_bucket_impl<true>(summary, bucket_idx,
+                                                      kWordShift, kWordMask)
+                        : jump_next_bucket_impl<false>(summary, bucket_idx,
+                                                       kWordShift, kWordMask);
+    if (bucket_idx < 0)
+      break;
+    off = is_bid ? (kBucketSize - 1) : 0;
+  }
+
+  return static_cast<int>(out.size());
+}
+
+int MarketOrderBook::peek_qty(bool is_bid, int level, std::span<double> qty_out,
+                              std::span<int> idx_out = {}) const noexcept {
+  const auto want = std::min<int>(level, static_cast<int>(qty_out.size()));
+  if (want <= 0)
+    return -1;
+
+  const auto& summary = is_bid ? bidSummary_ : askSummary_;
+  const auto& buckets = is_bid ? bidBuckets_ : askBuckets_;
+
+  int filled = 0;
+
+  auto consume_bucket = [&](int bidx, int start_off) {
+    const Bucket* bucket = buckets[bidx];
+    if (!bucket)
+      return false;
+
+    if (is_bid) {
+      return consume_bucket_side<Side::kBuy>(
+          bucket, bidx, start_off, kWordShift, kWordMask, kBucketSize,
+          kBucketBitmapWords, qty_out, idx_out, filled, want);
+    }
+    return consume_bucket_side<Side::kSell>(
+        bucket, bidx, start_off, kWordShift, kWordMask, kBucketSize,
+        kBucketBitmapWords, qty_out, idx_out, filled, want);
+  };
+
+  auto jump_next_bucket = [&](int bidx) -> int {
+    if (is_bid) {
+      return jump_next_bucket_impl<true /*Bid*/>(summary, bidx, kWordShift,
+                                                 kWordMask);
+    }
+    return jump_next_bucket_impl<false /*Ask*/>(summary, bidx, kWordShift,
+                                                kWordMask);
+  };
+
+  const int idx = is_bid ? best_bid_idx() : best_ask_idx();
+  if (idx < 0)
+    return -1;
+
+  int bidx = idx / kBucketSize;
+  int off = idx & (kBucketSize - 1);
+
+  if (consume_bucket(bidx, off))
+    return filled;
+
+  while (filled < want) {
+    bidx = jump_next_bucket(bidx);
+    if (bidx < 0)
+      break;
+    off = is_bid ? (kBucketSize - 1) : 0;
+    if (consume_bucket(bidx, off))
+      break;
+  }
+
+  return filled;
+}
+//NOLINTEND(readability-function-cognitive-complexity)
 }  // namespace trading

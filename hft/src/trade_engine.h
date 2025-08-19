@@ -30,6 +30,7 @@ class RiskManager;
 class OrderManager;
 class ResponseManager;
 class OrderGateway;
+class MarketMaker;
 
 class TradeEngine {
  public:
@@ -44,8 +45,9 @@ class TradeEngine {
 
   void stop();
   void on_market_data_updated(MarketUpdateData* data) const;
-  void on_order_book_updated(common::Price price, common::Side side,
-                             MarketOrderBook* market_order_book) const;
+  void on_orderbook_updated(const common::TickerId& ticker, common::Price price,
+                            common::Side side,
+                            MarketOrderBook* market_order_book) const;
   void on_trade_updated(const MarketData* market_data,
                         MarketOrderBook* order_book) const;
   void on_order_updated(const ExecutionReport* report) const noexcept;
@@ -71,6 +73,8 @@ class TradeEngine {
   std::unique_ptr<PositionKeeper> position_keeper_;
   std::unique_ptr<RiskManager> risk_manager_;
   std::unique_ptr<OrderManager> order_manager_;
+  //TODO(JB): 전략 변화
+  std::unique_ptr<MarketMaker> strategy_;
 
   void run();
   void response_run();

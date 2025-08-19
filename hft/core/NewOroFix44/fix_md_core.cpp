@@ -11,7 +11,6 @@
  */
 
 #include "fix_md_core.h"
-#include "signature.h"
 
 #include <fix8/f8includes.hpp>
 #include "NewOroFix44MD_types.hpp"
@@ -257,11 +256,11 @@ MarketUpdateData FixMdCore::create_snapshot_data_message(FIX8::Message* msg) {
 }
 
 FIX8::Message* FixMdCore::decode(const std::string& message) {
-#ifdef DEBUG
+#ifdef MEASUREMENT
   START_MEASURE(Convert_Message);
 #endif
   FIX8::Message* msg(FIX8::Message::factory(ctx(), message, true, true));
-#ifdef DEBUG
+#ifdef MEASUREMENT
   END_MEASURE(Convert_Message, logger_);
 #endif
   if (likely(msg)) {

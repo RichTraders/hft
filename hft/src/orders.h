@@ -74,8 +74,9 @@ struct Order {
   }
 };
 
+constexpr std::size_t kSlotsPerSide = 8;
 using OMOrderSideHashMap =
-    std::array<absl::flat_hash_map<common::OrderId, Order>,
+    std::array<std::array<Order, kSlotsPerSide>,
                common::sideToIndex(common::Side::kTrade)>;
 
 using OMOrderTickerSideHashMap =

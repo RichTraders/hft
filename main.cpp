@@ -94,6 +94,8 @@ int main() {
             logger.get(), market_update_data_pool.get(), market_data_pool.get(),
             response_manager.get(), config_map);
         engine_promise.set_value(engine.get());
+        engine->init_order_gateway(order_gateway.get());
+
         while (true) {}
       } catch (std::exception& e) {
         std::cerr << e.what() << "\n";

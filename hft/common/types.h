@@ -129,6 +129,21 @@ struct Qty {
     return *this;
   }
 
+  Qty& operator*(const Qty& other) {
+    value *= other.value;
+    return *this;
+  }
+
+  Qty& operator*(double other) {
+    value *= other;
+    return *this;
+  }
+
+  Qty& operator*=(double other) {
+    value *= other;
+    return *this;
+  }
+
   explicit operator double() const { return value; }
 };
 

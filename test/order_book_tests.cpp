@@ -9,59 +9,65 @@
  * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
-#include "gtest/gtest.h"
-#include "trade_engine.h"
-#include "order_book.h"
 #include "../hft/core/NewOroFix44/response_manager.h"
+#include "gtest/gtest.h"
+#include "order_book.h"
+#include "trade_engine.h"
 
 using namespace trading;
 using namespace common;
 
 class MarketOrderBookTest : public ::testing::Test {
-protected:
+ protected:
   Logger logger_;
   MarketOrderBook* book_;
+  TradeEngine* trade_engine;
+  ResponseManager* response_manager;
 
   void SetUp() override {
-
     TradeEngineCfgHashMap temp;
-    TradeEngineCfg tempcfg;
+    RiskCfg risk = {.max_order_size_ = Qty{1000.},
+                    .max_position_ = Qty{1000.},
+                    .max_loss_ = 1000.};
+    TradeEngineCfg tempcfg = {
+        .clip_ = Qty{100000}, .threshold_ = 10, .risk_cfg_ = risk};
     temp.emplace("BTCUSDT", tempcfg);
     auto pool = std::make_unique<MemoryPool<MarketUpdateData>>(4096);
     auto pool2 = std::make_unique<MemoryPool<MarketData>>(4096);
 
-    auto execution_report_pool = std::make_unique<MemoryPool<
-      ExecutionReport>>(1024);
-    auto order_cancel_reject_pool = std::make_unique<MemoryPool<
-      OrderCancelReject>>(1024);
-    auto order_mass_cancel_report_pool = std::make_unique<MemoryPool<
-      OrderMassCancelReport>>(1024);
+    auto execution_report_pool =
+        std::make_unique<MemoryPool<ExecutionReport>>(1024);
+    auto order_cancel_reject_pool =
+        std::make_unique<MemoryPool<OrderCancelReject>>(1024);
+    auto order_mass_cancel_report_pool =
+        std::make_unique<MemoryPool<OrderMassCancelReport>>(1024);
 
     auto logger = std::make_unique<Logger>();
-    ResponseManager* response_manager = new ResponseManager(
-        logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
-        order_mass_cancel_report_pool.get());
+    response_manager = new ResponseManager(
+        logger.get(), execution_report_pool.get(),
+        order_cancel_reject_pool.get(), order_mass_cancel_report_pool.get());
 
-    TradeEngine* trade_engine = new TradeEngine(logger.get(), pool.get(),
-                                                 pool2.get(), response_manager, temp);
+    trade_engine = new TradeEngine(logger.get(), pool.get(), pool2.get(),
+                                   response_manager, temp);
     // trade_engine_ 주입
-    book_ = new MarketOrderBook{"TEST_TICKER", &logger_};
+    book_ = new MarketOrderBook{"BTCUSDT", &logger_};
     book_->set_trade_engine(trade_engine);
   }
 
   void TearDown() override {
     if (book_)
       delete book_;
+    if (trade_engine)
+      delete trade_engine;
+    if (response_manager)
+      delete response_manager;
   }
-
-  std::string symbol = "BTCUSDT";;
 };
 
-// Clear
 TEST_F(MarketOrderBookTest, ClearResetsOrderBookAndUpdatesBBO) {
+  TickerId symbol = "BTCUSDT";
   const MarketData md(MarketUpdateType::kClear, OrderId{kOrderIdInvalid},
-                      symbol,
-                      Side::kBuy, Price{0.0}, Qty{0.0});
+                      symbol, Side::kBuy, Price{0.0}, Qty{0.0});
 
   book_->on_market_data_updated(&md);
 
@@ -75,35 +81,34 @@ TEST_F(MarketOrderBookTest, ClearResetsOrderBookAndUpdatesBBO) {
 
 // Trade
 TEST_F(MarketOrderBookTest, TradeInvokesTradeEngineAndSkipsOrderBookUpdate) {
-
+  TickerId symbol = "BTCUSDT";
   const Price price = Price{100000.00};
   const Qty qty = Qty{5.0};
-  const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                      symbol,
+  const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid}, symbol,
                       Side::kBuy, price, qty);
 
   book_->on_market_data_updated(&md);
 
   const Price trade_price = Price{100000.00};
   const Qty trade_qty = Qty{4.0};
-  const MarketData trade_md = MarketData(MarketUpdateType::kTrade,
-                                         OrderId{kOrderIdInvalid}, symbol,
-                                         Side::kBuy, trade_price, trade_qty);
+  const MarketData trade_md =
+      MarketData(MarketUpdateType::kTrade, OrderId{kOrderIdInvalid}, symbol,
+                 Side::kBuy, trade_price, trade_qty);
   book_->on_market_data_updated(&trade_md);
 
   const BBO* bbo = book_->get_bbo();
   EXPECT_EQ(bbo->bid_price, price);
   EXPECT_EQ(bbo->ask_price, kPriceInvalid);
-  EXPECT_EQ(bbo->bid_qty, qty.value-trade_qty.value);
+  EXPECT_EQ(bbo->bid_qty, qty.value - trade_qty.value);
   EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
 }
 
 // Add
 TEST_F(MarketOrderBookTest, AddOrder) {
+  TickerId symbol = "BTCUSDT";
   const Price price = Price{100000.00};
   const Qty qty = Qty{5.0};
-  const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                      symbol,
+  const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid}, symbol,
                       Side::kBuy, price, qty);
 
   book_->on_market_data_updated(&md);
@@ -116,12 +121,12 @@ TEST_F(MarketOrderBookTest, AddOrder) {
 }
 
 TEST_F(MarketOrderBookTest, AddOrders) {
+  TickerId symbol = "BTCUSDT";
   {
     const Price price = Price{100000.00};
     const Qty qty = Qty{5.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kBuy, price, qty);
+                        symbol, Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
 
@@ -135,8 +140,7 @@ TEST_F(MarketOrderBookTest, AddOrders) {
     const Price price = Price{100001.00};
     const Qty qty = Qty{4.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kBuy, price, qty);
+                        symbol, Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
 
@@ -150,8 +154,7 @@ TEST_F(MarketOrderBookTest, AddOrders) {
     const Price price = Price{100001.00};
     const Qty qty = Qty{3.0};
     const MarketData md(MarketUpdateType::kModify, OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kBuy, price, qty);
+                        symbol, Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
 
@@ -165,8 +168,7 @@ TEST_F(MarketOrderBookTest, AddOrders) {
     const Price price = Price{100001.00};
     const Qty qty = Qty{2.0};
     const MarketData md(MarketUpdateType::kTrade, OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kBuy, price, qty);
+                        symbol, Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
 
@@ -179,12 +181,13 @@ TEST_F(MarketOrderBookTest, AddOrders) {
 }
 
 TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
+
   {
+    TickerId symbol = "BTCUSDT";
     const Price price = Price{100000.00};
     const Qty qty = Qty{5.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kBuy, price, qty);
+                        symbol, Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
 
@@ -195,11 +198,11 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
+    TickerId symbol = "BTCUSDT";
     const Price price = Price{100001.00};
     const Qty qty = Qty{4.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kBuy, price, qty);
+                        symbol, Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
 
@@ -210,11 +213,11 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
+    TickerId symbol = "BTCUSDT";
     const Price price = Price{100001.00};
     const Qty qty = Qty{3.0};
     const MarketData md(MarketUpdateType::kModify, OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kBuy, price, qty);
+                        symbol, Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
 
@@ -225,11 +228,11 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
+    TickerId symbol = "BTCUSDT";
     const Price price = Price{100000.50};
     const Qty qty = Qty{14.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kBuy, price, qty);
+                        symbol, Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
 
@@ -240,11 +243,11 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
+    TickerId symbol = "BTCUSDT";
     const Price price = Price{100000.00};
     const Qty qty = Qty{2.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kSell, price, qty);
+                        symbol, Side::kSell, price, qty);
 
     book_->on_market_data_updated(&md);
 
@@ -255,11 +258,11 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, qty);
   }
   {
+    TickerId symbol = "BTCUSDT";
     const Price price = Price{99999.00};
     const Qty qty = Qty{3.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kSell, price, qty);
+                        symbol, Side::kSell, price, qty);
 
     book_->on_market_data_updated(&md);
 
@@ -270,17 +273,17 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, qty);
   }
   {
+    TickerId symbol = "BTCUSDT";
     const Price price = Price{100001.00};
     const Qty qty = Qty{3.0};
     const MarketData md(MarketUpdateType::kModify, OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kSell, price, qty);
+                        symbol, Side::kSell, price, qty);
 
     book_->on_market_data_updated(&md);
 
     const BBO* bbo = book_->get_bbo();
     EXPECT_EQ(bbo->bid_price, 100001.00);
-    EXPECT_EQ(bbo->ask_price, 99999.00); // previous
+    EXPECT_EQ(bbo->ask_price, 99999.00);  // previous
     EXPECT_EQ(bbo->bid_qty, 3.0);
     EXPECT_EQ(bbo->ask_qty, qty);
   }
@@ -289,11 +292,11 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
 // Delete
 TEST_F(MarketOrderBookTest, DeleteOrder) {
   {
+    TickerId symbol = "BTCUSDT";
     const Price price = Price{100000.00};
     const Qty qty = Qty{5.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kSell, price, qty);
+                        symbol, Side::kSell, price, qty);
     book_->on_market_data_updated(&md);
     const BBO* bbo = book_->get_bbo();
     EXPECT_EQ(bbo->bid_price, kPriceInvalid);
@@ -302,12 +305,12 @@ TEST_F(MarketOrderBookTest, DeleteOrder) {
     EXPECT_EQ(bbo->ask_qty, qty);
   }
   {
+    TickerId symbol = "BTCUSDT";
     const Price cancel_price = Price{100000.00};
     const Qty cancel_qty = Qty{kQtyInvalid};
     const MarketData cancel_md(MarketUpdateType::kCancel,
-                               OrderId{kOrderIdInvalid},
-                               symbol,
-                               Side::kSell, cancel_price, cancel_qty);
+                               OrderId{kOrderIdInvalid}, symbol, Side::kSell,
+                               cancel_price, cancel_qty);
 
     book_->on_market_data_updated(&cancel_md);
     const BBO* bbo = book_->get_bbo();
@@ -319,6 +322,7 @@ TEST_F(MarketOrderBookTest, DeleteOrder) {
 }
 
 TEST_F(MarketOrderBookTest, FindInBucket) {
+  TickerId symbol = "BTCUSDT";
   trading::Bucket b;
   // 모두 비활성
   for (auto& w : b.bitmap)
@@ -330,17 +334,17 @@ TEST_F(MarketOrderBookTest, FindInBucket) {
   b.bitmap[0] = (1ULL << 2);
   b.bitmap[1] = (1ULL << 5);
 
-  EXPECT_EQ(book_->find_in_bucket(&b, false), 2); // lowest → offset 2
-  EXPECT_EQ(book_->find_in_bucket(&b, true), 64 + 5); // highest → offset 69
+  EXPECT_EQ(book_->find_in_bucket(&b, false), 2);      // lowest → offset 2
+  EXPECT_EQ(book_->find_in_bucket(&b, true), 64 + 5);  // highest → offset 69
 }
 
 TEST_F(MarketOrderBookTest, NextActiveIdx) {
   for (int idx : {10, 20, 30}) {
-    Price p = Price
-        {static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
+    TickerId symbol = "BTCUSDT";
+    Price p =
+        Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{1.0};
-    MarketData md{MarketUpdateType::kAdd, OrderId{0},
-                  symbol, Side::kBuy, p, q};
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
     book_->on_market_data_updated(&md);
   }
   const BBO* bbo = book_->get_bbo();
@@ -351,11 +355,12 @@ TEST_F(MarketOrderBookTest, NextActiveIdx) {
   EXPECT_EQ(book_->next_active_idx(true, 10), -1);
 
   for (int idx : {100, 110, 120}) {
-    Price p = Price
-        {static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
+    TickerId symbol = "BTCUSDT";
+    Price p =
+        Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{2.0};
-    MarketData md{MarketUpdateType::kAdd, OrderId{1},
-                  symbol, Side::kSell, p, q};
+    MarketData md{
+        MarketUpdateType::kAdd, OrderId{1}, symbol, Side::kSell, p, q};
     book_->on_market_data_updated(&md);
   }
   EXPECT_EQ(bbo->ask_price, indexToPrice(100));
@@ -366,11 +371,11 @@ TEST_F(MarketOrderBookTest, NextActiveIdx) {
 
 TEST_F(MarketOrderBookTest, NextActiveIdxWithCancel) {
   for (int idx : {10, 20, 30}) {
-    Price p = Price
-        {static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
+    TickerId symbol = "BTCUSDT";
+    Price p =
+        Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{1.0};
-    MarketData md{MarketUpdateType::kAdd, OrderId{0},
-                  symbol, Side::kBuy, p, q};
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
     book_->on_market_data_updated(&md);
   }
   const BBO* bbo = book_->get_bbo();
@@ -381,22 +386,24 @@ TEST_F(MarketOrderBookTest, NextActiveIdxWithCancel) {
   EXPECT_EQ(book_->next_active_idx(true, 10), -1);
 
   for (int idx : {20}) {
-    Price p = Price
-        {static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
+    TickerId symbol = "BTCUSDT";
+    Price p =
+        Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{1.0};
-    MarketData md{MarketUpdateType::kCancel, OrderId{0},
-                  symbol, Side::kBuy, p, q};
+    MarketData md{
+        MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, p, q};
     book_->on_market_data_updated(&md);
   }
   EXPECT_EQ(bbo->bid_price, indexToPrice(30));
   EXPECT_EQ(book_->next_active_idx(true, 30), 10);
 
   for (int idx : {100, 110, 120}) {
-    Price p = Price
-        {static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
+    TickerId symbol = "BTCUSDT";
+    Price p =
+        Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{2.0};
-    MarketData md{MarketUpdateType::kAdd, OrderId{1},
-                  symbol, Side::kSell, p, q};
+    MarketData md{
+        MarketUpdateType::kAdd, OrderId{1}, symbol, Side::kSell, p, q};
     book_->on_market_data_updated(&md);
   }
   EXPECT_EQ(bbo->ask_price, indexToPrice(100));
@@ -407,11 +414,11 @@ TEST_F(MarketOrderBookTest, NextActiveIdxWithCancel) {
 
 TEST_F(MarketOrderBookTest, PeekLevels) {
   for (int idx : {5, 15, 25, 35, 45}) {
-    Price p = Price
-        {static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
+    TickerId symbol = "BTCUSDT";
+    Price p =
+        Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{1.0};
-    MarketData md{MarketUpdateType::kAdd, OrderId{2},
-                  symbol, Side::kBuy, p, q};
+    MarketData md{MarketUpdateType::kAdd, OrderId{2}, symbol, Side::kBuy, p, q};
     book_->on_market_data_updated(&md);
   }
   const BBO* bbo = book_->get_bbo();
@@ -422,11 +429,12 @@ TEST_F(MarketOrderBookTest, PeekLevels) {
   EXPECT_EQ(bids, want_bids);
 
   for (int idx : {200, 210, 220}) {
-    Price p = Price
-        {static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
+    TickerId symbol = "BTCUSDT";
+    Price p =
+        Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{3.0};
-    MarketData md{MarketUpdateType::kAdd, OrderId{3},
-                  symbol, Side::kSell, p, q};
+    MarketData md{
+        MarketUpdateType::kAdd, OrderId{3}, symbol, Side::kSell, p, q};
     book_->on_market_data_updated(&md);
   }
   EXPECT_EQ(bbo->ask_price, indexToPrice(200));

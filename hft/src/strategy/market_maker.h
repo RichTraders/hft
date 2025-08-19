@@ -15,9 +15,17 @@
 #include "strategy.hpp"
 
 namespace trading {
+class FeatureEngine;
+class MarketOrderBook;
+}  // namespace trading
+namespace trading {
 class MarketMaker : public BaseStrategy<MarketMaker> {
-  void on_orderbook_updated(common::TickerId, common::Price, common::Side,
-                            const MarketOrderBook*) noexcept;
+ public:
+  MarketMaker(OrderManager* order_manager, const FeatureEngine* feature_engine,
+              common::Logger* logger,
+              const common::TradeEngineCfgHashMap& ticker_cfg);
+  void on_orderbook_updated(const common::TickerId&, common::Price,
+                            common::Side, const MarketOrderBook*) noexcept;
 
   void on_trade_updated(const MarketData*, MarketOrderBook*) noexcept;
 

@@ -73,7 +73,7 @@ void FixApp<Derived, Cpu>::write_loop() {
     std::string msg;
 
     while (queue_->dequeue(msg)) {
-#ifdef DEBUG
+#ifdef MEASUREMENT
       START_MEASURE(TLS_WRITE);
 #endif
       auto result =
@@ -87,7 +87,7 @@ void FixApp<Derived, Cpu>::write_loop() {
         thread_running_ = false;
         break;
       }
-#ifdef DEBUG
+#ifdef MEASUREMENT
       END_MEASURE(TLS_WRITE, logger_);
 #endif
     }
@@ -99,13 +99,13 @@ template <typename Derived, int Cpu>
 void FixApp<Derived, Cpu>::read_loop() {
   std::string received_buffer;
   while (thread_running_) {
-#ifdef DEBUG
+#ifdef MEASUREMENT
     START_MEASURE(TLS_READ);
 #endif
     std::array<char, kReadBufferSize> buf;
     const int read = tls_sock_->read(buf.data(), buf.size());
 
-#ifdef DEBUG
+#ifdef MEASUREMENT
     END_MEASURE(TLS_READ, logger_);
 #endif
     if (read <= 0) {

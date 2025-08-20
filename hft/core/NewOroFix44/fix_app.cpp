@@ -40,6 +40,8 @@ FixApp<Derived, ReadThreadName, WriteThreadName>::FixApp(const std::string& addr
 template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
 FixApp<Derived, ReadThreadName, WriteThreadName>::~FixApp() {
   thread_running_ = false;
+  write_thread_.join();
+  read_thread_.join();
   logger_->info("Fix write thread finish");
   logger_->info("Fix read thread finish");
 }

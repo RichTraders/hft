@@ -57,6 +57,9 @@ TradeEngine::~TradeEngine() {
   running_ = false;
   response_running_ = false;
 
+  thread_.join();
+  response_thread_.join();
+
   logger_->info("Trade Engine TEMarketData thread finish");
   logger_->info("Trade Engine TEResponse thread finish");
 }

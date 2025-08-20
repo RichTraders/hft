@@ -155,6 +155,7 @@ class Logger {
 
   ~Logger() {
     stop_ = true;
+    worker_.join();
     info("Logger finish");
   }
 

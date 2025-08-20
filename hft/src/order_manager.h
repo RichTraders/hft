@@ -27,18 +27,18 @@ class OrderManager {
 
   void on_order_updated(const ExecutionReport* client_response) noexcept;
 
-  void new_order(Order* order, common::TickerId& ticker_id, common::Price price,
-                 common::Side side, common::Qty qty) noexcept;
+  void new_order(Order* order, const common::TickerId& ticker_id,
+                 common::Price price, common::Side side,
+                 common::Qty qty) noexcept;
 
   void cancel_order(Order* order) noexcept;
 
-  void move_order(Order* order, common::TickerId& ticker_id,
+  void move_order(Order* order, const common::TickerId& ticker_id,
                   common::Price price, common::Side side,
                   common::Qty qty) noexcept;
 
-  void move_orders(const std::vector<Order*>& orders,
-                   common::TickerId& ticker_id, common::Price bid_price,
-                   common::Price ask_price, common::Qty clip) noexcept;
+  void move_order(const common::TickerId& ticker_id, common::Price bid_price,
+                  common::Side side, const common::Qty& qty) noexcept;
 
   static bool isWorking(const OMOrderState state) noexcept {
     return (state == OMOrderState::kLive);
@@ -60,6 +60,12 @@ class OrderManager {
   common::Logger* logger_ = nullptr;
   OMOrderTickerSideHashMap ticker_side_order_;
   common::FastClock fast_clock_;
+
+  Order* find_order(const std::string& ticker, common::Side side,
+                    common::OrderId order_id);
+
+  Order* prepare_order(const std::string& ticker, common::Side side,
+                       bool create_if_missing = true);
 };
 }  // namespace trading
 

@@ -26,13 +26,19 @@ OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
     : trade_engine_(trade_engine),
       risk_manager_(risk_manager),
       logger_(logger),
-      fast_clock_(kCpuHzEstimate, kInterval) {}
+      fast_clock_(kCpuHzEstimate, kInterval) {
+  //TODO(JB): ticker 이름 받아오기
+  ticker_side_order_["BTCUSDT"] = OMOrderSideHashMap{};
+}
 
 void OrderManager::on_order_updated(
     const ExecutionReport* client_response) noexcept {
-  Order* order =
-      &(ticker_side_order_[client_response->symbol][common::sideToIndex(
-          client_response->side)][client_response->cl_order_id]);
+  Order* order = find_order(client_response->symbol, client_response->side,
+                            client_response->cl_order_id);
+  if (UNLIKELY(!order)) {
+    logger_->error("[CRITICAL]Order sent but, No order in the program!!!");
+    return;
+  }
 
   switch (client_response->ord_status) {
     case OrdStatus::kNew: {
@@ -42,8 +48,11 @@ void OrderManager::on_order_updated(
     } break;
     case OrdStatus::kFilled: {
       order->qty = client_response->leaves_qty;
-      if (order->qty.value == 0.)
+      if (order->qty.value == 0.) {
         order->order_state = OMOrderState::kDead;
+      }
+      logger_->info(
+          std::format("Completed order:{}", client_response->toString()));
     } break;
     case OrdStatus::kCanceled: {
       order->order_state = OMOrderState::kDead;
@@ -65,7 +74,7 @@ void OrderManager::on_order_updated(
   }
 }
 
-void OrderManager::new_order(Order* order, common::TickerId& ticker_id,
+void OrderManager::new_order(Order* order, const common::TickerId& ticker_id,
                              common::Price price, common::Side side,
                              common::Qty qty) noexcept {
   const RequestCommon new_request{
@@ -97,7 +106,7 @@ void OrderManager::cancel_order(Order* order) noexcept {
                             order->toString()));
 }
 
-void OrderManager::move_order(Order* order, common::TickerId& ticker_id,
+void OrderManager::move_order(Order* order, const common::TickerId& ticker_id,
                               const common::Price price,
                               const common::Side side,
                               const common::Qty qty) noexcept {
@@ -145,27 +154,76 @@ void OrderManager::move_order(Order* order, common::TickerId& ticker_id,
   }
 }
 
-// NOLINTBEGIN(bugprone-easily-swappable-parameters)
-void OrderManager::move_orders(const std::vector<Order*>& orders,
-                               common::TickerId& ticker_id,
-                               const common::Price bid_price,
-                               const common::Price ask_price,
-                               const common::Qty clip) noexcept {
-  {
-    START_MEASURE(Trading_OrderManager_moveOrder);
-    for (const auto& bid_order : orders) {
-      move_order(bid_order, ticker_id, bid_price, common::Side::kBuy, clip);
-    }
-    END_MEASURE(Trading_OrderManager_moveOrder, logger_);
+void OrderManager::move_order(const common::TickerId& ticker_id,
+                              const common::Price bid_price,
+                              const common::Side side,
+                              const common::Qty& qty) noexcept {
+#ifdef MEASUREMENT
+  START_MEASURE(Trading_OrderManager_moveOrder);
+#endif
+  Order* order = prepare_order(ticker_id, side);
+  if (UNLIKELY(!order)) {
+    logger_->error("No order available!!!");
+    return;
   }
-
-  {
-    START_MEASURE(Trading_OrderManager_moveOrder);
-    for (const auto& ask_order : orders) {
-      move_order(ask_order, ticker_id, ask_price, common::Side::kSell, clip);
-    }
-    END_MEASURE(Trading_OrderManager_moveOrder, logger_);
-  }
+  move_order(order, ticker_id, bid_price, side, qty);
+#ifdef MEASUREMENT
+  END_MEASURE(Trading_OrderManager_moveOrder, logger_);
+#endif
 }
 // NOLINTEND(bugprone-easily-swappable-parameters)
+
+Order* OrderManager::find_order(const std::string& ticker, common::Side side,
+                                common::OrderId order_id) {
+  const auto iter = ticker_side_order_.find(ticker);
+  if (iter == ticker_side_order_.end())
+    return nullptr;
+
+  const auto idx = common::sideToIndex(side);
+  if (idx >= common::sideToIndex(common::Side::kTrade))
+    return nullptr;
+
+  auto& slots = iter->second[static_cast<std::size_t>(idx)];
+  for (auto& ord : slots) {
+    if (ord.order_state == OMOrderState::kDead)
+      continue;
+    if (ord.order_id == order_id)
+      return &ord;
+  }
+  return nullptr;
+}
+
+Order* OrderManager::prepare_order(const std::string& ticker, common::Side side,
+                                   bool create_if_missing) {
+  const auto idx = common::sideToIndex(side);
+  if (idx >= common::sideToIndex(common::Side::kTrade))
+    return nullptr;
+
+  if (create_if_missing) {
+    auto& slots = ticker_side_order_[ticker][static_cast<std::size_t>(idx)];
+    for (auto& ord : slots) {
+      if (ord.order_state == OMOrderState::kDead)
+        return &ord;
+    }
+    for (auto& ord : slots) {
+      if (ord.order_state == OMOrderState::kInvalid)
+        return &ord;
+    }
+    return nullptr;
+  }
+  const auto iter = ticker_side_order_.find(ticker);
+  if (iter == ticker_side_order_.end())
+    return nullptr;
+
+  auto& slots = iter->second[static_cast<std::size_t>(idx)];
+  for (auto& ord : slots) {
+    if (ord.order_state == OMOrderState::kDead)
+      return &ord;
+  }
+  for (auto& ord : slots) {
+    if (ord.order_state == OMOrderState::kInvalid)
+      return &ord;
+  }
+  return nullptr;
+}
 }  // namespace trading

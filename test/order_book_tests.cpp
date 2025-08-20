@@ -9,35 +9,38 @@
  * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
-#include "gtest/gtest.h"
-#include "trade_engine.h"
-#include "order_book.h"
 #include "../hft/core/NewOroFix44/response_manager.h"
+#include "gtest/gtest.h"
+#include "order_book.h"
+#include "trade_engine.h"
 
 using namespace trading;
 using namespace common;
 
 class MarketOrderBookTest : public ::testing::Test {
-protected:
+ protected:
   Logger logger_;
   MarketOrderBook* book_;
   ResponseManager* response_manager_;
   TradeEngine* trade_engine_;
 
   void SetUp() override {
-
     TradeEngineCfgHashMap temp;
-    TradeEngineCfg tempcfg;
+    RiskCfg risk = {.max_order_size_ = Qty{1000.},
+                    .max_position_ = Qty{1000.},
+                    .max_loss_ = 1000.};
+    TradeEngineCfg tempcfg = {
+        .clip_ = Qty{100000}, .threshold_ = 10, .risk_cfg_ = risk};
     temp.emplace("BTCUSDT", tempcfg);
     auto pool = std::make_unique<MemoryPool<MarketUpdateData>>(4096);
     auto pool2 = std::make_unique<MemoryPool<MarketData>>(4096);
 
-    auto execution_report_pool = std::make_unique<MemoryPool<
-      ExecutionReport>>(1024);
-    auto order_cancel_reject_pool = std::make_unique<MemoryPool<
-      OrderCancelReject>>(1024);
-    auto order_mass_cancel_report_pool = std::make_unique<MemoryPool<
-      OrderMassCancelReport>>(1024);
+    auto execution_report_pool =
+        std::make_unique<MemoryPool<ExecutionReport>>(1024);
+    auto order_cancel_reject_pool =
+        std::make_unique<MemoryPool<OrderCancelReject>>(1024);
+    auto order_mass_cancel_report_pool =
+        std::make_unique<MemoryPool<OrderMassCancelReport>>(1024);
 
     auto logger = std::make_unique<Logger>();
     response_manager_ = new ResponseManager(
@@ -47,7 +50,7 @@ protected:
     trade_engine_ = new TradeEngine(logger.get(), pool.get(),
                                                  pool2.get(), response_manager_, temp);
     // trade_engine_ 주입
-    book_ = new MarketOrderBook{"TEST_TICKER", &logger_};
+    book_ = new MarketOrderBook{"BTCUSDT", &logger_};
     book_->set_trade_engine(trade_engine_);
   }
 
@@ -61,11 +64,8 @@ protected:
     if (book_)
       delete book_;
   }
-
-  std::string symbol = "BTCUSDT";;
 };
 
-// Clear
 TEST_F(MarketOrderBookTest, ClearResetsOrderBookAndUpdatesBBO) {
   TickerId symbol = "BTCUSDT";
   const MarketData md(MarketUpdateType::kClear, OrderId{kOrderIdInvalid},

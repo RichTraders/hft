@@ -55,7 +55,7 @@ void MarketConsumer::stop() {
 void MarketConsumer::on_login(FIX8::Message*) const {
   logger_->info("login successful");
   const std::string message = app_->create_market_data_subscription_message(
-      "DEPTH_STREAM", "1000", "BTCUSDT");
+      "DEPTH_STREAM", "5000", "BTCUSDT");
   app_->send(message);
   logger_->info("sent order message");
 }

@@ -84,6 +84,7 @@ int main() {
     auto engine = std::make_unique<trading::TradeEngine>(
         logger.get(), market_update_data_pool.get(), market_data_pool.get(),
         response_manager.get(), config_map);
+    engine->init_order_gateway(order_gateway.get());
 
     const trading::MarketConsumer consumer(
         logger.get(), engine.get(), market_update_data_pool.get(),
@@ -92,9 +93,9 @@ int main() {
     std::unique_ptr<common::CpuManager> cpu_manager =
         std::make_unique<common::CpuManager>(logger.get());
 
-    std::string cpu_init_resulit;
-    if (cpu_manager->init_cpu_group(cpu_init_resulit)) {
-      logger->info("failed to init cpu group" + cpu_init_resulit);
+    std::string cpu_init_result;
+    if (cpu_manager->init_cpu_group(cpu_init_result)) {
+      logger->info("failed to init cpu group" + cpu_init_result);
       return -1;
     }
 

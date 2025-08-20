@@ -3,6 +3,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(cmake/googletest.cmake)
 
 enable_testing()
+set(TEST_TARGETS "")
+
+set(TEST_RUNTIME_DIR "${CMAKE_BINARY_DIR}/test")
+
+set(RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
+file(MAKE_DIRECTORY "${TEST_RUNTIME_DIR}")
+file(COPY "${RESOURCE_DIR}" DESTINATION "${TEST_RUNTIME_DIR}")
 
 macro(add_unit_test _TEST_NAME)
     add_executable(${_TEST_NAME}_tests ${_TEST_NAME}_tests.cpp)
@@ -21,6 +28,8 @@ macro(add_unit_test _TEST_NAME)
     add_test(NAME ${_TEST_NAME}_tests COMMAND ${_TEST_NAME}_tests WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test)
     target_compile_definitions(${_TEST_NAME}_tests PRIVATE UNIT_TEST)
     target_compile_options(${_TEST_NAME}_tests PRIVATE -Wno-missing-field-initializers -Wno-error=unused-parameter)
+
+    list(APPEND TEST_TARGETS ${_TEST_NAME}_tests)
 endmacro()
 
 add_definitions(-DGOOGLEMOCK_INCLUDE_GMOCK_INTERNAL_GMOCK_GENERATED_FUNCTION_MOCKER_H_)
@@ -41,13 +50,10 @@ add_unit_test(order_gateway)
 add_unit_test(fix_md_app)
 add_unit_test(cpu_priority)
 
-set(RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
-file(COPY ${RESOURCE_DIR} DESTINATION ${CMAKE_BINARY_DIR}/test)
 file(COPY set_cpu.sh DESTINATION ${CMAKE_BINARY_DIR}/test)
 
-file(GLOB TEST_EXECUTABLES "${CMAKE_BINARY_DIR}/tests/*_tests")
-
 add_custom_target(RUN_ALL_TESTS
-        COMMAND sudo ${CMAKE_CTEST_COMMAND} --output-on-failure
-        DEPENDS ${TEST_EXECUTABLES}
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -C $<CONFIG>
+        WORKING_DIRECTORY "${TEST_RUNTIME_DIR}"
+        DEPENDS ${TEST_TARGETS}
 )

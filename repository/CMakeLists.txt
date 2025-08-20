@@ -63,6 +63,18 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(abseil)
+set(_no_ignored_attr
+        $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:-Wno-ignored-attributes -Wno-error=ignored-attributes>)
+
+if (TARGET absl_crc32c)
+    target_compile_options(absl_crc32c PRIVATE ${_no_ignored_attr})
+endif()
+
+foreach(t IN ITEMS absl_crc_internal absl_crc_cpu_detect)
+    if (TARGET ${t})
+        target_compile_options(${t} PRIVATE ${_no_ignored_attr})
+    endif()
+endforeach()
 
 file(GLOB_RECURSE LIB_SRC_FILES
         "${CMAKE_SOURCE_DIR}/hft/common/*.cpp"

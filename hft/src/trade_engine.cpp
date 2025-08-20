@@ -20,6 +20,8 @@
 #include "response_manager.h"
 #include "risk_manager.h"
 
+#include "strategy/market_maker.h"
+
 constexpr std::size_t kCapacity = 64;
 
 namespace trading {
@@ -49,6 +51,9 @@ TradeEngine::TradeEngine(
   orderbook->set_trade_engine(this);
   ticker_order_book_.insert({"BTCUSDT", std::move(orderbook)});
 
+  strategy_ = std::make_unique<MarketMaker>(
+      order_manager_.get(), feature_engine_.get(), logger_, ticker_cfg);
+
   thread_.start(&TradeEngine::run, this);
   response_thread_.start(&TradeEngine::response_run, this);
 }
@@ -77,19 +82,23 @@ void TradeEngine::stop() {
   response_running_ = false;
 }
 
-void TradeEngine::on_order_book_updated(common::Price price, common::Side side,
-                                        MarketOrderBook* order_book) const {
+void TradeEngine::on_orderbook_updated(const common::TickerId& ticker,
+                                       common::Price price, common::Side side,
+                                       MarketOrderBook* order_book) const {
   feature_engine_->on_order_book_updated(price, side, order_book);
+  strategy_->on_orderbook_updated(ticker, price, side, order_book);
 }
 
 void TradeEngine::on_trade_updated(const MarketData* market_data,
                                    MarketOrderBook* order_book) const {
   feature_engine_->on_trade_updated(market_data, order_book);
+  strategy_->on_trade_updated(market_data, order_book);
 }
 
 void TradeEngine::on_order_updated(
     const ExecutionReport* report) const noexcept {
   position_keeper_->add_fill(report);
+  strategy_->on_order_updated(report);
 }
 
 void TradeEngine::enqueue_response(const ResponseCommon& response) {
@@ -104,7 +113,9 @@ void TradeEngine::run() {
   while (running_) {
     MarketUpdateData* message;
     while (queue_->dequeue(message)) {
+#ifdef MEASUREMENT
       START_MEASURE(MAKE_ORDERBOOK);
+#endif
       for (auto& market_data : message->data) {
         ticker_order_book_[market_data->ticker_id]->on_market_data_updated(
             market_data);
@@ -114,7 +125,9 @@ void TradeEngine::run() {
       if (message) {
         market_update_data_pool_->deallocate(message);
       }
+#ifdef MEASUREMENT
       END_MEASURE(MAKE_ORDERBOOK, logger_);
+#endif
     }
     std::this_thread::yield();
   }
@@ -124,7 +137,9 @@ void TradeEngine::response_run() {
   while (response_running_) {
     ResponseCommon response;
     while (response_queue_->dequeue(response)) {
+#ifdef MEASUREMENT
       START_MEASURE(RESPONSE_COMMON);
+#endif
       switch (response.res_type) {
         case ResponseType::kExecutionReport:
           on_order_updated(response.execution_report);
@@ -145,8 +160,9 @@ void TradeEngine::response_run() {
         default:
           break;
       }
-
+#ifdef MEASUREMENT
       END_MEASURE(RESPONSE_COMMON, logger_);
+#endif
     }
     std::this_thread::yield();
   }

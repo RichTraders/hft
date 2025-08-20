@@ -57,10 +57,8 @@ TradeEngine::~TradeEngine() {
   running_ = false;
   response_running_ = false;
 
-  logger_->info("Trade Engine TEMarketData thread finixh" +
-                std::to_string(thread_.join()));
-  logger_->info("Trade Engine TEResponse thread finixh" +
-                std::to_string(response_thread_.join()));
+  logger_->info("Trade Engine TEMarketData thread finish");
+  logger_->info("Trade Engine TEResponse thread finish");
 }
 
 void TradeEngine::init_order_gateway(OrderGateway* order_gateway) {

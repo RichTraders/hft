@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "global.h"
 
 namespace common {
 template <typename F, typename... Args>
@@ -67,15 +67,15 @@ class Thread {
     if (err) {
       delete ctx;
       ctx = nullptr;
-      return false;
+      return true;
     }
 
-    constexpr std::string_view kName{Name.v, sizeof(Name.v) - 1};
+    constexpr std::string_view kName{Name.name, sizeof(Name.name) - 1};
     set_thread_name(kName.data());
-    return true;
+    return false;
   }
-
-  [[nodiscard]] int join() const {
+  // NOLINTNEXTLINE(modernize-use-nodiscard)
+  [[maybe_unused]] int join() const {
     void* ret = nullptr;
 
     if (tid_) {

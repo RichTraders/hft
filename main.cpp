@@ -27,7 +27,7 @@ constexpr int kMarketDataPoolSize = 16384;
 int main() {
   try {
     IniConfig config;
-#ifndef TEST_NET
+#ifdef TEST_NET
     config.load("resources/test_config.ini");
 #else
     config.load("resources/config.ini");
@@ -108,7 +108,7 @@ int main() {
 
   constexpr int kSleepCount = 10;
   while (true)
-    sleep(kSleepCount);  // 얘 어떻게 무한 루프 돌아야할 지 확인 필요
+    sleep(kSleepCount);  // TODO(neworo2):
 
   return 0;
 }

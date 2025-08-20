@@ -89,13 +89,13 @@ private:
 TEST(ThreadTest, NormalTest) {
   ThreadNormalTest thread;
 
-  EXPECT_TRUE(thread.start());
+  EXPECT_FALSE(thread.start());
 }
 
 TEST(ThreadTest, ThreadNameTest) {
   ThreadNameTest thread;
 
-  EXPECT_TRUE(thread.start());
+  EXPECT_FALSE(thread.start());
 
   std::string name = "thread_test";
 
@@ -110,7 +110,7 @@ TEST(ThreadTest, ThreadJoinTest) {
   ThreadJoinTest thread;
   constexpr int input = 100;
 
-  EXPECT_TRUE(thread.start(input));
+  EXPECT_FALSE(thread.start(input));
 
   int s = thread.join();
 

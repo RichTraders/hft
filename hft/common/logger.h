@@ -155,7 +155,7 @@ class Logger {
 
   ~Logger() {
     stop_ = true;
-    info("Logger finish: " + std::to_string(worker_.join()));
+    info("Logger finish");
   }
 
   void setLevel(LogLevel lvl) { level_.store(lvl, std::memory_order_relaxed); }

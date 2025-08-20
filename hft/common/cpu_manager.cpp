@@ -23,6 +23,8 @@ CpuManager::CpuManager(Logger* logger) {
   cfg.load("resources/config.ini");
 
   const int cpu_use_count = cfg.get_int("cpu_id", "count");
+  use_cpu_group_ = static_cast<bool>(cfg.get_int("cpu_id", "use_cpu_group"));
+  use_cpu_to_tid_ = static_cast<bool>(cfg.get_int("cpu_id", "use_cpu_to_tid"));
 
   for (int i = 0; i < cpu_use_count; i++) {
     CpuInfo info;
@@ -64,6 +66,10 @@ CpuManager::~CpuManager() {
 }
 
 bool CpuManager::init_cpu_to_tid() {
+  if (!use_cpu_to_tid_) {
+    return true;
+  }
+
   for (const auto& info : thread_info_list_) {
     const int value = info.second.value;
     const uint8_t cpu_id = info.second.cpu_id;
@@ -116,7 +122,11 @@ int CpuManager::get_tid(const std::string& thread_name) {
   return thread_info->second.tid;
 }
 
-int CpuManager::init_cpu_group(std::string& result) {
+int CpuManager::init_cpu_group(std::string& result) const {
+  if (!use_cpu_group_) {
+    return 1;
+  }
+
   if (setup(result)) {
     return 1;
   }
@@ -124,25 +134,25 @@ int CpuManager::init_cpu_group(std::string& result) {
   result.clear();
 
   if (part_fix(result)) {
-    return 2;
+    return 1;
   }
 
   result.clear();
 
   if (overlap(result)) {
-    return 3;
+    return 1;
   }
 
   result.clear();
 
   if (verify(result)) {
-    return 4;
+    return 1;
   }
 
   result.clear();
 
   if (attach(getpid(), result))
-    return -1;
+    return 1;
 
   return 0;
 }

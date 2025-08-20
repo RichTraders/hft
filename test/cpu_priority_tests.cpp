@@ -84,6 +84,15 @@ TEST(CpuPriorityTest, CpuSetting) {
   EXPECT_EQ(pol_3, 1);
 }
 
+TEST(CpuPriorityTest, CpuGroupAndTidTest) {
+  auto logger = std::make_unique<Logger>();
+  CpuManager cpu(logger.get());
+
+  std::string result;
+  EXPECT_FALSE(cpu.init_cpu_group(result));
+  EXPECT_FALSE(cpu.init_cpu_to_tid());
+}
+
 TEST(CpuPriorityTest, DISABLED_CpuSettingWithoutIRQL) {
   common::Thread<"test_0"> test_thread_0;
   common::Thread<"test_1"> test_thread_1;

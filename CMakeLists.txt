@@ -20,3 +20,4 @@ add_subdirectory(test)
 
 set(RESOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 file(COPY ${RESOURCES_DIR} DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY set_cpu.sh DESTINATION ${CMAKE_BINARY_DIR})

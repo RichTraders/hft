@@ -156,6 +156,7 @@ class Logger {
   ~Logger() {
     stop_ = true;
     worker_.join();
+    info("Logger finish");
   }
 
   void setLevel(LogLevel lvl) { level_.store(lvl, std::memory_order_relaxed); }
@@ -189,9 +190,9 @@ class Logger {
   MPSCSegQueue<LogMessage, static_cast<int>(QueueChunkSize::kDefaultSize)>
       queue_;
 #ifdef UNIT_TEST
-  Thread<NormalTag> worker_;
+  Thread<"Logger"> worker_;
 #else
-  Thread<PriorityTag<static_cast<int>(PriorityLevel::kPercent80)>> worker_;
+  Thread<"Logger"> worker_;
 #endif
   std::atomic<bool> stop_{false};
 };

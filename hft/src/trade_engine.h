@@ -60,8 +60,8 @@ class TradeEngine {
   ResponseManager* response_manager_;
   OrderGateway* order_gateway_;
   std::unique_ptr<common::SPSCQueue<MarketUpdateData*>> queue_;
-  common::Thread<common::AffinityTag<2>, common::PriorityTag<1>> thread_;
-  common::Thread<common::NormalTag> response_thread_;
+  common::Thread<"TEMarketData"> thread_;
+  common::Thread<"TEResponse"> response_thread_;
   std::unique_ptr<common::SPSCQueue<ResponseCommon>> response_queue_;
   MarketOrderBookHashMap ticker_order_book_;
 

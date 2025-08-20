@@ -25,7 +25,7 @@ class ResponseManager;
 
 namespace core {
 
-class FixOrderEntryApp : public FixApp<FixOrderEntryApp, 3> {
+class FixOrderEntryApp : public FixApp<FixOrderEntryApp, "OERead", "OEWrite"> {
 public:
   FixOrderEntryApp(const Authorization& authorization,
                    const std::string& sender_comp_id,

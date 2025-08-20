@@ -73,6 +73,15 @@ class IniConfig {
     }
   }
 
+  uint64_t get_uint64_t(const std::string_view section,
+                        const std::string_view key, const int def = 0) const {
+    try {
+      return std::stoull(get(section, key));
+    } catch (...) {
+      return def;
+    }
+  }
+
   double get_double(const std::string_view section, const std::string_view key,
                     const double def = 0.0) const {
     try {

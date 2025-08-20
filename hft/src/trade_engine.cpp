@@ -59,6 +59,9 @@ TradeEngine::~TradeEngine() {
 
   thread_.join();
   response_thread_.join();
+
+  logger_->info("Trade Engine TEMarketData thread finish");
+  logger_->info("Trade Engine TEResponse thread finish");
 }
 
 void TradeEngine::init_order_gateway(OrderGateway* order_gateway) {

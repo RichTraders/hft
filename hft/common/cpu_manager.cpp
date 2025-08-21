@@ -48,7 +48,14 @@ CpuManager::CpuManager(Logger* logger) {
     const std::string thread_name = cfg.get(thread_id, "name");
 
     info.cpu_id = static_cast<uint8_t>(cfg.get_int(thread_id, "cpu_id"));
-    if (info.cpu_id <= SCHED_RR) {
+
+    const auto& iter = cpu_info_list_.find(info.cpu_id);
+
+    if (iter == cpu_info_list_.end()) {
+      logger_->error("[Init] failed to get cpu_id info");
+    }
+
+    if (iter->second.type <= SCHED_RR) {
       info.value = cfg.get_int(thread_id, "prio");
     } else {
       info.value = cfg.get_int(thread_id, "nicev");

@@ -44,9 +44,12 @@ MarketConsumer::MarketConsumer(
       "5", [this](auto&& msg) { on_logout(std::forward<decltype(msg)>(msg)); });
 
   app_->start();
+  logger_->info("MarketConsumer Created");
 }
 
-MarketConsumer::~MarketConsumer() = default;
+MarketConsumer::~MarketConsumer() {
+  logger_->info("MarketConsumer Destory");
+}
 
 void MarketConsumer::stop() {
   app_->stop();

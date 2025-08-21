@@ -56,6 +56,7 @@ TradeEngine::TradeEngine(
 
   thread_.start(&TradeEngine::run, this);
   response_thread_.start(&TradeEngine::response_run, this);
+  logger_->info("TradeEngine Created");
 }
 
 TradeEngine::~TradeEngine() {
@@ -67,6 +68,7 @@ TradeEngine::~TradeEngine() {
 
   logger_->info("Trade Engine TEMarketData thread finish");
   logger_->info("Trade Engine TEResponse thread finish");
+  logger_->info("TradeEngine Destroy");
 }
 
 void TradeEngine::init_order_gateway(OrderGateway* order_gateway) {

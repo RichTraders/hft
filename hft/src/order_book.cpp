@@ -44,10 +44,12 @@ MarketOrderBook::MarketOrderBook(const TickerId& ticker_id,
       bid_bucket_pool_(
           std::make_unique<common::MemoryPool<Bucket>>(kBucketPoolSize)),
       ask_bucket_pool_(
-          std::make_unique<common::MemoryPool<Bucket>>(kBucketPoolSize)) {}
+          std::make_unique<common::MemoryPool<Bucket>>(kBucketPoolSize)) {
+  logger_->info("MarketOrderBook Created");
+}
 
 MarketOrderBook::~MarketOrderBook() {
-  logger_->info("MarketOrderBook::~MarketOrderBook");
+  logger_->info("MarketOrderBook Destory");
 
   trade_engine_ = nullptr;
   logger_ = nullptr;

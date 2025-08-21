@@ -50,7 +50,7 @@ public:
   using MarketDepthLevel = std::string;
   using SymbolId = std::string;
 
-  int start();
+  bool start();
 
   void stop();
 

@@ -23,4 +23,8 @@ RiskManager::RiskManager(common::Logger* logger,
                                      ticker_cfg.at(ticker).risk_cfg_);
   logger_->info("RiskManager Created");
 }
+
+RiskManager::~RiskManager() {
+  logger_->info("RiskManager Destroy");
+}
 }  // namespace trading

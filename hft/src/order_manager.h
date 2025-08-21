@@ -24,7 +24,7 @@ class OrderManager {
  public:
   OrderManager(common::Logger* logger, TradeEngine* trade_engine,
                RiskManager& risk_manager);
-
+  ~OrderManager();
   void on_order_updated(const ExecutionReport* client_response) noexcept;
 
   void new_order(Order* order, const common::TickerId& ticker_id,

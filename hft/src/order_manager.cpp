@@ -29,6 +29,10 @@ OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
       fast_clock_(kCpuHzEstimate, kInterval) {
   //TODO(JB): ticker 이름 받아오기
   ticker_side_order_["BTCUSDT"] = OMOrderSideHashMap{};
+  logger_->info("OrderManager Construct");
+}
+OrderManager::~OrderManager() {
+  logger_->info("OrderManager Destroy");
 }
 
 void OrderManager::on_order_updated(

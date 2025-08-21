@@ -41,10 +41,16 @@ OrderGateway::OrderGateway(const Authorization& authorization,
   app_->register_callback(
       "5", [this](auto&& msg) { on_logout(std::forward<decltype(msg)>(msg)); });
 
-  app_->start();
+  if (!app_->start()) {
+    logger_->info("Fix Order Entry Start");
+  }
+
+  logger_->info("OrderGateway Constructor");
 }
 
-OrderGateway::~OrderGateway() = default;
+OrderGateway::~OrderGateway() {
+  logger_->info("OrderGateway Destroy");
+}
 
 void OrderGateway::stop() {
   app_->stop();

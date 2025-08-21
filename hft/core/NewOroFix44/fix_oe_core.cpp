@@ -31,7 +31,13 @@ FixOeCore::FixOeCore(SendId sender_comp_id, TargetId target_comp_id,
     target_comp_id_(std::move(target_comp_id)),
     logger_(logger),
     response_manager_(response_manager),
-    authorization_(authorization) {}
+    authorization_(authorization) {
+  logger_->info("FixOeCore Created");
+}
+
+FixOeCore::~FixOeCore() {
+  logger_->info("FixOeCore Destroy");
+}
 
 std::string FixOeCore::create_log_on_message(const std::string& sig_b64,
                                              const std::string& timestamp) {

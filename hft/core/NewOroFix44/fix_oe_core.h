@@ -50,6 +50,9 @@ public:
             TargetId target_comp_id,
             common::Logger* logger, trading::ResponseManager* response_manager,
             const Authorization& authorization);
+
+  ~FixOeCore();
+
   std::string create_log_on_message(
       const std::string& sig_b64, const std::string& timestamp);
   std::string create_log_out_message();

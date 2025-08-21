@@ -44,14 +44,14 @@ class TradeEngine {
   void init_order_gateway(OrderGateway* order_gateway);
 
   void stop();
-  void on_market_data_updated(MarketUpdateData* data) const;
+  bool on_market_data_updated(MarketUpdateData* data) const;
   void on_orderbook_updated(const common::TickerId& ticker, common::Price price,
                             common::Side side,
                             MarketOrderBook* market_order_book) const;
   void on_trade_updated(const MarketData* market_data,
                         MarketOrderBook* order_book) const;
   void on_order_updated(const ExecutionReport* report) const noexcept;
-  void enqueue_response(const ResponseCommon& response);
+  bool enqueue_response(const ResponseCommon& response);
 
   void send_request(const RequestCommon& request);
 

@@ -75,8 +75,8 @@ void TradeEngine::init_order_gateway(OrderGateway* order_gateway) {
   order_gateway_ = order_gateway;
 }
 
-void TradeEngine::on_market_data_updated(MarketUpdateData* data) const {
-  queue_->enqueue(data);
+bool TradeEngine::on_market_data_updated(MarketUpdateData* data) const {
+  return queue_->enqueue(data);
 }
 
 void TradeEngine::stop() {
@@ -103,8 +103,8 @@ void TradeEngine::on_order_updated(
   strategy_->on_order_updated(report);
 }
 
-void TradeEngine::enqueue_response(const ResponseCommon& response) {
-  response_queue_->enqueue(response);
+bool TradeEngine::enqueue_response(const ResponseCommon& response) {
+  return response_queue_->enqueue(response);
 }
 
 void TradeEngine::send_request(const RequestCommon& request) {

@@ -71,7 +71,9 @@ void OrderGateway::on_execution_report(
   res.execution_report = app_->create_execution_report_message(msg);
   trade_engine_->enqueue_response(res);
 
-  logger_->info("on_execution_report");
+  if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
+    logger_->info("[Order_Gateway] on_execution_report failed");
+  }
 }
 
 void OrderGateway::on_order_cancel_reject(
@@ -81,7 +83,9 @@ void OrderGateway::on_order_cancel_reject(
   res.order_cancel_reject = app_->create_order_cancel_reject_message(msg);
   trade_engine_->enqueue_response(res);
 
-  logger_->info("on_order_cancel_reject");
+  if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
+    logger_->info("[Order_Gateway] on_order_cancel_reject failed");
+  }
 }
 
 void OrderGateway::on_order_mass_cancel_report(
@@ -90,9 +94,10 @@ void OrderGateway::on_order_mass_cancel_report(
   res.res_type = ResponseType::kOrderMassCancelReport;
   res.order_mass_cancel_report =
       app_->create_order_mass_cancel_report_message(msg);
-  trade_engine_->enqueue_response(res);
 
-  logger_->info("on_order_mass_cancel_report");
+  if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
+    logger_->info("[Order_Gateway] on_order_mass_cancel_report failed");
+  }
 }
 
 void OrderGateway::on_order_mass_status_response(FIX8::Message* msg) {
@@ -102,12 +107,17 @@ void OrderGateway::on_order_mass_status_response(FIX8::Message* msg) {
 
 void OrderGateway::on_logout(FIX8::Message*) {
   auto message = app_->create_log_out_message();
-  app_->send(message);
+  if (UNLIKELY(!app_->send(message))) {
+    logger_->info("[Order_Gateway] on_logout failed");
+  }
 }
 
 void OrderGateway::on_heartbeat(FIX8::Message* msg) {
   auto message = app_->create_heartbeat_message(msg);
-  app_->send(message);
+
+  if (UNLIKELY(!app_->send(message))) {
+    logger_->info("[Order_Gateway] on_heartbeat failed");
+  }
 }
 
 void OrderGateway::order_request(const RequestCommon& request) {
@@ -143,7 +153,10 @@ void OrderGateway::new_single_order_data(const RequestCommon& request) {
       .self_trade_prevention_mode = request.self_trade_prevention_mode};
 
   const std::string msg = app_->create_order_message(order_data);
-  app_->send(msg);
+
+  if (UNLIKELY(!app_->send(msg))) {
+    logger_->info("[Order_Gateway] new_single_order_data failed");
+  }
 }
 
 void OrderGateway::order_cancel_request(const RequestCommon& request) {
@@ -153,7 +166,10 @@ void OrderGateway::order_cancel_request(const RequestCommon& request) {
       .symbol = request.symbol};
 
   const std::string msg = app_->create_cancel_order_message(cancel_request);
-  app_->send(msg);
+
+  if (UNLIKELY(!app_->send(msg))) {
+    logger_->info("[Order_Gateway] order_cancel_request failed");
+  }
 }
 
 void OrderGateway::order_cancel_request_and_new_order_single(
@@ -171,7 +187,10 @@ void OrderGateway::order_cancel_request_and_new_order_single(
 
   const std::string msg =
       app_->create_cancel_and_reorder_message(cancel_and_reorder);
-  app_->send(msg);
+
+  if (UNLIKELY(!app_->send(msg))) {
+    logger_->info("[Order_Gateway] create_cancel_and_reorder_message failed");
+  }
 }
 
 void OrderGateway::order_mass_cancel_request(const RequestCommon& request) {
@@ -179,7 +198,10 @@ void OrderGateway::order_mass_cancel_request(const RequestCommon& request) {
       .cl_order_id = request.cl_order_id, .symbol = request.symbol};
 
   const std::string msg = app_->create_order_all_cancel(all_cancel_request);
-  app_->send(msg);
+
+  if (UNLIKELY(!app_->send(msg))) {
+    logger_->info("[Order_Gateway] order_mass_cancel_request failed");
+  }
 }
 
 }  // namespace trading

@@ -59,20 +59,28 @@ void MarketConsumer::on_login(FIX8::Message*) const {
   logger_->info("login successful");
   const std::string message = app_->create_market_data_subscription_message(
       "DEPTH_STREAM", "5000", "BTCUSDT");
-  app_->send(message);
-  logger_->info("sent order message");
+
+  if (UNLIKELY(!app_->send(message))) {
+    logger_->info("sent order message");
+  }
 }
 
 void MarketConsumer::on_snapshot(FIX8::Message* msg) const {
   auto* snapshot_data = market_update_data_pool_->allocate(
       app_->create_snapshot_data_message(msg));
-  trade_engine_->on_market_data_updated(snapshot_data);
+
+  if (UNLIKELY(!trade_engine_->on_market_data_updated(snapshot_data))) {
+    logger_->info("[MarketConsumer] on_market_data_updated failed");
+  }
 }
 
 void MarketConsumer::on_subscribe(FIX8::Message* msg) const {
   auto* data =
       market_update_data_pool_->allocate(app_->create_market_data_message(msg));
-  trade_engine_->on_market_data_updated(data);
+
+  if (UNLIKELY(!trade_engine_->on_market_data_updated(data))) {
+    logger_->info("[MarketConsumer] on_subsribe failed");
+  }
 }
 
 void MarketConsumer::on_reject(FIX8::Message*) const {
@@ -85,6 +93,8 @@ void MarketConsumer::on_logout(FIX8::Message*) const {
 
 void MarketConsumer::on_heartbeat(FIX8::Message* msg) const {
   auto message = app_->create_heartbeat_message(msg);
-  app_->send(message);
+  if (UNLIKELY(!app_->send(message))) {
+    logger_->info("[MarketConsumer] on_heartbeat failed");
+  }
 }
 }  // namespace trading

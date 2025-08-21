@@ -176,6 +176,7 @@ void OrderGateway::order_cancel_request_and_new_order_single(
     const RequestCommon& request) {
   const OrderCancelRequestAndNewOrderSingle cancel_and_reorder{
       .order_cancel_request_and_new_order_single_mode = 1,
+      .cancel_order_id = request.orig_cl_order_id,
       .cl_order_id = request.cl_order_id,
       .symbol = request.symbol,
       .side = to_common_side(request.side),

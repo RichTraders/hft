@@ -65,14 +65,13 @@ int main() {
             kResponseMemoryPoolSize);
 
     common::TradeEngineCfgHashMap config_map;
-    config_map["BTCUSDT"] = {.clip_ = common::Qty{0},
-                             .threshold_ = 0,
-                             .risk_cfg_ = common::RiskCfg(
-                                 common::Qty{static_cast<float>(
-                                     config.get_int("risk", "max_order_size"))},
-                                 common::Qty{static_cast<float>(
-                                     config.get_int("risk", "max_position"))},
-                                 config.get_int("risk", "max_loss"))};
+    config_map["BTCUSDT"] = {
+        .clip_ = common::Qty{0},
+        .threshold_ = 0,
+        .risk_cfg_ = common::RiskCfg(
+            common::Qty{config.get_double("risk", "max_order_size")},
+            common::Qty{config.get_double("risk", "max_position")},
+            config.get_double("risk", "max_loss"))};
 
     auto response_manager = std::make_unique<trading::ResponseManager>(
         logger.get(), execution_report_pool.get(),

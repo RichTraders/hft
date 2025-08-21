@@ -15,6 +15,7 @@
 #include "order_book.h"
 #include "order_entry.h"
 
+using common::oppIndex;
 using common::Qty;
 using common::Side;
 using common::sideToIndex;
@@ -22,18 +23,20 @@ using common::sideToIndex;
 namespace trading {
 std::string PositionInfo::toString() const {
   std::ostringstream stream;
+  const double vwap_buy =
+      (position_ != 0.0)
+          ? open_vwap_[sideToIndex(Side::kBuy)] / std::abs(position_)
+          : 0.0;
+  const double vwap_sell =
+      (position_ != 0.0)
+          ? open_vwap_[sideToIndex(Side::kSell)] / std::abs(position_)
+          : 0.0;
+
   stream << "Position{" << "pos:" << position_ << " u-pnl:" << unreal_pnl_
          << " r-pnl:" << real_pnl_ << " t-pnl:" << total_pnl_
-         << " vol:" << common::toString(volume_) << " vwaps:["
-         << (position_ == 0. ? open_vwap_.at(sideToIndex(common::Side::kBuy)) /
-                                   std::abs(position_)
-                             : 0)
-         << "X"
-         << (position_ == 0.
-                 ? open_vwap_.at(common::sideToIndex(common::Side::kSell)) /
-                       std::abs(position_)
-                 : 0)
-         << "] " << (bbo_ ? bbo_->toString() : "") << "}";
+         << " vol:" << common::toString(volume_) << " vwaps:[" << " vwaps:["
+         << vwap_buy << "X" << vwap_sell << "] "
+         << (bbo_ ? bbo_->toString() : "") << "}";
 
   return stream.str();
 }
@@ -41,33 +44,29 @@ std::string PositionInfo::toString() const {
 void PositionInfo::add_fill(const ExecutionReport* report,
                             common::Logger* logger) noexcept {
   const auto old_position = position_;
-  const auto side_index = sideToIndex(report->side);
-  const auto opp_side_index =
-      sideToIndex(report->side == Side::kBuy ? Side::kSell : Side::kBuy);
-  const auto side_value = common::sideToValue(report->side);
-  position_ += report->last_qty.value * static_cast<double>(side_value);
+  const auto idx = sideToIndex(report->side);
+  const auto opp_side_index = oppIndex(idx);
+  const int sgn = sideToValue(report->side);
+  position_ += report->last_qty.value * static_cast<double>(sgn);
   volume_.value += report->last_qty.value;
 
-  if (old_position * sideToValue(report->side) >= 0) {
-    open_vwap_[side_index] += report->price.value * report->last_qty.value;
+  if (old_position * sgn >= 0) {
+    open_vwap_[idx] += report->price.value * report->last_qty.value;
   } else {
     const auto opp_side_vwap =
         open_vwap_[opp_side_index] / std::abs(old_position);
     open_vwap_[opp_side_index] = opp_side_vwap * std::abs(position_);
-    real_pnl_ += std::min(static_cast<double>(report->last_qty.value),
-                          std::abs(old_position)) *
-                 (opp_side_vwap - report->price.value) *
-                 sideToValue(report->side);
+    real_pnl_ += std::min(report->last_qty.value, std::abs(old_position)) *
+                 (opp_side_vwap - report->price.value) * sgn;
     if (position_ * old_position < 0) {
-      open_vwap_[side_index] = (report->price.value * std::abs(position_));
+      open_vwap_[idx] = (report->price.value * std::abs(position_));
       open_vwap_[opp_side_index] = 0;
     }
   }
 
   if (position_ == 0.) {
-    open_vwap_[sideToIndex(Side::kBuy)] = open_vwap_[sideToIndex(Side::kSell)] =
-        0;
-    unreal_pnl_ = 0;
+    open_vwap_[0] = open_vwap_[1] = 0.;
+    unreal_pnl_ = 0.;
   } else {
     if (position_ > 0.)
       unreal_pnl_ = (report->price.value - open_vwap_[sideToIndex(Side::kBuy)] /

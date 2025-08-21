@@ -27,7 +27,7 @@ struct PositionInfo {
   double real_pnl_ = 0;
   double unreal_pnl_ = 0;
   double total_pnl_ = 0;
-  std::array<double, common::sideToIndex(common::Side::kBuy) + 1> open_vwap_;
+  std::array<double, common::sideToIndex(common::Side::kTrade)> open_vwap_;
   common::Qty volume_ = common::Qty{0};
   const BBO* bbo_ = nullptr;
 

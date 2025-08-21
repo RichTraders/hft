@@ -74,13 +74,29 @@ struct Order {
   }
 };
 
-constexpr std::size_t kSlotsPerSide = 8;
+struct QuoteIntent {
+  common::TickerId ticker;
+  common::Side side;
+  std::optional<common::Price> price;
+  common::Qty qty;
+};
+
+constexpr int kSlotsPerSide = 8;
 using OMOrderSideHashMap =
     std::array<std::array<Order, kSlotsPerSide>,
                common::sideToIndex(common::Side::kTrade)>;
 
 using OMOrderTickerSideHashMap =
     absl::flat_hash_map<std::string, OMOrderSideHashMap>;
+
+constexpr uint64_t kTicksInvalid = std::numeric_limits<uint64_t>::min();
+constexpr double kMinReplaceQtyDelta = 1e-9;
+constexpr int kMinReplaceTickDelta = 1;
+
+inline uint64_t to_ticks(double price, double tick) noexcept {
+  return std::llround(price / tick);
+}
+
 }  // namespace trading
 
 #endif  //OM_ORDER_H

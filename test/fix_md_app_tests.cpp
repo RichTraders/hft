@@ -26,17 +26,10 @@ protected:
   static void SetUpTestSuite() {
     IniConfig config;
     config.load("resources/config.ini");
-    const Authorization authorization{
-      .md_address = config.get("auth", "md_address"),
-      .port = config.get_int("auth", "port"),
-      .api_key = config.get("auth", "api_key"),
-      .pem_file_path = config.get("auth", "pem_file_path"),
-      .private_password = config.get("auth", "private_password")};
 
     market_data_pool_ = std::make_unique<common::MemoryPool<MarketData>>(1024);
     logger_ = std::make_unique<common::Logger>();
-    app_ = std::make_unique<core::FixMarketDataApp>(authorization,
-                                "BMDWATCH",
+    app_ = std::make_unique<core::FixMarketDataApp>("BMDWATCH",
                                 "SPOT",
                                 logger_.get(),
                                 market_data_pool_.get());

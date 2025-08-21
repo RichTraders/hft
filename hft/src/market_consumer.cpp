@@ -18,14 +18,13 @@ namespace trading {
 MarketConsumer::MarketConsumer(
     common::Logger* logger, TradeEngine* trade_engine,
     common::MemoryPool<MarketUpdateData>* market_update_data_pool,
-    common::MemoryPool<MarketData>* market_data_pool,
-    const Authorization& authorization)
+    common::MemoryPool<MarketData>* market_data_pool)
     : market_update_data_pool_(market_update_data_pool),
       market_data_pool_(market_data_pool),
       logger_(logger),
       trade_engine_(trade_engine),
-      app_(std::make_unique<core::FixMarketDataApp>(
-          authorization, "BMDWATCH", "SPOT", logger_, market_data_pool_)) {
+      app_(std::make_unique<core::FixMarketDataApp>("BMDWATCH", "SPOT", logger_,
+                                                    market_data_pool_)) {
 
   app_->register_callback(
       "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });

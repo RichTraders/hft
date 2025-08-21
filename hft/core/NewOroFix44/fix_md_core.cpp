@@ -17,6 +17,7 @@
 #include "NewOroFix44MD_router.hpp"
 #include "NewOroFix44MD_classes.hpp"
 #include "performance.h"
+#include "authorization.h"
 
 namespace core {
 using namespace FIX8::NewOroFix44MD;
@@ -25,13 +26,11 @@ constexpr int kMarketDataPoolSize = 2048;
 constexpr int kEntries = 268;
 
 FixMdCore::FixMdCore(SendId sender_comp_id, TargetId target_comp_id,
-                     Logger* logger, MemoryPool<MarketData>* pool,
-                     const Authorization& authorization)
+                     Logger* logger, MemoryPool<MarketData>* pool)
   : logger_(logger),
     sender_comp_id_(std::move(sender_comp_id)),
     target_comp_id_(std::move(target_comp_id)),
-    market_data_pool_(pool),
-    authorization_(authorization) {
+    market_data_pool_(pool) {
   logger_->info("[Constructor] FixMdCore Created");
 }
 
@@ -55,7 +54,7 @@ std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
       << new HeartBtInt(30)
       << new ResetSeqNumFlag(true)
       << new RawDataLength(static_cast<int>(sig_b64.size()))
-      << new RawData(sig_b64) << new Username(authorization_.api_key)
+      << new RawData(sig_b64) << new Username(AUTHORIZATION.get_api_key())
       << new MessageHandling(2);
 
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))

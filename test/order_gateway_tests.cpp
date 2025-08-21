@@ -32,13 +32,6 @@ protected:
   static void SetUpTestSuite() {
     IniConfig config;
     config.load("resources/config.ini");
-    const Authorization authorization{
-      .md_address = config.get("auth", "md_address"),
-      .oe_address = config.get("auth", "oe_address"),
-      .port = config.get_int("auth", "port"),
-      .api_key = config.get("auth", "api_key"),
-      .pem_file_path = config.get("auth", "pem_file_path"),
-      .private_password = config.get("auth", "private_password")};
 
     auto logger = std::make_unique<Logger>();
 
@@ -59,7 +52,7 @@ protected:
         logger.get(), execution_report_pool_.get(), order_cancel_reject_pool_.get(),
         order_mass_cancel_report_pool_.get());
 
-    order_gateway_= std::make_unique<trading::OrderGateway>(authorization, logger.get(), response_manager_.get());
+    order_gateway_= std::make_unique<trading::OrderGateway>(logger.get(), response_manager_.get());
     trade_engine_ = std::make_unique<TradeEngine>(logger.get(), market_update_data_pool_.get(),
                                                  market_data_pool_.get(), response_manager_.get(), temp);
 
@@ -126,13 +119,6 @@ TEST_F(OrderGatewayTest, OrderCancel) {
 TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
   IniConfig config;
   config.load("resources/config.ini");
-  const Authorization authorization{
-      .md_address = config.get("auth", "md_address"),
-      .oe_address = config.get("auth", "oe_address"),
-      .port = config.get_int("auth", "port"),
-      .api_key = config.get("auth", "api_key"),
-      .pem_file_path = config.get("auth", "pem_file_path"),
-      .private_password = config.get("auth", "private_password")};
 
   auto logger = std::make_unique<Logger>();
 
@@ -152,7 +138,7 @@ TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
   auto response_manager = std::make_unique<ResponseManager>(
       logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
       order_mass_cancel_report_pool.get());
-  OrderGateway og(authorization, logger.get(), response_manager.get());
+  OrderGateway og(logger.get(), response_manager.get());
   auto trade_engine = new TradeEngine(logger.get(), pool.get(),
                                                pool2.get(), response_manager.get(), temp);
   og.init_trade_engine(trade_engine);

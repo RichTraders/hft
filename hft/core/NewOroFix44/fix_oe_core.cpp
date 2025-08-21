@@ -18,6 +18,7 @@
 #include "NewOroFix44OE_classes.hpp"
 #include "performance.h"
 #include "response_manager.h"
+#include "authorization.h"
 
 
 namespace core {
@@ -25,13 +26,11 @@ using namespace FIX8::NewOroFix44OE;
 
 FixOeCore::FixOeCore(SendId sender_comp_id, TargetId target_comp_id,
                      common::Logger* logger,
-                     trading::ResponseManager* response_manager,
-                     const Authorization& authorization)
+                     trading::ResponseManager* response_manager)
   : sender_comp_id_(std::move(sender_comp_id)),
     target_comp_id_(std::move(target_comp_id)),
     logger_(logger),
-    response_manager_(response_manager),
-    authorization_(authorization) {
+    response_manager_(response_manager){
   logger_->info("[Constructor] FixOeCore Created");
 }
 
@@ -53,7 +52,7 @@ std::string FixOeCore::create_log_on_message(const std::string& sig_b64,
       << new ResetSeqNumFlag(true) << new MessageHandling('0')
       << new ResponseMode(1) << new DropCopyFlag(false)
       << new RawDataLength(static_cast<int>(sig_b64.size()))
-      << new RawData(sig_b64) << new Username(authorization_.api_key)
+      << new RawData(sig_b64) << new Username(AUTHORIZATION.get_api_key())
       << new MessageHandling(2);
 
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))

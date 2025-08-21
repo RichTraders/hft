@@ -24,8 +24,7 @@ class FixMdCore;
 
 class FixMarketDataApp : public FixApp<FixMarketDataApp,"MDRead", "MDWrite"> {
 public:
-  FixMarketDataApp(const Authorization& authorization,
-                   const std::string& sender_comp_id,
+  FixMarketDataApp(const std::string& sender_comp_id,
                    const std::string& target_comp_id, common::Logger* logger,
                    common::MemoryPool<MarketData>* market_data_pool);
 

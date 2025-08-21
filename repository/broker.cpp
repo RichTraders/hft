@@ -33,16 +33,8 @@ Broker::Broker()
   config.load("resources/config.ini");
 #endif
 
-  const Authorization authorization{
-      .md_address = config.get("auth", "md_address"),
-      .oe_address = config.get("auth", "oe_address"),
-      .port = config.get_int("auth", "port"),
-      .api_key = config.get("auth", "api_key"),
-      .pem_file_path = config.get("auth", "pem_file_path"),
-      .private_password = config.get("auth", "private_password")};
-
-  app_ = std::make_unique<core::FixMarketDataApp>(
-      authorization, "BMDWATCH", "SPOT", log_.get(), pool_.get());
+  app_ = std::make_unique<core::FixMarketDataApp>("BMDWATCH", "SPOT",
+                                                  log_.get(), pool_.get());
 
   log_->setLevel(LogLevel::kInfo);
   log_->clearSink();

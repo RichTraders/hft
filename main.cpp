@@ -26,20 +26,7 @@ constexpr int kMarketDataPoolSize = 16384;
 
 int main() {
   try {
-    IniConfig config;
-#ifdef TEST_NET
-    config.load("resources/test_config.ini");
-#else
-    config.load("resources/config.ini");
-#endif
-
-    const Authorization authorization{
-        .md_address = config.get("auth", "md_address"),
-        .oe_address = config.get("auth", "oe_address"),
-        .port = config.get_int("auth", "port"),
-        .api_key = config.get("auth", "api_key"),
-        .pem_file_path = config.get("auth", "pem_file_path"),
-        .private_password = config.get("auth", "private_password")};
+    const IniConfig config;
 
     std::unique_ptr<common::Logger> logger = std::make_unique<common::Logger>();
     logger->setLevel(common::LogLevel::kInfo);
@@ -79,16 +66,16 @@ int main() {
         order_cancel_reject_pool.get(), order_mass_cancel_report_pool.get());
 
     auto order_gateway = std::make_unique<trading::OrderGateway>(
-        authorization, logger.get(), response_manager.get());
+        logger.get(), response_manager.get());
 
     auto engine = std::make_unique<trading::TradeEngine>(
         logger.get(), market_update_data_pool.get(), market_data_pool.get(),
         response_manager.get(), config_map);
     engine->init_order_gateway(order_gateway.get());
 
-    const trading::MarketConsumer consumer(
-        logger.get(), engine.get(), market_update_data_pool.get(),
-        market_data_pool.get(), authorization);
+    const trading::MarketConsumer consumer(logger.get(), engine.get(),
+                                           market_update_data_pool.get(),
+                                           market_data_pool.get());
 
     std::unique_ptr<common::CpuManager> cpu_manager =
         std::make_unique<common::CpuManager>(logger.get());

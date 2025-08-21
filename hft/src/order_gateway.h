@@ -31,8 +31,7 @@ class ResponseManager;
 
 class OrderGateway {
  public:
-  OrderGateway(const Authorization& authorization, common::Logger* logger,
-               ResponseManager* response_manager);
+  OrderGateway(common::Logger* logger, ResponseManager* response_manager);
   ~OrderGateway();
 
   void init_trade_engine(TradeEngine* trade_engine);

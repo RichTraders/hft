@@ -11,7 +11,7 @@
  */
 
 #include <fix8/f8includes.hpp>
-
+#include "authorization.h"
 #include "fix_oe_app.h"
 #include "fix_md_app.h"
 #include "performance.h"
@@ -25,14 +25,12 @@ FixApp<Derived, ReadThreadName, WriteThreadName>::FixApp(const std::string& addr
                              int port,
                              std::string sender_comp_id,
                              std::string target_comp_id,
-                             common::Logger* logger,
-                             const Authorization& authorization)
+                             common::Logger* logger)
   : logger_(logger),
     tls_sock_(std::make_unique<SSLSocket>(address, port)),
     queue_(std::make_unique<common::SPSCQueue<std::string>>(kQueueSize)),
     sender_id_(std::move(sender_comp_id)),
-    target_id_(std::move(target_comp_id)),
-    authorization_(authorization) {
+    target_id_(std::move(target_comp_id)){
   write_thread_.start(&FixApp::write_loop, this);
   read_thread_.start(&FixApp::read_loop, this);
 }
@@ -205,8 +203,8 @@ std::string FixApp<Derived, ReadThreadName, WriteThreadName>::get_signature_base
     const std::string& timestamp) const {
   // TODO(jb): use config reader
   EVP_PKEY* private_key = Util::load_ed25519(
-      authorization_.pem_file_path,
-      authorization_.private_password.c_str());
+      AUTHORIZATION.get_pem_file_path(),
+      AUTHORIZATION.get_private_password().c_str());
 
   // payload = "A<SOH>Sender<SOH>Target<SOH>1<SOH>20250709-00:49:41.041346"
   const std::string payload = std::string("A") + SOH + sender_id_ + SOH +

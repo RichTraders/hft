@@ -13,7 +13,6 @@
 #pragma once
 #include <pch.h>
 
-#include "authorization.h"
 #include "logger.h"
 #include "memory_pool.hpp"
 #include "order_entry.h"
@@ -48,8 +47,7 @@ public:
 
   FixOeCore(SendId sender_comp_id,
             TargetId target_comp_id,
-            common::Logger* logger, trading::ResponseManager* response_manager,
-            const Authorization& authorization);
+            common::Logger* logger, trading::ResponseManager* response_manager);
 
   ~FixOeCore();
 
@@ -79,6 +77,5 @@ private:
   const std::string target_comp_id_;
   common::Logger* logger_;
   trading::ResponseManager* response_manager_;
-  Authorization authorization_;
 };
 }

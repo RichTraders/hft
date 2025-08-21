@@ -12,23 +12,21 @@
 
 #include "fix_md_app.h"
 #include "fix_md_core.h"
+#include "authorization.h"
 
 namespace core {
 
-FixMarketDataApp::FixMarketDataApp(const Authorization& authorization,
-                   const std::string& sender_comp_id,
+FixMarketDataApp::FixMarketDataApp(const std::string& sender_comp_id,
                    const std::string& target_comp_id, common::Logger* logger,
                    common::MemoryPool<MarketData>* market_data_pool):
-    FixApp(authorization.md_address,
-           authorization.port,
+    FixApp(AUTHORIZATION.get_md_address(),
+           AUTHORIZATION.get_port(),
            sender_comp_id,
            target_comp_id,
-           logger,
-           authorization)
+           logger)
     , market_data_pool_(market_data_pool) {
   fix_md_core_ = std::make_unique<FixMdCore>(sender_comp_id, target_comp_id,
-                                             logger, market_data_pool,
-                                             authorization);
+                                             logger, market_data_pool);
 }
 
 FixMarketDataApp::~FixMarketDataApp() {

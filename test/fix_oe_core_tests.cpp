@@ -56,12 +56,6 @@ protected:
   void SetUp() override {
     IniConfig config;
     config.load("resources/config.ini");
-    Authorization authorization{
-      .md_address = config.get("auth", "md_address"),
-      .port = config.get_int("auth", "port"),
-      .api_key = config.get("auth", "api_key"),
-      .pem_file_path = config.get("auth", "pem_file_path"),
-      .private_password = config.get("auth", "private_password")};
     auto execution_report_pool = std::make_unique<MemoryPool<
           trading::ExecutionReport>>(1024);
     auto order_cancel_reject_pool = std::make_unique<MemoryPool<
@@ -70,11 +64,11 @@ protected:
       trading::OrderMassCancelReport>>(1024);
     auto pool = std::make_unique<common::MemoryPool<OrderData>>(1024);
     auto logger = std::make_unique<common::Logger>();
-    ResponseManager* response_manager = new ResponseManager(
+    std::unique_ptr<ResponseManager> response_manager = std::make_unique<ResponseManager>(
        logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
        order_mass_cancel_report_pool.get());
 
-    fix = std::make_unique<FixOeCore>("SENDER", "TARGET", logger.get(), response_manager , authorization);
+    fix = std::make_unique<FixOeCore>("SENDER", "TARGET", logger.get(), response_manager.get());
   }
 
   std::unique_ptr<FixOeCore> fix;

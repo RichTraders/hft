@@ -15,12 +15,11 @@
 
 namespace trading {
 
-OrderGateway::OrderGateway(const Authorization& authorization,
-                           common::Logger* logger,
+OrderGateway::OrderGateway(common::Logger* logger,
                            ResponseManager* response_manager)
     : logger_(logger),
-      app_(std::make_unique<core::FixOrderEntryApp>(
-          authorization, "BMDWATCH", "SPOT", logger_, response_manager)) {
+      app_(std::make_unique<core::FixOrderEntryApp>("BMDWATCH", "SPOT", logger_,
+                                                    response_manager)) {
   app_->register_callback(
       "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });
   app_->register_callback("1", [this](auto&& msg) {

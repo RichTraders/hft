@@ -12,7 +12,7 @@
 
 #ifndef MARKET_CONSUMER_H
 #define MARKET_CONSUMER_H
-#include "authorization.h"
+
 #include "logger.h"
 #include "market_data.h"
 #include "memory_pool.hpp"
@@ -35,8 +35,7 @@ class MarketConsumer {
  public:
   MarketConsumer(common::Logger* logger, TradeEngine* trade_engine,
                  common::MemoryPool<MarketUpdateData>* market_update_data_pool,
-                 common::MemoryPool<MarketData>* market_data_pool,
-                 const Authorization& authorization);
+                 common::MemoryPool<MarketData>* market_data_pool);
   ~MarketConsumer();
   void stop();
   void on_login(FIX8::Message*) const;

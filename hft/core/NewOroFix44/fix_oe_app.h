@@ -14,6 +14,7 @@
 #include "fix_app.h"
 #include "fix_oe_core.h"
 #include "order_entry.h"
+#include "authorization.h"
 
 namespace FIX8 {
 class Message;
@@ -27,13 +28,12 @@ namespace core {
 
 class FixOrderEntryApp : public FixApp<FixOrderEntryApp, "OERead", "OEWrite"> {
 public:
-  FixOrderEntryApp(const Authorization& authorization,
-                   const std::string& sender_comp_id,
+  FixOrderEntryApp(const std::string& sender_comp_id,
                    const std::string& target_comp_id, common::Logger* logger, trading::ResponseManager* response_manager)
-    : FixApp(authorization.oe_address, authorization.port, sender_comp_id,
-             target_comp_id, logger, authorization){
+    : FixApp(AUTHORIZATION.get_od_address(), AUTHORIZATION.get_port(), sender_comp_id,
+             target_comp_id, logger){
     fix_oe_core_ = std::make_unique<FixOeCore>(sender_comp_id, target_comp_id,
-                                               logger, response_manager, authorization);
+                                               logger, response_manager);
   }
   std::string create_log_on_message(const std::string& sig_b64,
                                     const std::string& timestamp);

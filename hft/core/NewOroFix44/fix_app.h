@@ -15,8 +15,6 @@
 
 #include "common/spsc_queue.h"
 #include <common/thread.hpp>
-
-#include "authorization.h"
 #include "logger.h"
 
 constexpr int kQueueSize = 8;
@@ -37,8 +35,7 @@ public:
          int port,
          std::string sender_comp_id,
          std::string target_comp_id,
-         common::Logger* logger,
-         const Authorization& authorization);
+         common::Logger* logger);
 
   ~FixApp();
 
@@ -106,7 +103,6 @@ private:
   bool log_on_{false};
   const std::string sender_id_;
   const std::string target_id_;
-  const Authorization authorization_;
 };
 } // namespace core
 

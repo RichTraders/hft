@@ -140,13 +140,11 @@ class Logger {
   Logger() {
     stop_ = static_cast<bool>(worker_.start(&Logger::process, this));
     level_ = LogLevel::kInfo;
-    info("[Constructor] Logge Start");
   }
 
   ~Logger() {
     stop_ = true;
     worker_.join();
-    info("[Destructor] Logger finish");
   }
 
   void setLevel(LogLevel lvl) { level_.store(lvl, std::memory_order_relaxed); }

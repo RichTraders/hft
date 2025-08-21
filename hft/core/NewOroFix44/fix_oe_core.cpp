@@ -164,7 +164,7 @@ std::string FixOeCore::create_cancel_and_reorder_message(
       << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
       << new SendingTime();
 
-  request.add_field(new OrderID(std::to_string(cancel_and_re_order.cancel_order_id.value)));
+  request.add_field(new OrigClOrdID(std::to_string(cancel_and_re_order.cancel_order_id.value)));
   request.add_field(
       new ClOrdID(std::to_string(cancel_and_re_order.cl_order_id.value)));
   request.add_field(new Symbol(cancel_and_re_order.symbol));

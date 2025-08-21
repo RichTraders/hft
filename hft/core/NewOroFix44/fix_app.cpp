@@ -42,8 +42,8 @@ FixApp<Derived, ReadThreadName, WriteThreadName>::~FixApp() {
   thread_running_ = false;
   write_thread_.join();
   read_thread_.join();
-  logger_->info("Fix write thread finish");
-  logger_->info("Fix read thread finish");
+  logger_->info("[Thread] Fix write finish");
+  logger_->info("[Thread] Fix read finish");
 }
 
 template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>

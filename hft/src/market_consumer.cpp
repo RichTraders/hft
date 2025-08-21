@@ -44,11 +44,11 @@ MarketConsumer::MarketConsumer(
       "5", [this](auto&& msg) { on_logout(std::forward<decltype(msg)>(msg)); });
 
   app_->start();
-  logger_->info("MarketConsumer Created");
+  logger_->info("[Constructor] MarketConsumer Created");
 }
 
 MarketConsumer::~MarketConsumer() {
-  logger_->info("MarketConsumer Destory");
+  logger_->info("[Destructor] MarketConsumer Destory");
 }
 
 void MarketConsumer::stop() {
@@ -56,12 +56,12 @@ void MarketConsumer::stop() {
 }
 
 void MarketConsumer::on_login(FIX8::Message*) const {
-  logger_->info("login successful");
+  logger_->info("[Login] Market consumer successful");
   const std::string message = app_->create_market_data_subscription_message(
       "DEPTH_STREAM", "5000", "BTCUSDT");
 
   if (UNLIKELY(!app_->send(message))) {
-    logger_->info("sent order message");
+    logger_->error("[Message] failed to send login");
   }
 }
 
@@ -70,7 +70,7 @@ void MarketConsumer::on_snapshot(FIX8::Message* msg) const {
       app_->create_snapshot_data_message(msg));
 
   if (UNLIKELY(!trade_engine_->on_market_data_updated(snapshot_data))) {
-    logger_->info("[MarketConsumer] on_market_data_updated failed");
+    logger_->error("[Message] failed to send snapshot");
   }
 }
 
@@ -79,22 +79,22 @@ void MarketConsumer::on_subscribe(FIX8::Message* msg) const {
       market_update_data_pool_->allocate(app_->create_market_data_message(msg));
 
   if (UNLIKELY(!trade_engine_->on_market_data_updated(data))) {
-    logger_->info("[MarketConsumer] on_subsribe failed");
+    logger_->error("[Message] failed to send subscribe");
   }
 }
 
 void MarketConsumer::on_reject(FIX8::Message*) const {
-  logger_->info("reject data");
+  logger_->info("[Message] reject data");
 }
 
 void MarketConsumer::on_logout(FIX8::Message*) const {
-  logger_->info("logout");
+  logger_->info("[Message] logout");
 }
 
 void MarketConsumer::on_heartbeat(FIX8::Message* msg) const {
   auto message = app_->create_heartbeat_message(msg);
   if (UNLIKELY(!app_->send(message))) {
-    logger_->info("[MarketConsumer] on_heartbeat failed");
+    logger_->error("[Message] failed to send heartbeat");
   }
 }
 }  // namespace trading

@@ -45,11 +45,11 @@ OrderGateway::OrderGateway(const Authorization& authorization,
     logger_->info("Fix Order Entry Start");
   }
 
-  logger_->info("OrderGateway Constructor");
+  logger_->info("[Constructor] OrderGateway Constructor");
 }
 
 OrderGateway::~OrderGateway() {
-  logger_->info("OrderGateway Destroy");
+  logger_->info("[Destructor] OrderGateway Destroy");
 }
 
 void OrderGateway::stop() {
@@ -61,7 +61,7 @@ void OrderGateway::init_trade_engine(TradeEngine* trade_engine) {
 }
 
 void OrderGateway::on_login(FIX8::Message*) {
-  logger_->info("login successful");
+  logger_->info("[Message] login successful");
 }
 
 void OrderGateway::on_execution_report(
@@ -69,10 +69,9 @@ void OrderGateway::on_execution_report(
   ResponseCommon res;
   res.res_type = ResponseType::kExecutionReport;
   res.execution_report = app_->create_execution_report_message(msg);
-  trade_engine_->enqueue_response(res);
 
   if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
-    logger_->info("[Order_Gateway] on_execution_report failed");
+    logger_->error("[Report] failed to send execution_report");
   }
 }
 
@@ -81,10 +80,9 @@ void OrderGateway::on_order_cancel_reject(
   ResponseCommon res;
   res.res_type = ResponseType::kOrderCancelReject;
   res.order_cancel_reject = app_->create_order_cancel_reject_message(msg);
-  trade_engine_->enqueue_response(res);
 
   if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
-    logger_->info("[Order_Gateway] on_order_cancel_reject failed");
+    logger_->error("[Reject] faeild to send order_cancel_reject");
   }
 }
 
@@ -96,7 +94,7 @@ void OrderGateway::on_order_mass_cancel_report(
       app_->create_order_mass_cancel_report_message(msg);
 
   if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
-    logger_->info("[Order_Gateway] on_order_mass_cancel_report failed");
+    logger_->error("[Report] failed to send order_mass_cancel");
   }
 }
 
@@ -107,8 +105,9 @@ void OrderGateway::on_order_mass_status_response(FIX8::Message* msg) {
 
 void OrderGateway::on_logout(FIX8::Message*) {
   auto message = app_->create_log_out_message();
+
   if (UNLIKELY(!app_->send(message))) {
-    logger_->info("[Order_Gateway] on_logout failed");
+    logger_->error("[Message] failed to send logout");
   }
 }
 
@@ -116,7 +115,7 @@ void OrderGateway::on_heartbeat(FIX8::Message* msg) {
   auto message = app_->create_heartbeat_message(msg);
 
   if (UNLIKELY(!app_->send(message))) {
-    logger_->info("[Order_Gateway] on_heartbeat failed");
+    logger_->error("[Message] failed to send heartbeat");
   }
 }
 
@@ -136,7 +135,7 @@ void OrderGateway::order_request(const RequestCommon& request) {
       break;
     case ReqeustType::kInvalid:
     default:
-      logger_->info("[Order_Gateway] invalid request type");
+      logger_->info("[Message] invalid request type");
       break;
   }
 }
@@ -155,7 +154,7 @@ void OrderGateway::new_single_order_data(const RequestCommon& request) {
   const std::string msg = app_->create_order_message(order_data);
 
   if (UNLIKELY(!app_->send(msg))) {
-    logger_->info("[Order_Gateway] new_single_order_data failed");
+    logger_->error("[Message] failed to send new_single_order_data");
   }
 }
 
@@ -168,7 +167,7 @@ void OrderGateway::order_cancel_request(const RequestCommon& request) {
   const std::string msg = app_->create_cancel_order_message(cancel_request);
 
   if (UNLIKELY(!app_->send(msg))) {
-    logger_->info("[Order_Gateway] order_cancel_request failed");
+    logger_->error("[Message] failed to send order_cancel_request");
   }
 }
 
@@ -190,7 +189,7 @@ void OrderGateway::order_cancel_request_and_new_order_single(
       app_->create_cancel_and_reorder_message(cancel_and_reorder);
 
   if (UNLIKELY(!app_->send(msg))) {
-    logger_->info("[Order_Gateway] create_cancel_and_reorder_message failed");
+    logger_->error("[Message] failed to create_cancel_and_new_order");
   }
 }
 
@@ -201,7 +200,7 @@ void OrderGateway::order_mass_cancel_request(const RequestCommon& request) {
   const std::string msg = app_->create_order_all_cancel(all_cancel_request);
 
   if (UNLIKELY(!app_->send(msg))) {
-    logger_->info("[Order_Gateway] order_mass_cancel_request failed");
+    logger_->error("[Message] failed to send order_mass_cancel_request");
   }
 }
 

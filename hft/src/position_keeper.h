@@ -43,9 +43,9 @@ class PositionKeeper {
  public:
   explicit PositionKeeper(common::Logger* logger)
       : logger_(logger), ticker_position_{{"BTCUSDT", PositionInfo{}}} {
-    logger_->info("PositionKeeper Created");
+    logger_->info("[Constructor] PositionKeeper Created");
   }
-  ~PositionKeeper() { logger_->info("PositionKeeper Destory"); }
+  ~PositionKeeper() { logger_->info("[Destructor] PositionKeeper Destory"); }
 
   void add_fill(const ExecutionReport* report) noexcept;
 

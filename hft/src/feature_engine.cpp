@@ -36,9 +36,10 @@ void FeatureEngine::on_order_book_updated(const Price price, const Side side,
     auto ask_index = book->peek_levels(true, kLevel10);
   }
 
-  logger_->info(std::format("price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
-                            common::toString(price), common::toString(side),
-                            mkt_price_, agg_trade_qty_ratio_));
+  logger_->info(
+      std::format("[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
+                  common::toString(price), common::toString(side), mkt_price_,
+                  agg_trade_qty_ratio_));
 }
 void FeatureEngine::on_trade_updated(const MarketData* market_update,
                                      MarketOrderBook* book) noexcept {
@@ -67,7 +68,7 @@ void FeatureEngine::on_trade_updated(const MarketData* market_update,
   }
   vwap_index_++;
 
-  logger_->info(std::format("{} mkt-price:{} agg-trade-ratio:{}",
+  logger_->info(std::format("[Updated] {} mkt-price:{} agg-trade-ratio:{}",
                             market_update->toString(), mkt_price_,
                             agg_trade_qty_ratio_));
 }

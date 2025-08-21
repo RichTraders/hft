@@ -42,20 +42,18 @@ FixApp<Derived, ReadThreadName, WriteThreadName>::~FixApp() {
   thread_running_ = false;
   write_thread_.join();
   read_thread_.join();
-  logger_->info("Fix write thread finish");
-  logger_->info("Fix read thread finish");
+  logger_->info("[Thread] Fix write finish");
+  logger_->info("[Thread] Fix read finish");
 }
 
 template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
-int FixApp<Derived, ReadThreadName, WriteThreadName>::start() {
+bool FixApp<Derived, ReadThreadName, WriteThreadName>:: start() {
   const std::string cur_timestamp = timestamp();
   const std::string sig_b64 = get_signature_base64(cur_timestamp);
 
   const std::string fixmsg = create_log_on(sig_b64, cur_timestamp);
 
-  send(fixmsg);
-  logger_->info("log on sent");
-  return 0;
+  return send(fixmsg);
 }
 
 template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>

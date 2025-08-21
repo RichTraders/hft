@@ -12,6 +12,7 @@
 
 #ifndef POSITIONKEEPER_H
 #define POSITIONKEEPER_H
+#include "logger.h"
 #include "types.h"
 
 namespace common {
@@ -41,7 +42,10 @@ struct PositionInfo {
 class PositionKeeper {
  public:
   explicit PositionKeeper(common::Logger* logger)
-      : logger_(logger), ticker_position_{{"BTCUSDT", PositionInfo{}}} {}
+      : logger_(logger), ticker_position_{{"BTCUSDT", PositionInfo{}}} {
+    logger_->info("[Constructor] PositionKeeper Created");
+  }
+  ~PositionKeeper() { logger_->info("[Destructor] PositionKeeper Destory"); }
 
   void add_fill(const ExecutionReport* report) noexcept;
 

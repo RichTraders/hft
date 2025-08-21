@@ -101,13 +101,13 @@ int main() {
     if (cpu_manager->init_cpu_to_tid()) {
       logger->info("don't init cpu to tid");
     }
+
+    constexpr int kSleepCount = 10;
+    while (true)
+      sleep(kSleepCount);  // TODO(neworo2):
   } catch (std::exception& e) {
     std::cerr << e.what() << "\n";
   }
-
-  constexpr int kSleepCount = 10;
-  while (true)
-    sleep(kSleepCount);  // TODO(neworo2):
 
   return 0;
 }

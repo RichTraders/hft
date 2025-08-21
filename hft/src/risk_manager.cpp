@@ -21,6 +21,10 @@ RiskManager::RiskManager(common::Logger* logger,
   const std::string ticker = "BTCUSDT";
   ticker_risk_["BTCUSDT"] = RiskInfo(position_keeper->get_position_info(ticker),
                                      ticker_cfg.at(ticker).risk_cfg_);
-  logger_->info("RiskManager Created");
+  logger_->info("[Constructor] RiskManager Created");
+}
+
+RiskManager::~RiskManager() {
+  logger_->info("[Destructor] RiskManager Destroy");
 }
 }  // namespace trading

@@ -38,6 +38,7 @@ public:
             common::Logger* logger,
             common::MemoryPool<MarketData>* pool,
             const Authorization& authorization);
+  ~FixMdCore();
 
   std::string create_log_on_message(
       const std::string& sig_b64, const std::string& timestamp);

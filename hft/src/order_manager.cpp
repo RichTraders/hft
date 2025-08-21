@@ -29,6 +29,10 @@ OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
       fast_clock_(kCpuHzEstimate, kInterval) {
   //TODO(JB): ticker 이름 받아오기
   ticker_side_order_["BTCUSDT"] = OMOrderSideHashMap{};
+  logger_->info("[Constructor] OrderManager Construct");
+}
+OrderManager::~OrderManager() {
+  logger_->info("[Destructor] OrderManager Destroy");
 }
 
 void OrderManager::on_order_updated(
@@ -51,8 +55,8 @@ void OrderManager::on_order_updated(
       if (order->qty.value == 0.) {
         order->order_state = OMOrderState::kDead;
       }
-      logger_->info(
-          std::format("Completed order:{}", client_response->toString()));
+      logger_->info(std::format("[Updated] Completed order:{}",
+                                client_response->toString()));
     } break;
     case OrdStatus::kCanceled: {
       order->order_state = OMOrderState::kDead;
@@ -60,15 +64,15 @@ void OrderManager::on_order_updated(
     case OrdStatus::kPendingCancel: {
     } break;
     case OrdStatus::kRejected: {
-      logger_->error(
-          std::format("Rejected report:{}", client_response->toString()));
+      logger_->error(std::format("[Updated] Rejected report:{}",
+                                 client_response->toString()));
       order->order_state = OMOrderState::kDead;
     } break;
     case OrdStatus::kPendingNew: {
     }
     case OrdStatus::kExpired: {
-      logger_->error(
-          std::format("Expired report:{}", client_response->toString()));
+      logger_->error(std::format("[Updated] Expired report:{}",
+                                 client_response->toString()));
       order->order_state = OMOrderState::kDead;
     } break;
   }
@@ -89,8 +93,8 @@ void OrderManager::new_order(Order* order, const common::TickerId& ticker_id,
   *order = {ticker_id, new_request.cl_order_id,  side, price,
             qty,       OMOrderState::kPendingNew};
 
-  logger_->info(std::format("Sent new order {} for {}", new_request.toString(),
-                            order->toString()));
+  logger_->info(std::format("[Request] new_order {} for {}",
+                            new_request.toString(), order->toString()));
 }
 
 void OrderManager::cancel_order(Order* order) noexcept {
@@ -102,8 +106,8 @@ void OrderManager::cancel_order(Order* order) noexcept {
 
   order->order_state = OMOrderState::kPendingCancel;
 
-  logger_->info(std::format("Sent cancel {} for {}", cancel_request.toString(),
-                            order->toString()));
+  logger_->info(std::format("[Request] cancel_order {} for {}",
+                            cancel_request.toString(), order->toString()));
 }
 
 void OrderManager::move_order(Order* order, const common::TickerId& ticker_id,
@@ -142,10 +146,10 @@ void OrderManager::move_order(Order* order, const common::TickerId& ticker_id,
           END_MEASURE(Trading_OrderManager_newOrder, logger_);
 #endif
         } else
-          logger_->info(
-              std::format("Ticker:{} Side:{} Qty:{} RiskCheckResult:{}",
-                          ticker_id, toString(side), toString(qty),
-                          riskCheckResultToString(risk_result)));
+          logger_->info(std::format(
+              "[OrderState] Ticker:{} Side:{} Qty:{} RiskCheckResult:{}",
+              ticker_id, toString(side), toString(qty),
+              riskCheckResultToString(risk_result)));
       }
     } break;
     case OMOrderState::kPendingNew:
@@ -163,7 +167,7 @@ void OrderManager::move_order(const common::TickerId& ticker_id,
 #endif
   Order* order = prepare_order(ticker_id, side);
   if (UNLIKELY(!order)) {
-    logger_->error("No order available!!!");
+    logger_->error("[Order] No available!!!");
     return;
   }
   move_order(order, ticker_id, bid_price, side, qty);

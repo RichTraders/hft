@@ -23,11 +23,11 @@ ResponseManager::ResponseManager(
       execution_report_pool_(execution_report_pool),
       order_cancel_reject_pool_(order_cancel_reject_pool),
       order_mass_cancel_report_pool_(order_mass_cancel_report_pool) {
-  logger_->info("Response manager initialized");
+  logger_->info("[Constructor] Response manager initialized");
 }
 
 ResponseManager::~ResponseManager() {
-  logger_->info("Response manager deinitialized");
+  logger_->info("[Destructor] Response manager deinitialized");
 }
 
 ExecutionReport* ResponseManager::execution_report_allocate() {

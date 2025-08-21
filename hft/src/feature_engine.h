@@ -28,8 +28,11 @@ constexpr int kVwapSize = 64;
 namespace trading {
 class FeatureEngine {
  public:
-  explicit FeatureEngine(common::Logger* logger) : logger_(logger) {}
+  explicit FeatureEngine(common::Logger* logger) : logger_(logger) {
+    logger_->info("[Constructor] FeatureEngine Created");
+  }
 
+  ~FeatureEngine() { logger_->info("[Destructor] FeatureEngine Destory"); }
   auto on_trade_updated(const MarketData* market_update,
                         MarketOrderBook* book) noexcept -> void;
   auto on_order_book_updated(common::Price price, common::Side side,

@@ -57,12 +57,16 @@ CpuManager::CpuManager(Logger* logger) {
     info.tid = get_tid_by_thread_name(thread_name);
     thread_info_list_.emplace(thread_name, info);
   }
+
+  logger_->info("[Constructor] cpu manager start");
 }
 
 CpuManager::~CpuManager() {
   std::string result;
   detach(getpid(), result);
   undo(result);
+
+  logger_->info("[Destructor] cpu manager start");
 }
 
 bool CpuManager::init_cpu_to_tid() {

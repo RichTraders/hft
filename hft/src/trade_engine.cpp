@@ -115,9 +115,7 @@ void TradeEngine::run() {
   while (running_) {
     MarketUpdateData* message;
     while (queue_->dequeue(message)) {
-#ifdef MEASUREMENT
       START_MEASURE(MAKE_ORDERBOOK);
-#endif
       for (auto& market_data : message->data) {
         ticker_order_book_[market_data->ticker_id]->on_market_data_updated(
             market_data);
@@ -127,9 +125,7 @@ void TradeEngine::run() {
       if (message) {
         market_update_data_pool_->deallocate(message);
       }
-#ifdef MEASUREMENT
       END_MEASURE(MAKE_ORDERBOOK, logger_);
-#endif
     }
     std::this_thread::yield();
   }
@@ -139,9 +135,7 @@ void TradeEngine::response_run() {
   while (response_running_) {
     ResponseCommon response;
     while (response_queue_->dequeue(response)) {
-#ifdef MEASUREMENT
       START_MEASURE(RESPONSE_COMMON);
-#endif
       switch (response.res_type) {
         case ResponseType::kExecutionReport:
           on_order_updated(response.execution_report);
@@ -162,9 +156,7 @@ void TradeEngine::response_run() {
         default:
           break;
       }
-#ifdef MEASUREMENT
       END_MEASURE(RESPONSE_COMMON, logger_);
-#endif
     }
     std::this_thread::yield();
   }

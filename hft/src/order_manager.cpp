@@ -19,68 +19,112 @@
 namespace trading {
 using common::OrderId;
 constexpr double kCpuHzEstimate = 3.5e9;
+constexpr double kTickSize = 0.01;
 constexpr int kInterval = 6;
+
+using common::Price;
+using common::Qty;
+using common::Side;
+using common::TickerId;
+using order::LayerBook;
 
 OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
                            RiskManager& risk_manager)
-    : trade_engine_(trade_engine),
+    : layer_book_("BTCUSDT"),  //TODO(JB): ticker 이름 받아오기
+      trade_engine_(trade_engine),
       risk_manager_(risk_manager),
       logger_(logger),
       fast_clock_(kCpuHzEstimate, kInterval) {
-  //TODO(JB): ticker 이름 받아오기
-  ticker_side_order_["BTCUSDT"] = OMOrderSideHashMap{};
   logger_->info("[Constructor] OrderManager Construct");
 }
 OrderManager::~OrderManager() {
   logger_->info("[Destructor] OrderManager Destroy");
 }
 
-void OrderManager::on_order_updated(
-    const ExecutionReport* client_response) noexcept {
-  Order* order = find_order(client_response->symbol, client_response->side,
-                            client_response->cl_order_id);
-  if (UNLIKELY(!order)) {
-    logger_->error("[CRITICAL]Order sent but, No order in the program!!!");
+void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
+
+  auto& side_book = layer_book_.side_book(response->symbol, response->side);
+  int layer = LayerBook::find_layer_by_id(side_book, response->cl_order_id);
+  if (layer < 0) {
+    const uint64_t tick =
+        to_ticks(response->price.value,
+                 kTickSize);  // TODO(JB): 심볼별 tick_size 사용
+    layer = LayerBook::find_layer_by_ticks(side_book, tick);
+  }
+  if (layer < 0) {
+    logger_->error(
+        std::format("[Updated] on_order_updated: layer not found. response={}",
+                    response->toString()));
     return;
   }
 
-  switch (client_response->ord_status) {
-    case OrdStatus::kNew: {
-      order->order_state = OMOrderState::kLive;
-    } break;
-    case OrdStatus::kPartiallyFilled: {
-    } break;
-    case OrdStatus::kFilled: {
-      order->qty = client_response->leaves_qty;
-      if (order->qty.value == 0.) {
-        order->order_state = OMOrderState::kDead;
-      }
-      logger_->info(std::format("[Updated] Completed order:{}",
-                                client_response->toString()));
-    } break;
-    case OrdStatus::kCanceled: {
-      order->order_state = OMOrderState::kDead;
-    } break;
-    case OrdStatus::kPendingCancel: {
-    } break;
-    case OrdStatus::kRejected: {
-      logger_->error(std::format("[Updated] Rejected report:{}",
-                                 client_response->toString()));
-      order->order_state = OMOrderState::kDead;
-    } break;
+  auto& slot = side_book.slots[layer];
+
+  switch (response->ord_status) {
     case OrdStatus::kPendingNew: {
+      slot.state = OMOrderState::kPendingNew;
+      break;
+    }
+    case OrdStatus::kNew: {
+      slot.state = OMOrderState::kLive;
+      slot.price = response->price;
+      slot.qty = response->leaves_qty;
+      slot.cl_order_id = response->cl_order_id;
+      logger_->info(std::format("[Updated] New {}", response->toString()));
+      break;
+    }
+    case OrdStatus::kPartiallyFilled: {
+      slot.qty = response->leaves_qty;
+      slot.state = (response->leaves_qty.value <= 0.0) ? OMOrderState::kDead
+                                                       : OMOrderState::kLive;
+      if (slot.state == OMOrderState::kDead) {
+        LayerBook::unmap_layer(side_book, layer);
+      }
+      logger_->info(
+          std::format("[Updated] PartiallyFilled {}", response->toString()));
+      break;
+    }
+    case OrdStatus::kFilled: {
+      slot.qty = response->leaves_qty;  // 보통 0
+      slot.state = OMOrderState::kDead;
+      LayerBook::unmap_layer(side_book, layer);
+      logger_->info(std::format("[Updated] Filled {}", response->toString()));
+      break;
+    }
+    case OrdStatus::kPendingCancel: {
+      slot.state = OMOrderState::kPendingCancel;
+      break;
+    }
+    case OrdStatus::kCanceled: {
+      slot.state = OMOrderState::kDead;
+      LayerBook::unmap_layer(side_book, layer);
+      logger_->info(std::format("[Updated] Canceled {}", response->toString()));
+      break;
+    }
+    case OrdStatus::kRejected: {
+      slot.state = OMOrderState::kDead;
+      LayerBook::unmap_layer(side_book, layer);
+      logger_->error(
+          std::format("[Updated] Rejected {}", response->toString()));
+      break;
     }
     case OrdStatus::kExpired: {
-      logger_->error(std::format("[Updated] Expired report:{}",
-                                 client_response->toString()));
-      order->order_state = OMOrderState::kDead;
-    } break;
+      slot.state = OMOrderState::kDead;
+      LayerBook::unmap_layer(side_book, layer);
+      logger_->error(std::format("[Updated] Expired {}", response->toString()));
+      break;
+    }
+    default: {
+      logger_->error(
+          std::format("[Updated] on_order_updated: unknown OrdStatus {}",
+                      toString(response->ord_status)));
+      break;
+    }
   }
 }
 
-void OrderManager::new_order(Order* order, const common::TickerId& ticker_id,
-                             common::Price price, common::Side side,
-                             common::Qty qty) noexcept {
+void OrderManager::new_order(const TickerId& ticker_id, Price price, Side side,
+                             Qty qty) noexcept {
   const RequestCommon new_request{
       .req_type = ReqeustType::kNewSingleOrderData,
       .cl_order_id = OrderId{fast_clock_.get_timestamp()},
@@ -90,144 +134,69 @@ void OrderManager::new_order(Order* order, const common::TickerId& ticker_id,
       .price = price};
   trade_engine_->send_request(new_request);
 
-  *order = {ticker_id, new_request.cl_order_id,  side, price,
-            qty,       OMOrderState::kPendingNew};
-
-  logger_->info(std::format("[Request] new_order {} for {}",
-                            new_request.toString(), order->toString()));
+  logger_->info(std::format("Sent new order {}", new_request.toString()));
 }
 
-void OrderManager::cancel_order(Order* order) noexcept {
+void OrderManager::modify_order(const TickerId& ticker_id,
+                                const OrderId& order_id, Price price, Side side,
+                                Qty qty) noexcept {
+  const RequestCommon new_request{
+      .req_type = ReqeustType::kOrderCancelRequestAndNewOrderSingle,
+      .cl_order_id = OrderId{fast_clock_.get_timestamp()},
+      .orig_cl_order_id = order_id,
+      .symbol = ticker_id,
+      .side = side,
+      .order_qty = qty,
+      .price = price};
+  trade_engine_->send_request(new_request);
+
+  logger_->info(
+      std::format("[Request]Sent new order {}", new_request.toString()));
+}
+
+void OrderManager::cancel_order(const TickerId& ticker_id,
+                                const OrderId& order_id) noexcept {
   const RequestCommon cancel_request{
       .req_type = ReqeustType::kOrderCancelRequest,
       .cl_order_id = OrderId{fast_clock_.get_timestamp()},
-      .symbol = order->ticker_id};
+      .orig_cl_order_id = order_id,
+      .symbol = ticker_id};
   trade_engine_->send_request(cancel_request);
 
-  order->order_state = OMOrderState::kPendingCancel;
-
-  logger_->info(std::format("[Request] cancel_order {} for {}",
-                            cancel_request.toString(), order->toString()));
+  logger_->info(std::format("Sent cancel {}", cancel_request.toString()));
 }
 
-void OrderManager::move_order(Order* order, const common::TickerId& ticker_id,
-                              const common::Price price,
-                              const common::Side side,
-                              const common::Qty qty) noexcept {
-  switch (order->order_state) {
-    case OMOrderState::kLive: {
-      if (order->price != price) {
-#ifdef MEASUREMENT
-        START_MEASURE(Trading_OrderManager_cancelOrder);
-#endif
-        cancel_order(order);
-#ifdef MEASUREMENT
-        END_MEASURE(Trading_OrderManager_cancelOrder, logger_);
-#endif
-      }
-    } break;
-    case OMOrderState::kInvalid:
-    case OMOrderState::kDead: {
-      if (LIKELY(price != common::kPriceInvalid)) {
-#ifdef MEASUREMENT
-        START_MEASURE(Trading_RiskManager_checkPreTradeRisk);
-#endif
-        const auto risk_result =
-            risk_manager_.checkPreTradeRisk(ticker_id, side, qty);
-#ifdef MEASUREMENT
-        END_MEASURE(Trading_RiskManager_checkPreTradeRisk, logger_);
-#endif
-        if (LIKELY(risk_result == RiskCheckResult::kAllowed)) {
-#ifdef MEASUREMENT
-          START_MEASURE(Trading_OrderManager_newOrder);
-#endif
-          new_order(order, ticker_id, price, side, qty);
-#ifdef MEASUREMENT
-          END_MEASURE(Trading_OrderManager_newOrder, logger_);
-#endif
-        } else
-          logger_->info(std::format(
-              "[OrderState] Ticker:{} Side:{} Qty:{} RiskCheckResult:{}",
-              ticker_id, toString(side), toString(qty),
-              riskCheckResultToString(risk_result)));
-      }
-    } break;
-    case OMOrderState::kPendingNew:
-    case OMOrderState::kPendingCancel:
-      break;
+void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
+  START_MEASURE(Trading_OrderManager_apply);
+  auto actions = order::QuoteReconciler::diff(intents, layer_book_, kTickSize,
+                                              fast_clock_);
+  filter_by_risk(intents, actions);
+
+  const auto& ticker = intents.front().ticker;
+
+  for (auto& action : actions.news) {
+    new_order(ticker, action.price, action.side, action.qty);
   }
-}
-
-void OrderManager::move_order(const common::TickerId& ticker_id,
-                              const common::Price bid_price,
-                              const common::Side side,
-                              const common::Qty& qty) noexcept {
-#ifdef MEASUREMENT
-  START_MEASURE(Trading_OrderManager_moveOrder);
-#endif
-  Order* order = prepare_order(ticker_id, side);
-  if (UNLIKELY(!order)) {
-    logger_->error("[Order] No available!!!");
-    return;
+  for (auto& action : actions.repls) {
+    modify_order(ticker, action.cl_order_id, action.price, action.side,
+                 action.qty);
   }
-  move_order(order, ticker_id, bid_price, side, qty);
-#ifdef MEASUREMENT
-  END_MEASURE(Trading_OrderManager_moveOrder, logger_);
-#endif
-}
-// NOLINTEND(bugprone-easily-swappable-parameters)
-
-Order* OrderManager::find_order(const std::string& ticker, common::Side side,
-                                common::OrderId order_id) {
-  const auto iter = ticker_side_order_.find(ticker);
-  if (iter == ticker_side_order_.end())
-    return nullptr;
-
-  const auto idx = common::sideToIndex(side);
-  if (idx >= common::sideToIndex(common::Side::kTrade))
-    return nullptr;
-
-  auto& slots = iter->second[static_cast<std::size_t>(idx)];
-  for (auto& ord : slots) {
-    if (ord.order_state == OMOrderState::kDead)
-      continue;
-    if (ord.order_id == order_id)
-      return &ord;
+  for (auto& action : actions.cancels) {
+    cancel_order(ticker, action.cl_order_id);
   }
-  return nullptr;
+  END_MEASURE(Trading_OrderManager_apply, logger_);
 }
 
-Order* OrderManager::prepare_order(const std::string& ticker, common::Side side,
-                                   bool create_if_missing) {
-  const auto idx = common::sideToIndex(side);
-  if (idx >= common::sideToIndex(common::Side::kTrade))
-    return nullptr;
-
-  if (create_if_missing) {
-    auto& slots = ticker_side_order_[ticker][static_cast<std::size_t>(idx)];
-    for (auto& ord : slots) {
-      if (ord.order_state == OMOrderState::kDead)
-        return &ord;
+void OrderManager::filter_by_risk(const std::vector<QuoteIntent>& intents,
+                                  order::Actions& acts) const {
+  const auto& ticker = intents.empty() ? std::string{} : intents.front().ticker;
+  for (auto action = acts.news.begin(); action != acts.news.end();) {
+    if (risk_manager_.checkPreTradeRisk(ticker, action->side, action->qty) ==
+        RiskCheckResult::kAllowed) {
+      ++action;
+    } else {
+      action = acts.news.erase(action);
     }
-    for (auto& ord : slots) {
-      if (ord.order_state == OMOrderState::kInvalid)
-        return &ord;
-    }
-    return nullptr;
   }
-  const auto iter = ticker_side_order_.find(ticker);
-  if (iter == ticker_side_order_.end())
-    return nullptr;
-
-  auto& slots = iter->second[static_cast<std::size_t>(idx)];
-  for (auto& ord : slots) {
-    if (ord.order_state == OMOrderState::kDead)
-      return &ord;
-  }
-  for (auto& ord : slots) {
-    if (ord.order_state == OMOrderState::kInvalid)
-      return &ord;
-  }
-  return nullptr;
 }
 }  // namespace trading

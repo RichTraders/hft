@@ -71,9 +71,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::write_loop() {
     std::string msg;
 
     while (queue_->dequeue(msg)) {
-#ifdef MEASUREMENT
       START_MEASURE(TLS_WRITE);
-#endif
       auto result =
           tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
       if (result < 0) {
@@ -85,9 +83,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::write_loop() {
         thread_running_ = false;
         break;
       }
-#ifdef MEASUREMENT
       END_MEASURE(TLS_WRITE, logger_);
-#endif
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(kWriteThreadSleep));
   }
@@ -97,15 +93,10 @@ template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadN
 void FixApp<Derived, ReadThreadName, WriteThreadName>::read_loop() {
   std::string received_buffer;
   while (thread_running_) {
-#ifdef MEASUREMENT
     START_MEASURE(TLS_READ);
-#endif
     std::array<char, kReadBufferSize> buf;
     const int read = tls_sock_->read(buf.data(), buf.size());
-
-#ifdef MEASUREMENT
     END_MEASURE(TLS_READ, logger_);
-#endif
     if (read <= 0) {
       std::this_thread::yield();
       continue;
@@ -201,7 +192,6 @@ bool FixApp<Derived, ReadThreadName, WriteThreadName>::strip_to_header(std::stri
 template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
 std::string FixApp<Derived, ReadThreadName, WriteThreadName>::get_signature_base64(
     const std::string& timestamp) const {
-  // TODO(jb): use config reader
   EVP_PKEY* private_key = Util::load_ed25519(
       AUTHORIZATION.get_pem_file_path(),
       AUTHORIZATION.get_private_password().c_str());

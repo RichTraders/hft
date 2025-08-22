@@ -261,14 +261,10 @@ MarketUpdateData FixMdCore::create_snapshot_data_message(FIX8::Message* msg) {
 }
 
 FIX8::Message* FixMdCore::decode(const std::string& message) {
-#ifdef MEASUREMENT
   START_MEASURE(Convert_Message);
-#endif
   FIX8::Message* msg(FIX8::Message::factory(ctx(), message, true, true));
-#ifdef MEASUREMENT
   END_MEASURE(Convert_Message, logger_);
-#endif
-  if (likely(msg)) {
+  if (LIKELY(msg)) {
     return msg;
   }
   return nullptr;

@@ -15,7 +15,9 @@
 #include "risk_manager.h"
 
 #include "fast_clock.h"
+#include "layer_book.h"
 #include "orders.h"
+#include "quote_reconciler.h"
 
 namespace trading {
 class TradeEngine;
@@ -25,24 +27,18 @@ class OrderManager {
   OrderManager(common::Logger* logger, TradeEngine* trade_engine,
                RiskManager& risk_manager);
   ~OrderManager();
-  void on_order_updated(const ExecutionReport* client_response) noexcept;
+  void on_order_updated(const ExecutionReport* response) noexcept;
 
-  void new_order(Order* order, const common::TickerId& ticker_id,
-                 common::Price price, common::Side side,
-                 common::Qty qty) noexcept;
+  void new_order(const common::TickerId& ticker_id, common::Price price,
+                 common::Side side, common::Qty qty) noexcept;
+  void modify_order(const common::TickerId& ticker_id,
+                    const common::OrderId& order_id, common::Price price,
+                    common::Side side, common::Qty qty) noexcept;
 
-  void cancel_order(Order* order) noexcept;
+  void cancel_order(const common::TickerId& ticker_id,
+                    const common::OrderId& order_id) noexcept;
 
-  void move_order(Order* order, const common::TickerId& ticker_id,
-                  common::Price price, common::Side side,
-                  common::Qty qty) noexcept;
-
-  void move_order(const common::TickerId& ticker_id, common::Price bid_price,
-                  common::Side side, const common::Qty& qty) noexcept;
-
-  static bool isWorking(const OMOrderState state) noexcept {
-    return (state == OMOrderState::kLive);
-  }
+  void apply(const std::vector<QuoteIntent>& intents) noexcept;
 
   OrderManager() = delete;
 
@@ -55,17 +51,15 @@ class OrderManager {
   OrderManager& operator=(const OrderManager&&) = delete;
 
  private:
+  order::LayerBook layer_book_;
+  order::QuoteReconciler reconciler_;
   TradeEngine* trade_engine_ = nullptr;
   const RiskManager& risk_manager_;
   common::Logger* logger_ = nullptr;
-  OMOrderTickerSideHashMap ticker_side_order_;
   common::FastClock fast_clock_;
 
-  Order* find_order(const std::string& ticker, common::Side side,
-                    common::OrderId order_id);
-
-  Order* prepare_order(const std::string& ticker, common::Side side,
-                       bool create_if_missing = true);
+  void filter_by_risk(const std::vector<QuoteIntent>& intents,
+                      order::Actions& acts) const;
 };
 }  // namespace trading
 

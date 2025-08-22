@@ -43,9 +43,11 @@ std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
   Logon request;
 
   FIX8::MessageBase* header = request.Header();
-  *header << new SenderCompID(sender_comp_id_)
-          << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
-          << new SendingTime(timestamp);
+  *header
+      << new SenderCompID(sender_comp_id_)
+      << new TargetCompID(target_comp_id_)
+      << new MsgSeqNum(sequence_++)
+      << new SendingTime(timestamp);
   
   request << new EncryptMethod(EncryptMethod_NONE)
       << new HeartBtInt(30)
@@ -188,7 +190,7 @@ std::string FixMdCore::create_trade_data_subscription_message(
   return wire;
 }
 
-std::string FixMdCore::request_instrument_list_message() {
+std::string FixMdCore::create_instrument_list_request_message() {
   FIX8::NewOroFix44MD::InstrumentListRequest request(false);
   request.Header()->add_field(new SenderCompID(sender_comp_id_));
   request.Header()->add_field(new TargetCompID(target_comp_id_));
@@ -211,17 +213,21 @@ MarketUpdateData FixMdCore::create_market_data_message(FIX8::Message* msg) {
     if (unlikely(!entry))
       continue;
     const auto* side = entry->get<MDEntryType>();       // 269
-    const auto* price = entry->get<MDEntryPx>();        // 270
-    const auto* qty = entry->get<MDEntrySize>();        // 271
-    const auto* action = entry->get<MDUpdateAction>();  //279
-    data[i] = market_data_pool_->allocate(
-        (charToSide(side->get()) == common::Side::kTrade)
-            ? MarketUpdateType::kTrade
-            : charToMarketUpdateType(action->get()),
-        OrderId{kOrderIdInvalid}, symbol->get(), side->get(),
-        common::Price{static_cast<float>(price->get())},
-        qty == nullptr ? Qty{kQtyInvalid}
-                       : Qty{static_cast<float>(qty->get())});
+    const auto* price = entry->get<MDEntryPx>();       // 270
+    const auto* qty = entry->get<MDEntrySize>();       // 271
+    const auto* action = entry->get<MDUpdateAction>();  // 279
+    data[i] =
+        market_data_pool_->allocate(
+            (charToSide(side->get()) == common::Side::kTrade)
+              ? MarketUpdateType::kTrade
+              : charToMarketUpdateType(action->get()),
+            OrderId{kOrderIdInvalid},
+            symbol->get(),
+            side->get(),
+            common::Price{static_cast<float>(price->get())},
+            qty == nullptr
+              ? Qty{kQtyInvalid}
+              : Qty{static_cast<float>(qty->get())});
   }
   return MarketUpdateData(std::move(data));
 }
@@ -232,28 +238,35 @@ MarketUpdateData FixMdCore::create_snapshot_data_message(FIX8::Message* msg) {
 
   std::vector<MarketData*> data(entries->size() + 1);
   int index = 0;
-  data[index++] = market_data_pool_->allocate(
-      MarketUpdateType::kClear, OrderId{kOrderIdInvalid},
-      TickerId{symbol->get()}, common::Side::kInvalid,
-      common::Price{kPriceInvalid}, Qty{kQtyInvalid});
+  data[index++] =
+      market_data_pool_->allocate(
+          MarketUpdateType::kClear,
+          OrderId{},
+          TickerId{symbol->get()},
+          Side::kInvalid,
+          Price{},
+          Qty{});
 
   for (size_t i = 0; i < entries->size(); ++i) {
     const FIX8::MessageBase* entry = entries->get_element(i);
     if (unlikely(!entry))
       continue;
-    const auto* side = entry->get<MDEntryType>();  // 269
+    const auto* side = entry->get<MDEntryType>();   // 269
     const auto* price = entry->get<MDEntryPx>();   // 270
     const auto* qty = entry->get<MDEntrySize>();   // 271
-    data[index++] = market_data_pool_->allocate(
-        MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
-        TickerId{symbol->get()}, common::charToSide(side->get()),
-        common::Price{static_cast<float>(price->get())},
-        Qty{static_cast<float>(qty->get())});
+    data[index++] =
+        market_data_pool_->allocate(
+            MarketUpdateType::kAdd,
+            OrderId{kOrderIdInvalid},
+            TickerId{symbol->get()},
+            common::Side{side->get()},
+            common::Price{static_cast<float>(price->get())},
+            Qty{static_cast<float>(qty->get())});
   }
   return MarketUpdateData(std::move(data));
 }
 
-InstrumentInfo FixMdCore::response_instrument_list_message(FIX8::Message* msg) {
+InstrumentInfo FixMdCore::create_instrument_list_message(FIX8::Message* msg) {
   InstrumentInfo out{};
   if (!msg) return out;
 

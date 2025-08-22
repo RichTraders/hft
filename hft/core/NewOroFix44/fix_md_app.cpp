@@ -74,12 +74,12 @@ MarketUpdateData FixMarketDataApp::create_snapshot_data_message(
 }
 
 std::string FixMarketDataApp::request_instrument_list_message() {
-  return fix_md_core_->request_instrument_list_message();
+  return fix_md_core_->create_instrument_list_request_message();
 }
 
 InstrumentInfo FixMarketDataApp::create_instrument_list_message(
     FIX8::Message* msg) {
-  return fix_md_core_->response_instrument_list_message(msg);
+  return fix_md_core_->create_instrument_list_message(msg);
 }
 
 MarketDataReject FixMarketDataApp::create_reject_message(FIX8::Message* msg) {

@@ -203,9 +203,8 @@ void OrderManager::filter_by_risk(const std::vector<QuoteIntent>& intents,
     }
   }
   for (auto action = acts.repls.begin(); action != acts.repls.end();) {
-    if (risk_manager_.checkPreTradeRisk(
-            ticker, action->side,
-            Qty{action->qty.value - action->last_qty.value}) ==
+    if (risk_manager_.checkPreTradeRisk(ticker, action->side,
+                                        action->qty - action->last_qty) ==
         RiskCheckResult::kAllowed) {
       ++action;
     } else {

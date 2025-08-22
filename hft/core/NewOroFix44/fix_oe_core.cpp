@@ -99,28 +99,26 @@ std::string FixOeCore::create_order_message(
 
   FIX8::MessageBase* header = request.Header();
   *header << new SenderCompID(sender_comp_id_)
-          << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
+          << new TargetCompID(target_comp_id_)
+          << new MsgSeqNum(sequence_++)
           << new SendingTime();
-
-  auto data = std::to_string(order_data.order_qty.value);
 
   request.add_field(new ClOrdID(std::to_string(order_data.cl_order_id.value)));
   request.add_field(new Symbol(order_data.symbol));
   request.add_field(new Side(trading::to_char(order_data.side)));
   request.add_field(new OrdType(trading::to_char(order_data.ord_type)));
-  //request.add_field(new OrderQty(format_fixed(order_data.order_qty.value, 6)));
   request.add_field(new OrderQty(order_data.order_qty.value));
   request.add_field(new SelfTradePreventionMode(
       trading::to_char(order_data.self_trade_prevention_mode)));
 
   if (order_data.ord_type == trading::OrderType::kLimit) {
     // Limit 주문일 때만
-    request.add_field(new Price(std::to_string(order_data.price.value)));
+    request.add_field(new Price(order_data.price.value));
     request.add_field(
         new TimeInForce(trading::to_char(order_data.time_in_force)));
   }
-  if (auto* scid = static_cast<OrderQty*>(request.get_field(38)))
-    scid->set_precision(6);
+  static_cast<OrderQty*>(request.get_field(38))->set_precision(6); //Qty
+  static_cast<OrderQty*>(request.get_field(44))->set_precision(2); //Price
 
   /*
    * SelfTradePreventionMode

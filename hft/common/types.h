@@ -109,7 +109,7 @@ struct Qty {
   double value{std::numeric_limits<double>::max()};
 
   Qty() = default;
-  explicit Qty(double data) : value(data) {}
+  constexpr explicit Qty(double data) : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<double>::max();
@@ -127,62 +127,63 @@ struct Qty {
     value += other.value;
     return *this;
   }
-
   constexpr Qty& operator+=(double other) {
     value += other;
     return *this;
   }
-
   constexpr Qty& operator-=(const Qty& other) {
     value -= other.value;
     return *this;
   }
-
   constexpr Qty& operator-=(double other) {
     value -= other;
     return *this;
   }
-
-  // constexpr Qty operator-(Qty lhs, const Qty& rhs) noexcept {
-  //   lhs -= rhs;
-  //   return lhs;
-  // }
-  //
-  // constexpr Qty operator-(Qty lhs, double rhs) const noexcept {
-  //   lhs -= rhs;
-  //   return lhs;
-  // }
-  //
-  // constexpr Qty operator-(double lhs, const Qty& rhs) const noexcept {
-  //   return Qty{lhs - rhs.value};
-  // }
-  //
-  // constexpr Qty operator-(Qty q) const noexcept {
-  //   q.value = -q.value;
-  //   return q;
-  // }
-
-  constexpr Qty& operator*(const Qty& other) {
-    value *= other.value;
-    return *this;
-  }
-
-  constexpr Qty& operator*(double other) {
-    value *= other;
-    return *this;
-  }
-
   constexpr Qty& operator*=(double other) {
     value *= other;
     return *this;
   }
+  constexpr Qty operator-() const noexcept { return Qty{-value}; }
 
   explicit operator double() const { return value; }
+
+  friend constexpr Qty operator+(Qty lhs, const Qty& rhs) noexcept {
+    lhs += rhs;
+    return lhs;
+  }
+  friend constexpr Qty operator+(Qty lhs, double rhs) noexcept {
+    lhs += rhs;
+    return lhs;
+  }
+  friend constexpr Qty operator+(double lhs, Qty rhs) noexcept {
+    rhs += lhs;
+    return rhs;
+  }
+
+  friend constexpr Qty operator-(Qty lhs, const Qty& rhs) noexcept {
+    lhs -= rhs;
+    return lhs;
+  }
+  friend constexpr Qty operator-(Qty lhs, double rhs) noexcept {
+    lhs -= rhs;
+    return lhs;
+  }
+  friend constexpr Qty operator-(double lhs, const Qty& rhs) noexcept {
+    return Qty{lhs - rhs.value};
+  }
+
+  friend constexpr Qty operator*(Qty lhs, double rhs) noexcept {
+    lhs *= rhs;
+    return lhs;
+  }
+  friend constexpr Qty operator*(double lhs, Qty rhs) noexcept {
+    rhs *= lhs;
+    return rhs;
+  }
 };
 
 inline auto toString(Qty qty) -> std::string {
-  return UNLIKELY(!qty.is_valid()) ? "INVALID"
-                                   : std::to_string(static_cast<double>(qty));
+  return UNLIKELY(!qty.is_valid()) ? "INVALID" : std::to_string(qty.value);
 }
 
 constexpr auto kQtyInvalid = std::numeric_limits<double>::max();

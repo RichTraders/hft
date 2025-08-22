@@ -14,6 +14,9 @@
 #include "fix_md_core.h"
 #include "authorization.h"
 
+namespace FIX8::NewOroFix44MD {
+class InstrumentList;
+}
 namespace core {
 
 FixMarketDataApp::FixMarketDataApp(const std::string& sender_comp_id,
@@ -68,6 +71,19 @@ MarketUpdateData FixMarketDataApp::create_market_data_message(
 MarketUpdateData FixMarketDataApp::create_snapshot_data_message(
     FIX8::Message* msg) {
   return fix_md_core_->create_snapshot_data_message(msg);
+}
+
+std::string FixMarketDataApp::request_instrument_list_message() {
+  return fix_md_core_->request_instrument_list_message();
+}
+
+InstrumentInfo FixMarketDataApp::create_instrument_list_message(
+    FIX8::Message* msg) {
+  return fix_md_core_->response_instrument_list_message(msg);
+}
+
+MarketDataReject FixMarketDataApp::create_reject_message(FIX8::Message* msg) {
+  return fix_md_core_->create_reject_message(msg);
 }
 
 FIX8::Message* FixMarketDataApp::decode(const std::string& message) {

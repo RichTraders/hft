@@ -133,7 +133,9 @@ void OrderManager::new_order(const TickerId& ticker_id, Price price, Side side,
       .symbol = ticker_id,
       .side = side,
       .order_qty = qty,
-      .price = price};
+      .ord_type = OrderType::kLimit,
+      .price = price,
+      .time_in_force = TimeInForce::kGoodTillCancel};
   trade_engine_->send_request(new_request);
 
   logger_->info(std::format("Sent new order {}", new_request.toString()));
@@ -198,6 +200,16 @@ void OrderManager::filter_by_risk(const std::vector<QuoteIntent>& intents,
       ++action;
     } else {
       action = acts.news.erase(action);
+    }
+  }
+  for (auto action = acts.repls.begin(); action != acts.repls.end();) {
+    if (risk_manager_.checkPreTradeRisk(
+            ticker, action->side,
+            Qty{action->qty.value - action->last_qty.value}) ==
+        RiskCheckResult::kAllowed) {
+      ++action;
+    } else {
+      action = acts.repls.erase(action);
     }
   }
 }

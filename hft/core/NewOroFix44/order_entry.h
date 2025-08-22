@@ -340,6 +340,21 @@ struct ResponseCommon {
   OrderCancelReject* order_cancel_reject = nullptr;
   OrderMassCancelReport* order_mass_cancel_report = nullptr;
 };
-//struct OrderAmendKeepPriorityRequest {}; 차후에 필요할지도
+// TODO(CH) struct OrderAmendKeepPriorityRequest {}; 차후에 필요할지도
 
+struct OrderReject {
+  std::string session_reject_reason;
+  int rejected_message_type;
+  std::string error_message;
+  int error_code;
+  [[nodiscard]] std::string toString() const {
+    std::ostringstream stream;
+    stream << "OrderReject{"
+           << "session_reject_reason=" << session_reject_reason
+           << ", rejected_message_type=" << rejected_message_type
+           << ", error_code=" << error_code
+           << ", error_message=" << std::quoted(error_message) << "}";
+    return stream.str();
+  }
+};
 }  // namespace trading

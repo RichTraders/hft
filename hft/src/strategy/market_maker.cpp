@@ -16,7 +16,7 @@
 #include "order_book.h"
 #include "order_manager.h"
 
-constexpr double kPositionVariance = 1.6;
+constexpr double kPositionVariance = 1.6 / 1e6;
 constexpr double kEnterThreshold = 1.;
 constexpr double kExitThreshold = 0.8;
 using common::Qty;
@@ -30,8 +30,17 @@ MarketMaker::MarketMaker(OrderManager* const order_manager,
     : BaseStrategy(order_manager, feature_engine, logger) {}
 
 void MarketMaker::on_orderbook_updated(
-    const common::TickerId& ticker, common::Price, common::Side,
+    const common::TickerId& ticker, common::Price, Side,
     const MarketOrderBook* order_book) noexcept {
+  const auto* bbo = order_book->get_bbo();
+  if (bbo->bid_qty.value == common::kQtyInvalid ||
+      bbo->ask_qty.value == common::kQtyInvalid ||
+      bbo->bid_price.value == common::kPriceInvalid ||
+      bbo->ask_price.value == common::kPriceInvalid ||
+      bbo->ask_price.value < bbo->bid_price.value) {
+    logger_->debug("Invalid BBO. Skipping quoting.");
+    return;
+  }
 
   std::vector<double> bid_qty(kVwapSize);
   std::vector<double> ask_qty(kVwapSize);
@@ -47,28 +56,41 @@ void MarketMaker::on_orderbook_updated(
   const auto mid = (order_book->get_bbo()->bid_price.value +
                     order_book->get_bbo()->ask_price.value) *
                    0.5;
-  const auto delta = (mid - vwap) / spread;
+  const double denom = std::max({spread, 0.01});
+  const auto delta = (mid - vwap) / denom;
+  if (!std::isfinite(spread) || spread <= 0.0) {
+    logger_->debug(
+        std::format("Non-positive spread ({}). Using denom={}", spread, denom));
+  }
   const auto signal = delta * obi;
 
   std::vector<QuoteIntent> intents;
   intents.reserve(4);
 
+  logger_->info(std::format(
+      "[Updated] delta:{} obi:{} signal:{} mid:{}, vwap:{}, spread:{}", delta,
+      obi, signal, mid, vwap, spread));
+
   if (delta * obi > kEnterThreshold) {
     //TODO(JB): Implement qty clip using ticker_cfg
     const auto best_bid_price = order_book->get_bbo()->bid_price;
-    intents.push_back(QuoteIntent{ticker, Side::kBuy, best_bid_price,
-                                  Qty{delta * obi * kPositionVariance}});
+    intents.push_back(QuoteIntent{.ticker = ticker,
+                                  .side = Side::kBuy,
+                                  .price = best_bid_price,
+                                  .qty = Qty{delta * obi * kPositionVariance}});
 
     logger_->info(std::format("Order Created! price:{}, qty:{}",
                               best_bid_price.value,
                               delta * obi * kPositionVariance));
   } else if (delta * obi < -kEnterThreshold) {
     const auto best_ask_price = order_book->get_bbo()->ask_price;
-    intents.push_back(QuoteIntent{ticker, Side::kSell, best_ask_price,
-                                  Qty{delta * obi * kPositionVariance}});
-    logger_->info(std::format("Order Created! price:{}, qty:{}",
-                              best_ask_price.value,
-                              delta * obi * kPositionVariance));
+    intents.push_back(QuoteIntent{.ticker = ticker,
+                                  .side = Side::kSell,
+                                  .price = best_ask_price,
+                                  .qty = Qty{delta * obi * kPositionVariance}});
+    logger_->debug(std::format("Order Created! price:{}, qty:{}",
+                               best_ask_price.value,
+                               delta * obi * kPositionVariance));
   }
   if (std::abs(signal) < kExitThreshold) {
     intents.clear();

@@ -37,6 +37,9 @@ OrderGateway::OrderGateway(common::Logger* logger,
     on_order_mass_cancel_report(
         reinterpret_cast<FIX8::NewOroFix44OE::OrderMassCancelReport*>(msg));
   });
+  app_->register_callback("3", [&](FIX8::Message* msg) {
+    on_order_rejected(reinterpret_cast<FIX8::NewOroFix44OE::Reject*>(msg));
+  });
   app_->register_callback(
       "5", [this](auto&& msg) { on_logout(std::forward<decltype(msg)>(msg)); });
 
@@ -51,7 +54,7 @@ OrderGateway::~OrderGateway() {
   logger_->info("[Destructor] OrderGateway Destroy");
 }
 
-void OrderGateway::stop() {
+void OrderGateway::stop() const {
   app_->stop();
 }
 
@@ -59,12 +62,12 @@ void OrderGateway::init_trade_engine(TradeEngine* trade_engine) {
   trade_engine_ = trade_engine;
 }
 
-void OrderGateway::on_login(FIX8::Message*) {
+void OrderGateway::on_login(FIX8::Message*) const {
   logger_->info("[Message] login successful");
 }
 
 void OrderGateway::on_execution_report(
-    FIX8::NewOroFix44OE::ExecutionReport* msg) {
+    FIX8::NewOroFix44OE::ExecutionReport* msg) const {
   ResponseCommon res;
   res.res_type = ResponseType::kExecutionReport;
   res.execution_report = app_->create_execution_report_message(msg);
@@ -75,7 +78,7 @@ void OrderGateway::on_execution_report(
 }
 
 void OrderGateway::on_order_cancel_reject(
-    FIX8::NewOroFix44OE::OrderCancelReject* msg) {
+    FIX8::NewOroFix44OE::OrderCancelReject* msg) const {
   ResponseCommon res;
   res.res_type = ResponseType::kOrderCancelReject;
   res.order_cancel_reject = app_->create_order_cancel_reject_message(msg);
@@ -86,7 +89,7 @@ void OrderGateway::on_order_cancel_reject(
 }
 
 void OrderGateway::on_order_mass_cancel_report(
-    FIX8::NewOroFix44OE::OrderMassCancelReport* msg) {
+    FIX8::NewOroFix44OE::OrderMassCancelReport* msg) const {
   ResponseCommon res;
   res.res_type = ResponseType::kOrderMassCancelReport;
   res.order_mass_cancel_report =
@@ -97,12 +100,16 @@ void OrderGateway::on_order_mass_cancel_report(
   }
 }
 
-void OrderGateway::on_order_mass_status_response(FIX8::Message* msg) {
-  (void)msg;
+void OrderGateway::on_order_rejected(FIX8::NewOroFix44OE::Reject* msg) const {
+  const OrderReject reject = app_->create_reject_message(msg);
+  logger_->error(reject.toString());
+}
+
+void OrderGateway::on_order_mass_status_response(FIX8::Message*) const {
   logger_->info("on_order_mass_status_response");
 }
 
-void OrderGateway::on_logout(FIX8::Message*) {
+void OrderGateway::on_logout(FIX8::Message*) const {
   auto message = app_->create_log_out_message();
 
   if (UNLIKELY(!app_->send(message))) {
@@ -151,9 +158,11 @@ void OrderGateway::new_single_order_data(const RequestCommon& request) {
       .self_trade_prevention_mode = request.self_trade_prevention_mode};
 
   const std::string msg = app_->create_order_message(order_data);
+  logger_->info(std::format("Send order message:{}", msg));
 
   if (UNLIKELY(!app_->send(msg))) {
-    logger_->error("[Message] failed to send new_single_order_data");
+    logger_->error(std::format(
+        "[Message] failed to send new_single_order_data [msg:{}]", msg));
   }
 }
 

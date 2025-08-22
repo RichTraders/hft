@@ -152,6 +152,7 @@ TEST(QuoteReconcilerTest, ReplaceWhenQtyChangesBeyondThreshold) {
   const auto& r = acts.repls.front();
   EXPECT_EQ(r.cl_order_id.value, 33);
   EXPECT_EQ(r.price.value, 100);
+  EXPECT_EQ(r.last_qty, 1.0);
   EXPECT_DOUBLE_EQ(r.qty.value, 1.5);
   EXPECT_EQ(acts.news.size(), 0u);
   EXPECT_EQ(acts.cancels.size(), 0u);
@@ -200,7 +201,7 @@ TEST(QuoteReconcilerTest, VictimLiveLayerGeneratesCancelWithVictimId) {
   std::vector<QuoteIntent> intents = {{.ticker = kSym,
                                        .side = common::Side::kBuy,
                                        .price = common::Price(9999),
-                                       .qty = common::Qty{1.0}}};
+                                       .qty = common::Qty{3.0}}};
 
   auto acts = rec.diff(intents, lb, kTickSize, clk);
 
@@ -216,6 +217,8 @@ TEST(QuoteReconcilerTest, VictimLiveLayerGeneratesCancelWithVictimId) {
   ASSERT_EQ(acts.repls.size(), 1u);
   EXPECT_EQ(acts.repls.front().price.value, 9999);
   EXPECT_EQ(acts.repls.front().side, common::Side::kBuy);
+  EXPECT_EQ(acts.repls.front().qty, 3.0);
+  EXPECT_EQ(acts.repls.front().last_qty, 1.0);
 }
 
 TEST(QuoteReconcilerTest, BuySellIndependence) {

@@ -14,6 +14,20 @@
 #define MARKET_DATA_H
 
 #include "types.h"
+constexpr int kInstrumentReqID = 320;
+constexpr int kNoRelatedSym = 146;
+constexpr int kSymbol = 55;
+constexpr int kCurrency = 15;
+constexpr int kMinTradeVol = 562;
+constexpr int kMaxTradeVol = 1140;
+constexpr int kMinQtyIncrement = 25039;
+constexpr int kMarketMinTradeVol = 25040;
+constexpr int kMarketMaxTradeVol = 25041;
+constexpr int kMarketMinQtyIncrement = 25042;
+constexpr int kMinPriceIncrement = 969;
+
+constexpr int kQtyPrecision = 6;
+constexpr int kPricePrecision = 2;
 
 struct MarketData {
   common::MarketUpdateType type = common::MarketUpdateType::kInvalid;
@@ -71,5 +85,76 @@ struct MarketData {
 
 struct MarketUpdateData {
   std::vector<MarketData*> data;
+};
+
+struct InstrumentInfo {
+  std::string instrument_req_id;  // 320
+  int no_related_sym = 0;         // 146
+
+  struct RelatedSymT {
+    std::string symbol;                     // 55
+    std::string currency;                   // 15
+    double min_trade_vol = 0.0;             // 562
+    double max_trade_vol = 0.0;             // 1140
+    double min_qty_increment = 0.0;         // 25039
+    double market_min_trade_vol = 0.0;      // 25040
+    double market_max_trade_vol = 0.0;      // 25041
+    double market_min_qty_increment = 0.0;  // 25042
+    double min_price_increment = 0.0;       // 969
+
+    [[nodiscard]] std::string toString(int qty_prec = kQtyPrecision,
+                                       int px_prec = kPricePrecision) const {
+      std::ostringstream stream;
+      stream.setf(std::ios::fixed, std::ios::floatfield);
+      stream << "{symbol=" << symbol << ", currency=" << currency
+             << ", min_trade_vol=" << std::setprecision(qty_prec)
+             << min_trade_vol
+             << ", max_trade_vol=" << std::setprecision(qty_prec)
+             << max_trade_vol
+             << ", min_qty_increment=" << std::setprecision(qty_prec)
+             << min_qty_increment
+             << ", market_min_trade_vol=" << std::setprecision(qty_prec)
+             << market_min_trade_vol
+             << ", market_max_trade_vol=" << std::setprecision(qty_prec)
+             << market_max_trade_vol
+             << ", market_min_qty_increment=" << std::setprecision(qty_prec)
+             << market_min_qty_increment
+             << ", min_price_increment=" << std::setprecision(px_prec)
+             << min_price_increment << "}";
+      return stream.str();
+    }
+  };
+
+  std::vector<RelatedSymT> symbols;
+
+  [[nodiscard]] std::string toString(int qty_prec = kQtyPrecision,
+                                     int px_prec = kPricePrecision) const {
+    std::ostringstream stream;
+    stream << "fix_instrument_info{instrument_req_id=" << instrument_req_id
+           << ", no_related_sym=" << no_related_sym << ", symbols=[";
+    for (size_t idx = 0; idx < symbols.size(); ++idx) {
+      if (idx)
+        stream << ", ";
+      stream << symbols[idx].toString(qty_prec, px_prec);
+    }
+    stream << "]}";
+    return stream.str();
+  }
+};
+
+struct MarketDataReject {
+  std::string session_reject_reason;
+  int rejected_message_type;
+  std::string error_message;
+  int error_code;
+  [[nodiscard]] std::string toString() const {
+    std::ostringstream stream;
+    stream << "MarketDataReject{"
+           << "session_reject_reason=" << session_reject_reason
+           << ", rejected_message_type=" << rejected_message_type
+           << ", error_code=" << error_code
+           << ", error_message=" << std::quoted(error_message) << "}";
+    return stream.str();
+  }
 };
 #endif  //MARKET_DATA_H

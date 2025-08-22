@@ -22,13 +22,16 @@ struct ActionNew {
   common::Qty qty;
   common::Side side;
 };
+
 struct ActionReplace {
   int layer;
   common::Price price;
   common::Qty qty;
   common::Side side;
   common::OrderId cl_order_id;
+  common::Qty last_qty;
 };
+
 struct ActionCancel {
   int layer;
   common::Side side;
@@ -88,7 +91,8 @@ class QuoteReconciler {
                                              .price = *intent.price,
                                              .qty = intent.qty,
                                              .side = side,
-                                             .cl_order_id = vslot.cl_order_id});
+                                             .cl_order_id = vslot.cl_order_id,
+                                             .last_qty = vslot.qty});
           did_victim_this_side = true;
           continue;
         }
@@ -109,12 +113,12 @@ class QuoteReconciler {
           const bool qty_diff = (std::abs(slot.qty.value - intent.qty.value) >=
                                  kMinReplaceQtyDelta);
           if (price_diff || qty_diff) {
-            acts.repls.push_back(
-                ActionReplace{.layer = assign.layer,
-                              .price = *intent.price,
-                              .qty = intent.qty,
-                              .side = side,
-                              .cl_order_id = slot.cl_order_id});
+            acts.repls.push_back(ActionReplace{.layer = assign.layer,
+                                               .price = *intent.price,
+                                               .qty = intent.qty,
+                                               .side = side,
+                                               .cl_order_id = slot.cl_order_id,
+                                               .last_qty = slot.qty});
           }
         }
       }

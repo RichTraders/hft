@@ -22,7 +22,6 @@
 namespace core {
 using namespace FIX8::NewOroFix44MD;
 using namespace common;
-constexpr int kMarketDataPoolSize = 2048;
 constexpr int kEntries = 268;
 
 FixMdCore::FixMdCore(SendId sender_comp_id, TargetId target_comp_id,
@@ -44,12 +43,10 @@ std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
   Logon request;
 
   FIX8::MessageBase* header = request.Header();
-  *header
-      << new SenderCompID(sender_comp_id_)
-      << new TargetCompID(target_comp_id_)
-      << new MsgSeqNum(sequence_++)
-      << new SendingTime(timestamp);
-
+  *header << new SenderCompID(sender_comp_id_)
+          << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
+          << new SendingTime(timestamp);
+  
   request << new EncryptMethod(EncryptMethod_NONE)
       << new HeartBtInt(30)
       << new ResetSeqNumFlag(true)
@@ -97,8 +94,7 @@ std::string FixMdCore::create_heartbeat_message(FIX8::Message* message) {
 }
 
 std::string FixMdCore::create_market_data_subscription_message(
-    const RequestId& request_id,
-    const MarketDepthLevel& level,
+    const RequestId& request_id, const MarketDepthLevel& level,
     const SymbolId& symbol) {
   MarketDataRequest request(false);
   request.Header()->add_field(new SenderCompID(sender_comp_id_));
@@ -113,17 +109,17 @@ std::string FixMdCore::create_market_data_subscription_message(
     int count = 0;
     auto* entry_types = new MarketDataRequest::NoMDEntryTypes();
     FIX8::MessageBase* mb = entry_types->create_group(true);
-    mb->add_field(new MDEntryType('0')); // Bid
+    mb->add_field(new MDEntryType('0'));  // Bid
     entry_types->add(mb);
     count++;
 
     mb = entry_types->create_group(true);
-    mb->add_field(new MDEntryType('1')); // Ask
+    mb->add_field(new MDEntryType('1'));  // Ask
     entry_types->add(mb);
     count++;
 
     mb = entry_types->create_group(true);
-    mb->add_field(new MDEntryType('2')); // Trade
+    mb->add_field(new MDEntryType('2'));  // Trade
     entry_types->add(mb);
     count++;
 
@@ -134,18 +130,16 @@ std::string FixMdCore::create_market_data_subscription_message(
   {
     auto* entry_types = new MarketDataRequest::NoRelatedSym();
     FIX8::MessageBase* group = entry_types->create_group(true);
-    group->add_field(new Symbol(symbol)); // Bid
+    group->add_field(new Symbol(symbol));  // Bid
 
     entry_types->add(group);
     request.add_field(new NoRelatedSym(1));
     request.add_group(entry_types);
   }
 
-  request << new MDReqID(request_id)
-      << new SubscriptionRequestType('1')
+  request << new MDReqID(request_id) << new SubscriptionRequestType('1')
 
-      << new MarketDepth(level)
-      << new AggregatedBook(true);
+          << new MarketDepth(level) << new AggregatedBook(true);
 
   std::string wire;
   request.encode(wire);
@@ -154,8 +148,7 @@ std::string FixMdCore::create_market_data_subscription_message(
 
 //Does it really need?
 std::string FixMdCore::create_trade_data_subscription_message(
-    const RequestId& request_id,
-    const MarketDepthLevel& level,
+    const RequestId& request_id, const MarketDepthLevel& level,
     const SymbolId& symbol) {
   MarketDataRequest request(false);
   request.Header()->add_field(new SenderCompID(sender_comp_id_));
@@ -169,7 +162,7 @@ std::string FixMdCore::create_trade_data_subscription_message(
   {
     auto* entry_types = new MarketDataRequest::NoMDEntryTypes();
     FIX8::MessageBase* message = entry_types->create_group(true);
-    message->add_field(new MDEntryType('2')); // Bid
+    message->add_field(new MDEntryType('2'));  // Bid
     entry_types->add(message);
 
     request.add_field(new NoMDEntryTypes(1));
@@ -186,12 +179,23 @@ std::string FixMdCore::create_trade_data_subscription_message(
     request.add_group(entry_types);
   }
 
-  request << new MDReqID(request_id)
-      << new SubscriptionRequestType('1')
+  request << new MDReqID(request_id) << new SubscriptionRequestType('1')
 
-      << new MarketDepth(level)
-      << new AggregatedBook(true);
+          << new MarketDepth(level) << new AggregatedBook(true);
 
+  std::string wire;
+  request.encode(wire);
+  return wire;
+}
+
+std::string FixMdCore::request_instrument_list_message() {
+  FIX8::NewOroFix44MD::InstrumentListRequest request(false);
+  request.Header()->add_field(new SenderCompID(sender_comp_id_));
+  request.Header()->add_field(new TargetCompID(target_comp_id_));
+  request.Header()->add_field(new MsgSeqNum(sequence_++));
+  request.Header()->add_field(new SendingTime());
+  request << new FIX8::NewOroFix44MD::InstrumentReqID("BTCUSDT_INFO")
+          << new FIX8::NewOroFix44MD::InstrumentListRequestType(4);
   std::string wire;
   request.encode(wire);
   return wire;
@@ -200,28 +204,24 @@ std::string FixMdCore::create_trade_data_subscription_message(
 MarketUpdateData FixMdCore::create_market_data_message(FIX8::Message* msg) {
   auto* entries = msg->find_group(kEntries);
   std::vector<MarketData*> data(entries->size());
-  const auto* symbol = entries->get_element(0)->get<Symbol>(); //55
+  const auto* symbol = entries->get_element(0)->get<Symbol>();  //55
 
   for (size_t i = 0; i < entries->size(); ++i) {
     const FIX8::MessageBase* entry = entries->get_element(i);
     if (unlikely(!entry))
       continue;
-    const auto* side = entry->get<MDEntryType>(); // 269
-    const auto* price = entry->get<MDEntryPx>(); // 270
-    const auto* qty = entry->get<MDEntrySize>(); // 271
-    const auto* action = entry->get<MDUpdateAction>(); //279
-    data[i] =
-        market_data_pool_->allocate(
-            (charToSide(side->get()) == common::Side::kTrade)
-              ? MarketUpdateType::kTrade
-              : charToMarketUpdateType(action->get()),
-            OrderId{kOrderIdInvalid},
-            symbol->get(),
-            side->get(),
-            common::Price{static_cast<float>(price->get())},
-            qty == nullptr
-              ? Qty{kQtyInvalid}
-              : Qty{static_cast<float>(qty->get())});
+    const auto* side = entry->get<MDEntryType>();       // 269
+    const auto* price = entry->get<MDEntryPx>();        // 270
+    const auto* qty = entry->get<MDEntrySize>();        // 271
+    const auto* action = entry->get<MDUpdateAction>();  //279
+    data[i] = market_data_pool_->allocate(
+        (charToSide(side->get()) == common::Side::kTrade)
+            ? MarketUpdateType::kTrade
+            : charToMarketUpdateType(action->get()),
+        OrderId{kOrderIdInvalid}, symbol->get(), side->get(),
+        common::Price{static_cast<float>(price->get())},
+        qty == nullptr ? Qty{kQtyInvalid}
+                       : Qty{static_cast<float>(qty->get())});
   }
   return MarketUpdateData(std::move(data));
 }
@@ -232,32 +232,79 @@ MarketUpdateData FixMdCore::create_snapshot_data_message(FIX8::Message* msg) {
 
   std::vector<MarketData*> data(entries->size() + 1);
   int index = 0;
-  data[index++] =
-      market_data_pool_->allocate(
-          MarketUpdateType::kClear,
-          OrderId{kOrderIdInvalid},
-          TickerId{symbol->get()},
-          common::Side::kInvalid,
-          common::Price{kPriceInvalid},
-          Qty{kQtyInvalid});
+  data[index++] = market_data_pool_->allocate(
+      MarketUpdateType::kClear, OrderId{kOrderIdInvalid},
+      TickerId{symbol->get()}, common::Side::kInvalid,
+      common::Price{kPriceInvalid}, Qty{kQtyInvalid});
 
   for (size_t i = 0; i < entries->size(); ++i) {
     const FIX8::MessageBase* entry = entries->get_element(i);
     if (unlikely(!entry))
       continue;
-    const auto* side = entry->get<MDEntryType>(); // 269
-    const auto* price = entry->get<MDEntryPx>(); // 270
-    const auto* qty = entry->get<MDEntrySize>(); // 271
-    data[index++] =
-        market_data_pool_->allocate(
-            MarketUpdateType::kAdd,
-            OrderId{kOrderIdInvalid},
-            TickerId{symbol->get()},
-            common::Side{side->get()},
-            common::Price{static_cast<float>(price->get())},
-            Qty{static_cast<float>(qty->get())});
+    const auto* side = entry->get<MDEntryType>();  // 269
+    const auto* price = entry->get<MDEntryPx>();   // 270
+    const auto* qty = entry->get<MDEntrySize>();   // 271
+    data[index++] = market_data_pool_->allocate(
+        MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
+        TickerId{symbol->get()}, common::charToSide(side->get()),
+        common::Price{static_cast<float>(price->get())},
+        Qty{static_cast<float>(qty->get())});
   }
   return MarketUpdateData(std::move(data));
+}
+
+InstrumentInfo FixMdCore::response_instrument_list_message(FIX8::Message* msg) {
+  InstrumentInfo out{};
+  if (!msg) return out;
+
+  if (const auto* f = msg->get<InstrumentReqID>()) {
+    out.instrument_req_id = f->get();
+  }
+
+  const FIX8::GroupBase* group = msg->find_group(kNoRelatedSym);
+  if (group) {
+    out.symbols.reserve(group->size());
+    for (size_t i = 0; i < group->size(); ++i) {
+      const FIX8::MessageBase* g = group->get_element(i);
+      if (!g) continue;
+
+      InstrumentInfo::RelatedSymT related_symbol{};
+
+      if (const auto* field = g->get<Symbol>())                  related_symbol.symbol = field->get();            // 55
+      if (const auto* field = g->get<Currency>())                related_symbol.currency = field->get();          // 15
+      if (const auto* field = g->get<MinTradeVol>())             related_symbol.min_trade_vol = field->get();     // 562
+      if (const auto* field = g->get<MaxTradeVol>())             related_symbol.max_trade_vol = field->get();     // 1140
+      if (const auto* field = g->get<MinQtyIncrement>())         related_symbol.min_qty_increment = field->get(); // 25039
+      if (const auto* field = g->get<MarketMinTradeVol>())       related_symbol.market_min_trade_vol = field->get();   // 25040
+      if (const auto* field = g->get<MarketMaxTradeVol>())       related_symbol.market_max_trade_vol = field->get();   // 25041
+      if (const auto* field = g->get<MarketMinQtyIncrement>())   related_symbol.market_min_qty_increment = field->get(); // 25042
+      if (const auto* field = g->get<MinPriceIncrement>())       related_symbol.min_price_increment = field->get();     // 969
+
+      out.symbols.emplace_back(std::move(related_symbol));
+    }
+  }
+
+  return out;
+}
+
+MarketDataReject FixMdCore::create_reject_message(FIX8::Message* msg) {
+  const auto ref_sequence = msg->get<RefSeqNum>();
+  const auto msg_type = msg->get<RefMsgType>();
+  const auto rejected_type = msg->get<SessionRejectReason>();
+  const auto error_message = msg->get<Text>();
+  const auto error_code = msg->get<ErrorCode>();
+
+  if (ref_sequence != nullptr)
+    logger_->info(std::format("failed sequence :{}", ref_sequence->get()));
+
+  return MarketDataReject{
+      .session_reject_reason =
+          msg_type != nullptr ? msg_type->get() : "NO REASON",
+      .rejected_message_type =
+          rejected_type != nullptr ? rejected_type->get() : -1,
+      .error_message =
+          error_message != nullptr ? error_message->get() : "NO ERROR MESSAGE",
+      .error_code = error_code != nullptr ? error_code->get() : -1};
 }
 
 FIX8::Message* FixMdCore::decode(const std::string& message) {
@@ -270,4 +317,4 @@ FIX8::Message* FixMdCore::decode(const std::string& message) {
   return nullptr;
 }
 
-}
+}  // namespace core

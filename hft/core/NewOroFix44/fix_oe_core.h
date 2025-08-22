@@ -11,7 +11,6 @@
  */
 
 #pragma once
-#include <pch.h>
 
 #include "logger.h"
 #include "memory_pool.hpp"
@@ -25,6 +24,7 @@ namespace NewOroFix44OE {
 class ExecutionReport;
 class OrderCancelReject;
 class OrderMassCancelReport;
+class Reject;
 }
 }
 
@@ -69,6 +69,7 @@ public:
       FIX8::NewOroFix44OE::OrderCancelReject* msg);
   trading::OrderMassCancelReport* create_order_mass_cancel_report_message(
       FIX8::NewOroFix44OE::OrderMassCancelReport* msg);
+  trading::OrderReject create_reject_message(FIX8::NewOroFix44OE::Reject* msg);
   FIX8::Message* decode(const std::string& message);
 
 private:

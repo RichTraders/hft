@@ -38,6 +38,9 @@ MarketConsumer::MarketConsumer(
   app_->register_callback("1", [this](auto&& msg) {
     on_heartbeat(std::forward<decltype(msg)>(msg));
   });
+  app_->register_callback("y", [this](auto&& msg) {
+    on_instrument_list(std::forward<decltype(msg)>(msg));
+  });
   app_->register_callback(
       "3", [this](auto&& msg) { on_reject(std::forward<decltype(msg)>(msg)); });
   app_->register_callback(
@@ -64,6 +67,12 @@ void MarketConsumer::on_login(FIX8::Message*) const {
   if (UNLIKELY(!app_->send(message))) {
     logger_->error("[Message] failed to send login");
   }
+
+  const std::string instrument_message =
+      app_->request_instrument_list_message();
+  if (UNLIKELY(!app_->send(instrument_message))) {
+    logger_->error("[Message] failed to send instrument list");
+  }
 }
 
 void MarketConsumer::on_snapshot(FIX8::Message* msg) const {
@@ -84,12 +93,21 @@ void MarketConsumer::on_subscribe(FIX8::Message* msg) const {
   }
 }
 
-void MarketConsumer::on_reject(FIX8::Message*) const {
+void MarketConsumer::on_reject(FIX8::Message* msg) const {
   logger_->info("[Message] reject data");
+  logger_->error(
+      std::format("[Message] {}", app_->create_reject_message(msg).toString()));
 }
 
 void MarketConsumer::on_logout(FIX8::Message*) const {
   logger_->info("[Message] logout");
+}
+
+void MarketConsumer::on_instrument_list(FIX8::Message* msg) const {
+  logger_->info("[Message] on_instrument_list");
+  const InstrumentInfo instrument_message =
+      app_->create_instrument_list_message(msg);
+  logger_->info(std::format("[Message] :{}", instrument_message.toString()));
 }
 
 void MarketConsumer::on_heartbeat(FIX8::Message* msg) const {

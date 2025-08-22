@@ -11,9 +11,10 @@
  */
 
 #pragma once
+
 #include "fix_app.h"
-#include "memory_pool.hpp"
 #include "market_data.h"
+#include "memory_pool.hpp"
 
 namespace FIX8 {
 class Message;
@@ -43,6 +44,9 @@ public:
       const SymbolId& symbol);
   MarketUpdateData create_market_data_message(FIX8::Message* msg);
   MarketUpdateData create_snapshot_data_message(FIX8::Message* msg);
+  std::string request_instrument_list_message();
+  InstrumentInfo create_instrument_list_message(FIX8::Message* msg);
+  MarketDataReject create_reject_message(FIX8::Message* msg);
   FIX8::Message* decode(const std::string& message);
 
 private:

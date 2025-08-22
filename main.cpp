@@ -23,6 +23,8 @@
 
 constexpr int kMarketUpdateDataPoolSize = 64;
 constexpr int kMarketDataPoolSize = 16384;
+constexpr int kKilo = 1024;
+constexpr int kThirty = 30;
 
 int main() {
   try {
@@ -32,6 +34,8 @@ int main() {
     logger->setLevel(logger->string_to_level(INI_CONFIG.get("log", "level")));
     logger->clearSink();
     logger->addSink(std::make_unique<common::ConsoleSink>());
+    logger->addSink(
+        std::make_unique<common::FileSink>("log", kKilo * kKilo * kThirty));
 
     auto market_update_data_pool =
         std::make_unique<common::MemoryPool<MarketUpdateData>>(

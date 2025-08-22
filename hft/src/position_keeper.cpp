@@ -80,6 +80,7 @@ void PositionInfo::add_fill(const ExecutionReport* report,
   }
 
   total_pnl_ = unreal_pnl_ + real_pnl_;
+  reserved_position_ -= report->last_qty.value * static_cast<double>(sgn);
 
   logger->info(std::format("[Fill] {} {}", toString(), report->toString()));
 }

@@ -20,5 +20,6 @@ TEST(IniConfigTest, LoadAndReadValues) {
   EXPECT_EQ(INI_CONFIG.get_double("risk", "max_position"), 0.0001);
   EXPECT_EQ(INI_CONFIG.get_double("risk", "max_loss"), 0.3);
 
+  EXPECT_EQ(INI_CONFIG.get_int("risk", "not_exist"), 0);
   EXPECT_EQ(INI_CONFIG.get("database", "username", "root"), "root");
 }

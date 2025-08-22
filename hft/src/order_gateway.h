@@ -35,15 +35,17 @@ class OrderGateway {
   ~OrderGateway();
 
   void init_trade_engine(TradeEngine* trade_engine);
-  void stop();
+  void stop() const;
 
-  void on_login(FIX8::Message*);
-  void on_execution_report(FIX8::NewOroFix44OE::ExecutionReport* msg);
-  void on_order_cancel_reject(FIX8::NewOroFix44OE::OrderCancelReject* msg);
+  void on_login(FIX8::Message*) const;
+  void on_execution_report(FIX8::NewOroFix44OE::ExecutionReport* msg) const;
+  void on_order_cancel_reject(
+      FIX8::NewOroFix44OE::OrderCancelReject* msg) const;
   void on_order_mass_cancel_report(
-      FIX8::NewOroFix44OE::OrderMassCancelReport* msg);
-  void on_order_mass_status_response(FIX8::Message* msg);
-  void on_logout(FIX8::Message*);
+      FIX8::NewOroFix44OE::OrderMassCancelReport* msg) const;
+  void on_order_rejected(FIX8::NewOroFix44OE::Reject* msg) const;
+  void on_order_mass_status_response(FIX8::Message* msg) const;
+  void on_logout(FIX8::Message*) const;
   void on_heartbeat(FIX8::Message* msg);
   void order_request(const RequestCommon& request);
 

@@ -43,12 +43,13 @@ inline auto riskCheckResultToString(RiskCheckResult result) {
 }
 
 struct RiskInfo {
-  const PositionInfo* position_info_ = nullptr;
+  PositionInfo* position_info_ = nullptr;
 
   common::RiskCfg risk_cfg_;
 
   [[nodiscard]] RiskCheckResult checkPreTradeRisk(
-      common::Side side, common::Qty qty) const noexcept;
+      common::Side side, common::Qty qty,
+      common::Logger* logger) const noexcept;
 
   [[nodiscard]] auto toString() const {
     std::ostringstream stream;
@@ -63,14 +64,14 @@ using TickerRiskInfoHashMap = std::unordered_map<std::string, RiskInfo>;
 
 class RiskManager {
  public:
-  RiskManager(common::Logger* logger, const PositionKeeper* position_keeper,
+  RiskManager(common::Logger* logger, PositionKeeper* position_keeper,
               const common::TradeEngineCfgHashMap& ticker_cfg);
 
   ~RiskManager();
   [[nodiscard]] auto checkPreTradeRisk(const common::TickerId& ticker_id,
                                        const common::Side side,
                                        const common::Qty qty) const noexcept {
-    return ticker_risk_.at(ticker_id).checkPreTradeRisk(side, qty);
+    return ticker_risk_.at(ticker_id).checkPreTradeRisk(side, qty, logger_);
   }
 
   RiskManager() = delete;

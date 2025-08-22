@@ -43,6 +43,7 @@ class MarketConsumer {
   void on_subscribe(FIX8::Message* msg) const;
   void on_reject(FIX8::Message*) const;
   void on_logout(FIX8::Message*) const;
+  void on_instrument_list(FIX8::Message* msg) const;
   void on_heartbeat(FIX8::Message* msg) const;
 
  private:

@@ -58,8 +58,15 @@ trading::OrderCancelReject* FixOrderEntryApp::create_order_cancel_reject_message
   return fix_oe_core_->create_order_cancel_reject_message(msg);
 }
 
-trading::OrderMassCancelReport* FixOrderEntryApp::create_order_mass_cancel_report_message(FIX8::NewOroFix44OE::OrderMassCancelReport* msg) {
+trading::OrderMassCancelReport*
+FixOrderEntryApp::create_order_mass_cancel_report_message(
+    FIX8::NewOroFix44OE::OrderMassCancelReport* msg) {
   return fix_oe_core_->create_order_mass_cancel_report_message(msg);
+}
+
+trading::OrderReject FixOrderEntryApp::create_reject_message(
+    FIX8::NewOroFix44OE::Reject* msg) {
+  return fix_oe_core_->create_reject_message(msg);
 }
 
 FIX8::Message* FixOrderEntryApp::decode(const std::string& message) {

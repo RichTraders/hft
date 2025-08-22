@@ -25,6 +25,7 @@ struct BBO;
 struct ExecutionReport;
 
 struct PositionInfo {
+  double reserved_position_ = 0;
   double position_ = 0;
   double real_pnl_ = 0;
   double unreal_pnl_ = 0;
@@ -54,7 +55,7 @@ class PositionKeeper {
   void update_bbo(const common::TickerId& ticker_id, const BBO* bbo) noexcept;
 
   [[nodiscard]] auto get_position_info(
-      const common::TickerId& ticker_id) const noexcept {
+      const common::TickerId& ticker_id) noexcept {
     return &(ticker_position_.at(ticker_id));
   }
 

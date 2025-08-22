@@ -49,7 +49,10 @@ public:
   trading::ExecutionReport* create_execution_report_message(
       FIX8::NewOroFix44OE::ExecutionReport* msg);
   trading::OrderCancelReject* create_order_cancel_reject_message(FIX8::NewOroFix44OE::OrderCancelReject* msg);
-  trading::OrderMassCancelReport* create_order_mass_cancel_report_message(FIX8::NewOroFix44OE::OrderMassCancelReport* msg);
+  trading::OrderMassCancelReport* create_order_mass_cancel_report_message(
+      FIX8::NewOroFix44OE::OrderMassCancelReport* msg);
+  trading::OrderReject create_reject_message(FIX8::NewOroFix44OE::Reject* msg);
+
   FIX8::Message* decode(const std::string& message);
 
 private:

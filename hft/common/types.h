@@ -143,6 +143,25 @@ struct Qty {
     return *this;
   }
 
+  // constexpr Qty operator-(Qty lhs, const Qty& rhs) noexcept {
+  //   lhs -= rhs;
+  //   return lhs;
+  // }
+  //
+  // constexpr Qty operator-(Qty lhs, double rhs) const noexcept {
+  //   lhs -= rhs;
+  //   return lhs;
+  // }
+  //
+  // constexpr Qty operator-(double lhs, const Qty& rhs) const noexcept {
+  //   return Qty{lhs - rhs.value};
+  // }
+  //
+  // constexpr Qty operator-(Qty q) const noexcept {
+  //   q.value = -q.value;
+  //   return q;
+  // }
+
   constexpr Qty& operator*(const Qty& other) {
     value *= other.value;
     return *this;

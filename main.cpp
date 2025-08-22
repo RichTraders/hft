@@ -75,6 +75,7 @@ int main() {
         logger.get(), market_update_data_pool.get(), market_data_pool.get(),
         response_manager.get(), config_map);
     engine->init_order_gateway(order_gateway.get());
+    order_gateway->init_trade_engine(engine.get());
 
     const trading::MarketConsumer consumer(logger.get(), engine.get(),
                                            market_update_data_pool.get(),

@@ -259,7 +259,7 @@ MarketUpdateData FixMdCore::create_snapshot_data_message(FIX8::Message* msg) {
             MarketUpdateType::kAdd,
             OrderId{kOrderIdInvalid},
             TickerId{symbol->get()},
-            common::Side{side->get()},
+            charToSide(side->get()),
             common::Price{static_cast<float>(price->get())},
             Qty{static_cast<float>(qty->get())});
   }

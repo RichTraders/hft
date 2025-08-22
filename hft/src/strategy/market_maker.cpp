@@ -29,9 +29,12 @@ MarketMaker::MarketMaker(OrderManager* const order_manager,
                          const common::TradeEngineCfgHashMap&)
     : BaseStrategy(order_manager, feature_engine, logger) {}
 
-void MarketMaker::on_orderbook_updated(
-    const common::TickerId& ticker, common::Price, Side,
-    const MarketOrderBook* order_book) noexcept {
+void MarketMaker::on_orderbook_updated(const common::TickerId&, common::Price,
+                                       Side, const MarketOrderBook*) noexcept {}
+
+void MarketMaker::on_trade_updated(const MarketData* market_data,
+                                   MarketOrderBook* order_book) noexcept {
+  const auto ticker = market_data->ticker_id;
   const auto* bbo = order_book->get_bbo();
   if (bbo->bid_qty.value == common::kQtyInvalid ||
       bbo->ask_qty.value == common::kQtyInvalid ||
@@ -59,7 +62,7 @@ void MarketMaker::on_orderbook_updated(
   const double denom = std::max({spread, 0.01});
   const auto delta = (mid - vwap) / denom;
   if (!std::isfinite(spread) || spread <= 0.0) {
-    logger_->debug(
+    logger_->trace(
         std::format("Non-positive spread ({}). Using denom={}", spread, denom));
   }
   const auto signal = delta * obi;
@@ -97,9 +100,6 @@ void MarketMaker::on_orderbook_updated(
   }
   order_manager_->apply(intents);
 }
-
-void MarketMaker::on_trade_updated(const MarketData*,
-                                   MarketOrderBook*) noexcept {}
 
 void MarketMaker::on_order_updated(const ExecutionReport*) noexcept {}
 }  // namespace trading

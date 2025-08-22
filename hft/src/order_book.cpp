@@ -303,7 +303,7 @@ auto MarketOrderBook::on_market_data_updated(
               .ask_price = Price{common::kPriceInvalid},
               .bid_qty = Qty{common::kQtyInvalid},
               .ask_qty = Qty{common::kQtyInvalid}};
-      break;
+      return;
     }
     case MarketUpdateType::kInvalid:
       logger_->error("error in market update data");

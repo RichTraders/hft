@@ -22,18 +22,7 @@
 namespace common {
 // 로그 레벨 정의
 enum class LogLevel : uint8_t { kTrace, kDebug, kInfo, kWarn, kError, kFatal };
-enum class PriorityLevel : uint8_t {
-  kPercent100 = 100,
-  kPercent90 = 90,
-  kPercent80 = 80,
-  kPercent70 = 70,
-  kPercent60 = 60,
-  kPercent50 = 50,
-  kPercent40 = 40,
-  kPercent30 = 30,
-  kPercent20 = 20,
-  kPercent10 = 10,
-};
+
 enum class QueueChunkSize : uint16_t {
   kDefaultSize = 64,
   kSmallSize = 128,
@@ -151,12 +140,13 @@ class Logger {
   Logger() {
     stop_ = static_cast<bool>(worker_.start(&Logger::process, this));
     level_ = LogLevel::kInfo;
+    info("[Constructor] Logge Start");
   }
 
   ~Logger() {
     stop_ = true;
     worker_.join();
-    info("Logger finish");
+    info("[Destructor] Logger finish");
   }
 
   void setLevel(LogLevel lvl) { level_.store(lvl, std::memory_order_relaxed); }

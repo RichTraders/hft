@@ -94,21 +94,19 @@ int main() {
 
     std::string cpu_init_result;
     if (cpu_manager->init_cpu_group(cpu_init_result)) {
-      logger->info("failed to init cpu group" + cpu_init_result);
-      return -1;
+      logger->info(std::format("don't init cpu group: {}", cpu_init_result));
     }
 
     if (cpu_manager->init_cpu_to_tid()) {
-      logger->info("failed to init cpu to tid");
-      return -1;
+      logger->info("don't init cpu to tid");
     }
+
+    constexpr int kSleepCount = 10;
+    while (true)
+      sleep(kSleepCount);  // TODO(neworo2):
   } catch (std::exception& e) {
     std::cerr << e.what() << "\n";
   }
-
-  constexpr int kSleepCount = 10;
-  while (true)
-    sleep(kSleepCount);  // TODO(neworo2):
 
   return 0;
 }

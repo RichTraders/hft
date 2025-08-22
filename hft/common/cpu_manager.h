@@ -48,7 +48,7 @@ class CpuManager {
   explicit CpuManager(Logger* logger);
   ~CpuManager();
 
-  static int init_cpu_group(std::string& result);
+  int init_cpu_group(std::string& result) const;
   bool init_cpu_to_tid();
   int get_tid(const std::string& thread_name);
 
@@ -81,5 +81,7 @@ class CpuManager {
   uint8_t cpu_id_end_;
   std::map<uint8_t, CpuInfo> cpu_info_list_;
   std::map<std::string, ThreadInfo> thread_info_list_;
+  bool use_cpu_group_ = false;
+  bool use_cpu_to_tid_ = false;
 };
 }  // namespace common

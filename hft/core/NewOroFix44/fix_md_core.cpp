@@ -31,7 +31,13 @@ FixMdCore::FixMdCore(SendId sender_comp_id, TargetId target_comp_id,
     sender_comp_id_(std::move(sender_comp_id)),
     target_comp_id_(std::move(target_comp_id)),
     market_data_pool_(pool),
-    authorization_(authorization) {}
+    authorization_(authorization) {
+  logger_->info("[Constructor] FixMdCore Created");
+}
+
+FixMdCore::~FixMdCore() {
+  logger_->info("[Destructor] FixMdCore Destroy");
+}
 
 std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
                                              const std::string& timestamp) {

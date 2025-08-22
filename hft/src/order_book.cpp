@@ -44,10 +44,12 @@ MarketOrderBook::MarketOrderBook(const TickerId& ticker_id,
       bid_bucket_pool_(
           std::make_unique<common::MemoryPool<Bucket>>(kBucketPoolSize)),
       ask_bucket_pool_(
-          std::make_unique<common::MemoryPool<Bucket>>(kBucketPoolSize)) {}
+          std::make_unique<common::MemoryPool<Bucket>>(kBucketPoolSize)) {
+  logger_->info("[Constructor] MarketOrderBook Created");
+}
 
 MarketOrderBook::~MarketOrderBook() {
-  logger_->info("MarketOrderBook::~MarketOrderBook");
+  logger_->info("[Destructor] MarketOrderBook Destory");
 
   trade_engine_ = nullptr;
   logger_ = nullptr;
@@ -308,8 +310,8 @@ auto MarketOrderBook::on_market_data_updated(
       break;
   }
 
-  logger_->debug(
-      std::format("{} {}", market_update->toString(), bbo_.toString()));
+  logger_->debug(std::format("[Updated] {} {}", market_update->toString(),
+                             bbo_.toString()));
 
   trade_engine_->on_orderbook_updated(market_update->ticker_id,
                                       market_update->price, market_update->side,

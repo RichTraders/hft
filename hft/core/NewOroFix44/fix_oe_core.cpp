@@ -31,7 +31,13 @@ FixOeCore::FixOeCore(SendId sender_comp_id, TargetId target_comp_id,
     target_comp_id_(std::move(target_comp_id)),
     logger_(logger),
     response_manager_(response_manager),
-    authorization_(authorization) {}
+    authorization_(authorization) {
+  logger_->info("[Constructor] FixOeCore Created");
+}
+
+FixOeCore::~FixOeCore() {
+  logger_->info("[Destructor] FixOeCore Destroy");
+}
 
 std::string FixOeCore::create_log_on_message(const std::string& sig_b64,
                                              const std::string& timestamp) {
@@ -158,6 +164,7 @@ std::string FixOeCore::create_cancel_and_reorder_message(
       << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
       << new SendingTime();
 
+  request.add_field(new OrigClOrdID(std::to_string(cancel_and_re_order.cancel_order_id.value)));
   request.add_field(
       new ClOrdID(std::to_string(cancel_and_re_order.cl_order_id.value)));
   request.add_field(new Symbol(cancel_and_re_order.symbol));

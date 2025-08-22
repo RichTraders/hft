@@ -273,6 +273,7 @@ struct OrderCancelRequest {
 
 struct OrderCancelRequestAndNewOrderSingle {
   int order_cancel_request_and_new_order_single_mode = 1;
+  common::OrderId cancel_order_id;
   common::OrderId cl_order_id;
   std::string symbol;
   OrderSide side;

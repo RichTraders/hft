@@ -34,12 +34,18 @@ OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
       trade_engine_(trade_engine),
       risk_manager_(risk_manager),
       logger_(logger),
-      fast_clock_(kCpuHzEstimate, kInterval) {}
+      fast_clock_(kCpuHzEstimate, kInterval) {
+  //TODO(JB): ticker 이름 받아오기
+  ticker_side_order_["BTCUSDT"] = OMOrderSideHashMap{};
+  logger_->info("[Constructor] OrderManager Construct");
+}
+OrderManager::~OrderManager() {
+  logger_->info("[Destructor] OrderManager Destroy");
+}
 
 void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
 
   auto& side_book = layer_book_.side_book(response->symbol, response->side);
-
   int layer = LayerBook::find_layer_by_id(side_book, response->cl_order_id);
   if (layer < 0) {
     const uint64_t tick =
@@ -49,7 +55,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
   }
   if (layer < 0) {
     logger_->error(std::format(
-        "[OrderStatus] on_order_updated: layer not found. response={}",
+        "[Updated] on_order_updated: layer not found. response={}",
         response->toString()));
     return;
   }
@@ -66,7 +72,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       slot.price = response->price;
       slot.qty = response->leaves_qty;
       slot.cl_order_id = response->cl_order_id;
-      logger_->info(std::format("[Order Status] New {}", response->toString()));
+      logger_->info(std::format("[Updated] New {}", response->toString()));
       break;
     }
     case OrdStatus::kPartiallyFilled: {
@@ -76,7 +82,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       if (slot.state == OMOrderState::kDead) {
         LayerBook::unmap_layer(side_book, layer);
       }
-      logger_->info(std::format("[Order Status] PartiallyFilled {}",
+      logger_->info(std::format("[Updated] PartiallyFilled {}",
                                 response->toString()));
       break;
     }
@@ -85,7 +91,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
       logger_->info(
-          std::format("[Order Status] Filled {}", response->toString()));
+          std::format("[Updated] Filled {}", response->toString()));
       break;
     }
     case OrdStatus::kPendingCancel: {
@@ -96,25 +102,25 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
       logger_->info(
-          std::format("[Order Status] Canceled {}", response->toString()));
+          std::format("[Updated] Canceled {}", response->toString()));
       break;
     }
     case OrdStatus::kRejected: {
       slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
       logger_->error(
-          std::format("[Order Status] Rejected {}", response->toString()));
+          std::format("[Updated] Rejected {}", response->toString()));
       break;
     }
     case OrdStatus::kExpired: {
       slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
       logger_->error(
-          std::format("[Order Status] Expired {}", response->toString()));
+          std::format("[Updated] Expired {}", response->toString()));
       break;
     }
     default: {
-      logger_->error(std::format("[OM] on_order_updated: unknown OrdStatus {}",
+      logger_->error(std::format("[Updated] on_order_updated: unknown OrdStatus {}",
                                  toString(response->ord_status)));
       break;
     }
@@ -148,7 +154,7 @@ void OrderManager::modify_order(const TickerId& ticker_id,
       .price = price};
   trade_engine_->send_request(new_request);
 
-  logger_->info(std::format("Sent new order {}", new_request.toString()));
+  logger_->info(std::format("[Request]Sent new order {}", new_request.toString()));
 }
 
 void OrderManager::cancel_order(const TickerId& ticker_id,

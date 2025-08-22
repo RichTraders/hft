@@ -12,6 +12,7 @@
 
 #include "market_consumer.h"
 #include "fix_md_app.h"
+#include "ini_config.hpp"
 #include "trade_engine.h"
 
 namespace trading {
@@ -57,7 +58,8 @@ void MarketConsumer::stop() {
 void MarketConsumer::on_login(FIX8::Message*) const {
   logger_->info("[Login] Market consumer successful");
   const std::string message = app_->create_market_data_subscription_message(
-      "DEPTH_STREAM", "5000", "BTCUSDT");
+      "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
+      INI_CONFIG.get("meta", "ticker"));
 
   if (UNLIKELY(!app_->send(message))) {
     logger_->error("[Message] failed to send login");

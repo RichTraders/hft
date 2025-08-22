@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 #include "order_book.h"
 #include "trade_engine.h"
+#include "ini_config.hpp"
 
 using namespace trading;
 using namespace common;
@@ -25,13 +26,14 @@ class MarketOrderBookTest : public ::testing::Test {
   TradeEngine* trade_engine_;
 
   void SetUp() override {
+    INI_CONFIG.load("resources/config.ini");
     TradeEngineCfgHashMap temp;
     RiskCfg risk = {.max_order_size_ = Qty{1000.},
                     .max_position_ = Qty{1000.},
                     .max_loss_ = 1000.};
     TradeEngineCfg tempcfg = {
         .clip_ = Qty{100000}, .threshold_ = 10, .risk_cfg_ = risk};
-    temp.emplace("BTCUSDT", tempcfg);
+    temp.emplace(INI_CONFIG.get("meta", "ticker"), tempcfg);
     auto pool = std::make_unique<MemoryPool<MarketUpdateData>>(4096);
     auto pool2 = std::make_unique<MemoryPool<MarketData>>(4096);
 
@@ -50,7 +52,7 @@ class MarketOrderBookTest : public ::testing::Test {
     trade_engine_ = new TradeEngine(logger.get(), pool.get(),
                                                  pool2.get(), response_manager_, temp);
     // trade_engine_ 주입
-    book_ = new MarketOrderBook{"BTCUSDT", &logger_};
+    book_ = new MarketOrderBook{INI_CONFIG.get("meta", "ticker"), &logger_};
     book_->set_trade_engine(trade_engine_);
   }
 
@@ -67,7 +69,7 @@ class MarketOrderBookTest : public ::testing::Test {
 };
 
 TEST_F(MarketOrderBookTest, ClearResetsOrderBookAndUpdatesBBO) {
-  TickerId symbol = "BTCUSDT";
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
   const MarketData md(MarketUpdateType::kClear, OrderId{kOrderIdInvalid},
                       symbol, Side::kBuy, Price{0.0}, Qty{0.0});
 
@@ -83,7 +85,7 @@ TEST_F(MarketOrderBookTest, ClearResetsOrderBookAndUpdatesBBO) {
 
 // Trade
 TEST_F(MarketOrderBookTest, TradeInvokesTradeEngineAndSkipsOrderBookUpdate) {
-  TickerId symbol = "BTCUSDT";
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
   const Price price = Price{100000.00};
   const Qty qty = Qty{5.0};
   const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid}, symbol,
@@ -107,7 +109,7 @@ TEST_F(MarketOrderBookTest, TradeInvokesTradeEngineAndSkipsOrderBookUpdate) {
 
 // Add
 TEST_F(MarketOrderBookTest, AddOrder) {
-  TickerId symbol = "BTCUSDT";
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
   const Price price = Price{100000.00};
   const Qty qty = Qty{5.0};
   const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid}, symbol,
@@ -123,7 +125,7 @@ TEST_F(MarketOrderBookTest, AddOrder) {
 }
 
 TEST_F(MarketOrderBookTest, AddOrders) {
-  TickerId symbol = "BTCUSDT";
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
   {
     const Price price = Price{100000.00};
     const Qty qty = Qty{5.0};
@@ -185,7 +187,7 @@ TEST_F(MarketOrderBookTest, AddOrders) {
 TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
 
   {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     const Price price = Price{100000.00};
     const Qty qty = Qty{5.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
@@ -200,7 +202,7 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     const Price price = Price{100001.00};
     const Qty qty = Qty{4.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
@@ -215,7 +217,7 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     const Price price = Price{100001.00};
     const Qty qty = Qty{3.0};
     const MarketData md(MarketUpdateType::kModify, OrderId{kOrderIdInvalid},
@@ -230,7 +232,7 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     const Price price = Price{100000.50};
     const Qty qty = Qty{14.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
@@ -245,7 +247,7 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
   }
   {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     const Price price = Price{100000.00};
     const Qty qty = Qty{2.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
@@ -260,7 +262,7 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, qty);
   }
   {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     const Price price = Price{99999.00};
     const Qty qty = Qty{3.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
@@ -275,7 +277,7 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
     EXPECT_EQ(bbo->ask_qty, qty);
   }
   {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     const Price price = Price{100001.00};
     const Qty qty = Qty{3.0};
     const MarketData md(MarketUpdateType::kModify, OrderId{kOrderIdInvalid},
@@ -294,7 +296,7 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
 // Delete
 TEST_F(MarketOrderBookTest, DeleteOrder) {
   {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     const Price price = Price{100000.00};
     const Qty qty = Qty{5.0};
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
@@ -307,7 +309,7 @@ TEST_F(MarketOrderBookTest, DeleteOrder) {
     EXPECT_EQ(bbo->ask_qty, qty);
   }
   {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     const Price cancel_price = Price{100000.00};
     const Qty cancel_qty = Qty{kQtyInvalid};
     const MarketData cancel_md(MarketUpdateType::kCancel,
@@ -324,7 +326,7 @@ TEST_F(MarketOrderBookTest, DeleteOrder) {
 }
 
 TEST_F(MarketOrderBookTest, FindInBucket) {
-  TickerId symbol = "BTCUSDT";
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
   trading::Bucket b;
   // 모두 비활성
   for (auto& w : b.bitmap)
@@ -342,7 +344,7 @@ TEST_F(MarketOrderBookTest, FindInBucket) {
 
 TEST_F(MarketOrderBookTest, NextActiveIdx) {
   for (int idx : {10, 20, 30}) {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     Price p =
         Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{1.0};
@@ -357,7 +359,7 @@ TEST_F(MarketOrderBookTest, NextActiveIdx) {
   EXPECT_EQ(book_->next_active_idx(true, 10), -1);
 
   for (int idx : {100, 110, 120}) {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     Price p =
         Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{2.0};
@@ -373,7 +375,7 @@ TEST_F(MarketOrderBookTest, NextActiveIdx) {
 
 TEST_F(MarketOrderBookTest, NextActiveIdxWithCancel) {
   for (int idx : {10, 20, 30}) {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     Price p =
         Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{1.0};
@@ -388,7 +390,7 @@ TEST_F(MarketOrderBookTest, NextActiveIdxWithCancel) {
   EXPECT_EQ(book_->next_active_idx(true, 10), -1);
 
   for (int idx : {20}) {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     Price p =
         Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{1.0};
@@ -400,7 +402,7 @@ TEST_F(MarketOrderBookTest, NextActiveIdxWithCancel) {
   EXPECT_EQ(book_->next_active_idx(true, 30), 10);
 
   for (int idx : {100, 110, 120}) {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     Price p =
         Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{2.0};
@@ -416,7 +418,7 @@ TEST_F(MarketOrderBookTest, NextActiveIdxWithCancel) {
 
 TEST_F(MarketOrderBookTest, PeekLevels) {
   for (int idx : {5, 15, 25, 35, 45}) {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     Price p =
         Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{1.0};
@@ -431,7 +433,7 @@ TEST_F(MarketOrderBookTest, PeekLevels) {
   EXPECT_EQ(bids, want_bids);
 
   for (int idx : {200, 210, 220}) {
-    TickerId symbol = "BTCUSDT";
+    TickerId symbol = INI_CONFIG.get("meta", "ticker");
     Price p =
         Price{static_cast<double>(kMinPriceInt + idx) / kTickMultiplierInt};
     Qty q{3.0};

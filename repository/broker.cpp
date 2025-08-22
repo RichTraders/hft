@@ -52,7 +52,8 @@ Broker::Broker()
 void Broker::on_login(FIX8::Message*) {
   std::cout << "login successful\n";
   const std::string message = app_->create_market_data_subscription_message(
-      "DEPTH_STREAM", "5000", "BTCUSDT");
+      "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
+      INI_CONFIG.get("meta", "ticker"));
   std::cout << "snapshot : " << message << "\n";
   app_->send(message);
 }

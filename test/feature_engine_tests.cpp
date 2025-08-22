@@ -17,6 +17,7 @@
 #include "logger.h"
 #include "order_book.h"
 #include "trade_engine.h"
+#include "ini_config.hpp"
 
 using ::testing::_;
 using ::testing::HasSubstr;
@@ -26,6 +27,7 @@ using namespace trading;
 class FeatureEngineTest : public ::testing::Test {
  protected:
   void SetUp() override {
+    INI_CONFIG.load("resources/config.ini");
     market_pool = new MemoryPool<MarketData>(8);
     market_update_pool = new MemoryPool<MarketUpdateData>(8);
 
@@ -34,7 +36,7 @@ class FeatureEngineTest : public ::testing::Test {
     cfg.risk_cfg_.max_position_ = Qty{50};
     cfg.risk_cfg_.max_loss_ = -1000;
 
-    ticker_cfg = new TradeEngineCfgHashMap{{"BTCUSDT", cfg}};
+    ticker_cfg = new TradeEngineCfgHashMap{{INI_CONFIG.get("meta", "ticker"), cfg}};
 
     trade_engine = new TradeEngine(&logger, market_update_pool, market_pool,
                                    nullptr, *ticker_cfg);

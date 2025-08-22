@@ -52,7 +52,7 @@ int main() {
             kResponseMemoryPoolSize);
 
     common::TradeEngineCfgHashMap config_map;
-    config_map["BTCUSDT"] = {
+    config_map[INI_CONFIG.get("meta", "ticker")] = {
         .clip_ = common::Qty{0},
         .threshold_ = 0,
         .risk_cfg_ = common::RiskCfg(

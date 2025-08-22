@@ -11,6 +11,7 @@
  */
 
 #include "risk_manager.h"
+#include "ini_config.hpp"
 #include "logger.h"
 
 namespace trading {
@@ -32,9 +33,10 @@ RiskManager::RiskManager(common::Logger* logger,
                          const PositionKeeper* position_keeper,
                          const common::TradeEngineCfgHashMap& ticker_cfg)
     : logger_(logger) {
-  const std::string ticker = "BTCUSDT";
-  ticker_risk_["BTCUSDT"] = RiskInfo(position_keeper->get_position_info(ticker),
-                                     ticker_cfg.at(ticker).risk_cfg_);
+  const std::string ticker = INI_CONFIG.get("meta", "ticker");
+  ticker_risk_[INI_CONFIG.get("meta", "ticker")] =
+      RiskInfo(position_keeper->get_position_info(ticker),
+               ticker_cfg.at(ticker).risk_cfg_);
   logger_->info("[Constructor] RiskManager Created");
 }
 

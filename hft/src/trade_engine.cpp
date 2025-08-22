@@ -12,6 +12,7 @@
 
 #include "trade_engine.h"
 #include "feature_engine.h"
+#include "ini_config.hpp"
 #include "order_entry.h"
 #include "order_gateway.h"
 #include "order_manager.h"
@@ -42,14 +43,15 @@ TradeEngine::TradeEngine(
           logger, position_keeper_.get(), ticker_cfg)),
       order_manager_(
           std::make_unique<OrderManager>(logger, this, *risk_manager_)) {
-  auto orderbook = std::make_unique<MarketOrderBook>("BTCUSDT", logger);
+  const std::string ticker = INI_CONFIG.get("meta", "ticker");
+  auto orderbook = std::make_unique<MarketOrderBook>(ticker, logger);
 
   constexpr int kResponseQueueSize = 64;
   response_queue_ =
       std::make_unique<common::SPSCQueue<trading::ResponseCommon>>(
           kResponseQueueSize);
   orderbook->set_trade_engine(this);
-  ticker_order_book_.insert({"BTCUSDT", std::move(orderbook)});
+  ticker_order_book_.insert({ticker, std::move(orderbook)});
 
   strategy_ = std::make_unique<MarketMaker>(
       order_manager_.get(), feature_engine_.get(), logger_, ticker_cfg);

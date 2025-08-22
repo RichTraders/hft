@@ -36,7 +36,7 @@ protected:
 
     TradeEngineCfgHashMap temp;
     TradeEngineCfg tempcfg;
-    temp.emplace("BTCUSDT", tempcfg);
+    temp.emplace(INI_CONFIG.get("meta", "ticker"), tempcfg);
     market_update_data_pool_ = std::make_unique<MemoryPool<MarketUpdateData>>(1024);
     market_data_pool_ = std::make_unique<MemoryPool<MarketData>>(1024);
 
@@ -87,7 +87,7 @@ TEST_F(OrderGatewayTest, NewOrderSingle) {
 
   request.req_type = ReqeustType::kNewSingleOrderData;
   request.cl_order_id.value = cl_order_id;
-  request.symbol = "BTCUSDT";
+  request.symbol = INI_CONFIG.get("meta", "ticker");
   request.side = common::Side::kSell;
   request.order_qty.value = 0.01;
   request.price.value = 120000;
@@ -108,7 +108,7 @@ TEST_F(OrderGatewayTest, OrderCancel) {
   request.req_type = ReqeustType::kOrderCancelRequest;
   request.cl_order_id.value = cl_order_id + 1;
   request.orig_cl_order_id.value = cl_order_id;
-  request.symbol = "BTCUSDT";
+  request.symbol = INI_CONFIG.get("meta", "ticker");
 
   trade_engine_->send_request(request);
 
@@ -120,7 +120,7 @@ TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
 
   TradeEngineCfgHashMap temp;
   TradeEngineCfg tempcfg;
-  temp.emplace("BTCUSDT", tempcfg);
+  temp.emplace(INI_CONFIG.get("meta", "ticker"), tempcfg);
   auto pool = std::make_unique<MemoryPool<MarketUpdateData>>(1024);
   auto pool2 = std::make_unique<MemoryPool<MarketData>>(1024);
 
@@ -144,7 +144,7 @@ TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
 
   request.req_type = ReqeustType::kOrderMassCancelRequest;
   request.cl_order_id.value = cl_order_id;
-  request.symbol = "BTCUSDT";
+  request.symbol = INI_CONFIG.get("meta", "ticker");
 
   sleep(2);
 

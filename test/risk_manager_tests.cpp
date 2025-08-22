@@ -14,6 +14,7 @@
 #include "order_entry.h"
 #include "logger.h"
 #include "risk_manager.h"  // RiskManager 관련 코드
+#include "ini_config.hpp"
 
 using namespace trading;
 using namespace common;
@@ -26,6 +27,7 @@ protected:
   RiskManager* rm_ = nullptr;
 
   void SetUp() override {
+    INI_CONFIG.load("resources/config.ini");
     logger_ = new Logger();
     keeper_ = new PositionKeeper(logger_);
 
@@ -34,7 +36,7 @@ protected:
     cfg.risk_cfg_.max_position_ = Qty{50};
     cfg.risk_cfg_.max_loss_ = -1000;
 
-    ticker_cfg_ = new TradeEngineCfgHashMap{{"BTCUSDT", cfg}};
+    ticker_cfg_ = new TradeEngineCfgHashMap{{INI_CONFIG.get("meta", "ticker"), cfg}};
 
     rm_ = new RiskManager(logger_, keeper_, *ticker_cfg_);
   }
@@ -48,14 +50,14 @@ protected:
 };
 
 TEST_F(RiskManagerTest, OrderTooLarge) {
-  auto result = rm_->checkPreTradeRisk("BTCUSDT", Side::kBuy, Qty{20});
+  auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"), Side::kBuy, Qty{20});
   EXPECT_EQ(result, RiskCheckResult::kOrderTooLarge);
 }
 
 TEST_F(RiskManagerTest, PositionTooLarge) {
   ExecutionReport report{
     .cl_order_id = OrderId{1},
-    .symbol = "BTCUSDT",
+    .symbol = INI_CONFIG.get("meta", "ticker"),
     .ord_status = OrdStatus::kFilled,
     .cum_qty = Qty{45.0},
     .last_qty = Qty{45.0},
@@ -65,7 +67,7 @@ TEST_F(RiskManagerTest, PositionTooLarge) {
 
   keeper_->add_fill(&report);
 
-  auto result = rm_->checkPreTradeRisk("BTCUSDT", Side::kBuy, Qty{10});
+  auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"), Side::kBuy, Qty{10});
   EXPECT_EQ(result, RiskCheckResult::kPositionTooLarge);
 }
 
@@ -73,7 +75,7 @@ TEST_F(RiskManagerTest, LossTooLarge) {
   {
     ExecutionReport report{
       .cl_order_id = OrderId{1},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{45.0},
       .last_qty = Qty{45.0},
@@ -85,7 +87,7 @@ TEST_F(RiskManagerTest, LossTooLarge) {
   {
     ExecutionReport report{
       .cl_order_id = OrderId{2},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{45.0},
       .last_qty = Qty{45.0},
@@ -96,7 +98,7 @@ TEST_F(RiskManagerTest, LossTooLarge) {
     keeper_->add_fill(&report);
   }
 
-  auto result = rm_->checkPreTradeRisk("BTCUSDT", Side::kBuy, Qty{5});
+  auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"), Side::kBuy, Qty{5});
   EXPECT_EQ(result, RiskCheckResult::kLossTooLarge);
 }
 
@@ -104,7 +106,7 @@ TEST_F(RiskManagerTest, AllowedTrade) {
   {
     ExecutionReport report{
       .cl_order_id = OrderId{1},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{45.0},
       .last_qty = Qty{45.0},
@@ -117,7 +119,7 @@ TEST_F(RiskManagerTest, AllowedTrade) {
   {
     ExecutionReport report{
       .cl_order_id = OrderId{2},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{45.0},
       .last_qty = Qty{45.0},
@@ -128,6 +130,6 @@ TEST_F(RiskManagerTest, AllowedTrade) {
     keeper_->add_fill(&report);
 
   }
-  auto result = rm_->checkPreTradeRisk("BTCUSDT", Side::kSell, Qty{5});
+  auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"), Side::kSell, Qty{5});
   EXPECT_EQ(result, RiskCheckResult::kAllowed);
 }

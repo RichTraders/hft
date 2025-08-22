@@ -17,6 +17,7 @@
 
 #include "order_book.h"
 #include "order_entry.h"
+#include "ini_config.hpp"
 
 using namespace trading;
 using namespace common;
@@ -24,6 +25,7 @@ using namespace common;
 class PositionKeeperTest : public ::testing::Test {
 protected:
   void SetUp() override {
+    INI_CONFIG.load("resources/config.ini");
     logger = new Logger();
     keeper = new PositionKeeper(logger);
   }
@@ -41,7 +43,7 @@ protected:
 TEST_F(PositionKeeperTest, AddFillIncreasesPosition) {
   ExecutionReport report{
       .cl_order_id = OrderId{1},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{1.0},
       .last_qty = Qty{1.0},
@@ -64,7 +66,7 @@ TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
   // 1. Long 2 BTC @ 100
   ExecutionReport buy1{
       .cl_order_id = OrderId{1},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{2},
       .last_qty = Qty{2},
@@ -79,7 +81,7 @@ TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
   // 2. Sell 3 BTC @ 110
   ExecutionReport sell1{
       .cl_order_id = OrderId{2},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{3},
       .last_qty = Qty{3},
@@ -103,7 +105,7 @@ TEST_F(PositionKeeperTest, UnrealPnL_PositiveCase) {
   // 1. 2 BTC 매수 @ 100
   ExecutionReport buy1{
       .cl_order_id = OrderId{1},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{2},
       .last_qty = Qty{2},
@@ -134,7 +136,7 @@ TEST_F(PositionKeeperTest, AddFill_AvgPriceCalculation) {
   // 1. Buy 1 BTC @ 100
   const ExecutionReport buy1{
       .cl_order_id = OrderId{1},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{1},
       .last_qty = Qty{1},
@@ -146,7 +148,7 @@ TEST_F(PositionKeeperTest, AddFill_AvgPriceCalculation) {
   // 2. Buy 3 BTC @ 110
   const ExecutionReport buy2{
       .cl_order_id = OrderId{2},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{3},
       .last_qty = Qty{3},
@@ -167,7 +169,7 @@ TEST_F(PositionKeeperTest, AddFill_FullCloseRealizesPnL) {
   // 1. Buy 2 BTC @ 50
   ExecutionReport buy{
       .cl_order_id = OrderId{1},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{2},
       .last_qty = Qty{2},
@@ -179,7 +181,7 @@ TEST_F(PositionKeeperTest, AddFill_FullCloseRealizesPnL) {
   // 2. Sell 2 BTC @ 70
   ExecutionReport sell{
       .cl_order_id = OrderId{2},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{2},
       .last_qty = Qty{2},
@@ -197,7 +199,7 @@ TEST_F(PositionKeeperTest, UpdateBboUpdatesUnrealPnl) {
 
   ExecutionReport report{
       .cl_order_id = OrderId{1},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{1.0},
       .last_qty = Qty{1.0},
@@ -222,7 +224,7 @@ TEST_F(PositionKeeperTest, ToStringPrintsPositions) {
 
   ExecutionReport report{
       .cl_order_id = OrderId{1},
-      .symbol = "BTCUSDT",
+      .symbol = INI_CONFIG.get("meta", "ticker"),
       .ord_status = OrdStatus::kFilled,
       .cum_qty = Qty{1.0},
       .last_qty = Qty{1.0},
@@ -233,6 +235,6 @@ TEST_F(PositionKeeperTest, ToStringPrintsPositions) {
   keeper->add_fill(&report);
 
   auto output = keeper->toString();
-  EXPECT_NE(output.find("BTCUSDT"), std::string::npos);
+  EXPECT_NE(output.find(INI_CONFIG.get("meta", "ticker")), std::string::npos);
   EXPECT_NE(output.find("pos:"), std::string::npos);
 }

@@ -11,6 +11,7 @@
  */
 
 #include "order_manager.h"
+#include "ini_config.hpp"
 #include "logger.h"
 #include "order_entry.h"
 #include "performance.h"
@@ -30,7 +31,8 @@ using order::LayerBook;
 
 OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
                            RiskManager& risk_manager)
-    : layer_book_("BTCUSDT"),  //TODO(JB): ticker 이름 받아오기
+    : layer_book_(
+          INI_CONFIG.get("meta", "ticker")),  //TODO(JB): ticker 이름 받아오기
       trade_engine_(trade_engine),
       risk_manager_(risk_manager),
       logger_(logger),

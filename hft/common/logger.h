@@ -20,8 +20,16 @@
 //fsink 추가 필요
 
 namespace common {
-// 로그 레벨 정의
-enum class LogLevel : uint8_t { kTrace, kDebug, kInfo, kWarn, kError, kFatal };
+
+enum class LogLevel : uint8_t {
+  kTrace,
+  kDebug,
+  kInfo,
+  kWarn,
+  kError,
+  kFatal,
+  kNone
+};
 
 enum class QueueChunkSize : uint16_t {
   kDefaultSize = 64,
@@ -130,8 +138,9 @@ class LogFormatter {
         return "Error";
       case LogLevel::kFatal:
         return "Fatal";
+      default:
+        return "Unknown";
     }
-    return "UNKNOWN";
   }
 };
 
@@ -167,6 +176,8 @@ class Logger {
              const std::source_location& loc = std::source_location::current());
 
   void clearSink() { sinks_.clear(); }
+  static LogLevel string_to_level(const std::string& level) noexcept;
+  static std::string level_to_string(LogLevel level) noexcept;
 
  private:
   void process();

@@ -54,8 +54,7 @@ std::string timestamp() {
 class FixTest : public ::testing::Test {
 protected:
   void SetUp() override {
-    IniConfig config;
-    config.load("resources/config.ini");
+    INI_CONFIG.load("resources/config.ini");
     auto execution_report_pool = std::make_unique<MemoryPool<
           trading::ExecutionReport>>(1024);
     auto order_cancel_reject_pool = std::make_unique<MemoryPool<

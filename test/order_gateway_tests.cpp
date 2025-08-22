@@ -30,8 +30,7 @@ class OrderGatewayTest : public ::testing::Test  {
 protected:
 
   static void SetUpTestSuite() {
-    IniConfig config;
-    config.load("resources/config.ini");
+    INI_CONFIG.load("resources/config.ini");
 
     auto logger = std::make_unique<Logger>();
 
@@ -117,9 +116,6 @@ TEST_F(OrderGatewayTest, OrderCancel) {
 }
 
 TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
-  IniConfig config;
-  config.load("resources/config.ini");
-
   auto logger = std::make_unique<Logger>();
 
   TradeEngineCfgHashMap temp;

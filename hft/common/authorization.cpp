@@ -15,19 +15,12 @@
 
 namespace common {
 Authorization::Authorization() {
-  IniConfig config;
-#ifdef TEST_NET
-  config.load("resources/test_config.ini");
-#else
-  config.load("resources/config.ini");
-#endif
-
-  md_address_ = config.get("auth", "md_address");
-  oe_address_ = config.get("auth", "oe_address");
-  port_ = config.get_int("auth", "port");
-  api_key_ = config.get("auth", "api_key");
-  pem_file_path_ = config.get("auth", "pem_file_path");
-  private_password_ = config.get("auth", "private_password");
+  md_address_ = INI_CONFIG.get("auth", "md_address");
+  oe_address_ = INI_CONFIG.get("auth", "oe_address");
+  port_ = INI_CONFIG.get_int("auth", "port");
+  api_key_ = INI_CONFIG.get("auth", "api_key");
+  pem_file_path_ = INI_CONFIG.get("auth", "pem_file_path");
+  private_password_ = INI_CONFIG.get("auth", "private_password");
 }
 
 std::string Authorization::get_md_address() const {

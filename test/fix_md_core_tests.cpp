@@ -60,8 +60,7 @@ std::string timestamp() {
 class FixTest : public ::testing::Test {
 protected:
   void SetUp() override {
-    IniConfig config;
-    config.load("resources/config.ini");
+    INI_CONFIG.load("resources/config.ini");
 
     logger_ = std::make_unique<common::Logger>();
     pool_ = std::make_unique<common::MemoryPool<MarketData>>(1024);

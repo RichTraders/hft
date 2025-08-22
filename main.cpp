@@ -26,10 +26,10 @@ constexpr int kMarketDataPoolSize = 16384;
 
 int main() {
   try {
-    const IniConfig config;
+    INI_CONFIG.load("resources/config.ini");
 
     std::unique_ptr<common::Logger> logger = std::make_unique<common::Logger>();
-    logger->setLevel(common::LogLevel::kInfo);
+    logger->setLevel(logger->string_to_level(INI_CONFIG.get("log", "level")));
     logger->clearSink();
     logger->addSink(std::make_unique<common::ConsoleSink>());
 
@@ -56,9 +56,9 @@ int main() {
         .clip_ = common::Qty{0},
         .threshold_ = 0,
         .risk_cfg_ = common::RiskCfg(
-            common::Qty{config.get_double("risk", "max_order_size")},
-            common::Qty{config.get_double("risk", "max_position")},
-            config.get_double("risk", "max_loss"))};
+            common::Qty{INI_CONFIG.get_double("risk", "max_order_size")},
+            common::Qty{INI_CONFIG.get_double("risk", "max_position")},
+            INI_CONFIG.get_double("risk", "max_loss"))};
 
     auto response_manager = std::make_unique<trading::ResponseManager>(
         logger.get(), execution_report_pool.get(),

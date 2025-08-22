@@ -26,11 +26,10 @@ Broker::Broker()
     : pool_(std::make_unique<common::MemoryPool<MarketData>>(kMemoryPoolSize)),
       log_(std::make_unique<common::Logger>()) {
 
-  IniConfig config;
 #ifdef TEST_NET
-  config.load("resources/test_config.ini");
+  INI_CONFIG.load("resources/test_config.ini");
 #else
-  config.load("resources/config.ini");
+  INI_CONFIG.load("resources/config.ini");
 #endif
 
   app_ = std::make_unique<core::FixMarketDataApp>("BMDWATCH", "SPOT",

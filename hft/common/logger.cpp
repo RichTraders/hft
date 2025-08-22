@@ -119,4 +119,40 @@ void Logger::process() {
     sleep(1);
   }
 }
+
+LogLevel Logger::string_to_level(const std::string& level) noexcept {
+  if (level == "TRACE")
+    return LogLevel::kTrace;
+  if (level == "DEBUG")
+    return LogLevel::kDebug;
+  if (level == "INFO")
+    return LogLevel::kInfo;
+  if (level == "WARN")
+    return LogLevel::kWarn;
+  if (level == "ERROR")
+    return LogLevel::kError;
+  if (level == "FATAL")
+    return LogLevel::kFatal;
+  return LogLevel::kNone;
+}
+
+std::string Logger::level_to_string(LogLevel level) noexcept {
+  switch (level) {
+    case LogLevel::kTrace:
+      return "TRACE";
+    case LogLevel::kDebug:
+      return "DEBUG";
+    case LogLevel::kInfo:
+      return "INFO";
+    case LogLevel::kWarn:
+      return "WARN";
+    case LogLevel::kError:
+      return "ERROR";
+    case LogLevel::kFatal:
+      return "FATAL";
+    default:
+      return "NONE";
+  }
+}
+
 }  // namespace common

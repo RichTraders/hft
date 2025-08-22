@@ -13,7 +13,10 @@
 #ifndef INI_READER_H
 #define INI_READER_H
 
-class IniConfig {
+#include "singleton.h"
+
+namespace common {
+class IniConfig : public Singleton<IniConfig> {
  public:
   bool load(const std::string& filename) {
     std::ifstream file(filename);
@@ -62,6 +65,7 @@ class IniConfig {
     }
     return std::string(def);
   }
+
   // NOLINTEND(bugprone-easily-swappable-parameters,-warnings-as-errors)
 
   int get_int(const std::string_view section, const std::string_view key,
@@ -112,5 +116,8 @@ class IniConfig {
               str.end());
   }
 };
+}  // namespace common
+
+#define INI_CONFIG common::IniConfig::instance()
 
 #endif  //INI_READER_H

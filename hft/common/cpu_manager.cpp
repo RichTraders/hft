@@ -19,19 +19,18 @@ namespace common {
 CpuManager::CpuManager(Logger* logger) {
   logger_ = logger;
 
-  IniConfig cfg;
-  cfg.load("resources/config.ini");
-
-  const int cpu_use_count = cfg.get_int("cpu_id", "count");
-  use_cpu_group_ = static_cast<bool>(cfg.get_int("cpu_id", "use_cpu_group"));
-  use_cpu_to_tid_ = static_cast<bool>(cfg.get_int("cpu_id", "use_cpu_to_tid"));
+  const int cpu_use_count = INI_CONFIG.get_int("cpu_id", "count");
+  use_cpu_group_ =
+      static_cast<bool>(INI_CONFIG.get_int("cpu_id", "use_cpu_group"));
+  use_cpu_to_tid_ =
+      static_cast<bool>(INI_CONFIG.get_int("cpu_id", "use_cpu_to_tid"));
 
   for (int i = 0; i < cpu_use_count; i++) {
     CpuInfo info;
     const std::string cpu_id = "cpu_" + std::to_string(i);
 
-    info.use_irq = static_cast<bool>(cfg.get_int(cpu_id, "use_irq"));
-    info.type = static_cast<uint8_t>(cfg.get_int(cpu_id, "cpu_type"));
+    info.use_irq = static_cast<bool>(INI_CONFIG.get_int(cpu_id, "use_irq"));
+    info.type = static_cast<uint8_t>(INI_CONFIG.get_int(cpu_id, "cpu_type"));
     if (info.use_irq) {
       // irq 추가 필요, 현재 없으니 필요 없음
     }
@@ -39,15 +38,15 @@ CpuManager::CpuManager(Logger* logger) {
     cpu_info_list_.emplace(i, info);
   }
 
-  const int thread_count = cfg.get_int("thread", "count");
+  const int thread_count = INI_CONFIG.get_int("thread", "count");
 
   for (int i = 0; i < thread_count; i++) {
     ThreadInfo info;
     const std::string thread_id = "thread_" + std::to_string(i);
 
-    const std::string thread_name = cfg.get(thread_id, "name");
+    const std::string thread_name = INI_CONFIG.get(thread_id, "name");
 
-    info.cpu_id = static_cast<uint8_t>(cfg.get_int(thread_id, "cpu_id"));
+    info.cpu_id = static_cast<uint8_t>(INI_CONFIG.get_int(thread_id, "cpu_id"));
 
     const auto& iter = cpu_info_list_.find(info.cpu_id);
 
@@ -56,9 +55,9 @@ CpuManager::CpuManager(Logger* logger) {
     }
 
     if (iter->second.type <= SCHED_RR) {
-      info.value = cfg.get_int(thread_id, "prio");
+      info.value = INI_CONFIG.get_int(thread_id, "prio");
     } else {
-      info.value = cfg.get_int(thread_id, "nicev");
+      info.value = INI_CONFIG.get_int(thread_id, "nicev");
     }
 
     info.tid = get_tid_by_thread_name(thread_name);

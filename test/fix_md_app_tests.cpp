@@ -24,8 +24,7 @@
 class FixMdAppTest : public ::testing::Test  {
 protected:
   static void SetUpTestSuite() {
-    IniConfig config;
-    config.load("resources/config.ini");
+    INI_CONFIG.load("resources/config.ini");
 
     market_data_pool_ = std::make_unique<common::MemoryPool<MarketData>>(1024);
     logger_ = std::make_unique<common::Logger>();

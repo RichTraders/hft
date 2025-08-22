@@ -210,7 +210,7 @@ pid_t CpuManager::get_tid_by_thread_name(const std::string& target_name) {
       }
     }
   }
-  return 0;  // not found
+  return 0;
 }
 
 int CpuManager::setup(std::string& result) {
@@ -286,32 +286,107 @@ int CpuManager::set_rt(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
     return -1;
   }
 
-  if (set_affinity(AffinityInfo(CpuId(cpu_id), ThreadId(tid))) != 0) {
+  std::string result;
+  if (set_cpu_to_tid(cpu_id, tid, result)) {
+    logger_->error("[init] failed to cpu to tid");
     return -1;
   }
 
-  struct sched_param sched_params {};
+  // if (set_affinity(AffinityInfo(CpuId(cpu_id), ThreadId(tid))) != 0) {
+  //   return -1;
+  // }
+
+  /*struct sched_param sched_params{};
   sched_params.sched_priority = prio;
   if (sched_setscheduler(tid, static_cast<int>(policy), &sched_params) != 0) {
     return -1;
+  }*/
+
+  if (set_chrt(tid, prio, static_cast<int>(policy), result)) {
+    logger_->error("[init] failed to chrt to tid");
+    return -1;
   }
+
   return 0;
 }
 
 int CpuManager::set_cfs(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
                         int nicev) {
-  if (set_affinity(AffinityInfo(CpuId(cpu_id), ThreadId(tid))) != 0) {
+  // if (set_affinity(AffinityInfo(CpuId(cpu_id), ThreadId(tid))) != 0) {
+  //   return -1;
+  // }
+
+  std::string result;
+  if (set_cpu_to_tid(cpu_id, tid, result)) {
+    logger_->error("[init] failed to cpu to tid");
     return -1;
   }
 
-  const struct sched_param sched_params {};
+  result.clear();
+  /*const struct sched_param sched_params{};
   if (sched_setscheduler(tid, static_cast<int>(policy), &sched_params) != 0) {
     return -1;
-  }
-  if (setpriority(PRIO_PROCESS, tid, nicev) != 0) {
+  }*/
+
+  if (set_chrt(tid, 0, static_cast<int>(policy), result)) {
+    logger_->error("[init] failed to chrt to tid");
     return -1;
   }
+
+  /*if (setpriority(PRIO_PROCESS, tid, nicev) != 0) {
+    return -1;
+  }*/
+
+  result.clear();
+
+  if (set_priority(nicev, tid, result)) {
+    logger_->error("[init] failed to priority to tid");
+    return -1;
+  }
+
   return 0;
+}
+
+int CpuManager::set_cpu_to_tid(uint8_t cpu_id, pid_t tid, std::string& result) {
+  return run_commnad(
+      "sudo taskset -cp " + std::to_string(cpu_id) + " " + std::to_string(tid),
+      result);
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+int CpuManager::set_chrt(pid_t tid, int value, int sched, std::string& result) {
+  std::string command = "sudo chrt ";
+  switch (sched) {
+    case SCHED_OTHER:
+      command += "-o ";
+      break;
+    case SCHED_RR:
+      command += "-r ";
+      break;
+    case SCHED_FIFO:
+      command += "-f ";
+      break;
+    case SCHED_BATCH:
+      command += "-b ";
+      break;
+    case SCHED_IDLE:
+      command += "-i ";
+      break;
+    case SCHED_DEADLINE:
+    case SCHED_ISO:
+    default:
+      return -1;
+  }
+  command += "-p " + std::to_string(value) + " " + std::to_string(tid);
+
+  return run_commnad(command, result);
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+int CpuManager::set_priority(int value, pid_t tid, std::string& result) {
+  return run_commnad(
+      "sudo renice -n -" + std::to_string(value) + " -p " + std::to_string(tid),
+      result);
 }
 
 int CpuManager::run_commnad(const std::string& command, std::string& result) {

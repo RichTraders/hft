@@ -59,12 +59,14 @@ TEST(CpuPriorityTest, CpuSetting) {
   common::Thread<"test_1"> test_thread_1;
   common::Thread<"test_2"> test_thread_2;
   common::Thread<"test_3"> test_thread_3;
+  common::Thread<"test_4"> test_thread_4;
 
 
   test_thread_0.start(&run);
   test_thread_1.start(&run);
   test_thread_2.start(&run);
   test_thread_3.start(&run);
+  test_thread_4.start(&run);
 
   auto logger = std::make_unique<Logger>();
   CpuManager cpu(logger.get());
@@ -77,11 +79,13 @@ TEST(CpuPriorityTest, CpuSetting) {
   int pol_1 = sched_getscheduler(cpu.get_tid("test_1"));
   int pol_2 = sched_getscheduler(cpu.get_tid("test_2"));
   int pol_3 = sched_getscheduler(cpu.get_tid("test_3"));
+  int pol_4 = sched_getscheduler(cpu.get_tid("test_4"));
 
   EXPECT_EQ(pol_0, 2);
   EXPECT_EQ(pol_1, 2);
   EXPECT_EQ(pol_2, 1);
   EXPECT_EQ(pol_3, 1);
+  EXPECT_EQ(pol_4, 3);
 }
 
 TEST(CpuPriorityTest, CpuGroupAndTidTest) {

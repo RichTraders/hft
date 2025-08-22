@@ -158,7 +158,7 @@ void OrderGateway::new_single_order_data(const RequestCommon& request) {
       .self_trade_prevention_mode = request.self_trade_prevention_mode};
 
   const std::string msg = app_->create_order_message(order_data);
-  logger_->info(std::format("Send order message:{}", msg));
+  logger_->debug(std::format("[Message]Send order message:{}", msg));
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_->error(std::format(
@@ -173,6 +173,7 @@ void OrderGateway::order_cancel_request(const RequestCommon& request) {
       .symbol = request.symbol};
 
   const std::string msg = app_->create_cancel_order_message(cancel_request);
+  logger_->debug(std::format("[Message]Send cancel order message:{}", msg));
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_->error("[Message] failed to send order_cancel_request");
@@ -195,6 +196,8 @@ void OrderGateway::order_cancel_request_and_new_order_single(
 
   const std::string msg =
       app_->create_cancel_and_reorder_message(cancel_and_reorder);
+  logger_->debug(
+      std::format("[Message]Send cancel and reorder message:{}", msg));
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_->error("[Message] failed to create_cancel_and_new_order");
@@ -206,6 +209,8 @@ void OrderGateway::order_mass_cancel_request(const RequestCommon& request) {
       .cl_order_id = request.cl_order_id, .symbol = request.symbol};
 
   const std::string msg = app_->create_order_all_cancel(all_cancel_request);
+  logger_->debug(
+      std::format("[Message]Send cancel all orders message:{}", msg));
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_->error("[Message] failed to send order_mass_cancel_request");

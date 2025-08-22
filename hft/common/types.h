@@ -16,17 +16,19 @@
 namespace common {
 struct OrderId {
   uint64_t value{std::numeric_limits<uint64_t>::max()};
-
+  explicit OrderId() = default;
   explicit OrderId(uint64_t data) : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<uint64_t>::max();
   }
 
-  bool operator==(uint64_t other) const { return value == other; }
-  bool operator==(const OrderId& other) const { return value == other.value; }
+  constexpr bool operator==(uint64_t other) const { return value == other; }
+  constexpr bool operator==(const OrderId& other) const {
+    return value == other.value;
+  }
 
-  OrderId& operator++(int) {
+  constexpr OrderId& operator++(int) {
     value++;
     return (*this);
   }
@@ -40,9 +42,8 @@ struct OrderId {
 };
 
 inline auto toString(OrderId order_id) -> std::string {
-  return UNLIKELY(!order_id.is_valid())
-             ? "INVALID"
-             : std::to_string(static_cast<uint64_t>(order_id));
+  return UNLIKELY(!order_id.is_valid()) ? "INVALID"
+                                        : std::to_string(order_id.value);
 }
 
 constexpr auto kOrderIdInvalid = std::numeric_limits<uint64_t>::max();
@@ -52,14 +53,14 @@ constexpr auto kTickerIdInvalid = "";
 
 struct ClientId {
   uint32_t value{std::numeric_limits<uint32_t>::max()};
-
+  explicit ClientId() = default;
   explicit ClientId(uint32_t data) : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<uint32_t>::max();
   }
 
-  bool operator==(uint32_t other) const { return value == other; }
+  constexpr bool operator==(uint32_t other) const { return value == other; }
   explicit operator uint32_t() const { return value; }
 };
 
@@ -74,72 +75,85 @@ constexpr auto kClientIdInvalid = std::numeric_limits<uint32_t>::max();
 struct Price {
   double value{std::numeric_limits<double>::max()};
 
+  Price() = default;
   explicit Price(double data) : value(data) {}
 
-  bool operator==(double other) const { return value == other; }
+  constexpr bool operator==(double other) const { return value == other; }
 
-  bool operator!=(double other) const { return value != other; }
-  bool operator<(const Price& other) const { return value < other.value; }
-  bool operator==(const Price& other) const { return value == other.value; }
-
-  [[nodiscard]] bool isValid() const {
-    return value != std::numeric_limits<double>::max();
+  constexpr bool operator!=(double other) const { return value != other; }
+  constexpr bool operator<(const Price& other) const {
+    return value < other.value;
+  }
+  constexpr bool operator==(const Price& other) const {
+    return value == other.value;
   }
 
-  explicit operator double() const { return value; }
+  [[nodiscard]] constexpr bool isValid() const {
+    return value != std::numeric_limits<double>::max();
+  }
+  friend constexpr bool operator==(double lhs, const Price& rhs) {
+    return rhs == lhs;
+  }
+  friend constexpr bool operator!=(double lhs, const Price& rhs) {
+    return rhs != lhs;
+  }
 };
 
 constexpr auto kPriceInvalid = std::numeric_limits<double>::max();
 
 inline auto toString(Price price) -> std::string {
-  return price.isValid() ? std::to_string(static_cast<double>(price))
-                         : "INVALID";
+  return price.isValid() ? std::to_string(price.value) : "INVALID";
 }
 
 struct Qty {
   double value{std::numeric_limits<double>::max()};
 
+  Qty() = default;
   explicit Qty(double data) : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<double>::max();
   }
 
-  bool operator==(double other) const { return value == other; }
-  bool operator<(const Qty& other) const { return value < other.value; }
-  bool operator==(const Qty& other) const { return value == other.value; }
+  constexpr bool operator==(double other) const { return value == other; }
+  constexpr bool operator<(const Qty& other) const {
+    return value < other.value;
+  }
+  constexpr bool operator==(const Qty& other) const {
+    return value == other.value;
+  }
 
-  Qty& operator+=(const Qty& other) {
+  constexpr Qty& operator+=(const Qty& other) {
     value += other.value;
     return *this;
   }
 
-  Qty& operator+=(double other) {
+  constexpr Qty& operator+=(double other) {
     value += other;
     return *this;
   }
 
-  Qty& operator-=(const Qty& other) {
+  constexpr Qty& operator-=(const Qty& other) {
     value -= other.value;
     return *this;
   }
 
-  Qty& operator-=(double other) {
+  constexpr Qty& operator-=(double other) {
     value -= other;
     return *this;
   }
 
-  Qty& operator*(const Qty& other) {
+  constexpr Qty& operator*(const Qty& other) {
     value *= other.value;
     return *this;
   }
 
-  Qty& operator*(double other) {
+  constexpr Qty& operator*(double other) {
     value *= other;
     return *this;
   }
 
-  Qty& operator*=(double other) {
+  constexpr Qty& operator*=(double other) {
     value *= other;
     return *this;
   }
@@ -163,7 +177,7 @@ struct Priority {
     return value != std::numeric_limits<uint64_t>::max();
   }
 
-  bool operator==(uint64_t other) const { return value == other; }
+  constexpr bool operator==(uint64_t other) const { return value == other; }
   explicit operator uint64_t() const { return value; }
 };
 
@@ -176,11 +190,10 @@ inline auto toString(Priority priority) -> std::string {
 constexpr auto kPriorityInvalid = std::numeric_limits<uint64_t>::max();
 
 enum class Side : int8_t {
-  kInvalid = 0,
-  kBuy = 1,
-  kSell = -1,
+  kBuy = 0,
+  kSell = 1,
   kTrade = 2,
-  kMax = 3,
+  kInvalid = 3,
 };
 
 inline auto toString(const Side side) -> std::string {
@@ -189,12 +202,10 @@ inline auto toString(const Side side) -> std::string {
       return "BUY";
     case Side::kSell:
       return "SELL";
-    case Side::kInvalid:
-      return "INVALID";
     case Side::kTrade:
       return "TRADE";
-    case Side::kMax:
-      return "MAX";
+    case Side::kInvalid:
+      return "INVALID";
   }
 
   return "UNKNOWN";
@@ -214,11 +225,16 @@ inline Side charToSide(const char character) {
 }
 
 constexpr auto sideToIndex(Side side) noexcept {
-  return static_cast<size_t>(side) + 1;
+  return static_cast<size_t>(side);
+}
+
+constexpr auto oppIndex(size_t idx) noexcept -> size_t {
+  return idx ^ 1U;
 }
 
 constexpr auto sideToValue(Side side) noexcept {
-  return static_cast<int>(side);
+  const int ret = side == Side::kBuy ? 1 : -1;
+  return ret;
 }
 
 enum class MarketUpdateType : uint8_t {

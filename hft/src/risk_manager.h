@@ -47,19 +47,8 @@ struct RiskInfo {
 
   common::RiskCfg risk_cfg_;
 
-  [[nodiscard]] auto checkPreTradeRisk(const common::Side side,
-                                       const common::Qty qty) const noexcept {
-    if (UNLIKELY(qty.value > risk_cfg_.max_order_size_.value))
-      return RiskCheckResult::kOrderTooLarge;
-    if (UNLIKELY(std::abs(position_info_->position_ +
-                          sideToValue(side) * static_cast<int32_t>(qty.value)) >
-                 static_cast<int32_t>(risk_cfg_.max_position_.value)))
-      return RiskCheckResult::kPositionTooLarge;
-    if (UNLIKELY(position_info_->total_pnl_ < risk_cfg_.max_loss_))
-      return RiskCheckResult::kLossTooLarge;
-
-    return RiskCheckResult::kAllowed;
-  }
+  [[nodiscard]] RiskCheckResult checkPreTradeRisk(
+      common::Side side, common::Qty qty) const noexcept;
 
   [[nodiscard]] auto toString() const {
     std::ostringstream stream;

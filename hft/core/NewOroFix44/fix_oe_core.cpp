@@ -50,7 +50,7 @@ std::string FixOeCore::create_log_on_message(const std::string& sig_b64,
       << new SendingTime(timestamp);
 
   request << new EncryptMethod(EncryptMethod_NONE) << new HeartBtInt(30)
-      << new ResetSeqNumFlag(true) << new MessageHandling('0')
+      << new ResetSeqNumFlag(true)
       << new ResponseMode(1) << new DropCopyFlag(false)
       << new RawDataLength(static_cast<int>(sig_b64.size()))
       << new RawData(sig_b64) << new Username(authorization_.api_key)
@@ -289,13 +289,9 @@ FixOeCore::create_order_mass_cancel_report_message(
 }
 
 FIX8::Message* FixOeCore::decode(const std::string& message) {
-#ifdef MEASUREMENT
-  START_MEASURE(Convert_Message);
-#endif
+  START_MEASURE(OE_Convert_Message);
   FIX8::Message* msg(FIX8::Message::factory(ctx(), message, true, true));
-#ifdef MEASUREMENT
   END_MEASURE(Convert_Message, logger_);
-#endif
   if (likely(msg)) {
     return msg;
   }

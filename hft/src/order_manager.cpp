@@ -35,8 +35,6 @@ OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
       risk_manager_(risk_manager),
       logger_(logger),
       fast_clock_(kCpuHzEstimate, kInterval) {
-  //TODO(JB): ticker 이름 받아오기
-  ticker_side_order_["BTCUSDT"] = OMOrderSideHashMap{};
   logger_->info("[Constructor] OrderManager Construct");
 }
 OrderManager::~OrderManager() {
@@ -54,9 +52,9 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
     layer = LayerBook::find_layer_by_ticks(side_book, tick);
   }
   if (layer < 0) {
-    logger_->error(std::format(
-        "[Updated] on_order_updated: layer not found. response={}",
-        response->toString()));
+    logger_->error(
+        std::format("[Updated] on_order_updated: layer not found. response={}",
+                    response->toString()));
     return;
   }
 
@@ -82,16 +80,15 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       if (slot.state == OMOrderState::kDead) {
         LayerBook::unmap_layer(side_book, layer);
       }
-      logger_->info(std::format("[Updated] PartiallyFilled {}",
-                                response->toString()));
+      logger_->info(
+          std::format("[Updated] PartiallyFilled {}", response->toString()));
       break;
     }
     case OrdStatus::kFilled: {
       slot.qty = response->leaves_qty;  // 보통 0
       slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
-      logger_->info(
-          std::format("[Updated] Filled {}", response->toString()));
+      logger_->info(std::format("[Updated] Filled {}", response->toString()));
       break;
     }
     case OrdStatus::kPendingCancel: {
@@ -101,8 +98,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
     case OrdStatus::kCanceled: {
       slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
-      logger_->info(
-          std::format("[Updated] Canceled {}", response->toString()));
+      logger_->info(std::format("[Updated] Canceled {}", response->toString()));
       break;
     }
     case OrdStatus::kRejected: {
@@ -115,13 +111,13 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
     case OrdStatus::kExpired: {
       slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
-      logger_->error(
-          std::format("[Updated] Expired {}", response->toString()));
+      logger_->error(std::format("[Updated] Expired {}", response->toString()));
       break;
     }
     default: {
-      logger_->error(std::format("[Updated] on_order_updated: unknown OrdStatus {}",
-                                 toString(response->ord_status)));
+      logger_->error(
+          std::format("[Updated] on_order_updated: unknown OrdStatus {}",
+                      toString(response->ord_status)));
       break;
     }
   }
@@ -154,7 +150,8 @@ void OrderManager::modify_order(const TickerId& ticker_id,
       .price = price};
   trade_engine_->send_request(new_request);
 
-  logger_->info(std::format("[Request]Sent new order {}", new_request.toString()));
+  logger_->info(
+      std::format("[Request]Sent new order {}", new_request.toString()));
 }
 
 void OrderManager::cancel_order(const TickerId& ticker_id,
@@ -171,7 +168,8 @@ void OrderManager::cancel_order(const TickerId& ticker_id,
 
 void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
   START_MEASURE(Trading_OrderManager_apply);
-  auto actions = reconciler_.diff(intents, layer_book_, kTickSize, fast_clock_);
+  auto actions = order::QuoteReconciler::diff(intents, layer_book_, kTickSize,
+                                              fast_clock_);
   filter_by_risk(intents, actions);
 
   const auto& ticker = intents.front().ticker;

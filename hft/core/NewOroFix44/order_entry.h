@@ -299,7 +299,7 @@ struct ExecutionReport {
   common::Qty cum_qty = common::Qty{.0f};
   common::Qty leaves_qty = common::Qty{.0f};
   common::Qty last_qty = common::Qty{.0f};
-  int reason;
+  int error_code;
   common::Price price = common::Price{.0f};
   common::Side side;
 
@@ -311,7 +311,7 @@ struct ExecutionReport {
            << ", ord_status=" << trading::toString(ord_status)
            << ", cum_qty=" << cum_qty.value
            << ", leaves_qty=" << leaves_qty.value
-           << ", last_qty=" << last_qty.value << ", reason=" << reason
+           << ", last_qty=" << last_qty.value << ", reason=" << error_code
            << ", price=" << price.value << ", side=" << common::toString(side)
            << "}";
     return stream.str();

@@ -212,15 +212,15 @@ std::string FixOeCore::create_order_all_cancel(
 
 trading::ExecutionReport* FixOeCore::create_excution_report_message(
     ExecutionReport* msg) {
-  const auto cl_order_id = msg->get<ClOrdID>();
-  const auto symbol = msg->get<Symbol>();
-  const auto exec_type = msg->get<ExecType>();
-  const auto ord_status = msg->get<OrdStatus>();
-  const auto cum_qty = msg->get<CumQty>();
-  const auto leaves_qty = msg->get<LeavesQty>();
-  const auto last_qty = msg->get<LastQty>();
-  const auto price = msg->get<Price>();
-  const auto reason = msg->get<OrdRejReason>();
+  const auto* cl_order_id = msg->get<ClOrdID>();
+  const auto* symbol = msg->get<Symbol>();
+  const auto* exec_type = msg->get<ExecType>();
+  const auto* ord_status = msg->get<OrdStatus>();
+  const auto* cum_qty = msg->get<CumQty>();
+  const auto* leaves_qty = msg->get<LeavesQty>();
+  const auto* last_qty = msg->get<LastQty>();
+  const auto* price = msg->get<Price>();
+  const auto* error_code = msg->get<ErrorCode>();
 
   auto* ret = response_manager_->execution_report_allocate();
 
@@ -237,17 +237,17 @@ trading::ExecutionReport* FixOeCore::create_excution_report_message(
   if (likely(price != nullptr))
     ret->price.value = price->get();
 
-  if (likely(reason != nullptr))
-    ret->reason = reason->get();
+  if (likely(error_code != nullptr))
+    ret->error_code = error_code->get();
 
   return ret;
 }
 
 trading::OrderCancelReject* FixOeCore::create_order_cancel_reject_message(
     FIX8::NewOroFix44OE::OrderCancelReject* msg) {
-  auto cl_order_id = msg->get<ClOrdID>();
-  auto symbol = msg->get<Symbol>();
-  auto error_code = msg->get<ErrorCode>();
+  const auto* cl_order_id = msg->get<ClOrdID>();
+  const auto* symbol = msg->get<Symbol>();
+  const auto* error_code = msg->get<ErrorCode>();
 
   auto* ret = response_manager_->order_cancel_reject_allocate();
 
@@ -263,12 +263,12 @@ trading::OrderCancelReject* FixOeCore::create_order_cancel_reject_message(
 trading::OrderMassCancelReport*
 FixOeCore::create_order_mass_cancel_report_message(
     FIX8::NewOroFix44OE::OrderMassCancelReport* msg) {
-  auto cl_order_id = msg->get<ClOrdID>();
-  auto symbol = msg->get<Symbol>();
-  auto error_code = msg->get<ErrorCode>();
-  auto response = msg->get<MassCancelResponse>();
-  auto mass_cancel_request_type = msg->get<MassCancelRequestType>();
-  auto total_affected_orders = msg->get<TotalAffectedOrders>();
+  const auto* cl_order_id = msg->get<ClOrdID>();
+  const auto* symbol = msg->get<Symbol>();
+  const auto* error_code = msg->get<ErrorCode>();
+  const auto* response = msg->get<MassCancelResponse>();
+  const auto* mass_cancel_request_type = msg->get<MassCancelRequestType>();
+  const auto* total_affected_orders = msg->get<TotalAffectedOrders>();
 
   auto* ret = response_manager_->order_mass_cancel_report_allocate();
 

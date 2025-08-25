@@ -79,7 +79,7 @@ constexpr char to_char(T text) noexcept {
 }
 
 enum class OrderSide : char {
-  kNone = 0,
+  kNone = '0',
   kBuy = '1',  // 매수
   kSell = '2'  // 매도
 };

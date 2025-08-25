@@ -21,39 +21,37 @@
 #include "thread.hpp"
 #include "trade_engine.h"
 
-constexpr int kMarketUpdateDataPoolSize = 64;
-constexpr int kMarketDataPoolSize = 16384;
-constexpr int kKilo = 1024;
-constexpr int kThirty = 30;
-
 int main() {
   try {
     INI_CONFIG.load("resources/config.ini");
+    const int kilo = INI_CONFIG.get_int("main_info", "kilo");
+    const int thirty = INI_CONFIG.get_int("main_info", "thirty");
 
     std::unique_ptr<common::Logger> logger = std::make_unique<common::Logger>();
     logger->setLevel(logger->string_to_level(INI_CONFIG.get("log", "level")));
     logger->clearSink();
     logger->addSink(std::make_unique<common::ConsoleSink>());
     logger->addSink(
-        std::make_unique<common::FileSink>("log", kKilo * kKilo * kThirty));
+        std::make_unique<common::FileSink>("log", kilo * kilo * thirty));
 
     auto market_update_data_pool =
         std::make_unique<common::MemoryPool<MarketUpdateData>>(
-            kMarketUpdateDataPoolSize);
-    auto market_data_pool =
-        std::make_unique<common::MemoryPool<MarketData>>(kMarketDataPoolSize);
+            INI_CONFIG.get_int("main_info", "mud_pool_size"));
+    auto market_data_pool = std::make_unique<common::MemoryPool<MarketData>>(
+        INI_CONFIG.get_int("main_info", "md_pool_size"));
 
-    constexpr int kResponseMemoryPoolSize = 1024;
+    const int k_response_memory_pool_size =
+        INI_CONFIG.get_int("main_info", "response_memory_size");
 
     auto execution_report_pool =
         std::make_unique<common::MemoryPool<trading::ExecutionReport>>(
-            kResponseMemoryPoolSize);
+            k_response_memory_pool_size);
     auto order_cancel_reject_pool =
         std::make_unique<common::MemoryPool<trading::OrderCancelReject>>(
-            kResponseMemoryPoolSize);
+            k_response_memory_pool_size);
     auto order_mass_cancel_report_pool =
         std::make_unique<common::MemoryPool<trading::OrderMassCancelReport>>(
-            kResponseMemoryPoolSize);
+            k_response_memory_pool_size);
 
     common::TradeEngineCfgHashMap config_map;
     config_map[INI_CONFIG.get("meta", "ticker")] = {

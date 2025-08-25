@@ -13,21 +13,13 @@
 #ifndef MARKET_DATA_H
 #define MARKET_DATA_H
 
+#include "ini_config.hpp"
 #include "types.h"
-constexpr int kInstrumentReqID = 320;
 constexpr int kNoRelatedSym = 146;
-constexpr int kSymbol = 55;
-constexpr int kCurrency = 15;
-constexpr int kMinTradeVol = 562;
-constexpr int kMaxTradeVol = 1140;
-constexpr int kMinQtyIncrement = 25039;
-constexpr int kMarketMinTradeVol = 25040;
-constexpr int kMarketMaxTradeVol = 25041;
-constexpr int kMarketMinQtyIncrement = 25042;
-constexpr int kMinPriceIncrement = 969;
 
-constexpr int kQtyPrecision = 6;
-constexpr int kPricePrecision = 2;
+const int kQtyPrecision = INI_CONFIG.get_int("meta", "qty_precision");
+const int kPricePrecision = INI_CONFIG.get_int("meta", "price_precision");
+;
 
 struct MarketData {
   common::MarketUpdateType type = common::MarketUpdateType::kInvalid;

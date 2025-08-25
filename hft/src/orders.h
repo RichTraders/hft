@@ -13,6 +13,7 @@
 #ifndef OM_ORDER_H
 #define OM_ORDER_H
 
+#include "ini_config.hpp"
 #include "types.h"
 
 namespace trading {
@@ -90,8 +91,11 @@ using OMOrderTickerSideHashMap =
     absl::flat_hash_map<std::string, OMOrderSideHashMap>;
 
 constexpr uint64_t kTicksInvalid = std::numeric_limits<uint64_t>::min();
-constexpr double kMinReplaceQtyDelta = 1e-9;
-constexpr int kMinReplaceTickDelta = 1;
+const double kMinReplaceQtyDelta =
+    INI_CONFIG.get_double("orders", "min_replace_qty_delta");
+const uint64_t kMinReplaceTickDelta =
+    INI_CONFIG.get_uint64_t("orders", "min_replace_tick_delta");
+;
 
 inline uint64_t to_ticks(double price, double tick) noexcept {
   return std::llround(price / tick);

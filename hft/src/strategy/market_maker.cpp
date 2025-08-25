@@ -13,12 +13,19 @@
 #include "market_maker.h"
 
 #include "feature_engine.h"
+#include "ini_config.hpp"
 #include "order_book.h"
 #include "order_manager.h"
 
-constexpr double kPositionVariance = 1.6 / 1e6;
-constexpr double kEnterThreshold = 1.;
-constexpr double kExitThreshold = 0.8;
+const double kVarianceDenominator =
+    INI_CONFIG.get_double("strategy", "variance_denominator");
+const double kPositionVariance =
+    INI_CONFIG.get_double("strategy", "position_variance") /
+    kVarianceDenominator;
+const double kEnterThreshold =
+    INI_CONFIG.get_double("strategy", "enter_threshold");
+const double kExitThreshold =
+    INI_CONFIG.get_double("strategy", "exit_threshold");
 using common::Qty;
 using common::Side;
 

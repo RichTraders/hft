@@ -19,9 +19,6 @@
 
 namespace trading {
 using common::OrderId;
-constexpr double kCpuHzEstimate = 3.5e9;
-constexpr double kTickSize = 0.01;
-constexpr int kInterval = 6;
 
 using common::Price;
 using common::Qty;
@@ -36,7 +33,8 @@ OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
       trade_engine_(trade_engine),
       risk_manager_(risk_manager),
       logger_(logger),
-      fast_clock_(kCpuHzEstimate, kInterval) {
+      fast_clock_(INI_CONFIG.get_double("cpu_info", "clock"),
+                  INI_CONFIG.get_int("cpu_info", "interval")) {
   logger_->info("[Constructor] OrderManager Construct");
 }
 OrderManager::~OrderManager() {
@@ -48,9 +46,10 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
   auto& side_book = layer_book_.side_book(response->symbol, response->side);
   int layer = LayerBook::find_layer_by_id(side_book, response->cl_order_id);
   if (layer < 0) {
-    const uint64_t tick =
-        to_ticks(response->price.value,
-                 kTickSize);  // TODO(JB): 심볼별 tick_size 사용
+    const uint64_t tick = to_ticks(
+        response->price.value,
+        INI_CONFIG.get_double(
+            "meta", "ticker_size"));  // TODO(JB): 심볼별 tick_size 사용
     layer = LayerBook::find_layer_by_ticks(side_book, tick);
   }
   if (layer < 0) {
@@ -172,8 +171,9 @@ void OrderManager::cancel_order(const TickerId& ticker_id,
 
 void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
   START_MEASURE(Trading_OrderManager_apply);
-  auto actions = order::QuoteReconciler::diff(intents, layer_book_, kTickSize,
-                                              fast_clock_);
+  auto actions = order::QuoteReconciler::diff(
+      intents, layer_book_, INI_CONFIG.get_double("meta", "ticker_size"),
+      fast_clock_);
   filter_by_risk(intents, actions);
 
   const auto& ticker = intents.front().ticker;

@@ -79,7 +79,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::write_loop() {
           queue_->enqueue(msg);
           break;
         }
-        perror("send failed");
+        logger_->error("send failed");
         thread_running_ = false;
         break;
       }
@@ -117,7 +117,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::register_callback(const M
   if (!callbacks_.contains(type)) {
     callbacks_[type] = callback;
   } else {
-    std::cout << "already registered type" << type << "\n";
+    logger_->info("already registered type");
   }
 }
 

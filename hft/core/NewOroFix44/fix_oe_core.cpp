@@ -307,7 +307,7 @@ trading::OrderReject FixOeCore::create_reject_message(
 FIX8::Message* FixOeCore::decode(const std::string& message) {
   START_MEASURE(OE_Convert_Message);
   FIX8::Message* msg(FIX8::Message::factory(ctx(), message, true, true));
-  END_MEASURE(Convert_Message, logger_);
+  END_MEASURE(OE_Convert_Message, logger_);
   if (likely(msg)) {
     return msg;
   }

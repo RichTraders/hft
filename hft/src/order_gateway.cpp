@@ -84,7 +84,7 @@ void OrderGateway::on_order_cancel_reject(
   res.order_cancel_reject = app_->create_order_cancel_reject_message(msg);
 
   if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
-    logger_->error("[Reject] faeild to send order_cancel_reject");
+    logger_->error("[Reject] failed to send order_cancel_reject");
   }
 }
 

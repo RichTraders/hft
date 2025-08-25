@@ -89,9 +89,9 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
                                   .price = best_bid_price,
                                   .qty = Qty{delta * obi * kPositionVariance}});
 
-    logger_->info(std::format("Order Created! price:{}, qty:{}",
-                              best_bid_price.value,
-                              delta * obi * kPositionVariance));
+    logger_->debug(std::format("Order Created! price:{}, qty:{}",
+                               best_bid_price.value,
+                               delta * obi * kPositionVariance));
   } else if (delta * obi < -kEnterThreshold) {
     const auto best_ask_price = order_book->get_bbo()->ask_price;
     intents.push_back(QuoteIntent{.ticker = ticker,

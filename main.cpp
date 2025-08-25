@@ -23,7 +23,11 @@
 
 int main() {
   try {
+#ifdef TEST_NET
+    INI_CONFIG.load("test/resources/config.ini");
+#else
     INI_CONFIG.load("resources/config.ini");
+#endif
 
     const int kilo = INI_CONFIG.get_int("main_init", "kilo");
     const int thirty = INI_CONFIG.get_int("main_init", "thirty");

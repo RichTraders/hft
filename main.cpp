@@ -24,7 +24,7 @@
 int main() {
   try {
 #ifdef TEST_NET
-    INI_CONFIG.load("test/resources/config.ini");
+    INI_CONFIG.load("resources/test_config.ini");
 #else
     INI_CONFIG.load("resources/config.ini");
 #endif

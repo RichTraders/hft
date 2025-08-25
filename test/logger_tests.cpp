@@ -63,8 +63,12 @@ TEST(LoggerTest, ConsoleLogTest) {
 
 TEST(LoggerTest, FileLogTest) {
   std::string cur_dir_path = getCurrentWorkingDirectory();
-  std::string remove_dir = cur_dir_path + "/file_log_test_0.txt";
-  std::remove(remove_dir.c_str());
+  std::string remove_dir = cur_dir_path + "/file_log_test.txt";
+
+  std::ifstream remove_file(remove_dir);
+
+  if (remove_file.is_open())
+    std::remove(remove_dir.c_str());
 
   Logger lg;
   lg.setLevel(LogLevel::kDebug);
@@ -80,7 +84,7 @@ TEST(LoggerTest, FileLogTest) {
 
   sleep(2);
 
-  const std::string file_path = "file_log_test_0.txt";
+  const std::string file_path = "file_log_test.txt";
   std::ifstream ifs(file_path);
 
   EXPECT_TRUE(ifs.is_open());
@@ -95,29 +99,34 @@ TEST(LoggerTest, FileLogTest) {
 
 TEST(LoggerTest, FileLogLotateTest) {
   std::string cur_dir_path = getCurrentWorkingDirectory();
-  std::string remove_dir1 = cur_dir_path + "/file_log_lotate_test_0.txt";
-  std::string remove_dir2 = cur_dir_path + "/file_log_lotate_test_1.txt";
+  std::string remove_dir1 = cur_dir_path + "/file_log_lotate_test_final.txt";
+  std::string remove_dir2 = cur_dir_path + "/file_log_lotate_test_final_1.txt";
 
-  std::remove(remove_dir1.c_str());
-  std::remove(remove_dir2.c_str());
+  std::ifstream remove_file(remove_dir1);
+
+  if (remove_file.is_open())
+    std::remove(remove_dir1.c_str());
+
+  std::ifstream remove_file2(remove_dir2);
+
+  if (remove_file2.is_open())
+    std::remove(remove_dir2.c_str());
 
   std::vector<std::string> line_list;
   line_list.push_back("FileLogTest lotate Test");
   line_list.push_back("Application lotate shutting down333");
-  const std::string file_path = "file_log_lotate_test_0.txt";
-  const std::string file_path2 = "file_log_lotate_test_1.txt";
+  const std::string file_path = "file_log_lotate_test_final.txt";
+  const std::string file_path2 = "file_log_lotate_test_final_1.txt";
 
   Logger lg;
 
   lg.setLevel(LogLevel::kDebug);
   lg.clearSink();
-  lg.addSink(std::make_unique<FileSink>("file_log_lotate_test", 32));
+  lg.addSink(std::make_unique<FileSink>("file_log_lotate_test_final", 32));
 
   lg.debug(line_list[0].c_str());
   lg.debug(line_list[1].c_str());
-
-  sleep(2);
-
+  sleep(3);
   {
     std::ifstream ifs(file_path);
 
@@ -148,9 +157,12 @@ TEST(LoggerTest, FileLogLotateTest) {
 
 TEST(LoggerTest, FileAndConsoleLogTest) {
   std::string cur_dir_path = getCurrentWorkingDirectory();
-  std::string remove_dir = cur_dir_path + "/file_console_file_log_test_0.txt";
+  std::string remove_dir = cur_dir_path + "/file_console_file_log_test.txt";
 
-  std::remove(remove_dir.c_str());
+  std::ifstream remove_file(remove_dir);
+
+  if (remove_file.is_open())
+      std::remove(remove_dir.c_str());
 
   Logger lg;
   lg.setLevel(LogLevel::kDebug);
@@ -189,7 +201,7 @@ TEST(LoggerTest, FileAndConsoleLogTest) {
   // 6) std::cin 버퍼도 복원
   std::cin.rdbuf(old_cin_buf);
 
-  const std::string file_path = "file_console_file_log_test_0.txt";
+  const std::string file_path = "file_console_file_log_test.txt";
   std::ifstream ifs(file_path);
 
   EXPECT_TRUE(ifs.is_open());

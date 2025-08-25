@@ -24,8 +24,9 @@
 int main() {
   try {
     INI_CONFIG.load("resources/config.ini");
-    const int kilo = INI_CONFIG.get_int("main_info", "kilo");
-    const int thirty = INI_CONFIG.get_int("main_info", "thirty");
+
+    const int kilo = INI_CONFIG.get_int("main_init", "kilo");
+    const int thirty = INI_CONFIG.get_int("main_init", "thirty");
 
     std::unique_ptr<common::Logger> logger = std::make_unique<common::Logger>();
     logger->setLevel(logger->string_to_level(INI_CONFIG.get("log", "level")));
@@ -36,12 +37,12 @@ int main() {
 
     auto market_update_data_pool =
         std::make_unique<common::MemoryPool<MarketUpdateData>>(
-            INI_CONFIG.get_int("main_info", "mud_pool_size"));
+            INI_CONFIG.get_int("main_init", "mud_pool_size"));
     auto market_data_pool = std::make_unique<common::MemoryPool<MarketData>>(
-        INI_CONFIG.get_int("main_info", "md_pool_size"));
+        INI_CONFIG.get_int("main_init", "md_pool_size"));
 
     const int k_response_memory_pool_size =
-        INI_CONFIG.get_int("main_info", "response_memory_size");
+        INI_CONFIG.get_int("main_init", "response_memory_size");
 
     auto execution_report_pool =
         std::make_unique<common::MemoryPool<trading::ExecutionReport>>(

@@ -33,7 +33,7 @@ protected:
 
     TradeEngineCfg cfg;
     cfg.risk_cfg_.max_order_size_ = Qty{10};
-    cfg.risk_cfg_.max_position_ = Qty{50};
+    cfg.risk_cfg_.max_position_ = Qty{9};
     cfg.risk_cfg_.max_loss_ = -1000;
 
     ticker_cfg_ = new TradeEngineCfgHashMap{{INI_CONFIG.get("meta", "ticker"), cfg}};

@@ -18,6 +18,7 @@
 #include "performance.h"
 #include "response_manager.h"
 #include "authorization.h"
+#include "ini_config.hpp"
 
 namespace core {
 using namespace FIX8::NewOroFix44OE;
@@ -29,6 +30,8 @@ FixOeCore::FixOeCore(SendId sender_comp_id, TargetId target_comp_id,
     target_comp_id_(std::move(target_comp_id)),
     logger_(logger),
     response_manager_(response_manager){
+  qty_precision = INI_CONFIG.get_int("meta", "qty_precision");
+  price_precision = INI_CONFIG.get_int("meta", "price_precision");
   logger_->info("[Constructor] FixOeCore Created");
 }
 
@@ -117,8 +120,8 @@ std::string FixOeCore::create_order_message(
     request.add_field(
         new TimeInForce(trading::to_char(order_data.time_in_force)));
   }
-  static_cast<OrderQty*>(request.get_field(38))->set_precision(6); //Qty
-  static_cast<OrderQty*>(request.get_field(44))->set_precision(2); //Price
+  static_cast<OrderQty*>(request.get_field(38))->set_precision(qty_precision); //Qty
+  static_cast<OrderQty*>(request.get_field(44))->set_precision(price_precision); //Price
 
   /*
    * SelfTradePreventionMode

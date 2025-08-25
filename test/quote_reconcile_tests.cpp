@@ -44,6 +44,7 @@ static void SetLiveSlot(SideBook& sb, int layer, double px, double qty,
 }
 
 TEST(QuoteReconcilerTest, EmptyIntentsYieldNoActions) {
+  INI_CONFIG.load("resources/config.ini");
   LayerBook lb{kSym};
   QuoteReconciler rec;
   std::vector<QuoteIntent> intents;
@@ -54,6 +55,7 @@ TEST(QuoteReconcilerTest, EmptyIntentsYieldNoActions) {
 }
 
 TEST(QuoteReconcilerTest, NewActionWhenSlotInvalidOrDead) {
+  INI_CONFIG.load("resources/config.ini");
   LayerBook lb{kSym};
   lb.side_book(kSym, common::Side::kBuy);
 
@@ -78,6 +80,7 @@ TEST(QuoteReconcilerTest, NewActionWhenSlotInvalidOrDead) {
 }
 
 TEST(QuoteReconcilerTest, NoReplaceWhenSameTickAndTinyQtyChange) {
+  INI_CONFIG.load("resources/config.ini");
   LayerBook lb{kSym};
   auto& sb = lb.side_book(kSym, common::Side::kBuy);
 
@@ -99,6 +102,7 @@ TEST(QuoteReconcilerTest, NoReplaceWhenSameTickAndTinyQtyChange) {
 }
 
 TEST(QuoteReconcilerTest, MovePriceGeneratesNewThenCancelWhenFreeLayerExists) {
+  INI_CONFIG.load("resources/config.ini");
   LayerBook lb{kSym};
   auto& sb = lb.side_book(kSym, common::Side::kBuy);
 
@@ -133,6 +137,7 @@ TEST(QuoteReconcilerTest, MovePriceGeneratesNewThenCancelWhenFreeLayerExists) {
 }
 
 TEST(QuoteReconcilerTest, ReplaceWhenQtyChangesBeyondThreshold) {
+  INI_CONFIG.load("resources/config.ini");
   LayerBook lb{kSym};
   auto& sb = lb.side_book(kSym, common::Side::kBuy);
 
@@ -159,6 +164,7 @@ TEST(QuoteReconcilerTest, ReplaceWhenQtyChangesBeyondThreshold) {
 }
 
 TEST(QuoteReconcilerTest, AutoCancelForStaleLiveLayer) {
+  INI_CONFIG.load("resources/config.ini");
   LayerBook lb{kSym};
   auto& sb = lb.side_book(kSym, common::Side::kSell);
 
@@ -186,6 +192,7 @@ TEST(QuoteReconcilerTest, AutoCancelForStaleLiveLayer) {
 }
 
 TEST(QuoteReconcilerTest, VictimLiveLayerGeneratesCancelWithVictimId) {
+  INI_CONFIG.load("resources/config.ini");
   LayerBook lb{kSym};
   auto& sb = lb.side_book(kSym, common::Side::kBuy);
 
@@ -222,6 +229,7 @@ TEST(QuoteReconcilerTest, VictimLiveLayerGeneratesCancelWithVictimId) {
 }
 
 TEST(QuoteReconcilerTest, BuySellIndependence) {
+  INI_CONFIG.load("resources/config.ini");
   LayerBook lb{kSym};
   auto& buy = lb.side_book(kSym, common::Side::kBuy);
   auto& sell = lb.side_book(kSym, common::Side::kSell);
@@ -253,6 +261,7 @@ TEST(QuoteReconcilerTest, BuySellIndependence) {
 }
 
 TEST(QuoteReconcilerTest, NoDuplicateActionsForSameIntentTwice) {
+  INI_CONFIG.load("resources/config.ini");
   LayerBook lb{kSym};
   auto& sb = lb.side_book(kSym, common::Side::kBuy);
 

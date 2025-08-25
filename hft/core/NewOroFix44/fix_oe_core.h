@@ -78,5 +78,7 @@ private:
   const std::string target_comp_id_;
   common::Logger* logger_;
   trading::ResponseManager* response_manager_;
+  int qty_precision;
+  int price_precision;
 };
 }

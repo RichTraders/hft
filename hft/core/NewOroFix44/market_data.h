@@ -17,10 +17,6 @@
 #include "types.h"
 constexpr int kNoRelatedSym = 146;
 
-const int kQtyPrecision = INI_CONFIG.get_int("meta", "qty_precision");
-const int kPricePrecision = INI_CONFIG.get_int("meta", "price_precision");
-;
-
 struct MarketData {
   common::MarketUpdateType type = common::MarketUpdateType::kInvalid;
   common::OrderId order_id = common::OrderId{common::kOrderIdInvalid};
@@ -80,8 +76,14 @@ struct MarketUpdateData {
 };
 
 struct InstrumentInfo {
+  InstrumentInfo() {
+    qty_precision = INI_CONFIG.get_int("meta", "qty_precision");
+    price_precision = INI_CONFIG.get_int("meta", "price_precision");
+  }
   std::string instrument_req_id;  // 320
   int no_related_sym = 0;         // 146
+  int qty_precision;
+  int price_precision;
 
   struct RelatedSymT {
     std::string symbol;                     // 55
@@ -94,24 +96,23 @@ struct InstrumentInfo {
     double market_min_qty_increment = 0.0;  // 25042
     double min_price_increment = 0.0;       // 969
 
-    [[nodiscard]] std::string toString(int qty_prec = kQtyPrecision,
-                                       int px_prec = kPricePrecision) const {
+    [[nodiscard]] std::string toString(int qty_precision,
+                                       int price_recision) const {
       std::ostringstream stream;
       stream.setf(std::ios::fixed, std::ios::floatfield);
       stream << "{symbol=" << symbol << ", currency=" << currency
-             << ", min_trade_vol=" << std::setprecision(qty_prec)
+             << ", min_trade_vol=" << std::setprecision(qty_precision)
              << min_trade_vol
-             << ", max_trade_vol=" << std::setprecision(qty_prec)
+             << ", max_trade_vol=" << std::setprecision(qty_precision)
              << max_trade_vol
-             << ", min_qty_increment=" << std::setprecision(qty_prec)
+             << ", min_qty_increment=" << std::setprecision(qty_precision)
              << min_qty_increment
-             << ", market_min_trade_vol=" << std::setprecision(qty_prec)
+             << ", market_min_trade_vol=" << std::setprecision(qty_precision)
              << market_min_trade_vol
-             << ", market_max_trade_vol=" << std::setprecision(qty_prec)
-             << market_max_trade_vol
-             << ", market_min_qty_increment=" << std::setprecision(qty_prec)
-             << market_min_qty_increment
-             << ", min_price_increment=" << std::setprecision(px_prec)
+             << ", market_max_trade_vol=" << std::setprecision(qty_precision)
+             << market_max_trade_vol << ", market_min_qty_increment="
+             << std::setprecision(qty_precision) << market_min_qty_increment
+             << ", min_price_increment=" << std::setprecision(price_recision)
              << min_price_increment << "}";
       return stream.str();
     }
@@ -119,15 +120,14 @@ struct InstrumentInfo {
 
   std::vector<RelatedSymT> symbols;
 
-  [[nodiscard]] std::string toString(int qty_prec = kQtyPrecision,
-                                     int px_prec = kPricePrecision) const {
+  [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
     stream << "fix_instrument_info{instrument_req_id=" << instrument_req_id
            << ", no_related_sym=" << no_related_sym << ", symbols=[";
     for (size_t idx = 0; idx < symbols.size(); ++idx) {
       if (idx)
         stream << ", ";
-      stream << symbols[idx].toString(qty_prec, px_prec);
+      stream << symbols[idx].toString(qty_precision, price_precision);
     }
     stream << "]}";
     return stream.str();

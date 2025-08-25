@@ -49,9 +49,14 @@ struct Actions {
 
 class QuoteReconciler {
  public:
-  static Actions diff(const std::vector<QuoteIntent>& intents,
-                      LayerBook& layer_book, double tick_size,
-                      common::FastClock& clock) {
+  QuoteReconciler() {
+    min_replace_qty_delta_ =
+        INI_CONFIG.get_double("orders", "min_replace_qty_delta");
+    min_replace_tick_delta_ =
+        INI_CONFIG.get_uint64_t("orders", "min_replace_tick_delta");
+  }
+  Actions diff(const std::vector<QuoteIntent>& intents, LayerBook& layer_book,
+               double tick_size, common::FastClock& clock) const {
     Actions acts;
     if (intents.empty())
       return acts;
@@ -108,10 +113,10 @@ class QuoteReconciler {
           const auto intent_tick = to_ticks(intent.price->value, tick_size);
           const bool price_diff =
               slot_tick > intent_tick
-                  ? slot_tick - intent_tick >= kMinReplaceTickDelta
-                  : intent_tick - slot_tick >= kMinReplaceTickDelta;
+                  ? slot_tick - intent_tick >= min_replace_tick_delta_
+                  : intent_tick - slot_tick >= min_replace_tick_delta_;
           const bool qty_diff = (std::abs(slot.qty.value - intent.qty.value) >=
-                                 kMinReplaceQtyDelta);
+                                 min_replace_qty_delta_);
           if (price_diff || qty_diff) {
             acts.repls.push_back(ActionReplace{.layer = assign.layer,
                                                .price = *intent.price,
@@ -141,6 +146,10 @@ class QuoteReconciler {
     }
     return acts;
   }
+
+ private:
+  double min_replace_qty_delta_;
+  uint64_t min_replace_tick_delta_;
 };
 }  // namespace trading::order
 #endif  //QUOTERECONCILER_H

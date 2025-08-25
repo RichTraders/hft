@@ -28,8 +28,7 @@ using order::LayerBook;
 
 OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
                            RiskManager& risk_manager)
-    : layer_book_(
-          INI_CONFIG.get("meta", "ticker")),  //TODO(JB): ticker 이름 받아오기
+    : layer_book_(INI_CONFIG.get("meta", "ticker")),
       trade_engine_(trade_engine),
       risk_manager_(risk_manager),
       logger_(logger),
@@ -171,8 +170,8 @@ void OrderManager::cancel_order(const TickerId& ticker_id,
 
 void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
   START_MEASURE(Trading_OrderManager_apply);
-  auto actions = order::QuoteReconciler::diff(intents, layer_book_,
-                                              ticker_size_, fast_clock_);
+  auto actions =
+      reconciler_.diff(intents, layer_book_, ticker_size_, fast_clock_);
   filter_by_risk(intents, actions);
 
   const auto& ticker = intents.front().ticker;

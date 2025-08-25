@@ -57,6 +57,7 @@ class OrderManager {
   const RiskManager& risk_manager_;
   common::Logger* logger_ = nullptr;
   common::FastClock fast_clock_;
+  double ticker_size_ = 0;
 
   void filter_by_risk(const std::vector<QuoteIntent>& intents,
                       order::Actions& acts) const;

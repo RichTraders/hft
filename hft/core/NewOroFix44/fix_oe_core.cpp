@@ -29,9 +29,9 @@ FixOeCore::FixOeCore(SendId sender_comp_id, TargetId target_comp_id,
   : sender_comp_id_(std::move(sender_comp_id)),
     target_comp_id_(std::move(target_comp_id)),
     logger_(logger),
-    response_manager_(response_manager){
-  qty_precision = INI_CONFIG.get_int("meta", "qty_precision");
-  price_precision = INI_CONFIG.get_int("meta", "price_precision");
+    response_manager_(response_manager),
+    qty_precision_(INI_CONFIG.get_int("meta", "qty_precision")),
+    price_precision_(INI_CONFIG.get_int("meta", "price_precision")) {
   logger_->info("[Constructor] FixOeCore Created");
 }
 
@@ -41,13 +41,13 @@ FixOeCore::~FixOeCore() {
 
 std::string FixOeCore::create_log_on_message(const std::string& sig_b64,
                                              const std::string& timestamp) {
-  FIX8::NewOroFix44OE_ctx();  // 왜하는겨?
+  FIX8::NewOroFix44OE_ctx(); // 왜하는겨?
   Logon request;
 
   FIX8::MessageBase* header = request.Header();
   *header << new SenderCompID(sender_comp_id_)
-          << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
-          << new SendingTime(timestamp);
+      << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
+      << new SendingTime(timestamp);
 
   request << new EncryptMethod(EncryptMethod_NONE) << new HeartBtInt(30)
       << new ResetSeqNumFlag(true)
@@ -102,9 +102,9 @@ std::string FixOeCore::create_order_message(
 
   FIX8::MessageBase* header = request.Header();
   *header << new SenderCompID(sender_comp_id_)
-          << new TargetCompID(target_comp_id_)
-          << new MsgSeqNum(sequence_++)
-          << new SendingTime();
+      << new TargetCompID(target_comp_id_)
+      << new MsgSeqNum(sequence_++)
+      << new SendingTime();
 
   request.add_field(new ClOrdID(std::to_string(order_data.cl_order_id.value)));
   request.add_field(new Symbol(order_data.symbol));
@@ -120,8 +120,10 @@ std::string FixOeCore::create_order_message(
     request.add_field(
         new TimeInForce(trading::to_char(order_data.time_in_force)));
   }
-  static_cast<OrderQty*>(request.get_field(38))->set_precision(qty_precision); //Qty
-  static_cast<OrderQty*>(request.get_field(44))->set_precision(price_precision); //Price
+  static_cast<OrderQty*>(request.get_field(38))->set_precision(qty_precision_);
+  //Qty
+  static_cast<OrderQty*>(request.get_field(44))->
+      set_precision(price_precision_); //Price
 
   /*
    * SelfTradePreventionMode
@@ -143,8 +145,8 @@ std::string FixOeCore::create_cancel_order_message(
 
   FIX8::MessageBase* header = request.Header();
   *header << new SenderCompID(sender_comp_id_)
-          << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
-          << new SendingTime();
+      << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
+      << new SendingTime();
 
   request.add_field(
       new ClOrdID(std::to_string(cancel_request.cl_order_id.value)));
@@ -163,8 +165,8 @@ std::string FixOeCore::create_cancel_and_reorder_message(
 
   FIX8::MessageBase* header = request.Header();
   *header << new SenderCompID(sender_comp_id_)
-          << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
-          << new SendingTime();
+      << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
+      << new SendingTime();
 
   request.add_field(new OrigClOrdID(
       std::to_string(cancel_and_re_order.cancel_order_id.value)));
@@ -199,8 +201,8 @@ std::string FixOeCore::create_order_all_cancel(
 
   FIX8::MessageBase* header = request.Header();
   *header << new SenderCompID(sender_comp_id_)
-          << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
-          << new SendingTime();
+      << new TargetCompID(target_comp_id_) << new MsgSeqNum(sequence_++)
+      << new SendingTime();
 
   request.add_field(
       new ClOrdID(std::to_string(all_order_cancel.cl_order_id.value)));
@@ -314,4 +316,4 @@ FIX8::Message* FixOeCore::decode(const std::string& message) {
   return nullptr;
 }
 
-}  // namespace core
+} // namespace core

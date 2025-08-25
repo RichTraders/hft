@@ -24,20 +24,18 @@
 int main() {
   try {
 #ifdef TEST_NET
-    INI_CONFIG.load("test/resources/config.ini");
+    INI_CONFIG.load("resources/test_config.ini");
 #else
     INI_CONFIG.load("resources/config.ini");
 #endif
 
-    const int kilo = INI_CONFIG.get_int("main_init", "kilo");
-    const int thirty = INI_CONFIG.get_int("main_init", "thirty");
+    const int log_max_size = INI_CONFIG.get_int("log", "size");
 
     std::unique_ptr<common::Logger> logger = std::make_unique<common::Logger>();
     logger->setLevel(logger->string_to_level(INI_CONFIG.get("log", "level")));
     logger->clearSink();
     logger->addSink(std::make_unique<common::ConsoleSink>());
-    logger->addSink(
-        std::make_unique<common::FileSink>("log", kilo * kilo * thirty));
+    logger->addSink(std::make_unique<common::FileSink>("log", log_max_size));
 
     auto market_update_data_pool =
         std::make_unique<common::MemoryPool<MarketUpdateData>>(

@@ -17,8 +17,6 @@
 #include "mpsc_queue_cas.hpp"
 #include "thread.hpp"
 
-//fsink 추가 필요
-
 namespace common {
 
 enum class LogLevel : uint8_t {
@@ -38,7 +36,6 @@ enum class QueueChunkSize : uint16_t {
   kBigSize = 1024,
 };
 
-// 로그 메시지 구조체
 struct LogMessage {
   LogLevel level;
   uint32_t line;
@@ -48,33 +45,29 @@ struct LogMessage {
   std::string text;
 };
 
-// 로그 싱크 인터페이스
 class LogSink {
  public:
   virtual ~LogSink() = default;
   virtual void write(const std::string& msg) = 0;
 };
 
-// 콘솔 싱크
 class ConsoleSink final : public LogSink {
  public:
   ConsoleSink() = default;
   void write(const std::string& msg) override;
 };
 
-// 파일 싱크 (회전 기능 지원)
 class FileSink final : public LogSink {
  public:
   FileSink() = delete;
   FileSink(const std::string& filename, std::size_t max_size)
       : max_size_(max_size), index_(0) {
     auto pos = filename.find_last_of('.');
-    const std::string name = (pos == std::string::npos)
-                                 ? filename                  // 확장자 없음
-                                 : filename.substr(0, pos);  // “file_name”
+    const std::string name =
+        (pos == std::string::npos) ? filename : filename.substr(0, pos);
 
-    const std::string ext = (pos == std::string::npos) ? ""  // 확장자 없음
-                                                       : filename.substr(pos);
+    const std::string ext =
+        (pos == std::string::npos) ? "" : filename.substr(pos);
 
     filename_ = name;
     file_extension_ = ext;
@@ -82,10 +75,7 @@ class FileSink final : public LogSink {
     if (file_extension_.empty())
       file_extension_ = ".txt";
 
-    ofs_.open(filename_ + '_' + std::to_string(index_) + file_extension_,
-              std::ios::out | std::ios::app);
-
-    line_cnt_ = 0;
+    ofs_.open(filename_, std::ios::out | std::ios::app);
   }
   void write(const std::string& msg) override;
 
@@ -100,7 +90,6 @@ class FileSink final : public LogSink {
   int index_;
 };
 
-// 포맷터
 class LogFormatter {
  public:
   static std::string format(const LogMessage& msg) {
@@ -186,13 +175,8 @@ class Logger {
 
   std::atomic<LogLevel> level_;
   std::vector<std::unique_ptr<LogSink>> sinks_;
-  MPSCSegQueue<LogMessage, static_cast<int>(QueueChunkSize::kDefaultSize)>
-      queue_;
-#ifdef UNIT_TEST
+  MPSCSegQueue<LogMessage> queue_;
   Thread<"Logger"> worker_;
-#else
-  Thread<"Logger"> worker_;
-#endif
   std::atomic<bool> stop_{false};
 };
 

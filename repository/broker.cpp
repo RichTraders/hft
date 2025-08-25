@@ -39,6 +39,7 @@ Broker::Broker()
   log_->clearSink();
   log_->addSink(
       std::make_unique<FileSink>("repository", kKilo * kKilo * kThirty));
+  log_->addSink(std::make_unique<common::ConsoleSink>());
 
   app_->register_callback(
       "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });

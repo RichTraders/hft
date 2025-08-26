@@ -61,6 +61,7 @@ class OrderManager {
   common::Logger* logger_ = nullptr;
   common::FastClock fast_clock_;
   order::QuoteReconciler reconciler_;
+  order::VenuePolicy venue_policy_;
   const double ticker_size_ = 0;
   common::Qty reserved_position_{0};
 

@@ -16,6 +16,7 @@
 #include "fast_clock.h"
 #include "layer_book.h"
 #include "types.h"
+
 namespace trading::order {
 struct ActionNew {
   int layer;
@@ -46,9 +47,95 @@ struct Actions {
   std::vector<ActionNew> news;
   std::vector<ActionReplace> repls;
   std::vector<ActionCancel> cancels;
+
   [[nodiscard]] bool empty() const {
     return news.empty() && repls.empty() && cancels.empty();
   }
+};
+
+class VenuePolicy {
+ public:
+  VenuePolicy()
+      : minimum_usdt_(INI_CONFIG.get_double("venue", "minimum_order_usdt")),
+        minimum_qty_(INI_CONFIG.get_double("venue", "minimum_order_qty")),
+        minimum_time_gap_(
+            INI_CONFIG.get_double("venue", "minimum_order_time_gap")) {}
+
+  ~VenuePolicy() = default;
+
+  void filter_bu_venue(const std::string& symbol, Actions& actions,
+                       uint64_t current_time, LayerBook& layer_book) {
+    uint64_t buy_last_used = 0;
+    uint64_t sell_last_used = 0;
+    std::tie(buy_last_used, sell_last_used) = layer_book.get_last_time(symbol);
+
+    if (current_time - buy_last_used < minimum_time_gap_) {
+      for (size_t i = 0; i < actions.news.size();) {
+        if (actions.news[i].side == common::Side::kBuy) {
+          actions.news[i] = std::move(actions.news.back());
+          actions.news.pop_back();
+        } else {
+          ++i;
+        }
+      }
+
+      for (size_t i = 0; i < actions.repls.size();) {
+        if (actions.repls[i].side == common::Side::kBuy) {
+          actions.repls[i] = std::move(actions.repls.back());
+          actions.repls.pop_back();
+        } else {
+          ++i;
+        }
+      }
+    }
+
+    if (current_time - sell_last_used < minimum_time_gap_) {
+      for (size_t i = 0; i < actions.news.size();) {
+        if (actions.news[i].side == common::Side::kSell) {
+          actions.news[i] = std::move(actions.news.back());
+          actions.news.pop_back();
+        } else {
+          ++i;
+        }
+      }
+
+      for (size_t i = 0; i < actions.repls.size();) {
+        if (actions.repls[i].side == common::Side::kSell) {
+          actions.repls[i] = std::move(actions.repls.back());
+          actions.repls.pop_back();
+        } else {
+          ++i;
+        }
+      }
+    }
+
+    for (auto& action : actions.news) {
+      action.qty.value =
+          action.qty.value < minimum_qty_ ? minimum_qty_ : action.qty.value;
+
+      const double order_usdt = action.price.value * action.qty.value;
+
+      if (order_usdt < minimum_usdt_) {
+        action.qty.value = minimum_usdt_ / action.price.value;
+      }
+    }
+
+    for (auto& action : actions.repls) {
+      action.qty.value =
+          action.qty.value < minimum_qty_ ? minimum_qty_ : action.qty.value;
+
+      const double order_usdt = action.price.value * action.qty.value;
+
+      if (order_usdt < minimum_usdt_) {
+        action.qty.value = action.price.value / minimum_usdt_;
+      }
+    }
+  }
+
+ private:
+  const double minimum_usdt_;
+  const double minimum_qty_;
+  const uint64_t minimum_time_gap_;
 };
 
 class QuoteReconciler {

@@ -122,6 +122,23 @@ class LayerBook {
     return {.layer = vidx, .victim_live_layer = victim, .tick = tick};
   }
 
+  std::pair<uint64_t, uint64_t> get_last_time(const std::string& symbol) {
+    SideBook side = books_[symbol][common::sideToIndex(common::Side::kBuy)];
+    uint64_t buy_last_time = 0;
+    for (const auto& iter : side.slots) {
+      buy_last_time = std::max(buy_last_time, iter.last_used);
+    }
+
+    side = books_[symbol][common::sideToIndex(common::Side::kSell)];
+    uint64_t sell_last_time = 0;
+
+    for (const auto& iter : side.slots) {
+      sell_last_time = std::max(sell_last_time, iter.last_used);
+    }
+
+    return {buy_last_time, sell_last_time};
+  }
+
  private:
   using TwoSide = std::array<SideBook, 2>;
   absl::flat_hash_map<std::string, TwoSide> books_;

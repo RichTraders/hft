@@ -184,9 +184,12 @@ void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
   START_MEASURE(Trading_OrderManager_apply);
   auto actions =
       reconciler_.diff(intents, layer_book_, ticker_size_, fast_clock_);
-  filter_by_risk(intents, actions);
 
   const auto& ticker = intents.front().ticker;
+
+  venue_policy_.filter_bu_venue(ticker, actions, fast_clock_.get_timestamp(),
+                                layer_book_);
+  filter_by_risk(intents, actions);
 
   for (auto& action : actions.news) {
     auto& side_book = layer_book_.side_book(ticker, action.side);

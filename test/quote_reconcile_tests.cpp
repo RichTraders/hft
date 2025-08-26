@@ -138,12 +138,12 @@ TEST(QuoteReconcilerTest, MovePriceGeneratesNewThenCancelWhenFreeLayerExists) {
   EXPECT_EQ(n.side, common::Side::kBuy);
   EXPECT_EQ(n.price.value, 101);
   EXPECT_DOUBLE_EQ(n.qty.value, 1.0);
-  EXPECT_NE(n.layer, 0);  // 보통 비어있는 다음 슬롯(예: 1)
+  EXPECT_NE(n.layer, 0); // 보통 비어있는 다음 슬롯(예: 1)
 
   const auto& c = acts.cancels.front();
   EXPECT_EQ(c.side, common::Side::kBuy);
   EXPECT_EQ(c.layer, 0);
-  EXPECT_EQ(c.original_cl_order_id.value, 22);  // 기존 오더 id
+  EXPECT_EQ(c.original_cl_order_id.value, 22); // 기존 오더 id
 }
 
 TEST(QuoteReconcilerTest, ReplaceWhenQtyChangesBeyondThreshold) {
@@ -225,9 +225,11 @@ TEST(QuoteReconcilerTest, VictimLiveLayerGeneratesCancelWithVictimId) {
   ASSERT_TRUE(acts.cancels.empty());
   ASSERT_TRUE(acts.news.empty());
   auto it = std::ranges::find_if(acts.repls,
-                         [](const ActionReplace& c) {
-                           return c.layer == 0 && c.side == common::Side::kBuy && c.original_cl_order_id == 1000;
-                         });
+                                 [](const ActionReplace& c) {
+                                   return c.layer == 0 && c.side ==
+                                          common::Side::kBuy && c.
+                                          original_cl_order_id == 1000;
+                                 });
   ASSERT_NE(it, acts.repls.end());
   EXPECT_EQ(it->original_cl_order_id.value, 1000);
 
@@ -245,7 +247,8 @@ TEST(QuoteReconcilerTest, AllReservedLayerGeneratesNoActions) {
 
   //full
   for (int i = 0; i < kSlotsPerSide; ++i) {
-    SetLiveSlot(sb, i, 100 + i, 1.0, /*last_used=*/100 + i, /*id=*/1000 + i, OMOrderState::kReserved);
+    SetLiveSlot(sb, i, 100 + i, 1.0, /*last_used=*/100 + i, /*id=*/1000 + i,
+                OMOrderState::kReserved);
   }
   EXPECT_EQ(LayerBook::pick_victim_layer(sb), 0);
 
@@ -317,4 +320,87 @@ TEST(QuoteReconcilerTest, NoDuplicateActionsForSameIntentTwice) {
 
   EXPECT_TRUE(a1.empty());
   EXPECT_TRUE(a2.empty());
+}
+
+TEST(VenuePolicyTest, FilterCurrentTime) {
+  INI_CONFIG.load("resources/config.ini");
+  LayerBook lb{kSym};
+  auto& sb = lb.side_book(kSym, common::Side::kBuy);
+
+  // 기존 라이브: 100@1.0 id=701
+  SetLiveSlot(sb, 0, 100, 1.0, 10, 701);
+  SetLiveSlot(sb, 0, 200, 2.0, 20, 702);
+  SetLiveSlot(sb, 0, 300, 3.0, 30, 703);
+
+  QuoteReconciler rec;
+  common::FastClock clk(3.5e9, 10);
+
+  // 같은 의도를 두 번 diff해도 replace/new가 추가적으로 생기면 안 됨
+  std::vector<QuoteIntent> intents = {{.ticker = kSym,
+                                       .side = common::Side::kBuy,
+                                       .price = common::Price(100),
+                                       .qty = common::Qty{1.0}},
+                                      {.ticker = kSym,
+                                       .side = common::Side::kSell,
+                                       .price = common::Price(100),
+                                       .qty = common::Qty{1.0}},
+  };
+  auto a1 = rec.diff(intents, lb, kTickSize, clk);
+
+  EXPECT_EQ(a1.news.size(), 2);
+  order::VenuePolicy policy;
+
+  policy.filter_bu_venue(kSym, a1, 38, lb);
+  EXPECT_EQ(a1.news.size(), 1);
+}
+
+TEST(VenuePolicyTest, FilterQty) {
+  INI_CONFIG.load("resources/config.ini");
+  LayerBook lb{kSym};
+  auto& sb = lb.side_book(kSym, common::Side::kBuy);
+
+  // 기존 라이브: 100@1.0 id=701
+  SetLiveSlot(sb, 0, 400, 1.0, 10, 701);
+
+  QuoteReconciler rec;
+  common::FastClock clk(3.5e9, 10);
+
+  // 같은 의도를 두 번 diff해도 replace/new가 추가적으로 생기면 안 됨
+  std::vector<QuoteIntent> intents = {
+      {
+          .ticker = kSym,
+          .side = common::Side::kBuy,
+          .price = common::Price(100),
+          .qty = common::Qty{1.0}
+      },
+      {
+          .ticker = kSym,
+          .side = common::Side::kBuy,
+          .price = common::Price(200),
+          .qty = common::Qty{3.0}
+      },
+
+      {
+          .ticker = kSym,
+          .side = common::Side::kBuy,
+          .price = common::Price(30),
+          .qty = common::Qty{1.0}
+      },
+  };
+  auto a1 = rec.diff(intents, lb, kTickSize, clk);
+
+  order::VenuePolicy policy;
+
+  policy.filter_bu_venue(kSym, a1, 38, lb);
+  int cnt = 0;
+  for (const auto& iter : a1.news) {
+    if (cnt == 0) {
+      EXPECT_EQ(iter.qty.value, 2);
+    } else if (cnt == 1) {
+      EXPECT_EQ(iter.qty.value, 3);
+    } else {
+      EXPECT_EQ(iter.qty.value, 2);
+    }
+    cnt++;
+  }
 }

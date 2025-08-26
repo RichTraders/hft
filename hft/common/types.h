@@ -300,6 +300,7 @@ inline std::string toString(MarketUpdateType type) {
 struct RiskCfg {
   Qty max_order_size_ = Qty{0};
   Qty max_position_ = Qty{0};
+  Qty min_position_ = Qty{0};
   double max_loss_ = 0;
 
   [[nodiscard]] auto toString() const {
@@ -308,6 +309,7 @@ struct RiskCfg {
     stream << "RiskCfg{"
            << "max-order-size:" << common::toString(max_order_size_) << " "
            << "max-position:" << common::toString(max_position_) << " "
+           << "min-position:" << common::toString(min_position_) << " "
            << "max-loss:" << max_loss_ << "}";
 
     return stream.str();

@@ -302,6 +302,7 @@ struct ExecutionReport {
   int error_code;
   common::Price price = common::Price{.0f};
   common::Side side;
+  std::string text;
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
@@ -313,7 +314,7 @@ struct ExecutionReport {
            << ", leaves_qty=" << leaves_qty.value
            << ", last_qty=" << last_qty.value << ", error_code=" << error_code
            << ", price=" << price.value << ", side=" << common::toString(side)
-           << "}";
+           << ", text=" << text << "}";
     return stream.str();
   }
 };

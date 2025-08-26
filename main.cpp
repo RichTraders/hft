@@ -63,6 +63,7 @@ int main() {
         .risk_cfg_ = common::RiskCfg(
             common::Qty{INI_CONFIG.get_double("risk", "max_order_size")},
             common::Qty{INI_CONFIG.get_double("risk", "max_position")},
+            common::Qty{INI_CONFIG.get_double("risk", "min_position", 0.)},
             INI_CONFIG.get_double("risk", "max_loss"))};
 
     auto response_manager = std::make_unique<trading::ResponseManager>(

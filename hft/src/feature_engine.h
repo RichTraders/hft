@@ -24,7 +24,7 @@ struct MarketData;
 namespace common {
 class Logger;
 }
-constexpr int kVwapSize = 64;
+constexpr int kVwapSize = 256;
 namespace trading {
 class FeatureEngine {
  public:

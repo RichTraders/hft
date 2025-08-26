@@ -226,6 +226,8 @@ trading::ExecutionReport* FixOeCore::create_excution_report_message(
   const auto* last_qty = msg->get<LastQty>();
   const auto* price = msg->get<Price>();
   const auto* error_code = msg->get<ErrorCode>();
+  const auto* text = msg->get<Text>();
+  const auto* side = msg->get<Side>();
 
   auto* ret = response_manager_->execution_report_allocate();
 
@@ -235,6 +237,7 @@ trading::ExecutionReport* FixOeCore::create_excution_report_message(
   ret->exec_type = trading::exec_type_from_char(exec_type->get());
   ret->last_qty.value = last_qty->get();
   ret->ord_status = trading::ord_status_from_char(ord_status->get());
+  ret->side = common::charToSide(side->get() - 1); // 1: Buy, 2: Sell
 
   if (likely(leaves_qty != nullptr))
     ret->leaves_qty.value = leaves_qty->get();
@@ -244,6 +247,9 @@ trading::ExecutionReport* FixOeCore::create_excution_report_message(
 
   if (error_code != nullptr)
     ret->error_code = error_code->get();
+
+  if (text != nullptr)
+    ret->text = text->get();
 
   return ret;
 }

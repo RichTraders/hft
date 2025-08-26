@@ -70,7 +70,7 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
     logger_->trace(
         std::format("Non-positive spread ({}). Using denom={}", spread, denom));
   }
-  const auto signal = delta * obi;
+  const auto signal = std::abs(delta * obi);
 
   std::vector<QuoteIntent> intents;
   intents.reserve(4);
@@ -80,29 +80,26 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
       obi, signal, mid, vwap, spread));
 
   if (delta * obi > enter_threshold_) {
-    //TODO(JB): Implement qty clip using ticker_cfg
     const auto best_bid_price = order_book->get_bbo()->bid_price;
-    intents.push_back(
-        QuoteIntent{.ticker = ticker,
-                    .side = Side::kBuy,
-                    .price = best_bid_price,
-                    .qty = Qty{delta * obi * position_variance_}});
+    intents.push_back(QuoteIntent{.ticker = ticker,
+                                  .side = Side::kBuy,
+                                  .price = best_bid_price,
+                                  .qty = Qty{signal * position_variance_}});
 
     logger_->debug(std::format("Order Created! price:{}, qty:{}",
                                best_bid_price.value,
                                delta * obi * position_variance_));
   } else if (delta * obi < -enter_threshold_) {
     const auto best_ask_price = order_book->get_bbo()->ask_price;
-    intents.push_back(
-        QuoteIntent{.ticker = ticker,
-                    .side = Side::kSell,
-                    .price = best_ask_price,
-                    .qty = Qty{delta * obi * position_variance_}});
+    intents.push_back(QuoteIntent{.ticker = ticker,
+                                  .side = Side::kSell,
+                                  .price = best_ask_price,
+                                  .qty = Qty{signal * position_variance_}});
     logger_->debug(std::format("Order Created! price:{}, qty:{}",
                                best_ask_price.value,
-                               delta * obi * position_variance_));
+                               signal * position_variance_));
   }
-  if (std::abs(signal) < exit_threshold_) {
+  if (signal < exit_threshold_) {
     intents.clear();
   }
   order_manager_->apply(intents);

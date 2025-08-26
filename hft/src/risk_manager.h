@@ -21,8 +21,9 @@ enum class RiskCheckResult : uint8_t {
   kInvalid = 0,
   kOrderTooLarge = 1,
   kPositionTooLarge = 2,
-  kLossTooLarge = 3,
-  kAllowed = 4
+  kPositionTooSmall = 3,
+  kLossTooLarge = 4,
+  kAllowed = 5
 };
 
 inline auto riskCheckResultToString(RiskCheckResult result) {
@@ -33,6 +34,8 @@ inline auto riskCheckResultToString(RiskCheckResult result) {
       return "ORDER_TOO_LARGE";
     case RiskCheckResult::kPositionTooLarge:
       return "POSITION_TOO_LARGE";
+    case RiskCheckResult::kPositionTooSmall:
+      return "POSITION_TOO_Small";
     case RiskCheckResult::kLossTooLarge:
       return "LOSS_TOO_LARGE";
     case RiskCheckResult::kAllowed:

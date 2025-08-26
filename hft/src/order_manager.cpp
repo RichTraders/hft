@@ -77,7 +77,8 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       slot.state = (response->leaves_qty.value <= 0.0) ? OMOrderState::kDead
                                                        : OMOrderState::kLive;
       if (slot.state == OMOrderState::kDead) {
-        reserved_position_ -= slot.qty;
+        reserved_position_ -=
+            static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
         LayerBook::unmap_layer(side_book, layer);
       }
       logger_->info(std::format("[OrderUpdated] PartiallyFilled {}",
@@ -87,7 +88,8 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
     case OrdStatus::kFilled: {
       slot.qty = response->leaves_qty;
       slot.state = OMOrderState::kDead;
-      reserved_position_ -= slot.qty;
+      reserved_position_ -=
+          static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
       LayerBook::unmap_layer(side_book, layer);
       logger_->info(
           std::format("[OrderUpdated] Filled {}", response->toString()));
@@ -99,7 +101,8 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
     }
     case OrdStatus::kCanceled: {
       slot.state = OMOrderState::kDead;
-      reserved_position_ -= slot.qty;
+      reserved_position_ -=
+          static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
       LayerBook::unmap_layer(side_book, layer);
       logger_->info(
           std::format("[OrderUpdated] Canceled {}", response->toString()));
@@ -107,7 +110,8 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
     }
     case OrdStatus::kRejected: {
       slot.state = OMOrderState::kDead;
-      reserved_position_ -= slot.qty;
+      reserved_position_ -=
+          static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
       LayerBook::unmap_layer(side_book, layer);
       logger_->error(
           std::format("[OrderUpdated] Rejected {}", response->toString()));
@@ -115,7 +119,8 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
     }
     case OrdStatus::kExpired: {
       slot.state = OMOrderState::kDead;
-      reserved_position_ -= slot.qty;
+      reserved_position_ -=
+          static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
       LayerBook::unmap_layer(side_book, layer);
       logger_->error(
           std::format("[OrderUpdated] Expired {}", response->toString()));
@@ -206,7 +211,8 @@ void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
 
     new_order(ticker, action.price, action.side, action.qty,
               action.cl_order_id);
-    reserved_position_ += action.qty;
+    reserved_position_ +=
+        static_cast<double>(common::sideToIndex(action.side)) * action.qty;
   }
   for (auto& action : actions.repls) {
     auto& side_book = layer_book_.side_book(ticker, action.side);
@@ -223,7 +229,9 @@ void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
 
     modify_order(ticker, action.cl_order_id, action.original_cl_order_id,
                  action.price, action.side, action.qty);
-    reserved_position_ += action.qty - action.last_qty;
+    reserved_position_ +=
+        static_cast<double>(common::sideToIndex(action.side)) *
+        (action.qty - action.last_qty);
   }
   for (auto& action : actions.cancels) {
     auto& side_book = layer_book_.side_book(ticker, action.side);

@@ -22,6 +22,16 @@ struct OrderSlot {
   uint64_t last_used{0};
   common::OrderId cl_order_id;
 };
+
+inline std::string toString(const OrderSlot& slot) {
+  std::ostringstream ostream;
+  ostream << "OrderSlot{" << "state=" << toString(slot.state) << ", "
+          << "price=" << slot.price.value << ", " << "qty=" << slot.qty.value
+          << ", " << "last_used=" << slot.last_used << ", "
+          << "cl_order_id=" << slot.cl_order_id.value << "}";
+  return ostream.str();
+}
+
 struct SideBook {
   std::array<OrderSlot, kSlotsPerSide> slots;
   std::array<uint64_t, kSlotsPerSide> layer_ticks;

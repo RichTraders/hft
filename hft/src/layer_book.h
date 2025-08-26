@@ -123,18 +123,25 @@ class LayerBook {
   }
 
   std::pair<uint64_t, uint64_t> get_last_time(const std::string& symbol) {
-    SideBook side = books_[symbol][common::sideToIndex(common::Side::kBuy)];
-    uint64_t buy_last_time = 0;
-    for (const auto& iter : side.slots) {
-      buy_last_time = std::max(buy_last_time, iter.last_used);
-    }
+    auto is_active = [](const auto& slot) {
+      return slot.state == OMOrderState::kLive ||
+             slot.state == OMOrderState::kReserved;
+    };
 
-    side = books_[symbol][common::sideToIndex(common::Side::kSell)];
-    uint64_t sell_last_time = 0;
+    auto last_time_for = [&](common::Side side_enum) -> uint64_t {
+      const auto& side = books_[symbol][common::sideToIndex(side_enum)];
+      const auto& slots = side.slots;
 
-    for (const auto& iter : side.slots) {
-      sell_last_time = std::max(sell_last_time, iter.last_used);
-    }
+      uint64_t last = 0;
+      for (const auto& slot : slots | std::ranges::views::filter(is_active)) {
+        last = std::max(last, slot.last_used);
+      }
+
+      return last;
+    };
+
+    const uint64_t buy_last_time = last_time_for(common::Side::kBuy);
+    const uint64_t sell_last_time = last_time_for(common::Side::kSell);
 
     return {buy_last_time, sell_last_time};
   }

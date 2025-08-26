@@ -361,6 +361,7 @@ TEST(VenuePolicyTest, FilterQty) {
 
   // 기존 라이브: 100@1.0 id=701
   SetLiveSlot(sb, 0, 400, 1.0, 10, 701);
+  SetLiveSlot(sb, 1, 500, 3.0, 20, 902, OMOrderState::kDead);
 
   QuoteReconciler rec;
   common::FastClock clk(3.5e9, 10);
@@ -399,7 +400,7 @@ TEST(VenuePolicyTest, FilterQty) {
     } else if (cnt == 1) {
       EXPECT_EQ(iter.qty.value, 3);
     } else {
-      EXPECT_EQ(iter.qty.value, 2);
+      EXPECT_NEAR(iter.qty.value, 2.3333333, 1e-6);
     }
     cnt++;
   }

@@ -17,31 +17,29 @@
 namespace trading {
 RiskCheckResult RiskInfo::checkPreTradeRisk(
     const common::Side side, const common::Qty qty,
-    common::Logger* logger) const noexcept {
+    common::Qty reserved_position, common::Logger* logger) const noexcept {
   if (qty.value > risk_cfg_.max_order_size_.value) {
-    logger->debug(std::format("[Risk]Order is too large [Desired:{}][Allow:{}]",
-                              qty.value, risk_cfg_.max_order_size_.value));
+    logger->info(std::format("[Risk]Order is too large [Desired:{}][Allow:{}]",
+                             qty.value, risk_cfg_.max_order_size_.value));
     return RiskCheckResult::kOrderTooLarge;
   }
-  if (std::abs(position_info_->position_ + position_info_->reserved_position_ +
+  if (std::abs(position_info_->position_ + reserved_position.value +
                sideToValue(side) * qty.value) >
       static_cast<double>(risk_cfg_.max_position_.value)) {
-    logger->debug(std::format(
+    logger->info(std::format(
         "[Risk]Maximum position allowed has been reached."
         "[Desired:{}][Current Position:{}][Working Position:{}][Allow:{}]",
-        qty.value, position_info_->position_,
-        position_info_->reserved_position_, risk_cfg_.max_position_.value));
+        qty.value, position_info_->position_, reserved_position.value,
+        risk_cfg_.max_position_.value));
     return RiskCheckResult::kPositionTooLarge;
   }
   if (position_info_->total_pnl_ < risk_cfg_.max_loss_) {
-    logger->debug(
+    logger->info(
         std::format("[Risk]Maximum PnL allowed has been reached."
                     "[Current:{}][Allow:{}]",
                     position_info_->total_pnl_, risk_cfg_.max_loss_));
     return RiskCheckResult::kLossTooLarge;
   }
-
-  position_info_->reserved_position_ += sideToValue(side) * qty.value;
 
   return RiskCheckResult::kAllowed;
 }

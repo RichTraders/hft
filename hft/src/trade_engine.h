@@ -32,6 +32,9 @@ class ResponseManager;
 class OrderGateway;
 class MarketMaker;
 
+constexpr std::size_t kMarketDataCapacity = 64;
+constexpr int kResponseQueueSize = 64;
+
 class TradeEngine {
  public:
   explicit TradeEngine(
@@ -61,10 +64,12 @@ class TradeEngine {
   common::MemoryPool<MarketData>* market_data_pool_;
   ResponseManager* response_manager_;
   OrderGateway* order_gateway_;
-  std::unique_ptr<common::SPSCQueue<MarketUpdateData*>> queue_;
+  std::unique_ptr<common::SPSCQueue<MarketUpdateData*, kMarketDataCapacity>>
+      queue_;
   common::Thread<"TEMarketData"> thread_;
   common::Thread<"TEResponse"> response_thread_;
-  std::unique_ptr<common::SPSCQueue<ResponseCommon>> response_queue_;
+  std::unique_ptr<common::SPSCQueue<ResponseCommon, kResponseQueueSize>>
+      response_queue_;
   MarketOrderBookHashMap ticker_order_book_;
 
   bool running_{true};

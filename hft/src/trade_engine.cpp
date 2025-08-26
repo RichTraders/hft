@@ -23,8 +23,6 @@
 
 #include "strategy/market_maker.h"
 
-constexpr std::size_t kCapacity = 64;
-
 namespace trading {
 TradeEngine::TradeEngine(
     common::Logger* logger,
@@ -36,7 +34,8 @@ TradeEngine::TradeEngine(
       market_update_data_pool_(market_update_data_pool),
       market_data_pool_(market_data_pool),
       response_manager_(response_manager),
-      queue_(std::make_unique<common::SPSCQueue<MarketUpdateData*>>(kCapacity)),
+      queue_(std::make_unique<
+             common::SPSCQueue<MarketUpdateData*, kMarketDataCapacity>>()),
       feature_engine_(std::make_unique<FeatureEngine>(logger)),
       position_keeper_(std::make_unique<PositionKeeper>(logger)),
       risk_manager_(std::make_unique<RiskManager>(
@@ -45,11 +44,8 @@ TradeEngine::TradeEngine(
           std::make_unique<OrderManager>(logger, this, *risk_manager_)) {
   const std::string ticker = INI_CONFIG.get("meta", "ticker");
   auto orderbook = std::make_unique<MarketOrderBook>(ticker, logger);
-
-  constexpr int kResponseQueueSize = 64;
-  response_queue_ =
-      std::make_unique<common::SPSCQueue<trading::ResponseCommon>>(
-          kResponseQueueSize);
+  response_queue_ = std::make_unique<
+      common::SPSCQueue<trading::ResponseCommon, kResponseQueueSize>>();
   orderbook->set_trade_engine(this);
   ticker_order_book_.insert({ticker, std::move(orderbook)});
 
@@ -95,14 +91,21 @@ void TradeEngine::on_orderbook_updated(const common::TickerId& ticker,
 
 void TradeEngine::on_trade_updated(const MarketData* market_data,
                                    MarketOrderBook* order_book) const {
+  START_MEASURE(TRADE_UPDATED);
   feature_engine_->on_trade_updated(market_data, order_book);
   strategy_->on_trade_updated(market_data, order_book);
+  END_MEASURE(TRADE_UPDATED, logger_);
 }
 
 void TradeEngine::on_order_updated(
     const ExecutionReport* report) const noexcept {
+  START_MEASURE(Trading_TradeEngine_on_order_updated);
   position_keeper_->add_fill(report);
   strategy_->on_order_updated(report);
+  order_manager_->on_order_updated(report);
+  END_MEASURE(Trading_TradeEngine_on_order_updated, logger_);
+
+  logger_->info(std::format("[Result]{}", report->toString()));
 }
 
 bool TradeEngine::enqueue_response(const ResponseCommon& response) {
@@ -117,6 +120,8 @@ void TradeEngine::run() {
   while (running_) {
     MarketUpdateData* message;
     while (queue_->dequeue(message)) {
+      if (UNLIKELY(message == nullptr))
+        continue;
       START_MEASURE(MAKE_ORDERBOOK);
       for (auto& market_data : message->data) {
         ticker_order_book_[market_data->ticker_id]->on_market_data_updated(

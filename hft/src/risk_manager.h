@@ -48,7 +48,7 @@ struct RiskInfo {
   common::RiskCfg risk_cfg_;
 
   [[nodiscard]] RiskCheckResult checkPreTradeRisk(
-      common::Side side, common::Qty qty,
+      common::Side side, common::Qty qty, common::Qty reserved_position,
       common::Logger* logger) const noexcept;
 
   [[nodiscard]] auto toString() const {
@@ -68,10 +68,11 @@ class RiskManager {
               const common::TradeEngineCfgHashMap& ticker_cfg);
 
   ~RiskManager();
-  [[nodiscard]] auto checkPreTradeRisk(const common::TickerId& ticker_id,
-                                       const common::Side side,
-                                       const common::Qty qty) const noexcept {
-    return ticker_risk_.at(ticker_id).checkPreTradeRisk(side, qty, logger_);
+  [[nodiscard]] auto checkPreTradeRisk(
+      const common::TickerId& ticker_id, const common::Side side,
+      const common::Qty qty, const common::Qty reserved_qty) const noexcept {
+    return ticker_risk_.at(ticker_id).checkPreTradeRisk(side, qty, reserved_qty,
+                                                        logger_);
   }
 
   RiskManager() = delete;

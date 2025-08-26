@@ -37,8 +37,9 @@ void FileSink::rotate() {
   ofs_.close();
   const std::string new_file_name =
       filename_ + "_" + std::to_string(++index_) + file_extension_;
+  std::filesystem::rename(filename_ + file_extension_, new_file_name);
 
-  ofs_.open(new_file_name);
+  ofs_.open(filename_ + file_extension_);
 }
 
 void Logger::trace(const std::string& text, const std::source_location& loc) {

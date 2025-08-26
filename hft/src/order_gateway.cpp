@@ -84,7 +84,7 @@ void OrderGateway::on_order_cancel_reject(
   res.order_cancel_reject = app_->create_order_cancel_reject_message(msg);
 
   if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
-    logger_->error("[Reject] faeild to send order_cancel_reject");
+    logger_->error("[Reject] failed to send order_cancel_reject");
   }
 }
 
@@ -158,7 +158,7 @@ void OrderGateway::new_single_order_data(const RequestCommon& request) {
       .self_trade_prevention_mode = request.self_trade_prevention_mode};
 
   const std::string msg = app_->create_order_message(order_data);
-  logger_->debug(std::format("[Message]Send order message:{}", msg));
+  logger_->info(std::format("[Message]Send order message:{}", msg));
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_->error(std::format(

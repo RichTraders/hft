@@ -10,8 +10,9 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#ifndef QUOTERECONCILER_H
-#define QUOTERECONCILER_H
+#ifndef QUOTE_RECONCILER_H
+#define QUOTE_RECONCILER_H
+
 #include "fast_clock.h"
 #include "layer_book.h"
 #include "types.h"
@@ -21,6 +22,7 @@ struct ActionNew {
   common::Price price;
   common::Qty qty;
   common::Side side;
+  common::OrderId cl_order_id;
 };
 
 struct ActionReplace {
@@ -29,6 +31,7 @@ struct ActionReplace {
   common::Qty qty;
   common::Side side;
   common::OrderId cl_order_id;
+  common::OrderId original_cl_order_id;
   common::Qty last_qty;
 };
 
@@ -36,6 +39,7 @@ struct ActionCancel {
   int layer;
   common::Side side;
   common::OrderId cl_order_id;
+  common::OrderId original_cl_order_id;
 };
 
 struct Actions {
@@ -49,12 +53,12 @@ struct Actions {
 
 class QuoteReconciler {
  public:
-  QuoteReconciler() {
-    min_replace_qty_delta_ =
-        INI_CONFIG.get_double("orders", "min_replace_qty_delta");
-    min_replace_tick_delta_ =
-        INI_CONFIG.get_uint64_t("orders", "min_replace_tick_delta");
-  }
+  QuoteReconciler()
+      : min_replace_qty_delta_(
+            INI_CONFIG.get_double("orders", "min_replace_qty_delta")),
+        min_replace_tick_delta_(
+            INI_CONFIG.get_uint64_t("orders", "min_replace_tick_delta")) {}
+
   Actions diff(const std::vector<QuoteIntent>& intents, LayerBook& layer_book,
                double tick_size, common::FastClock& clock) const {
     Actions acts;
@@ -87,17 +91,19 @@ class QuoteReconciler {
         const uint64_t tick = to_ticks(intent.price->value, tick_size);
         want_ticks.push_back(tick);
 
-        auto assign = LayerBook::get_or_assign_layer(side_book, tick, now);
+        auto assign = LayerBook::plan_layer(side_book, tick);
         const OrderSlot& slot = side_book.slots[assign.layer];
         if (assign.victim_live_layer) {
           const int vidx = *assign.victim_live_layer;
           const auto& vslot = side_book.slots[vidx];
-          acts.repls.push_back(ActionReplace{.layer = vidx,
-                                             .price = *intent.price,
-                                             .qty = intent.qty,
-                                             .side = side,
-                                             .cl_order_id = vslot.cl_order_id,
-                                             .last_qty = vslot.qty});
+          acts.repls.push_back(
+              ActionReplace{.layer = vidx,
+                            .price = *intent.price,
+                            .qty = intent.qty,
+                            .side = side,
+                            .cl_order_id = common::OrderId{now},
+                            .original_cl_order_id = vslot.cl_order_id,
+                            .last_qty = vslot.qty});
           did_victim_this_side = true;
           continue;
         }
@@ -107,7 +113,8 @@ class QuoteReconciler {
           acts.news.push_back(ActionNew{.layer = assign.layer,
                                         .price = *intent.price,
                                         .qty = intent.qty,
-                                        .side = side});
+                                        .side = side,
+                                        .cl_order_id = common::OrderId{now}});
         } else if (slot.state == OMOrderState::kLive) {
           const auto slot_tick = to_ticks(slot.price.value, tick_size);
           const auto intent_tick = to_ticks(intent.price->value, tick_size);
@@ -118,12 +125,14 @@ class QuoteReconciler {
           const bool qty_diff = (std::abs(slot.qty.value - intent.qty.value) >=
                                  min_replace_qty_delta_);
           if (price_diff || qty_diff) {
-            acts.repls.push_back(ActionReplace{.layer = assign.layer,
-                                               .price = *intent.price,
-                                               .qty = intent.qty,
-                                               .side = side,
-                                               .cl_order_id = slot.cl_order_id,
-                                               .last_qty = slot.qty});
+            acts.repls.push_back(
+                ActionReplace{.layer = assign.layer,
+                              .price = *intent.price,
+                              .qty = intent.qty,
+                              .side = side,
+                              .cl_order_id = common::OrderId{now},
+                              .original_cl_order_id = slot.cl_order_id,
+                              .last_qty = slot.qty});
           }
         }
       }
@@ -138,7 +147,8 @@ class QuoteReconciler {
               acts.cancels.push_back(ActionCancel{
                   .layer = layer,
                   .side = side,
-                  .cl_order_id = side_book.slots[layer].cl_order_id});
+                  .cl_order_id = common::OrderId{now},
+                  .original_cl_order_id = side_book.slots[layer].cl_order_id});
             }
           }
         }
@@ -152,4 +162,4 @@ class QuoteReconciler {
   uint64_t min_replace_tick_delta_;
 };
 }  // namespace trading::order
-#endif  //QUOTERECONCILER_H
+#endif  //QUOTE_RECONCILER_H

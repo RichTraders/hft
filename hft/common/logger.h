@@ -75,7 +75,7 @@ class FileSink final : public LogSink {
     if (file_extension_.empty())
       file_extension_ = ".txt";
 
-    ofs_.open(filename_ + file_extension_, std::ios::out | std::ios::app);
+    ofs_.open(filename_ + file_extension_);
   }
   void write(const std::string& msg) override;
 

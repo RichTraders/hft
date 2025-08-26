@@ -305,13 +305,13 @@ struct ExecutionReport {
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
-    stream << "ExecutionReport{" << ", order_id=" << cl_order_id.value
+    stream << "ExecutionReport{" << "order_id=" << cl_order_id.value
            << ", symbol=" << symbol
            << ", exec_type=" << trading::toString(exec_type)
            << ", ord_status=" << trading::toString(ord_status)
            << ", cum_qty=" << cum_qty.value
            << ", leaves_qty=" << leaves_qty.value
-           << ", last_qty=" << last_qty.value << ", reason=" << error_code
+           << ", last_qty=" << last_qty.value << ", error_code=" << error_code
            << ", price=" << price.value << ", side=" << common::toString(side)
            << "}";
     return stream.str();

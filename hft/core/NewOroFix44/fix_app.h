@@ -13,11 +13,11 @@
 #ifndef FIX_PROTOCOL_H
 #define FIX_PROTOCOL_H
 
-#include "common/spsc_queue.h"
 #include <common/thread.hpp>
+#include <common/spsc_queue.h>
 #include "logger.h"
 
-constexpr int kQueueSize = 8;
+constexpr int kQueueSize = 64;
 constexpr int kReadBufferSize = 1024;
 constexpr int kWriteThreadSleep = 100;
 
@@ -94,7 +94,7 @@ private:
 #ifdef REPOSITORY
   std::function<void(const std::string&)> raw_data_callback_;
 #endif
-  std::unique_ptr<common::SPSCQueue<std::string>> queue_;
+  std::unique_ptr<common::SPSCQueue<std::string, kQueueSize>> queue_;
 
   common::Thread<WriteThreadName> write_thread_;
   common::Thread<ReadThreadName> read_thread_;

@@ -28,6 +28,12 @@ struct SideBook {
   SideBook() { layer_ticks.fill(kTicksInvalid); }
 };
 
+struct AssignPlan {
+  int layer{-1};
+  std::optional<int> victim_live_layer;
+  uint64_t tick;
+};
+
 class LayerBook {
  public:
   explicit LayerBook(const common::TickerId& ticker) {
@@ -45,7 +51,7 @@ class LayerBook {
     return -1;
   }
   static int find_layer_by_id(const SideBook& side_book,
-                              common::OrderId order_id) noexcept {
+                              const common::OrderId order_id) noexcept {
     if (order_id.value == common::kOrderIdInvalid)
       return -1;
     for (int idx = 0; idx < kSlotsPerSide; ++idx)
@@ -81,12 +87,14 @@ class LayerBook {
                                     uint64_t now) {
     if (const int layer = find_layer_by_ticks(side_book, tick); layer >= 0) {
       side_book.slots[layer].last_used = now;
-      return {layer, std::nullopt};
+      side_book.slots[layer].cl_order_id = common::OrderId{now};
+      return {.layer = layer, .victim_live_layer = std::nullopt};
     }
     if (const int free_layer = find_free_layer(side_book); free_layer >= 0) {
       side_book.layer_ticks[free_layer] = tick;
       side_book.slots[free_layer].last_used = now;
-      return {free_layer, std::nullopt};
+      side_book.slots[free_layer].cl_order_id = common::OrderId{now};
+      return {.layer = free_layer, .victim_live_layer = std::nullopt};
     }
     int vidx = pick_victim_layer(side_book);
     std::optional<int> victim{};
@@ -94,11 +102,24 @@ class LayerBook {
       victim = vidx;
     side_book.layer_ticks[vidx] = tick;
     side_book.slots[vidx].last_used = now;
-    return {vidx, victim};
+    side_book.slots[vidx].cl_order_id = common::OrderId{now};
+    return {.layer = vidx, .victim_live_layer = victim};
   }
 
   static void unmap_layer(SideBook& side_book, int layer) {
     side_book.layer_ticks[layer] = kTicksInvalid;
+  }
+
+  static AssignPlan plan_layer(const SideBook& side_book, uint64_t tick) {
+    if (const int layer = find_layer_by_ticks(side_book, tick); layer >= 0)
+      return {.layer = layer, .victim_live_layer = std::nullopt, .tick = tick};
+    if (const int layer = find_free_layer(side_book); layer >= 0)
+      return {.layer = layer, .victim_live_layer = std::nullopt, .tick = tick};
+    const int vidx = pick_victim_layer(side_book);
+    std::optional<int> victim{};
+    if (side_book.slots[vidx].state == OMOrderState::kLive)
+      victim = vidx;
+    return {.layer = vidx, .victim_live_layer = victim, .tick = tick};
   }
 
  private:

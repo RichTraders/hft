@@ -99,8 +99,13 @@ void TradeEngine::on_trade_updated(const MarketData* market_data,
 
 void TradeEngine::on_order_updated(
     const ExecutionReport* report) const noexcept {
+  START_MEASURE(Trading_TradeEngine_on_order_updated);
   position_keeper_->add_fill(report);
   strategy_->on_order_updated(report);
+  order_manager_->on_order_updated(report);
+  END_MEASURE(Trading_TradeEngine_on_order_updated, logger_);
+
+  logger_->info(std::format("[Result]{}", report->toString()));
 }
 
 bool TradeEngine::enqueue_response(const ResponseCommon& response) {
@@ -115,6 +120,8 @@ void TradeEngine::run() {
   while (running_) {
     MarketUpdateData* message;
     while (queue_->dequeue(message)) {
+      if (UNLIKELY(message == nullptr))
+        continue;
       START_MEASURE(MAKE_ORDERBOOK);
       for (auto& market_data : message->data) {
         ticker_order_book_[market_data->ticker_id]->on_market_data_updated(

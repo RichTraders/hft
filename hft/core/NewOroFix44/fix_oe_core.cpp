@@ -240,7 +240,7 @@ trading::ExecutionReport* FixOeCore::create_excution_report_message(
   if (likely(price != nullptr))
     ret->price.value = price->get();
 
-  if (likely(error_code != nullptr))
+  if (error_code != nullptr)
     ret->error_code = error_code->get();
 
   return ret;

@@ -22,7 +22,8 @@ enum class OMOrderState : int8_t {
   kPendingNew = 1,
   kLive = 2,
   kPendingCancel = 3,
-  kDead = 4
+  kDead = 4,
+  kReserved = 5,
 };
 
 inline auto toString(OMOrderState side) -> std::string {
@@ -37,6 +38,8 @@ inline auto toString(OMOrderState side) -> std::string {
       return "DEAD";
     case OMOrderState::kInvalid:
       return "INVALID";
+    case OMOrderState::kReserved:
+      return "RESERVED";
   }
 
   return "UNKNOWN";

@@ -43,6 +43,16 @@ static void SetLiveSlot(SideBook& sb, int layer, double px, double qty,
   sb.slots[layer].cl_order_id = common::OrderId{id};
 }
 
+static void SetLiveSlot(SideBook& sb, int layer, double px, double qty,
+                        uint64_t last_used, uint64_t id, OMOrderState state) {
+  sb.layer_ticks[layer] = TK(px);
+  sb.slots[layer].state = state;
+  sb.slots[layer].price = common::Price(px);
+  sb.slots[layer].qty = common::Qty{qty};
+  sb.slots[layer].last_used = last_used;
+  sb.slots[layer].cl_order_id = common::OrderId{id};
+}
+
 TEST(QuoteReconcilerTest, EmptyIntentsYieldNoActions) {
   INI_CONFIG.load("resources/config.ini");
   LayerBook lb{kSym};
@@ -133,7 +143,7 @@ TEST(QuoteReconcilerTest, MovePriceGeneratesNewThenCancelWhenFreeLayerExists) {
   const auto& c = acts.cancels.front();
   EXPECT_EQ(c.side, common::Side::kBuy);
   EXPECT_EQ(c.layer, 0);
-  EXPECT_EQ(c.cl_order_id.value, 22);  // 기존 오더 id
+  EXPECT_EQ(c.original_cl_order_id.value, 22);  // 기존 오더 id
 }
 
 TEST(QuoteReconcilerTest, ReplaceWhenQtyChangesBeyondThreshold) {
@@ -155,7 +165,7 @@ TEST(QuoteReconcilerTest, ReplaceWhenQtyChangesBeyondThreshold) {
   auto acts = rec.diff(intents, lb, kTickSize, clk);
   ASSERT_EQ(acts.repls.size(), 1u);
   const auto& r = acts.repls.front();
-  EXPECT_EQ(r.cl_order_id.value, 33);
+  EXPECT_EQ(r.original_cl_order_id.value, 33);
   EXPECT_EQ(r.price.value, 100);
   EXPECT_EQ(r.last_qty, 1.0);
   EXPECT_DOUBLE_EQ(r.qty.value, 1.5);
@@ -185,7 +195,7 @@ TEST(QuoteReconcilerTest, AutoCancelForStaleLiveLayer) {
   const auto& c = acts.cancels.front();
   EXPECT_EQ(c.side, common::Side::kSell);
   EXPECT_EQ(c.layer, 1);
-  EXPECT_EQ(c.cl_order_id.value, 44);
+  EXPECT_EQ(c.original_cl_order_id.value, 44);
   // 새 레벨은 New로 나와야
   ASSERT_EQ(acts.news.size(), 1u);
   EXPECT_EQ(acts.repls.size(), 0u);
@@ -216,16 +226,42 @@ TEST(QuoteReconcilerTest, VictimLiveLayerGeneratesCancelWithVictimId) {
   ASSERT_TRUE(acts.news.empty());
   auto it = std::ranges::find_if(acts.repls,
                          [](const ActionReplace& c) {
-                           return c.layer == 0 && c.side == common::Side::kBuy && c.cl_order_id == 1000;
+                           return c.layer == 0 && c.side == common::Side::kBuy && c.original_cl_order_id == 1000;
                          });
   ASSERT_NE(it, acts.repls.end());
-  EXPECT_EQ(it->cl_order_id.value, 1000);  // victim의 id
+  EXPECT_EQ(it->original_cl_order_id.value, 1000);
 
   ASSERT_EQ(acts.repls.size(), 1u);
   EXPECT_EQ(acts.repls.front().price.value, 9999);
   EXPECT_EQ(acts.repls.front().side, common::Side::kBuy);
   EXPECT_EQ(acts.repls.front().qty, 3.0);
   EXPECT_EQ(acts.repls.front().last_qty, 1.0);
+}
+
+TEST(QuoteReconcilerTest, AllReservedLayerGeneratesNoActions) {
+  INI_CONFIG.load("resources/config.ini");
+  LayerBook lb{kSym};
+  auto& sb = lb.side_book(kSym, common::Side::kBuy);
+
+  //full
+  for (int i = 0; i < kSlotsPerSide; ++i) {
+    SetLiveSlot(sb, i, 100 + i, 1.0, /*last_used=*/100 + i, /*id=*/1000 + i, OMOrderState::kReserved);
+  }
+  EXPECT_EQ(LayerBook::pick_victim_layer(sb), 0);
+
+  QuoteReconciler rec;
+  common::FastClock clk(3.5e9, 10);
+
+  std::vector<QuoteIntent> intents = {{.ticker = kSym,
+                                       .side = common::Side::kBuy,
+                                       .price = common::Price(9999),
+                                       .qty = common::Qty{3.0}}};
+
+  auto acts = rec.diff(intents, lb, kTickSize, clk);
+
+  ASSERT_TRUE(acts.cancels.empty());
+  ASSERT_TRUE(acts.news.empty());
+  ASSERT_TRUE(acts.repls.empty());
 }
 
 TEST(QuoteReconcilerTest, BuySellIndependence) {
@@ -255,7 +291,7 @@ TEST(QuoteReconcilerTest, BuySellIndependence) {
   // SELL
   ASSERT_EQ(acts.cancels.size(), 1u);
   EXPECT_EQ(acts.cancels.front().side, common::Side::kBuy);
-  EXPECT_EQ(acts.cancels.front().cl_order_id.value, 501);
+  EXPECT_EQ(acts.cancels.front().original_cl_order_id.value, 501);
 
   EXPECT_TRUE(acts.repls.empty());
 }

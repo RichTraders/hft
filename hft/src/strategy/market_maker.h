@@ -31,6 +31,12 @@ class MarketMaker : public BaseStrategy<MarketMaker> {
   void on_trade_updated(const MarketData*, MarketOrderBook*) noexcept;
 
   void on_order_updated(const ExecutionReport*) noexcept;
+
+ private:
+  const double variance_denominator_;
+  const double position_variance_;
+  const double enter_threshold_;
+  const double exit_threshold_;
 };
 }  // namespace trading
 

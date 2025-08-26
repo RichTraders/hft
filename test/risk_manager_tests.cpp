@@ -50,7 +50,8 @@ protected:
 };
 
 TEST_F(RiskManagerTest, OrderTooLarge) {
-  auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"), Side::kBuy, Qty{20});
+  auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"),
+                                       Side::kBuy, Qty{20}, Qty{0});
   EXPECT_EQ(result, RiskCheckResult::kOrderTooLarge);
 }
 
@@ -67,7 +68,8 @@ TEST_F(RiskManagerTest, PositionTooLarge) {
 
   keeper_->add_fill(&report);
 
-  auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"), Side::kBuy, Qty{10});
+  auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"),
+                                       Side::kBuy, Qty{10}, Qty{0});
   EXPECT_EQ(result, RiskCheckResult::kPositionTooLarge);
 }
 
@@ -98,7 +100,8 @@ TEST_F(RiskManagerTest, LossTooLarge) {
     keeper_->add_fill(&report);
   }
 
-  auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"), Side::kBuy, Qty{5});
+  auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"),
+                                       Side::kBuy, Qty{5}, Qty{0});
   EXPECT_EQ(result, RiskCheckResult::kLossTooLarge);
 }
 
@@ -130,6 +133,7 @@ TEST_F(RiskManagerTest, AllowedTrade) {
     keeper_->add_fill(&report);
 
   }
-  auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"), Side::kSell, Qty{5});
+  auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"),
+                                       Side::kSell, Qty{5}, Qty{0});
   EXPECT_EQ(result, RiskCheckResult::kAllowed);
 }

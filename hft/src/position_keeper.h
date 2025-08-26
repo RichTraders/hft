@@ -25,7 +25,6 @@ struct BBO;
 struct ExecutionReport;
 
 struct PositionInfo {
-  double reserved_position_ = 0;
   double position_ = 0;
   double real_pnl_ = 0;
   double unreal_pnl_ = 0;

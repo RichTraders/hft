@@ -158,7 +158,7 @@ void OrderGateway::new_single_order_data(const RequestCommon& request) {
       .self_trade_prevention_mode = request.self_trade_prevention_mode};
 
   const std::string msg = app_->create_order_message(order_data);
-  logger_->debug(std::format("[Message]Send order message:{}", msg));
+  logger_->info(std::format("[Message]Send order message:{}", msg));
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_->error(std::format(

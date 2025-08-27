@@ -134,6 +134,6 @@ TEST_F(RiskManagerTest, AllowedTrade) {
 
   }
   auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"),
-                                       Side::kSell, Qty{5}, Qty{0});
+                                       Side::kBuy, Qty{5}, Qty{0});
   EXPECT_EQ(result, RiskCheckResult::kAllowed);
 }

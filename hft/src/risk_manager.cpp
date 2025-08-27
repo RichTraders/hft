@@ -25,22 +25,22 @@ RiskCheckResult RiskInfo::checkPreTradeRisk(
   }
   if (position_info_->position_ + reserved_position.value +
           sideToValue(side) * qty.value >
-      static_cast<double>(risk_cfg_.max_position_.value)) {
-    logger->info(std::format(
-        "[Risk]Maximum position allowed has been reached."
-        "[Desired:{}][Current Position:{}][Working Position:{}][Allow:{}]",
-        sideToValue(side) * qty.value, position_info_->position_,
-        reserved_position.value, risk_cfg_.max_position_.value));
+      risk_cfg_.max_position_.value) {
+    logger->info(
+        std::format("[Risk]Maximum position allowed has been reached."
+                    "[Desired:{}][Current:{}][Working:{}][Allow:{}]",
+                    sideToValue(side) * qty.value, position_info_->position_,
+                    reserved_position.value, risk_cfg_.max_position_.value));
     return RiskCheckResult::kPositionTooLarge;
   }
   if (position_info_->position_ + reserved_position.value +
           sideToValue(side) * qty.value <
-      static_cast<double>(risk_cfg_.min_position_.value)) {
-    logger->info(std::format(
-        "[Risk]Minimum position allowed has been reached."
-        "[Desired:{}][Current Position:{}][Working Position:{}][Allow:{}]",
-        sideToValue(side) * qty.value, position_info_->position_,
-        reserved_position.value, risk_cfg_.min_position_.value));
+      risk_cfg_.min_position_.value) {
+    logger->info(
+        std::format("[Risk]Minimum position allowed has been reached."
+                    "[Desired:{}][Current:{}][Working:{}][Allow:{}]",
+                    sideToValue(side) * qty.value, position_info_->position_,
+                    reserved_position.value, risk_cfg_.min_position_.value));
     return RiskCheckResult::kPositionTooSmall;
   }
   if (position_info_->total_pnl_ < risk_cfg_.max_loss_) {

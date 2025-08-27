@@ -33,7 +33,7 @@ void FeatureEngine::on_order_book_updated(const Price price, const Side side,
     spread_ = bbo->ask_price.value - bbo->bid_price.value;
 
     auto bid_index = book->peek_levels(true, kLevel10);
-    auto ask_index = book->peek_levels(true, kLevel10);
+    auto ask_index = book->peek_levels(false, kLevel10);
   }
 
   logger_->debug(
@@ -52,8 +52,8 @@ void FeatureEngine::on_trade_updated(const MarketData* market_update,
                                            : bbo->bid_qty.value);
   }
 
-  const auto idx = static_cast<size_t>(vwap_index_ & (kVwapSize - 1));
-  if (LIKELY(vwap_index_ >= kVwapSize)) {
+  const auto idx = static_cast<size_t>(vwap_index_ & (vwap_size_ - 1));
+  if (LIKELY(vwap_index_ >= vwap_size_)) {
     const double old_q = vwap_qty_[idx];
     const double old_p = vwap_price_[idx];
     acc_vwap_qty_ -= old_q;

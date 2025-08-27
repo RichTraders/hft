@@ -37,6 +37,9 @@ class MarketMaker : public BaseStrategy<MarketMaker> {
   const double position_variance_;
   const double enter_threshold_;
   const double exit_threshold_;
+  const int obi_level_;
+  std::vector<double> bid_qty_;
+  std::vector<double> ask_qty_;
 };
 }  // namespace trading
 

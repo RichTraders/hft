@@ -68,17 +68,16 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       slot.state = OMOrderState::kLive;
       slot.price = response->price;
       slot.qty = response->leaves_qty;
-      slot.cl_order_id = response->cl_order_id;
       logger_->info(std::format("[OrderUpdated] New {}", response->toString()));
       break;
     }
     case OrdStatus::kPartiallyFilled: {
+      reserved_position_ -=
+          static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
       slot.qty = response->leaves_qty;
       slot.state = (response->leaves_qty.value <= 0.0) ? OMOrderState::kDead
                                                        : OMOrderState::kLive;
       if (slot.state == OMOrderState::kDead) {
-        reserved_position_ -=
-            static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
         LayerBook::unmap_layer(side_book, layer);
       }
       logger_->info(std::format("[OrderUpdated] PartiallyFilled {}",
@@ -86,11 +85,12 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       break;
     }
     case OrdStatus::kFilled: {
-      slot.qty = response->leaves_qty;
-      slot.state = OMOrderState::kDead;
       reserved_position_ -=
           static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
+      slot.qty = response->leaves_qty;
+      slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
+
       logger_->info(
           std::format("[OrderUpdated] Filled {}", response->toString()));
       break;
@@ -104,6 +104,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       reserved_position_ -=
           static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
       LayerBook::unmap_layer(side_book, layer);
+
       logger_->info(
           std::format("[OrderUpdated] Canceled {}", response->toString()));
       break;
@@ -113,6 +114,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       reserved_position_ -=
           static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
       LayerBook::unmap_layer(side_book, layer);
+
       logger_->error(
           std::format("[OrderUpdated] Rejected {}", response->toString()));
       break;
@@ -122,6 +124,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       reserved_position_ -=
           static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
       LayerBook::unmap_layer(side_book, layer);
+
       logger_->error(
           std::format("[OrderUpdated] Expired {}", response->toString()));
       break;

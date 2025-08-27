@@ -19,7 +19,7 @@
 
 using common::Qty;
 using common::Side;
-
+constexpr int kLevel10 = 10;
 namespace trading {
 MarketMaker::MarketMaker(OrderManager* const order_manager,
                          const FeatureEngine* const feature_engine,
@@ -32,7 +32,10 @@ MarketMaker::MarketMaker(OrderManager* const order_manager,
           INI_CONFIG.get_double("strategy", "position_variance") /
           variance_denominator_),
       enter_threshold_(INI_CONFIG.get_double("strategy", "enter_threshold")),
-      exit_threshold_(INI_CONFIG.get_double("strategy", "exit_threshold")) {}
+      exit_threshold_(INI_CONFIG.get_double("strategy", "exit_threshold")),
+      obi_level_(INI_CONFIG.get_int("strategy", "obi_level", kLevel10)),
+      bid_qty_(obi_level_),
+      ask_qty_(obi_level_) {}
 
 void MarketMaker::on_orderbook_updated(const common::TickerId&, common::Price,
                                        Side, const MarketOrderBook*) noexcept {}
@@ -50,17 +53,14 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
     return;
   }
 
-  std::vector<double> bid_qty(kVwapSize);
-  std::vector<double> ask_qty(kVwapSize);
-
-  (void)order_book->peek_qty(true, kVwapSize, bid_qty, {});
-  (void)order_book->peek_qty(false, kVwapSize, ask_qty, {});
+  (void)order_book->peek_qty(true, obi_level_, bid_qty_, {});
+  (void)order_book->peek_qty(false, obi_level_, ask_qty_, {});
 
   const auto vwap = feature_engine_->get_vwap();
   const auto spread = feature_engine_->get_spread();
 
   const double obi =
-      FeatureEngine::orderbook_imbalance_from_levels(bid_qty, ask_qty);
+      FeatureEngine::orderbook_imbalance_from_levels(bid_qty_, ask_qty_);
   const auto mid = (order_book->get_bbo()->bid_price.value +
                     order_book->get_bbo()->ask_price.value) *
                    0.5;

@@ -29,13 +29,12 @@ int main() {
     INI_CONFIG.load("resources/config.ini");
 #endif
 
-    const int log_max_size = INI_CONFIG.get_int("log", "size");
-
     std::unique_ptr<common::Logger> logger = std::make_unique<common::Logger>();
     logger->setLevel(logger->string_to_level(INI_CONFIG.get("log", "level")));
     logger->clearSink();
     logger->addSink(std::make_unique<common::ConsoleSink>());
-    logger->addSink(std::make_unique<common::FileSink>("log", log_max_size));
+    logger->addSink(std::make_unique<common::FileSink>(
+        "log", INI_CONFIG.get_int("log", "size")));
 
     auto market_update_data_pool =
         std::make_unique<common::MemoryPool<MarketUpdateData>>(

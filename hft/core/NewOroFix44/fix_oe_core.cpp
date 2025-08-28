@@ -180,8 +180,8 @@ std::string FixOeCore::create_cancel_and_reorder_message(
   request.add_field(new SelfTradePreventionMode(
       trading::to_char(cancel_and_re_order.self_trade_prevention_mode)));
   request.add_field(
-      new OrderCancelRequestAndNewOrderSingleMode(trading::to_char(
-          cancel_and_re_order.order_cancel_request_and_new_order_single_mode)));
+      new OrderCancelRequestAndNewOrderSingleMode(
+          cancel_and_re_order.order_cancel_request_and_new_order_single_mode));
 
   if (cancel_and_re_order.ord_type == trading::OrderType::kLimit) {
     // Limit 주문일 때만

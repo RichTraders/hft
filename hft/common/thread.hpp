@@ -21,112 +21,118 @@
 #include "global.h"
 
 namespace common {
-template <typename F, typename... Args>
-struct ThreadContext {
-  std::decay_t<F> fn;
-  std::tuple<std::decay_t<Args>...> args;
+    template<typename F, typename... Args>
+    struct ThreadContext {
+        std::decay_t<F> fn;
+        std::tuple<std::decay_t<Args>...> args;
 
-  explicit ThreadContext(F&& func, Args&&... avrgs)
-      : fn(std::forward<F>(func)), args(std::forward<Args>(avrgs)...) {}
+        explicit ThreadContext(F &&func, Args &&... avrgs)
+            : fn(std::forward<F>(func)), args(std::forward<Args>(avrgs)...) {
+        }
 
-  void run() { std::apply(fn, args); }
+        void run() { std::apply(fn, args); }
 
-  static void* entry(void* void_point) {
-    std::unique_ptr<ThreadContext> ctx(static_cast<ThreadContext*>(void_point));
+        static void *entry(void *void_point) {
+            std::unique_ptr<ThreadContext> ctx(static_cast<ThreadContext *>(void_point));
 
-    using RetT = std::invoke_result_t<F, Args...>;
+            using RetT = std::invoke_result_t<F, Args...>;
 
-    if constexpr (std::is_void_v<RetT>) {
-      std::apply(ctx->fn, ctx->args);
-      return nullptr;
-    } else if constexpr (std::is_same_v<RetT, void*>) {
-      return std::apply(ctx->fn, ctx->args);
-    } else if constexpr (std::is_same_v<RetT, int>) {
-      int ret = std::apply(ctx->fn, ctx->args);
-      return new int(ret);
-    } else {
-      static_assert(false, "Unsupported thread function return type");
-    }
-  }
-};
+            if constexpr (std::is_void_v<RetT>) {
+                std::apply(ctx->fn, ctx->args);
+                return nullptr;
+            } else if constexpr (std::is_same_v<RetT, void *>) {
+                return std::apply(ctx->fn, ctx->args);
+            } else if constexpr (std::is_same_v<RetT, int>) {
+                int ret = std::apply(ctx->fn, ctx->args);
+                return new int(ret);
+            } else {
+                static_assert(false, "Unsupported thread function return type");
+            }
+        }
+    };
 
-template <FixedString Name>
-class Thread {
- public:
-  Thread() = default;
-  virtual ~Thread() = default;
+    template<FixedString Name>
+    class Thread {
+    public:
+        Thread() = default;
 
-  template <typename F, typename... Args>
-  int start(F&& func, Args&&... args) {
+        virtual ~Thread() = default;
 
-    auto* ctx = new ThreadContext<F, Args...>(std::forward<F>(func),
-                                              std::forward<Args>(args)...);
+        template<typename F, typename... Args>
+        int start(F &&func, Args &&... args) {
+            auto *ctx = new ThreadContext<F, Args...>(std::forward<F>(func),
+                                                      std::forward<Args>(args)...);
 
-    int err =
-        pthread_create(&tid_, nullptr, &ThreadContext<F, Args...>::entry, ctx);
-    if (err) {
-      delete ctx;
-      ctx = nullptr;
-      return true;
-    }
+            int err =
+                    pthread_create(&tid_, nullptr, &ThreadContext<F, Args...>::entry, ctx);
+            if (err) {
+                delete ctx;
+                ctx = nullptr;
+                return true;
+            }
 
-    constexpr std::string_view kName{Name.name, sizeof(Name.name) - 1};
-    set_thread_name(kName.data());
-    return false;
-  }
-  // NOLINTNEXTLINE(modernize-use-nodiscard)
-  [[maybe_unused]] int join() const {
-    void* ret = nullptr;
+            constexpr std::string_view kName{Name.name, sizeof(Name.name) - 1};
+            set_thread_name(kName.data());
+            return false;
+        }
 
-    if (tid_) {
-      if (pthread_join(tid_, &ret) != 0)
-        return -1;
-    }
+        // NOLINTNEXTLINE(modernize-use-nodiscard)
+        [[maybe_unused]] int join() const {
+            void *ret = nullptr;
 
-    if (ret == nullptr)
-      return -1;
+            if (tid_) {
+                if (pthread_join(tid_, &ret) != 0)
+                    return -1;
+            }
 
-    const std::unique_ptr<int> pointer(static_cast<int*>(ret));
-    return *pointer;
-  }
+            if (ret == nullptr)
+                return -1;
 
-  [[nodiscard]] int detach() const {
-    if (tid_ == 0)
-      return -1;
+            const std::unique_ptr<int> pointer(static_cast<int *>(ret));
+            return *pointer;
+        }
 
-    return pthread_detach(tid_);
-  }
+        [[nodiscard]] int detach() const {
+            if (tid_ == 0)
+                return -1;
 
-  [[nodiscard]] int get_priority_level() const {
-    int policy;
-    sched_param cur_sch_params;
+            return pthread_detach(tid_);
+        }
 
-    if (pthread_getschedparam(tid_, &policy, &cur_sch_params)) {
-      return -1;
-    }
+        [[nodiscard]] int get_priority_level() const {
+            int policy;
+            sched_param cur_sch_params;
 
-    return cur_sch_params.sched_priority;
-  }
+            if (pthread_getschedparam(tid_, &policy, &cur_sch_params)) {
+                return -1;
+            }
 
-  int set_thread_name(const std::string& name) {
-    if (tid_ == 0)
-      return -1;
+            return cur_sch_params.sched_priority;
+        }
 
-    return pthread_setname_np(tid_, name.c_str());
-  }
+        int set_thread_name(const std::string &name) {
+            if (tid_ == 0)
+                return -1;
+#if defined(__linux__)
+            return pthread_setname_np(tid_, name.c_str());
+#elif defined(__APPLE__)
+            return pthread_setname_np(name.c_str());
+#endif
+        }
 
-  [[nodiscard]] std::string get_thread_name() const {
-    if (tid_ == 0)
-      return "";
+        [[nodiscard]] std::string get_thread_name() const {
+            if (tid_ == 0)
+                return "";
 
-    static constexpr std::size_t kMaxThreadNameLen = 16;
-    std::array<char, kMaxThreadNameLen> name{};
+            static constexpr std::size_t kMaxThreadNameLen = 16;
+            std::array<char, kMaxThreadNameLen> name{};
 
-    pthread_getname_np(tid_, name.data(), name.size());
-    return std::string(name.data());
-  }
+            pthread_getname_np(tid_, name.data(), name.size());
+            return std::string(name.data());
+        }
 
-  [[nodiscard]] int get_cpu_id() const {
+        [[nodiscard]] int get_cpu_id() const {
+#if defined(__linux__)
     int cpu_id = -1;
     cpu_set_t cpuset;
 
@@ -143,11 +149,15 @@ class Thread {
     }
 
     return cpu_id;
-  }
 
-  [[nodiscard]] pthread_t get_thread_id() const { return tid_; }
+#elif defined(__APPLE__)
+            return -1;
+#endif
+        }
 
- private:
-  pthread_t tid_{0};
-};
-}  // namespace common
+        [[nodiscard]] pthread_t get_thread_id() const { return tid_; }
+
+    private:
+        pthread_t tid_{0};
+    };
+} // namespace common

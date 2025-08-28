@@ -26,7 +26,16 @@ file(GLOB_RECURSE LIB_SRC_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
 )
 
+list(FILTER LIB_SRC_FILES EXCLUDE REGEX ".*/cpu_manager_linux\\.cpp$")
+list(FILTER LIB_SRC_FILES EXCLUDE REGEX ".*/cpu_manager_macos\\.cpp$")
+
 add_library(Common STATIC ${LIB_SRC_FILES})
+
+# ⬇️ 여기서 OS에 맞는 구현 파일을 다시 '선택적으로' 추가
+target_sources(Common PRIVATE
+        $<$<PLATFORM_ID:Linux>: ${CMAKE_CURRENT_SOURCE_DIR}/cpu_manager_linux.cpp>
+        $<$<PLATFORM_ID:Darwin>:${CMAKE_CURRENT_SOURCE_DIR}/cpu_manager_macos.cpp>
+)
 
 target_precompile_headers(Common PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
 target_include_directories(Common PUBLIC

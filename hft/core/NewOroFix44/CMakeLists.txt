@@ -22,11 +22,19 @@ set(FIX8_SRC
         fix_oe_app.cpp
 )
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # 경고는 남기되 에러로 승격하지 않음
+    target_compile_options(Common PRIVATE -Wno-error=deprecated-volatile)
+    # (완전 숨기고 싶으면 다음 줄도 추가)
+    # target_compile_options(Common PRIVATE -Wno-deprecated-volatile)
+endif()
+
 add_library(Fix8Schema STATIC ${FIX8_SRC})
 target_precompile_headers(Fix8Schema PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
 target_include_directories(Fix8Schema PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
         /usr/local/include
+        /opt/homebrew/include
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/hft
 )

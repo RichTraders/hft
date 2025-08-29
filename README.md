@@ -131,3 +131,10 @@ cpu_id = 4
 prio = 50
 
 ```
+
+
+# INI Checker
+Run ini_checker python file to verify that the config.ini file matches all code which uses ini configuration values.
+```
+python3 ini_checker.py --ini resources/config.ini --root hft
+```

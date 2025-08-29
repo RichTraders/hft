@@ -20,6 +20,12 @@
 using common::Qty;
 using common::Side;
 constexpr int kLevel10 = 10;
+inline double round5(double value) {
+  constexpr double kFactor = 100000.0;
+  constexpr double kInvFactor = 1.0 / kFactor;
+  return std::round(value * kFactor * kInvFactor);
+}
+
 namespace trading {
 MarketMaker::MarketMaker(OrderManager* const order_manager,
                          const FeatureEngine* const feature_engine,
@@ -81,20 +87,22 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
 
   if (delta * obi > enter_threshold_) {
     const auto best_bid_price = order_book->get_bbo()->bid_price;
-    intents.push_back(QuoteIntent{.ticker = ticker,
-                                  .side = Side::kBuy,
-                                  .price = best_bid_price,
-                                  .qty = Qty{signal * position_variance_}});
+    intents.push_back(
+        QuoteIntent{.ticker = ticker,
+                    .side = Side::kBuy,
+                    .price = best_bid_price,
+                    .qty = Qty{round5(signal * position_variance_)}});
 
     logger_->debug(std::format("Order Created! price:{}, qty:{}",
                                best_bid_price.value,
                                delta * obi * position_variance_));
   } else if (delta * obi < -enter_threshold_) {
     const auto best_ask_price = order_book->get_bbo()->ask_price;
-    intents.push_back(QuoteIntent{.ticker = ticker,
-                                  .side = Side::kSell,
-                                  .price = best_ask_price,
-                                  .qty = Qty{signal * position_variance_}});
+    intents.push_back(
+        QuoteIntent{.ticker = ticker,
+                    .side = Side::kSell,
+                    .price = best_ask_price,
+                    .qty = Qty{round5(signal * position_variance_)}});
     logger_->debug(std::format("Order Created! price:{}, qty:{}",
                                best_ask_price.value,
                                signal * position_variance_));

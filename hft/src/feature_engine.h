@@ -72,10 +72,10 @@ class FeatureEngine {
   double acc_vwap_qty_ = 0.;
   double acc_vwap_ = 0.;
   double vwap_ = 0.;
-  const int vwap_size_ = 0;
+  const uint32_t vwap_size_ = 0;
   std::vector<double> vwap_qty_;
   std::vector<double> vwap_price_;
-  int vwap_index_ = 0;
+  uint32_t vwap_index_ = 0;
 };
 }  // namespace trading
 

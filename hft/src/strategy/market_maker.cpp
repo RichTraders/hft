@@ -23,7 +23,7 @@ constexpr int kLevel10 = 10;
 inline double round5(double value) {
   constexpr double kFactor = 100000.0;
   constexpr double kInvFactor = 1.0 / kFactor;
-  return std::round(value * kFactor * kInvFactor);
+  return std::round(value * kFactor) * kInvFactor;
 }
 
 namespace trading {
@@ -95,7 +95,7 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
 
     logger_->debug(std::format("Order Created! price:{}, qty:{}",
                                best_bid_price.value,
-                               delta * obi * position_variance_));
+                               round5(delta * obi * position_variance_)));
   } else if (delta * obi < -enter_threshold_) {
     const auto best_ask_price = order_book->get_bbo()->ask_price;
     intents.push_back(
@@ -105,7 +105,7 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
                     .qty = Qty{round5(signal * position_variance_)}});
     logger_->debug(std::format("Order Created! price:{}, qty:{}",
                                best_ask_price.value,
-                               signal * position_variance_));
+                               round5(signal * position_variance_)));
   }
   if (signal < exit_threshold_) {
     intents.clear();

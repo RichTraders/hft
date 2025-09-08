@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 add_compile_options(-Wall -Wextra -Werror -Wno-pedantic)
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(-march=native)
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
+    set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_RELEASE} -g")
 endif ()
 
 include_directories(

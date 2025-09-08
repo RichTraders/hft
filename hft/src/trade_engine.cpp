@@ -85,8 +85,10 @@ void TradeEngine::stop() {
 void TradeEngine::on_orderbook_updated(const common::TickerId& ticker,
                                        common::Price price, common::Side side,
                                        MarketOrderBook* order_book) const {
+  START_MEASURE(ORDERBOOK_UPDATED);
   feature_engine_->on_order_book_updated(price, side, order_book);
   strategy_->on_orderbook_updated(ticker, price, side, order_book);
+  END_MEASURE(ORDERBOOK_UPDATED, logger_);
 }
 
 void TradeEngine::on_trade_updated(const MarketData* market_data,
@@ -122,17 +124,19 @@ void TradeEngine::run() {
     while (queue_->dequeue(message)) {
       if (UNLIKELY(message == nullptr))
         continue;
-      START_MEASURE(MAKE_ORDERBOOK);
+      START_MEASURE(MAKE_ORDERBOOK_ALL);
       for (auto& market_data : message->data) {
+        START_MEASURE(MAKE_ORDERBOOK_UNIT);
         ticker_order_book_[market_data->ticker_id]->on_market_data_updated(
             market_data);
         market_data_pool_->deallocate(market_data);
+        END_MEASURE(MAKE_ORDERBOOK_UNIT, logger_);
       }
 
       if (message) {
         market_update_data_pool_->deallocate(message);
       }
-      END_MEASURE(MAKE_ORDERBOOK, logger_);
+      END_MEASURE(MAKE_ORDERBOOK_ALL, logger_);
     }
     std::this_thread::yield();
   }

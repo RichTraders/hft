@@ -32,7 +32,7 @@ class ResponseManager;
 class OrderGateway;
 class MarketMaker;
 
-constexpr std::size_t kMarketDataCapacity = 64;
+constexpr std::size_t kMarketDataCapacity = 128;
 constexpr int kResponseQueueSize = 64;
 
 class TradeEngine {

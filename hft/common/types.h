@@ -76,7 +76,7 @@ struct Price {
   double value{std::numeric_limits<double>::max()};
 
   Price() = default;
-  explicit Price(double data) : value(data) {}
+  explicit constexpr Price(double data) : value(data) {}
 
   constexpr bool operator==(double other) const { return value == other; }
 
@@ -86,6 +86,26 @@ struct Price {
   }
   constexpr bool operator==(const Price& other) const {
     return value == other.value;
+  }
+
+  constexpr Price operator-(const Price& other) const {
+    return Price{value - other.value};
+  }
+
+  constexpr Price operator-(double other) const { return Price{value - other}; }
+
+  friend constexpr Price operator-(double lhs, const Price& rhs) {
+    return Price{lhs - rhs.value};
+  }
+
+  constexpr Price operator+(const Price& other) const {
+    return Price{value + other.value};
+  }
+
+  constexpr Price operator+(double other) const { return Price{value + other}; }
+
+  friend constexpr Price operator+(double lhs, const Price& rhs) {
+    return Price{lhs + rhs.value};
   }
 
   [[nodiscard]] constexpr bool isValid() const {

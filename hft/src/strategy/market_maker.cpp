@@ -20,6 +20,7 @@
 using common::Qty;
 using common::Side;
 constexpr int kLevel10 = 10;
+constexpr int kGap = 5000;
 inline double round5(double value) {
   constexpr double kFactor = 100000.0;
   constexpr double kInvFactor = 1.0 / kFactor;
@@ -90,21 +91,21 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
     intents.push_back(
         QuoteIntent{.ticker = ticker,
                     .side = Side::kBuy,
-                    .price = best_bid_price,
+                    .price = best_bid_price - kGap,
                     .qty = Qty{round5(signal * position_variance_)}});
 
     logger_->debug(std::format("Order Created! price:{}, qty:{}",
-                               best_bid_price.value,
+                               best_bid_price.value - kGap,
                                round5(delta * obi * position_variance_)));
   } else if (delta * obi < -enter_threshold_) {
     const auto best_ask_price = order_book->get_bbo()->ask_price;
     intents.push_back(
         QuoteIntent{.ticker = ticker,
                     .side = Side::kSell,
-                    .price = best_ask_price,
+                    .price = best_ask_price + kGap,
                     .qty = Qty{round5(signal * position_variance_)}});
     logger_->debug(std::format("Order Created! price:{}, qty:{}",
-                               best_ask_price.value,
+                               best_ask_price.value + kGap,
                                round5(signal * position_variance_)));
   }
   if (signal < exit_threshold_) {

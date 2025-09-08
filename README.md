@@ -138,3 +138,37 @@ Run ini_checker python file to verify that the config.ini file matches all code 
 ```
 python3 ini_checker.py --ini resources/config.ini --root hft
 ```
+
+
+# HFT program Health checker
+sudo auth needed.
+1. Add pid watcher user
+```
+sudo useradd -r -s /usr/sbin/nologin pidwatch
+```
+2. Register service
+```Shell
+# Add slack webhook in service file
+Environment=SLACK_WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ
+# copy service file
+sudo cp util/hft-pid-watcher.service /etc/systemd/system/
+# copy python file
+sudo cp util/pid_watcher.py /opt/pid-watch/pid_watcher.py
+
+# init systemctl
+sudo systemctl daemon-reload
+sudo systemctl enable --now hft-pid-watcher.service
+sudo systemctl start hft-pid-watcher.service
+``` 
+
+3. Custom
+Change PID_WATCH_INTERVAL_SEC, PID_WATCH_STALE_SEC values you want in service file.
+   
+PID_WATCH_INTERVAL_SEC:Program status check cycle
+
+
+PID_WATCH_STALE_SEC: If this value exceeds this limit, the program is considered terminated.
+```
+CHECK_INTERVAL_SEC = int(os.environ.get("PID_WATCH_INTERVAL_SEC", "600"))
+PID_STALE_SEC = int(os.environ.get("PID_WATCH_STALE_SEC", "1200"))
+```

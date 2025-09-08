@@ -1,0 +1,24 @@
+# /etc/systemd/system/hft-pid-watcher.service
+[Unit]
+Description=PID Watch FIFO Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pidwatch
+Group=pidwatch
+RuntimeDirectory=pidwatch
+RuntimeDirectoryMode=0750
+Environment=PID_WATCH_FIFO=/run/pidwatch/pid_watch.fifo
+ExecStart=/usr/bin/python3 /opt/pid-watch/pid_watcher.py
+Restart=always
+RestartSec=2
+
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

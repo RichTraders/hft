@@ -166,16 +166,4 @@ popd
 sudo supervisorctl reread
 sudo supervisorctl update
 sudo supervisorctl status
-``` 
-
-3. Custom
-Change PID_WATCH_INTERVAL_SEC, PID_WATCH_STALE_SEC values you want in service file.
-   
-PID_WATCH_INTERVAL_SEC:Program status check cycle
-
-
-PID_WATCH_STALE_SEC: If this value exceeds this limit, the program is considered terminated.
-```
-CHECK_INTERVAL_SEC = int(os.environ.get("PID_WATCH_INTERVAL_SEC", "600"))
-PID_STALE_SEC = int(os.environ.get("PID_WATCH_STALE_SEC", "1200"))
 ```

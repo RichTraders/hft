@@ -20,7 +20,7 @@
 using common::Qty;
 using common::Side;
 constexpr int kLevel10 = 10;
-constexpr int kGap = 5000;
+constexpr int kGap = 50;
 inline double round5(double value) {
   constexpr double kFactor = 100000.0;
   constexpr double kInvFactor = 1.0 / kFactor;

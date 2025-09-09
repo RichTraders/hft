@@ -153,16 +153,24 @@ sudo apt install supervisord
 ```Shell
 # Add slack webhook in supervisord
 Environment=SLACK_WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ
-# copy execute file
+
+# Copy execute file
 pushd /opt/supervisor/
-sudo ln -s ${YOUR_PROJECT_PATH}/util/hft-supervisord.conf .
+sudo ln -s ${YOUR_PROJECT_BUILD_PATH}/HFT .
 popd
-# copy slack notifier file
+
+# Copy slack notifier file
 pushd /opt/supervisor/listeners/
 sudo ln -s ${YOUR_PROJECT_PATH}/util/slack_notifier.py .
 popd
 
-# init systemctl and check status
+# Register supervisord files
+pushd /etc/supervisor/conf.d/
+sudo ln -s ${YOUR_PROJECT_PATH}/util/hft-supervisord.conf .
+sudo ln -s ${YOUR_PROJECT_PATH}/util/slack_notifier.conf .
+popd
+
+# Init supervisorctl and check its status
 sudo supervisorctl reread
 sudo supervisorctl update
 sudo supervisorctl status

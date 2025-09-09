@@ -111,6 +111,8 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
   if (signal < exit_threshold_) {
     return;
   }
+
+  order_manager_->apply(intents);
 }
 
 void MarketMaker::on_order_updated(const ExecutionReport*) noexcept {}

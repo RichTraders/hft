@@ -109,7 +109,7 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
                                round5(signal * position_variance_)));
   }
   if (signal < exit_threshold_) {
-    intents.clear();
+    return;
   }
   order_manager_->apply(intents);
 }

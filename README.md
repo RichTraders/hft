@@ -140,25 +140,32 @@ python3 ini_checker.py --ini resources/config.ini --root hft
 ```
 
 
-# HFT program Health checker
+# HFT program Health checker with supervisord
 sudo auth needed.
-1. Add pid watcher user
+1. Install supervisord
+
+#### linux
 ```
-sudo useradd -r -s /usr/sbin/nologin pidwatch
+sudo apt install supervisord
 ```
+
 2. Register service
 ```Shell
-# Add slack webhook in service file
+# Add slack webhook in supervisord
 Environment=SLACK_WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ
-# copy service file
-sudo cp util/hft-pid-watcher.service /etc/systemd/system/
-# copy python file
-sudo cp util/pid_watcher.py /opt/pid-watch/pid_watcher.py
+# copy execute file
+pushd /opt/supervisor/
+sudo ln -s ${YOUR_PROJECT_PATH}/util/hft-supervisord.conf .
+popd
+# copy slack notifier file
+pushd /opt/supervisor/listeners/
+sudo ln -s ${YOUR_PROJECT_PATH}/util/slack_notifier.py .
+popd
 
-# init systemctl
-sudo systemctl daemon-reload
-sudo systemctl enable --now hft-pid-watcher.service
-sudo systemctl start hft-pid-watcher.service
+# init systemctl and check status
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl status
 ``` 
 
 3. Custom

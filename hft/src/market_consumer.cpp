@@ -13,7 +13,6 @@
 #include "market_consumer.h"
 #include "fix_md_app.h"
 #include "ini_config.hpp"
-#include "pid_notifier.hpp"
 #include "trade_engine.h"
 
 namespace trading {
@@ -90,15 +89,9 @@ void MarketConsumer::on_subscribe(FIX8::Message* msg) const {
       market_update_data_pool_->allocate(app_->create_market_data_message(msg));
 
   if (UNLIKELY(data == nullptr)) {
-    const PidNotifier notifier("/run/pidwatch/pid_watch.fifo");
-    const bool result = notifier.notify_now();
-    std::cout
-        << "[CRITICAL] market update data pool is full and send pid notifier "
-        << result << "\n";
 #ifdef NDEBUG
     app_->stop();
     exit(1);
-    return;
 #endif
   }
   if (UNLIKELY(!trade_engine_->on_market_data_updated(data))) {

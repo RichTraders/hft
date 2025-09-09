@@ -88,6 +88,12 @@ void MarketConsumer::on_subscribe(FIX8::Message* msg) const {
   auto* data =
       market_update_data_pool_->allocate(app_->create_market_data_message(msg));
 
+  if (UNLIKELY(data == nullptr)) {
+#ifdef NDEBUG
+    app_->stop();
+    exit(1);
+#endif
+  }
   if (UNLIKELY(!trade_engine_->on_market_data_updated(data))) {
     logger_->error("[Message] failed to send subscribe");
   }

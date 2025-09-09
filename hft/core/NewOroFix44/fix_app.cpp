@@ -77,7 +77,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::write_loop() {
     std::string msg;
 
     while (queue_->dequeue(msg)) {
-      START_MEASURE(TLS_WRITE);
+      // START_MEASURE(TLS_WRITE);
       auto result = tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
       if (result < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -88,7 +88,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::write_loop() {
         thread_running_ = false;
         break;
       }
-      END_MEASURE(TLS_WRITE, logger_);
+      // END_MEASURE(TLS_WRITE, logger_);
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(kWriteThreadSleep));
   }
@@ -99,10 +99,10 @@ template <typename Derived, FixedString ReadThreadName,
 void FixApp<Derived, ReadThreadName, WriteThreadName>::read_loop() {
   std::string received_buffer;
   while (thread_running_) {
-    START_MEASURE(TLS_READ);
+    // START_MEASURE(TLS_READ);
     std::array<char, kReadBufferSize> buf;
     const int read = tls_sock_->read(buf.data(), buf.size());
-    END_MEASURE(TLS_READ, logger_);
+    // END_MEASURE(TLS_READ, logger_);
     if (read <= 0) {
       std::this_thread::yield();
       continue;

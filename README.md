@@ -138,3 +138,40 @@ Run ini_checker python file to verify that the config.ini file matches all code 
 ```
 python3 ini_checker.py --ini resources/config.ini --root hft
 ```
+
+
+# HFT program Health checker with supervisord
+sudo auth needed.
+1. Install supervisord
+
+#### linux
+```
+sudo apt install supervisord
+```
+
+2. Register service
+```Shell
+# Add slack webhook in supervisord
+Environment=SLACK_WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ
+
+# Copy execute file
+pushd /opt/supervisor/
+sudo ln -s ${YOUR_PROJECT_BUILD_PATH}/HFT .
+popd
+
+# Copy slack notifier file
+pushd /opt/supervisor/listeners/
+sudo ln -s ${YOUR_PROJECT_PATH}/util/slack_notifier.py .
+popd
+
+# Register supervisord files
+pushd /etc/supervisor/conf.d/
+sudo ln -s ${YOUR_PROJECT_PATH}/util/hft-supervisord.conf .
+sudo ln -s ${YOUR_PROJECT_PATH}/util/slack_notifier.conf .
+popd
+
+# Init supervisorctl and check its status
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl status
+```

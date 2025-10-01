@@ -13,8 +13,8 @@
 #ifndef FIX_PROTOCOL_H
 #define FIX_PROTOCOL_H
 
-#include <common/thread.hpp>
 #include <common/spsc_queue.h>
+#include <common/thread.hpp>
 #include "logger.h"
 
 constexpr int kQueueSize = 64;
@@ -28,14 +28,12 @@ class Message;
 namespace core {
 class SSLSocket;
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
 class FixApp {
-public:
-  FixApp(const std::string& address,
-         int port,
-         std::string sender_comp_id,
-         std::string target_comp_id,
-         common::Logger* logger);
+ public:
+  FixApp(const std::string& address, int port, std::string sender_comp_id,
+         std::string target_comp_id, common::Logger* logger);
 
   ~FixApp();
 
@@ -61,13 +59,15 @@ public:
                          const std::function<void(FIX8::Message*)>& callback);
 
 #ifdef REPOSITORY
-  void register_callback(std::function<void(const std::string&)> cb) {
+  void register_callback(std::function<void(const std::string&, FIX8::Message*,
+                                            const std::string&)>
+                             cb) {
     raw_data_callback_ = std::move(cb);
   }
 #endif
 
-  [[nodiscard]] std::string create_log_on(
-      const std::string& sig_b64, const std::string& timestamp);
+  [[nodiscard]] std::string create_log_on(const std::string& sig_b64,
+                                          const std::string& timestamp);
 
   [[nodiscard]] std::string create_log_out();
 
@@ -76,7 +76,7 @@ public:
 
   std::string timestamp();
 
-private:
+ private:
   static bool strip_to_header(std::string& buffer);
 
   std::string get_signature_base64(const std::string& timestamp) const;
@@ -92,7 +92,8 @@ private:
   std::map<std::string, std::function<void(FIX8::Message*)>> callbacks_;
 
 #ifdef REPOSITORY
-  std::function<void(const std::string&)> raw_data_callback_;
+  std::function<void(const std::string&, FIX8::Message*, const std::string&)>
+      raw_data_callback_;
 #endif
   std::unique_ptr<common::SPSCQueue<std::string, kQueueSize>> queue_;
 
@@ -104,6 +105,6 @@ private:
   const std::string sender_id_;
   const std::string target_id_;
 };
-} // namespace core
+}  // namespace core
 
 #endif  //FIX_PROTOCOL_H

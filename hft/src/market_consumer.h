@@ -40,7 +40,7 @@ class MarketConsumer {
   void stop();
   void on_login(FIX8::Message*) const;
   void on_snapshot(FIX8::Message* msg) const;
-  void on_subscribe(FIX8::Message* msg) const;
+  void on_subscribe(FIX8::Message* msg);
   void on_reject(FIX8::Message*) const;
   void on_logout(FIX8::Message*) const;
   void on_instrument_list(FIX8::Message* msg) const;
@@ -52,6 +52,7 @@ class MarketConsumer {
   common::Logger* logger_;
   TradeEngine* trade_engine_;
   std::unique_ptr<core::FixMarketDataApp> app_;
+  uint64_t update_index_ = 0ULL;
 };
 }  // namespace trading
 

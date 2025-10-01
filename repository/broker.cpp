@@ -15,15 +15,17 @@
 #include "common/logger.h"
 #include "fix_md_app.h"
 #include "ini_config.hpp"
-
-constexpr int kKilo = 1024;
-constexpr int kThirty = 30;
+#include "scope_exit.h"
 
 using common::FileSink;
 using common::LogLevel;
 
 Broker::Broker()
-    : pool_(std::make_unique<common::MemoryPool<MarketData>>(kMemoryPoolSize)),
+    : market_update_data_pool_(
+          std::make_unique<common::MemoryPool<MarketUpdateData>>(
+              kMarketUpdateDataMemoryPoolSize)),
+      market_data_pool_(
+          std::make_unique<common::MemoryPool<MarketData>>(kMemoryPoolSize)),
       log_(std::make_unique<common::Logger>()) {
 
 #ifdef TEST_NET
@@ -32,18 +34,24 @@ Broker::Broker()
   INI_CONFIG.load("resources/config.ini");
 #endif
 
-  app_ = std::make_unique<core::FixMarketDataApp>("BMDWATCH", "SPOT",
-                                                  log_.get(), pool_.get());
+  app_ = std::make_unique<core::FixMarketDataApp>(
+      "BMDWATCH", "SPOT", log_.get(), market_data_pool_.get());
 
   log_->setLevel(LogLevel::kInfo);
   log_->clearSink();
-  log_->addSink(
-      std::make_unique<FileSink>("repository", kKilo * kKilo * kThirty));
+  log_->addSink(std::make_unique<common::FileSink>(
+      "repository", INI_CONFIG.get_int("log", "size")));
   log_->addSink(std::make_unique<common::ConsoleSink>());
 
   app_->register_callback(
       "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });
-  app_->register_callback([this](auto&& msg) { on_subscribe(msg); });
+  app_->register_callback("Y", [this](auto&& msg) {
+    on_market_request_reject(std::forward<decltype(msg)>(msg));
+  });
+  app_->register_callback(
+      [this](auto&& str_msg, auto&& msg, auto&& event_type) {
+        on_subscribe(str_msg, msg, event_type);
+      });
   app_->register_callback("1", [this](auto&& msg) {
     on_heartbeat(std::forward<decltype(msg)>(msg));
   });
@@ -54,9 +62,13 @@ void Broker::on_login(FIX8::Message*) {
   std::cout << "login successful\n";
   const std::string message = app_->create_market_data_subscription_message(
       "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
-      INI_CONFIG.get("meta", "ticker"));
-  std::cout << "snapshot : " << message << "\n";
+      INI_CONFIG.get("meta", "ticker"), true);
+  std::cout << "Market subscription message : " << message << "\n";
   app_->send(message);
+}
+
+void Broker::on_market_request_reject(FIX8::Message*) {
+  log_->error("Market subscription rejected");
 }
 
 void Broker::on_heartbeat(FIX8::Message* msg) {
@@ -64,6 +76,57 @@ void Broker::on_heartbeat(FIX8::Message* msg) {
   app_->send(message);
 }
 
-void Broker::on_subscribe(const std::string& msg) {
-  log_->info(msg);
+void Broker::on_subscribe(const std::string& str_msg, FIX8::Message* msg,
+                          const std::string& event_type) {
+  log_->info(str_msg);
+  if (event_type != "X") {
+    return;
+  }
+  subscribed_ = true;
+
+  MarketUpdateData* data =
+      market_update_data_pool_->allocate(app_->create_market_data_message(msg));
+
+  if (!data) {
+    log_->error(
+        "[Error] Failed to allocate market data message, but log is here");
+    return;
+  }
+
+  auto cleanup = MakeScopeExit([&] {
+    for (auto* iter : data->data) {
+      if (iter)
+        market_data_pool_->deallocate(iter);
+    }
+    market_update_data_pool_->deallocate(data);
+    data = nullptr;
+  });
+
+  if (data->type == kNone || (data->type == kMarket &&
+                              (data->start_idx != this->update_index_ + 1ULL) &&
+                              (this->update_index_ != 0ULL) && subscribed_)) {
+    log_->error(std::format(
+        "Update index is outdated. current index :{}, new index :{}",
+        this->update_index_, data->start_idx));
+
+    // re-subscribe
+    {
+      const std::string msg_unsub =
+          app_->create_market_data_subscription_message(
+              "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
+              INI_CONFIG.get("meta", "ticker"), /*subscribe=*/false);
+      app_->send(msg_unsub);
+
+      const std::string msg_sub = app_->create_market_data_subscription_message(
+          "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
+          INI_CONFIG.get("meta", "ticker"), /*subscribe=*/true);
+      app_->send(msg_sub);
+      subscribed_ = false;
+    }
+    this->update_index_ = 0ULL;
+
+    return;
+  }
+
+  this->update_index_ = data->end_idx;
 }

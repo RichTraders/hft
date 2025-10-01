@@ -251,9 +251,9 @@ using MarketMaxTradeVol = Field<Qty, 25041>;
 //-------------------------------------------------------------------------------------------------
 using MarketMinQtyIncrement = Field<Qty, 25042>;
 //-------------------------------------------------------------------------------------------------
-using FirstBookUpdateID = Field<int, 25043>;
+using FirstBookUpdateID = Field<f8String, 25043>;
 //-------------------------------------------------------------------------------------------------
-using LastBookUpdateID = Field<int, 25044>;
+using LastBookUpdateID = Field<f8String, 25044>;
 //-------------------------------------------------------------------------------------------------
 using NewOroFix44MD_BaseEntry = FieldTable;
 

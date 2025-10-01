@@ -271,7 +271,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::process_message(
   }
 #ifdef REPOSITORY
   if (raw_data_callback_) {
-    raw_data_callback_(raw_msg);
+    raw_data_callback_(raw_msg, msg, type);
   }
 #endif
   delete msg;

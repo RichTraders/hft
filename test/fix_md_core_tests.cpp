@@ -156,7 +156,7 @@ TEST_F(FixTest, CreateSubscriptionMessage_ContainsCorrectFields) {
   FixMdCore::SymbolId symbol = "BTCUSD";
 
   std::string const msg_str = fix->create_market_data_subscription_message(
-      req_id, depth, symbol);
+      req_id, depth, symbol, true);
   FIX8::Message* msg = fix->decode(msg_str);
   ASSERT_NE(msg, nullptr);
 

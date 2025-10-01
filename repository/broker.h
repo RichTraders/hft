@@ -22,15 +22,23 @@ class Broker {
   Broker();
 
  private:
-  static constexpr int kMemoryPoolSize = 1024;
+  static constexpr int kMemoryPoolSize = 16384;
+  static constexpr int kMarketUpdateDataMemoryPoolSize = 1024;
 
-  std::unique_ptr<common::MemoryPool<MarketData>> pool_;
+  std::unique_ptr<common::MemoryPool<MarketUpdateData>>
+      market_update_data_pool_;
+  std::unique_ptr<common::MemoryPool<MarketData>> market_data_pool_;
   std::unique_ptr<common::Logger> log_;
   std::unique_ptr<core::FixMarketDataApp> app_;
 
+  bool subscribed_ = false;
+  uint64_t update_index_ = 0ULL;
+
   void on_login(FIX8::Message*);
+  void on_market_request_reject(FIX8::Message*);
   void on_heartbeat(FIX8::Message*);
-  void on_subscribe(const std::string& msg);
+  void on_subscribe(const std::string& str_msg, FIX8::Message* msg,
+                    const std::string& event_type);
 };
 
 #endif  //BROKER_H

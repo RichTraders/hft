@@ -102,6 +102,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 endif ()
 
 add_executable(Repository main.cpp broker.cpp)
+target_compile_definitions(Repository PUBLIC LIGHT_LOGGER)
 target_precompile_headers(Repository PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
 target_link_libraries(Repository PRIVATE
         BrokerFix8Schema

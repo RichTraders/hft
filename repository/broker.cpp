@@ -76,9 +76,15 @@ void Broker::on_heartbeat(FIX8::Message* msg) {
   app_->send(message);
 }
 
+#ifdef LIGHT_LOGGER
+void Broker::on_subscribe(const std::string& str_msg, FIX8::Message*,
+                          const std::string&) {
+#else
 void Broker::on_subscribe(const std::string& str_msg, FIX8::Message* msg,
                           const std::string& event_type) {
+#endif
   log_->info(str_msg);
+#ifndef LIGHT_LOGGER
   if (event_type != "X") {
     return;
   }
@@ -129,4 +135,5 @@ void Broker::on_subscribe(const std::string& str_msg, FIX8::Message* msg,
   }
 
   this->update_index_ = data->end_idx;
+#endif
 }

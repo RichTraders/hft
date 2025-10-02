@@ -10,12 +10,12 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 #include "ssl_socket.h"
-#include <pch.h>
-#include <openssl/ssl.h>
-#include <sys/socket.h>
-#include <unistd.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
+#include <openssl/ssl.h>
+#include <pch.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 namespace core {
 SSLSocket::SSLSocket(const std::string& host, int port) {
@@ -50,7 +50,24 @@ SSLSocket::SSLSocket(const std::string& host, int port) {
 }
 
 int SSLSocket::read(char* buf, int len) const {
-  return SSL_read(ssl, buf, len);
+  const int read = SSL_read(ssl, buf, len);
+  if (read > 0)
+    return read;
+
+  const int err = SSL_get_error(ssl, read);
+  switch (err) {
+    case SSL_ERROR_ZERO_RETURN:
+      return 0;
+    case SSL_ERROR_WANT_READ:
+    case SSL_ERROR_WANT_WRITE:
+      errno = EAGAIN;
+      return -1;
+    case SSL_ERROR_SYSCALL:
+      // errno를 그대로 사용 (EAGAIN일 수 있음)
+      return -2;
+    default:
+      return -1;
+  }
 }
 
 int SSLSocket::write(const char* buf, int len) const {
@@ -63,4 +80,4 @@ SSLSocket::~SSLSocket() {
   close(sockfd);
   SSL_CTX_free(ctx);
 }
-}
+}  // namespace core

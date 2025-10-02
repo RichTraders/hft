@@ -51,7 +51,7 @@ add_unit_test(fix_md_app)
 add_unit_test(cpu_priority)
 add_unit_test(layer_book)
 add_unit_test(quote_reconcile)
-add_unit_test(pid_notifier)
+add_unit_test(extract)
 
 file(COPY set_cpu.sh DESTINATION ${CMAKE_BINARY_DIR}/test)
 

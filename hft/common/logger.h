@@ -61,7 +61,7 @@ class FileSink final : public LogSink {
  public:
   FileSink() = delete;
   FileSink(const std::string& filename, std::size_t max_size)
-      : max_size_(max_size), index_(0) {
+      : max_size_(max_size) {
     auto pos = filename.find_last_of('.');
     const std::string name =
         (pos == std::string::npos) ? filename : filename.substr(0, pos);
@@ -74,20 +74,22 @@ class FileSink final : public LogSink {
 
     if (file_extension_.empty())
       file_extension_ = ".txt";
-
     ofs_.open(filename_ + file_extension_);
   }
   void write(const std::string& msg) override;
 
+  void flush() { ofs_.flush(); }
+
  private:
   void rotate();
+  void reopen_fallback();
 
   std::string filename_;
   std::string file_extension_;
   std::size_t max_size_;
   std::ofstream ofs_;
-  uint32_t line_cnt_;
-  int index_;
+  uint32_t line_cnt_{0};
+  int index_{0};
 };
 
 class LogFormatter {
@@ -143,6 +145,12 @@ class Logger {
   ~Logger() {
     stop_ = true;
     worker_.join();
+
+    for (auto& sink : sinks_) {
+      if (auto* file_sink = dynamic_cast<FileSink*>(sink.get())) {
+        file_sink->flush();
+      }
+    }
   }
 
   void setLevel(LogLevel lvl) { level_.store(lvl, std::memory_order_relaxed); }

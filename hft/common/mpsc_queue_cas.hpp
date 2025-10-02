@@ -13,88 +13,85 @@
 #pragma once
 
 namespace common {
-template<typename T, size_t ChunkSize = 64>
+constexpr int kDefaultChunkSize = 512;
+template <typename T, size_t ChunkSize = kDefaultChunkSize>
 class MPSCSegQueue {
-private:
   struct Chunk {
     std::atomic<size_t> idx{0};
     std::atomic<Chunk*> next{nullptr};
-    T                   data[ChunkSize];
+    T data[ChunkSize];  // NOLINT(modernize-avoid-c-arrays)
   };
 
-  std::atomic<Chunk*> _tail;
-  Chunk*              _head;
-  size_t              _head_pos{0};
+  std::atomic<Chunk*> tail_;
+  Chunk* head_;
+  size_t head_pos_{0};
 
-public:
+ public:
   MPSCSegQueue() {
     auto* dummy = new Chunk();
-    _head = dummy;
-    _tail.store(dummy, std::memory_order_relaxed);
+    head_ = dummy;
+    tail_.store(dummy, std::memory_order_relaxed);
   }
 
   ~MPSCSegQueue() {
     T tmp;
-    while (dequeue(tmp));
-    delete _head;
+    while (dequeue(tmp)) {}
+    delete head_;
   }
 
-  template<typename U>
-  void enqueue(U&& v) {
+  template <typename U>
+  void enqueue(U&& input) {
     while (true) {
-      Chunk* cur = _tail.load(std::memory_order_acquire);
+      Chunk* cur = tail_.load(std::memory_order_acquire);
       size_t pos = cur->idx.fetch_add(1, std::memory_order_acq_rel);
 
       if (pos < ChunkSize) {
-        cur->data[pos] = std::forward<U>(v);
+        cur->data[pos] = std::forward<U>(input);
         return;
       }
 
       Chunk* next = cur->next.load(std::memory_order_acquire);
       if (!next) {
-        Chunk* _new = new Chunk();
-        if (cur->next.compare_exchange_strong(
-                next, _new,
-                std::memory_order_release,
-                std::memory_order_relaxed)) {
-          next = _new;
-                } else {
-                  delete _new;
-                }
+        auto* new_chuck = new Chunk();
+        if (cur->next.compare_exchange_strong(next, new_chuck,
+                                              std::memory_order_release,
+                                              std::memory_order_relaxed)) {
+          next = new_chuck;
+        } else {
+          delete new_chuck;
+        }
       }
 
-      _tail.compare_exchange_strong(
-          cur, next,
-          std::memory_order_release,
-          std::memory_order_relaxed);
+      tail_.compare_exchange_strong(cur, next, std::memory_order_release,
+                                    std::memory_order_relaxed);
     }
   }
 
   bool dequeue(T& out) {
-    if (_head_pos < ChunkSize) {
-      if (_head_pos >= _head->idx.load(std::memory_order_acquire))
+    if (head_pos_ < ChunkSize) {
+      if (head_pos_ >= head_->idx.load(std::memory_order_acquire))
         return false;
-      out = std::move(_head->data[_head_pos++]);
+      out = std::move(head_->data[head_pos_++]);
       return true;
     }
 
-    Chunk* nxt = _head->next.load(std::memory_order_acquire);
+    Chunk* nxt = head_->next.load(std::memory_order_acquire);
     if (!nxt)
       return false;
 
-    delete _head;
-    _head = nxt;
-    _head_pos = 0;
+    delete head_;
+    head_ = nxt;
+    head_pos_ = 0;
 
     return dequeue(out);
   }
 
-  bool empty() const {
+  [[nodiscard]] bool empty() const {
 
-    if (_head_pos < _head->idx.load(std::memory_order_acquire))
+    if (head_pos_ < head_->idx.load(std::memory_order_acquire))
       return false;
 
-    return _head->next.load(std::memory_order_acquire) == nullptr;
+    return head_->next.load(std::memory_order_acquire) == nullptr;
   }
 };
-}
+}  // namespace common

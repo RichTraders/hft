@@ -10,21 +10,23 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 #include "logger.h"
+#include "wait_strategy.h"
 
 namespace common {
+constexpr int kDrainLimit = 4096;
 
 void ConsoleSink::write(const std::string& msg) {
   std::cout << msg << '\n';
 }
 
 void FileSink::write(const std::string& msg) {
-  if (ofs_.tellp() > static_cast<std::streamoff>(max_size_)) {
+  const auto cur = ofs_.tellp();
+  if (cur >= 0 && static_cast<size_t>(cur) + msg.size() + 1 > max_size_) {
     rotate();
   }
   ofs_ << msg << '\n';
 
   constexpr uint32_t kMaxLineCnt = 100;
-
   if (line_cnt_ >= kMaxLineCnt) {
     ofs_.flush();
     line_cnt_ = 0;
@@ -40,6 +42,19 @@ void FileSink::rotate() {
   std::filesystem::rename(filename_ + file_extension_, new_file_name);
 
   ofs_.open(filename_ + file_extension_);
+}
+
+void FileSink::reopen_fallback() {
+  std::error_code error_code;
+  ofs_.close();
+  std::filesystem::rename(filename_ + file_extension_,
+                          filename_ + "_reopen_" +
+                              std::to_string(std::time(nullptr)) +
+                              file_extension_,
+                          error_code);
+  ofs_.open(filename_ + file_extension_);
+  ofs_.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+  line_cnt_ = 0;
 }
 
 void Logger::trace(const std::string& text, const std::source_location& loc) {
@@ -104,20 +119,28 @@ void Logger::log(LogLevel lvl, const std::string& text,
 }
 
 void Logger::process() {
-  while (!stop_) {
-    if (stop_.load(std::memory_order_relaxed) && queue_.empty()) {
+  WaitStrategy wait_strategy;
+  while (true) {
+    if (stop_.load(std::memory_order_relaxed) && queue_.empty())
       break;
-    }
 
     LogMessage msg;
+    size_t drained = 0;
     while (queue_.dequeue(msg)) {
       auto out = LogFormatter::format(msg);
-      for (const auto& sink : sinks_) {
+      for (const auto& sink : sinks_)
         sink->write(out);
-      }
+      ++drained;
+
+      if (drained >= kDrainLimit)
+        break;
     }
 
-    sleep(1);
+    if (drained == 0) {
+      wait_strategy.idle();
+    } else {
+      wait_strategy.reset();
+    }
   }
 }
 

@@ -51,9 +51,9 @@ std::string FixMarketDataApp::create_heartbeat_message(FIX8::Message* message) {
 
 std::string FixMarketDataApp::create_market_data_subscription_message(
     const RequestId& request_id, const MarketDepthLevel& level,
-    const SymbolId& symbol) {
-  return fix_md_core_->create_market_data_subscription_message(request_id,
-    level, symbol);
+    const SymbolId& symbol, const bool subscribe) const {
+  return fix_md_core_->create_market_data_subscription_message(
+      request_id, level, symbol, subscribe);
 }
 
 std::string FixMarketDataApp::create_trade_data_subscription_message(

@@ -19,6 +19,7 @@
 
 namespace FIX8 {
 class Message;
+class GroupBase;
 }
 
 namespace core {
@@ -45,8 +46,8 @@ public:
   std::string create_heartbeat_message(FIX8::Message* message);
 
   std::string create_market_data_subscription_message(
-      const RequestId& request_id,
-      const MarketDepthLevel& level, const SymbolId& symbol);
+      const RequestId& request_id, const MarketDepthLevel& level,
+      const SymbolId& symbol, bool subscribe);
   std::string create_trade_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
       const SymbolId& symbol);
@@ -57,12 +58,18 @@ public:
   MarketDataReject create_reject_message(FIX8::Message* msg);
 
   FIX8::Message* decode(const std::string& message);
-private:
+  std::string encode(FIX8::Message* message, int reserve = 0);
+
+ private:
   int64_t sequence_{1};
   common::Logger* logger_;
   const std::string sender_comp_id_;
   const std::string target_comp_id_;
   common::MemoryPool<MarketData>* market_data_pool_;
+
+  MarketUpdateData _create_market_data_message(
+      const FIX8::GroupBase* msg) const;
+  MarketUpdateData _create_trade_data_message(const FIX8::GroupBase* msg) const;
 };
 }
 

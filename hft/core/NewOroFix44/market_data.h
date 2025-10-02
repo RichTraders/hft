@@ -30,8 +30,7 @@ struct MarketData {
 
   MarketData(const char _type, const common::OrderId _order_id,
              common::TickerId& _ticker_id, const char _side,
-             const common::Price _price,
-             const common::Qty _qty)
+             const common::Price _price, const common::Qty _qty)
       : type(common::charToMarketUpdateType(_type)),  //279
         order_id(_order_id),
         ticker_id(std::move(_ticker_id)),
@@ -71,8 +70,35 @@ struct MarketData {
   }
 };
 
+enum MarketDataType : uint8_t {
+  kTrade = 0,
+  kMarket,
+  kNone,
+};
+
 struct MarketUpdateData {
+  uint64_t start_idx = 0ULL;
+  uint64_t end_idx = 0ULL;
+  MarketDataType type;
   std::vector<MarketData*> data;
+  explicit MarketUpdateData() = default;
+  MarketUpdateData(MarketDataType _type, const std::vector<MarketData*>& _data)
+      : type(_type), data(_data) {}
+
+  MarketUpdateData(MarketDataType _type,
+                   std::vector<MarketData*>&& _data) noexcept
+      : type(_type), data(std::move(_data)) {}
+
+  MarketUpdateData(uint64_t _start_idx, uint64_t _end_idx, MarketDataType _type,
+                   const std::vector<MarketData*>& _data)
+      : start_idx(_start_idx), end_idx(_end_idx), type(_type), data(_data) {}
+
+  MarketUpdateData(uint64_t _start_idx, uint64_t _end_idx, MarketDataType _type,
+                   std::vector<MarketData*>&& _data) noexcept
+      : start_idx(_start_idx),
+        end_idx(_end_idx),
+        type(_type),
+        data(std::move(_data)) {}
 };
 
 struct InstrumentInfo {

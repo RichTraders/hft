@@ -62,7 +62,7 @@ void MarketConsumer::on_login(FIX8::Message*) const {
   logger_->info("[Login] Market consumer successful");
   const std::string message = app_->create_market_data_subscription_message(
       "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
-      INI_CONFIG.get("meta", "ticker"));
+      INI_CONFIG.get("meta", "ticker"), true);
 
   if (UNLIKELY(!app_->send(message))) {
     logger_->error("[Message] failed to send login");
@@ -84,16 +84,44 @@ void MarketConsumer::on_snapshot(FIX8::Message* msg) const {
   }
 }
 
-void MarketConsumer::on_subscribe(FIX8::Message* msg) const {
+void MarketConsumer::on_subscribe(FIX8::Message* msg) {
   auto* data =
       market_update_data_pool_->allocate(app_->create_market_data_message(msg));
 
   if (UNLIKELY(data == nullptr)) {
+    logger_->error(
+        "[Error] Failed to allocate market data message, but log is here");
 #ifdef NDEBUG
     app_->stop();
     exit(1);
 #endif
+    return;
   }
+
+  if (data->type == kNone ||
+      (data->type == kMarket && data->start_idx != this->update_index_ + 1)) {
+    logger_->error(std::format(
+        "Update index is outdated. current index :{}, new index :{}",
+        this->update_index_, data->start_idx));
+
+    // re-subscribe
+    {
+      const std::string msg_unsub =
+          app_->create_market_data_subscription_message(
+              "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
+              INI_CONFIG.get("meta", "ticker"), /*subscribe=*/false);
+      app_->send(msg_unsub);
+
+      const std::string msg_sub = app_->create_market_data_subscription_message(
+          "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
+          INI_CONFIG.get("meta", "ticker"), /*subscribe=*/true);
+      app_->send(msg_sub);
+    }
+    this->update_index_ = 0ULL;
+    return;
+  }
+
+  this->update_index_ = data->end_idx;
   if (UNLIKELY(!trade_engine_->on_market_data_updated(data))) {
     logger_->error("[Message] failed to send subscribe");
   }

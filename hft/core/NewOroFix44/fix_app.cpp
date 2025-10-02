@@ -10,16 +10,17 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "spsc_queue.h"
 #include <fix8/f8includes.hpp>
 #include "authorization.h"
 #include "fix_md_app.h"
 #include "fix_oe_app.h"
 #include "performance.h"
 #include "signature.h"
+#include "spsc_queue.h"
 #include "ssl_socket.h"
 
 namespace core {
+constexpr std::string kFixSignature = "8=FIX";
 
 template <typename Derived, FixedString ReadThreadName,
           FixedString WriteThreadName>
@@ -103,9 +104,9 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::read_loop() {
     std::array<char, kReadBufferSize> buf;
     const int read = tls_sock_->read(buf.data(), buf.size());
     // END_MEASURE(TLS_READ, logger_);
-    if (read <= 0) {
-      std::this_thread::yield();
-      continue;
+    if (read < 0) {
+      logger_->error("TLS socket has failed to read. Stop read loop");
+      return;
     }
     received_buffer.append(buf.data(), read);
 
@@ -190,15 +191,15 @@ template <typename Derived, FixedString ReadThreadName,
           FixedString WriteThreadName>
 bool FixApp<Derived, ReadThreadName, WriteThreadName>::strip_to_header(
     std::string& buffer) {
-  const size_t pos = buffer.find("8=FIX");
+  const size_t pos = buffer.find(kFixSignature);
   if (pos == std::string::npos) {
-    // 헤더가 없으면 entire buffer 가 garbage
-    buffer.clear();
+    if (buffer.size() > kFixSignature.size() - 1) {
+      buffer.erase(0, buffer.size() - (kFixSignature.size() - 1));
+    }
     return false;
   }
-  if (pos > 0) {
+  if (pos > 0)
     buffer.erase(0, pos);
-  }
   return true;
 }
 
@@ -222,8 +223,7 @@ template <typename Derived, FixedString ReadThreadName,
           FixedString WriteThreadName>
 bool FixApp<Derived, ReadThreadName, WriteThreadName>::peek_full_message_len(
     const std::string& buffer, size_t& msg_len) {
-  constexpr size_t kBegin = 0;
-  const size_t body_start = buffer.find("9=", kBegin);
+  const size_t body_start = buffer.find("9=");
   if (body_start == std::string::npos)
     return false;
 
@@ -233,7 +233,7 @@ bool FixApp<Derived, ReadThreadName, WriteThreadName>::peek_full_message_len(
 
   const int body_len =
       std::stoi(buffer.substr(body_start + 2, body_end - (body_start + 2)));
-  const size_t header_len = (body_end + 1) - kBegin;
+  const size_t header_len = (body_end + 1);
   msg_len = header_len + body_len +
             7;  // NOLINT(readability-magic-numbers) 7 = "10=" + 3bytes + SOH
   return buffer.size() >= msg_len;
@@ -271,7 +271,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::process_message(
   }
 #ifdef REPOSITORY
   if (raw_data_callback_) {
-    raw_data_callback_(raw_msg);
+    raw_data_callback_(raw_msg, msg, type);
   }
 #endif
   delete msg;

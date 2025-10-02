@@ -16,6 +16,8 @@
 #include "market_data.h"
 #include "memory_pool.hpp"
 
+#include <fix_app.h>
+
 namespace FIX8 {
 class Message;
 }
@@ -23,8 +25,8 @@ class Message;
 namespace core {
 class FixMdCore;
 
-class FixMarketDataApp : public FixApp<FixMarketDataApp,"MDRead", "MDWrite"> {
-public:
+class FixMarketDataApp : public FixApp<FixMarketDataApp, "MDRead", "MDWrite"> {
+ public:
   FixMarketDataApp(const std::string& sender_comp_id,
                    const std::string& target_comp_id, common::Logger* logger,
                    common::MemoryPool<MarketData>* market_data_pool);
@@ -35,10 +37,9 @@ public:
                                     const std::string& timestamp);
   std::string create_log_out_message();
   std::string create_heartbeat_message(FIX8::Message* message);
-  std::string create_market_data_subscription_message(
-      const RequestId& request_id,
-      const MarketDepthLevel& level,
-      const SymbolId& symbol);
+  [[nodiscard]] std::string create_market_data_subscription_message(
+      const RequestId& request_id, const MarketDepthLevel& level,
+      const SymbolId& symbol, bool subscribe) const;
   std::string create_trade_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
       const SymbolId& symbol);
@@ -49,8 +50,8 @@ public:
   MarketDataReject create_reject_message(FIX8::Message* msg);
   FIX8::Message* decode(const std::string& message);
 
-private:
+ private:
   common::MemoryPool<MarketData>* market_data_pool_;
   std::unique_ptr<FixMdCore> fix_md_core_;
 };
-}
+}  // namespace core

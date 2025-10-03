@@ -20,8 +20,10 @@
 #include "position_keeper.h"
 #include "response_manager.h"
 #include "risk_manager.h"
+#include "wait_strategy.h"
 
 #include "strategy/market_maker.h"
+constexpr int kWaitStrategyLimit = 4096;
 
 namespace trading {
 TradeEngine::TradeEngine(
@@ -119,8 +121,11 @@ void TradeEngine::send_request(const RequestCommon& request) {
 }
 
 void TradeEngine::run() {
+  common::WaitStrategy wait;
   while (running_) {
+    int processed = 0;
     MarketUpdateData* message;
+
     while (queue_->dequeue(message)) {
       if (UNLIKELY(message == nullptr))
         continue;
@@ -137,13 +142,22 @@ void TradeEngine::run() {
         market_update_data_pool_->deallocate(message);
       }
       END_MEASURE(MAKE_ORDERBOOK_ALL, logger_);
+      ++processed;
+
+      if (processed >= kWaitStrategyLimit)
+        break;
     }
-    std::this_thread::yield();
+
+    if (processed == 0) {
+      wait.idle_hot();
+    }
   }
 }
 
 void TradeEngine::response_run() {
+  common::WaitStrategy wait;
   while (response_running_) {
+    int processed = 0;
     ResponseCommon response;
     while (response_queue_->dequeue(response)) {
       START_MEASURE(RESPONSE_COMMON);
@@ -168,8 +182,14 @@ void TradeEngine::response_run() {
           break;
       }
       END_MEASURE(RESPONSE_COMMON, logger_);
+      processed++;
+
+      if (processed >= kWaitStrategyLimit)
+        break;
     }
-    std::this_thread::yield();
+    if (processed == 0) {
+      wait.idle_hot();
+    }
   }
 }
 

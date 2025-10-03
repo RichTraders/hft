@@ -16,8 +16,10 @@
 namespace common {
 struct WaitStrategy {
   static constexpr int kBusySpinIters = 1'000;  // 완전 바쁜-스핀
-  static constexpr int kYieldIters = 5'000;     // sched_yield()
-  static constexpr int kSleepIters = 50'000;    // 짧게 sleep
+  static constexpr int kSpinIters = 16'000;
+  static constexpr int kYieldIters = 5'000;
+  static constexpr int kNsShort = 20'000;    // 20 µs
+  static constexpr int kNsLong = 1'000'000;  // 1 ms
 
   static constexpr int kUltraShortSleep = 50;
 
@@ -28,14 +30,22 @@ struct WaitStrategy {
 #if defined(__x86_64__) || defined(_M_X64)
       _mm_pause();
 #endif
-    } else if (iter < kBusySpinIters + kYieldIters) {
-      std::this_thread::yield();
-    } else if (iter < kBusySpinIters + kYieldIters + kSleepIters) {
-      std::this_thread::sleep_for(std::chrono::microseconds(kUltraShortSleep));
-    } else {
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    } else if (iter < kBusySpinIters + kYieldIters)
+      std::this_thread::sleep_for(std::chrono::nanoseconds(kNsShort));
+    else {
+      std::this_thread::sleep_for(std::chrono::nanoseconds(kNsLong));
     }
     ++iter;
+  }
+
+  void idle_hot() {
+#if defined(__x86_64__) || defined(_M_X64)
+    _mm_pause();
+#elif defined(__aarch64__)
+    __asm__ __volatile__("yield");
+#endif
+    if (++iter > kSpinIters)
+      iter = kSpinIters;
   }
 
   void reset() { iter = 0; }

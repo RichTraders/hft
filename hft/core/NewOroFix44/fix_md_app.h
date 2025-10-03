@@ -45,7 +45,7 @@ class FixMarketDataApp : public FixApp<FixMarketDataApp, "MDRead", "MDWrite"> {
       const SymbolId& symbol);
   MarketUpdateData create_market_data_message(FIX8::Message* msg);
   MarketUpdateData create_snapshot_data_message(FIX8::Message* msg);
-  std::string request_instrument_list_message();
+  std::string request_instrument_list_message(const std::string& symbol="");
   InstrumentInfo create_instrument_list_message(FIX8::Message* msg);
   MarketDataReject create_reject_message(FIX8::Message* msg);
   FIX8::Message* decode(const std::string& message);

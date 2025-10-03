@@ -191,14 +191,22 @@ std::string FixMdCore::create_trade_data_subscription_message(
   return wire;
 }
 
-std::string FixMdCore::create_instrument_list_request_message() {
+std::string FixMdCore::create_instrument_list_request_message(
+    const std::string& symbol) {
   FIX8::NewOroFix44MD::InstrumentListRequest request(false);
   request.Header()->add_field(new SenderCompID(sender_comp_id_));
   request.Header()->add_field(new TargetCompID(target_comp_id_));
   request.Header()->add_field(new MsgSeqNum(sequence_++));
   request.Header()->add_field(new SendingTime());
-  request << new FIX8::NewOroFix44MD::InstrumentReqID("BTCUSDT_INFO")
-          << new FIX8::NewOroFix44MD::InstrumentListRequestType(4);
+  if (symbol.empty()) {
+    request << new InstrumentReqID("BTCUSDT")
+            << new InstrumentListRequestType(4);
+  }else {
+    request << new InstrumentReqID("BTCUSDT")
+            << new InstrumentListRequestType(0)
+            << new Symbol();
+  }
+
   std::string wire;
   request.encode(wire);
   return wire;

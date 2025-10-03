@@ -73,8 +73,8 @@ MarketUpdateData FixMarketDataApp::create_snapshot_data_message(
   return fix_md_core_->create_snapshot_data_message(msg);
 }
 
-std::string FixMarketDataApp::request_instrument_list_message() {
-  return fix_md_core_->create_instrument_list_request_message();
+std::string FixMarketDataApp::request_instrument_list_message(const std::string& symbol) {
+  return fix_md_core_->create_instrument_list_request_message(symbol);
 }
 
 InstrumentInfo FixMarketDataApp::create_instrument_list_message(

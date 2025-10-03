@@ -58,6 +58,29 @@ struct Probe {
   explicit Probe(int v) : value(v) {}
   Probe(int v, std::atomic<bool>* block, std::atomic<bool>* ent)
       : value(v), block_until(block), entered(ent) {}
+
+  Probe(Probe&& other) noexcept
+      : value(other.value), block_until(other.block_until), entered(other.entered) {
+    if (entered) entered->store(true, std::memory_order_release);
+    if (block_until) {
+      while (!block_until->load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+      }
+    }
+  }
+
+  // 혹시 복사 경로로 생성될 수도 있으니 동일 훅
+  Probe(const Probe& other)
+      : value(other.value), block_until(other.block_until), entered(other.entered) {
+    if (entered) entered->store(true, std::memory_order_release);
+    if (block_until) {
+      while (!block_until->load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+      }
+    }
+  }
+  Probe& operator=(const Probe&) = default;
+  Probe& operator=(Probe&&) = default;
 };
 
 using namespace std::chrono_literals;

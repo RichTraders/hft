@@ -13,18 +13,30 @@
 #pragma once
 
 namespace common {
+
 constexpr int kDefaultChunkSize = 512;
-template <typename T, size_t ChunkSize = kDefaultChunkSize>
+constexpr std::size_t kCacheLine = 64;
+
+template <typename T, size_t ChunkSize = kDefaultChunkSize,
+          size_t CacheLine = kCacheLine>
 class MPSCSegQueue {
-  struct Chunk {
-    std::atomic<size_t> idx{0};
-    std::atomic<Chunk*> next{nullptr};
-    T data[ChunkSize];  // NOLINT(modernize-avoid-c-arrays)
+  struct Slot {
+    std::atomic<uint8_t> ready{0};
+    alignas(T) std::array<unsigned char, sizeof(T)> storage;
+    T* ptr() { return std::launder(reinterpret_cast<T*>(storage.data())); }
+    const T* ptr() const {
+      return std::launder(reinterpret_cast<const T*>(storage.data()));
+    }
+  };
+  struct alignas(CacheLine) Chunk {
+    alignas(CacheLine) std::atomic<std::size_t> idx{0};
+    alignas(CacheLine) std::atomic<Chunk*> next{nullptr};
+    alignas(CacheLine) std::array<Slot, ChunkSize> slots;
   };
 
-  std::atomic<Chunk*> tail_;
-  Chunk* head_;
-  size_t head_pos_{0};
+  alignas(CacheLine) std::atomic<Chunk*> tail_;
+  alignas(CacheLine) Chunk* head_;
+  std::size_t head_pos_{0};
 
  public:
   MPSCSegQueue() {
@@ -36,61 +48,98 @@ class MPSCSegQueue {
   ~MPSCSegQueue() {
     T tmp;
     while (dequeue(tmp)) {}
-    delete head_;
+    Chunk* chunk = head_;
+    bool first = true;
+    const size_t start_pos = head_pos_;
+
+    while (chunk) {
+      const size_t begin = first ? start_pos : 0;
+      const size_t limit =
+          std::min(chunk->idx.load(std::memory_order_acquire), ChunkSize);
+      for (size_t idx = begin; idx < limit; ++idx) {
+        const Slot& slot = chunk->slots[idx];
+        if (slot.ready.load(std::memory_order_acquire)) {
+          slot.ptr()->~T();
+        }
+      }
+      Chunk* next = chunk->next.load(std::memory_order_acquire);
+      delete chunk;
+      chunk = next;
+      first = false;
+    }
   }
 
+  MPSCSegQueue(const MPSCSegQueue&) = delete;
+  MPSCSegQueue& operator=(const MPSCSegQueue&) = delete;
+  MPSCSegQueue(MPSCSegQueue&&) = delete;
+  MPSCSegQueue& operator=(MPSCSegQueue&&) = delete;
+
   template <typename U>
-  void enqueue(U&& input) {
+    requires(std::constructible_from<T, U &&>)
+  void enqueue(U&& input) noexcept(noexcept(T(std::forward<U>(input)))) {
     while (true) {
       Chunk* cur = tail_.load(std::memory_order_acquire);
       size_t pos = cur->idx.fetch_add(1, std::memory_order_acq_rel);
 
       if (pos < ChunkSize) {
-        cur->data[pos] = std::forward<U>(input);
+        Slot& slot = cur->slots[pos];
+        new (slot.ptr()) T(std::forward<U>(input));
+        slot.ready.store(true, std::memory_order_release);
         return;
       }
 
       Chunk* next = cur->next.load(std::memory_order_acquire);
       if (!next) {
-        auto* new_chuck = new Chunk();
-        if (cur->next.compare_exchange_strong(next, new_chuck,
-                                              std::memory_order_release,
+        auto* new_chunk = new Chunk();
+        if (cur->next.compare_exchange_strong(next, new_chunk,
+                                              std::memory_order_acq_rel,
                                               std::memory_order_relaxed)) {
-          next = new_chuck;
+          next = new_chunk;
         } else {
-          delete new_chuck;
+          delete new_chunk;
         }
       }
 
-      tail_.compare_exchange_strong(cur, next, std::memory_order_release,
+      tail_.compare_exchange_strong(cur, next, std::memory_order_acq_rel,
                                     std::memory_order_relaxed);
     }
   }
 
   bool dequeue(T& out) {
-    if (head_pos_ < ChunkSize) {
-      if (head_pos_ >= head_->idx.load(std::memory_order_acquire))
+    while (true) {
+      if (head_pos_ < ChunkSize) {
+        Slot& slot = head_->slots[head_pos_];
+        if (!slot.ready.load(std::memory_order_acquire))
+          return false;
+        out = std::move(*slot.ptr());
+        slot.ptr()->~T();
+        ++head_pos_;
+
+        if (head_pos_ == ChunkSize) {
+          Chunk* old = head_;
+          Chunk* nxt = old->next.load(std::memory_order_acquire);
+          if (nxt) {
+            head_ = nxt;
+            head_pos_ = 0;
+            delete old;  // 즉시 회수
+          }
+        }
+        return true;
+      }
+      Chunk* nxt = head_->next.load(std::memory_order_acquire);
+      if (!nxt)
         return false;
-      out = std::move(head_->data[head_pos_++]);
-      return true;
+      Chunk* old = head_;
+      head_ = nxt;
+      head_pos_ = 0;
+      delete old;
     }
-
-    Chunk* nxt = head_->next.load(std::memory_order_acquire);
-    if (!nxt)
-      return false;
-
-    delete head_;
-    head_ = nxt;
-    head_pos_ = 0;
-
-    return dequeue(out);
   }
 
   [[nodiscard]] bool empty() const {
-
-    if (head_pos_ < head_->idx.load(std::memory_order_acquire))
-      return false;
-
+    if (head_pos_ < ChunkSize) {
+      return !head_->slots[head_pos_].ready.load(std::memory_order_acquire);
+    }
     return head_->next.load(std::memory_order_acquire) == nullptr;
   }
 };

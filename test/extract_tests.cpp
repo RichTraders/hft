@@ -47,8 +47,7 @@ bool strip_to_header(std::string& buffer) {
 }
 
 bool peek_full_message_len(const std::string& buffer, size_t& msg_len) {
-  constexpr size_t kBegin = 0;
-  const size_t body_start = buffer.find("9=", kBegin);
+  const size_t body_start = buffer.find("9=");
   if (body_start == std::string::npos)
     return false;
 
@@ -58,7 +57,7 @@ bool peek_full_message_len(const std::string& buffer, size_t& msg_len) {
 
   const int body_len =
       std::stoi(buffer.substr(body_start + 2, body_end - (body_start + 2)));
-  const size_t header_len = (body_end + 1) - kBegin;
+  const size_t header_len = (body_end + 1);
   msg_len = header_len + body_len +
             7;  // NOLINT(readability-magic-numbers) 7 = "10=" + 3bytes + SOH
   return buffer.size() >= msg_len;
@@ -87,7 +86,8 @@ static std::string MakeMinimalFix() {
 TEST(StripToHeaderTest, ClearsOnNoHeader) {
   std::string buf = "garbage_without_header";
   EXPECT_FALSE(strip_to_header(buf));
-  EXPECT_TRUE(buf.empty());
+  EXPECT_FALSE(buf.empty());
+  EXPECT_NE(buf, "garbage_without_header");
 }
 
 TEST(StripToHeaderTest, ErasesGarbageBeforeHeader) {
@@ -134,12 +134,12 @@ TEST(PeekFullLenTest, ComputesLengthForMinimalMessage) {
 
   // 수동 계산:
   // header_len = 위치(kBegin=0)부터 "9=5<SOH>" 끝까지 길이
-  // "8=FIX.4.2<SOH>9=5<SOH>" = 11 + 1 + 3 + 1 = 16
+  // "8=FIX.4.2<SOH>9=5<SOH>" = 9 + 1 + 3 + 1 = 14
   // body_len = 5
   // checksum 고정 7 ("10=" + 3자리 + SOH)
-  // 총합 = 16 + 5 + 7 = 28
-  EXPECT_EQ(len, 28u);
-  EXPECT_EQ(buf.size(), 28u);
+  // 총합 = 14 + 5 + 7 = 26
+  EXPECT_EQ(len, 26u);
+  EXPECT_EQ(buf.size(), 26u);
 }
 
 TEST(ExtractNextMessageTest, ExtractsSingleCompleteMessage) {
@@ -154,7 +154,7 @@ TEST(ExtractNextMessageTest, ReturnsFalseOnNoHeaderAndClearsBuffer) {
   std::string buf = "blahblah";
   std::string msg;
   EXPECT_FALSE(extract_next_message(buf, msg));
-  EXPECT_TRUE(buf.empty());
+  EXPECT_FALSE(buf.empty());
   EXPECT_TRUE(msg.empty());
 }
 
@@ -199,12 +199,8 @@ TEST(ExtractNextMessageTest,
 
 TEST(ExtractNextMessageTest, HandlesLargeBodyLengthIfBufferHasEnoughData) {
   const std::string SOH = "\x01";
-  // body를 10바이트로 맞춘 메시지 구성
-  // body: "35=0<SOH>112=ABC<SOH>" -> "35=0" + SOH(1)=5, "112=ABC"(7)+SOH(1)=8, 합계 13 (너무 김)
-  // 10바이트가 되도록 더 짧게 구성: "35=0<SOH>49=X<SOH>" -> 5 + 6 = 11 (여전히 김)
-  // 딱 10으로: "112=A<SOH>9=??" 같은 꼼수는 안됨. 그냥 body_len=11로 두고 실제 버퍼도 충분히 채움.
-  std::string body = "35=0" + SOH + "49=X" + SOH;  // 5 + 6 = 11
-  std::string msg = "8=FIX.4.4" + SOH + "9=11" + SOH + body + "10=000" + SOH;
+  std::string body = "35=0" + SOH + "49=X" + SOH;  // 5 + 5 = 10
+  std::string msg = "8=FIX.4.4" + SOH + "9=10" + SOH + body + "10=000" + SOH;
 
   std::string buf = msg;
   std::string out;

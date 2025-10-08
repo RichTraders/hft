@@ -11,6 +11,8 @@ set(RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 file(MAKE_DIRECTORY "${TEST_RUNTIME_DIR}")
 file(COPY "${RESOURCE_DIR}" DESTINATION "${TEST_RUNTIME_DIR}")
 
+option(ENABLE_ASAN "Build with AddressSanitizer" ON)
+
 macro(add_unit_test _TEST_NAME)
     add_executable(${_TEST_NAME}_tests ${_TEST_NAME}_tests.cpp)
     target_link_libraries(${_TEST_NAME}_tests PRIVATE
@@ -28,6 +30,12 @@ macro(add_unit_test _TEST_NAME)
     add_test(NAME ${_TEST_NAME}_tests COMMAND ${_TEST_NAME}_tests WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test)
     target_compile_definitions(${_TEST_NAME}_tests PRIVATE UNIT_TEST)
     target_compile_options(${_TEST_NAME}_tests PRIVATE -Wno-missing-field-initializers -Wno-error=unused-parameter)
+
+    if (ENABLE_ASAN)
+        message(STATUS "Building with AddressSanitizer")
+        target_compile_options(${_TEST_NAME}_tests PRIVATE -fsanitize=address -fno-omit-frame-pointer -O1 -g)
+        target_link_options(${_TEST_NAME}_tests PRIVATE -fsanitize=address)
+    endif()
 
     list(APPEND TEST_TARGETS ${_TEST_NAME}_tests)
 endmacro()

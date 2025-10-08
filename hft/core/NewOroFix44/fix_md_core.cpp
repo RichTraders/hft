@@ -253,7 +253,7 @@ MarketUpdateData FixMdCore::_create_market_data_message(
     market_data_pool_->allocate(
       charToMarketUpdateType( first_action->get()),
       OrderId{kOrderIdInvalid},
-      symbol->get(),
+      TickerId{symbol->get()},
       first_side->get(),
       Price{static_cast<float>(first_price->get())},
       first_qty == nullptr
@@ -271,7 +271,7 @@ MarketUpdateData FixMdCore::_create_market_data_message(
     auto market_data = market_data_pool_->allocate(
         charToMarketUpdateType(action->get()),
             OrderId{kOrderIdInvalid},
-            symbol->get(),
+            TickerId{symbol->get()},
             side->get(),
             Price{static_cast<float>(price->get())},
             qty == nullptr
@@ -282,7 +282,7 @@ MarketUpdateData FixMdCore::_create_market_data_message(
       market_data = market_data_pool_->allocate(
         charToMarketUpdateType(action->get()),
             OrderId{kOrderIdInvalid},
-            symbol->get(),
+            TickerId{symbol->get()},
             side->get(),
             Price{static_cast<float>(price->get())},
             qty == nullptr
@@ -317,7 +317,7 @@ MarketUpdateData FixMdCore::_create_trade_data_message(
    market_data_pool_->allocate(
      MarketUpdateType::kTrade,
      OrderId{kOrderIdInvalid},
-     symbol->get(),
+     TickerId{symbol->get()},
      first_side->get(),
      Price{static_cast<float>(first_price->get())},
      first_qty == nullptr
@@ -335,7 +335,7 @@ MarketUpdateData FixMdCore::_create_trade_data_message(
         market_data_pool_->allocate(
           MarketUpdateType::kTrade,
           OrderId{kOrderIdInvalid},
-          symbol->get(),
+          TickerId{symbol->get()},
           side->get(),
           Price{static_cast<float>(price->get())},
           qty == nullptr

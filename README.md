@@ -175,3 +175,10 @@ sudo supervisorctl reread
 sudo supervisorctl update
 sudo supervisorctl status
 ```
+
+# ASAN Test
+```shell
+cmake -S . -B test-build -DENABLE_ASAN=ON
+cmake --build test-build -j
+ASAN_OPTIONS=allocator_may_return_null=0:detect_leaks=1 ctest --test-dir test-build/test -V
+```

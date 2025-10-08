@@ -16,52 +16,58 @@ namespace common {
 template <typename T>
 class MemoryPool {
  public:
-  explicit MemoryPool(int num_elems) : store_(num_elems, {T(), true}) {
-    if (reinterpret_cast<const ObjectBin*>(&(store_[0].object_)) ==
-        store_.data()) {
-      next_free_index_ = 0;
-    } else
-      next_free_index_ = -1;
+  explicit MemoryPool(std::size_t num_elems)
+      : store_(num_elems), free_(num_elems) {
+    for (size_t idx = 0; idx < num_elems; ++idx)
+      free_[idx] = num_elems - 1 - idx;
   }
 
   template <typename... Args>
-  T* allocate(Args... args) noexcept {
-    if (next_free_index_ == -1)
+    requires(std::is_nothrow_constructible_v<T, Args...>)
+  T* allocate(Args&&... args) noexcept {
+    if (free_.empty())
       return nullptr;
+    std::size_t idx = free_.back();
+    free_.pop_back();
 
-    auto obj_block = &(store_[next_free_index_]);
-
-    if (!static_cast<bool>(obj_block->is_free_))
-      return nullptr;
-
-    T* ret = &(obj_block->object_);
-    ret = new (ret) T(args...);  // placement new.
-    obj_block->is_free_ = false;
-
-    if (!static_cast<bool>(updateNextFreeIndex()))
-      return nullptr;
-
-    return ret;
+    Bin& bin = store_[idx];
+    T* pointer = std::construct_at(reinterpret_cast<T*>(bin.storage.data()),
+                                   std::forward<Args>(args)...);
+    bin.alive = true;
+    return pointer;
   }
 
   bool deallocate(const T* elem) noexcept {
+    static_assert(std::is_nothrow_destructible_v<T>,
+                  "T must be nothrow-destructible");
     if (elem == nullptr)
       return false;
 
-    const auto elem_index =
-        (reinterpret_cast<const ObjectBin*>(elem) - store_.data());
-    if (elem_index < 0)
+    const auto* const base =
+        reinterpret_cast<const unsigned char*>(store_.data());
+    const auto* const cur = reinterpret_cast<const unsigned char*>(elem);
+    const std::ptrdiff_t off = cur - base;
+
+    if (off < 0)
+      return false;
+    if (static_cast<std::size_t>(off) % sizeof(Bin) != 0)
       return false;
 
-    if (static_cast<size_t>(elem_index) >= store_.size())
+    const auto idx = off / sizeof(Bin);
+    if (idx >= store_.size())
       return false;
 
-    if (static_cast<bool>(store_[elem_index].is_free_))
+    Bin& bin = store_[idx];
+    if (!bin.alive)
       return false;
 
-    store_[elem_index].is_free_ = true;
+    std::destroy_at(const_cast<T*>(elem));
+    bin.alive = false;
+    free_.push_back(idx);
     return true;
   }
+  [[nodiscard]] std::size_t capacity() const noexcept { return store_.size(); }
+  [[nodiscard]] std::size_t free_count() const noexcept { return free_.size(); }
 
   MemoryPool() = delete;
 
@@ -74,28 +80,12 @@ class MemoryPool {
   MemoryPool& operator=(const MemoryPool&&) = delete;
 
  private:
-  bool updateNextFreeIndex() noexcept {
-    const int initial_free_index = next_free_index_;
-    while (!store_[next_free_index_].is_free_) {
-      ++next_free_index_;
-      if (UNLIKELY(next_free_index_ == static_cast<int>(store_.size()))) {
-        // hardware branch predictor should almost always predict this to be false any ways.
-        next_free_index_ = 0;
-      }
-      if (UNLIKELY(initial_free_index == next_free_index_)) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  struct ObjectBin {
-    T object_;
-    bool is_free_ = true;
+  struct Bin {
+    alignas(T) std::array<std::byte, sizeof(T)> storage;
+    bool alive = false;
   };
 
-  std::vector<ObjectBin> store_;
-  int next_free_index_ = -1;
+  std::vector<Bin> store_;
+  std::vector<std::size_t> free_;
 };
 }  // namespace common

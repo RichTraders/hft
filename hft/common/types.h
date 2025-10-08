@@ -247,7 +247,6 @@ inline auto toString(const Side side) -> std::string {
     case Side::kInvalid:
       return "INVALID";
   }
-
   return "UNKNOWN";
 }
 

@@ -105,16 +105,14 @@ void Logger::fatal(const std::string& text, const std::source_location& loc) {
   log(LogLevel::kFatal, text, loc);
 }
 
-void Logger::log(LogLevel lvl, const std::string& text,
-                 const std::source_location& loc) {
+void Logger::log(LogLevel /*lvl*/, const std::string& text,
+                 const std::source_location& /*loc*/) {
   LogMessage msg;
 
-  msg.level = lvl;
-  msg.line = loc.line();
-  msg.func = loc.function_name();
+  //msg.level = lvl;
+  //msg.line = loc.line();
+  //msg.func = loc.function_name();
   msg.text = text;
-  msg.thread_id = std::this_thread::get_id();
-  msg.timestamp = "";
   { queue_.enqueue(std::move(msg)); }
 }
 

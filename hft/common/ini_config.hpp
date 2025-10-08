@@ -71,7 +71,10 @@ class IniConfig : public Singleton<IniConfig> {
   int get_int(const std::string_view section, const std::string_view key,
               const int def = 0) const {
     try {
-      return std::stoi(get(section, key));
+      auto value = get(section, key);
+      std::erase(value, '\'');
+      std::erase(value, ',');
+      return std::stoi(value);
     } catch (...) {
       return def;
     }
@@ -80,7 +83,10 @@ class IniConfig : public Singleton<IniConfig> {
   uint64_t get_uint64_t(const std::string_view section,
                         const std::string_view key, const int def = 0) const {
     try {
-      return std::stoull(get(section, key));
+      auto value = get(section, key);
+      std::erase(value, '\'');
+      std::erase(value, ',');
+      return std::stoull(value);
     } catch (...) {
       return def;
     }
@@ -89,7 +95,10 @@ class IniConfig : public Singleton<IniConfig> {
   double get_double(const std::string_view section, const std::string_view key,
                     const double def = 0.0) const {
     try {
-      return std::stod(get(section, key));
+      auto value = get(section, key);
+      std::erase(value, '\'');
+      std::erase(value, ',');
+      return std::stod(value);
     } catch (...) {
       return def;
     }

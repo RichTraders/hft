@@ -109,7 +109,7 @@ void TradeEngine::on_order_updated(
   order_manager_->on_order_updated(report);
   END_MEASURE(Trading_TradeEngine_on_order_updated, logger_);
 
-  logger_->info(std::format("[Result]{}", report->toString()));
+  logger_->info(std::format("[OrderResult]{}", report->toString()));
 }
 
 bool TradeEngine::enqueue_response(const ResponseCommon& response) {
@@ -160,6 +160,7 @@ void TradeEngine::response_run() {
     int processed = 0;
     ResponseCommon response;
     while (response_queue_->dequeue(response)) {
+      wait.reset();
       START_MEASURE(RESPONSE_COMMON);
       switch (response.res_type) {
         case ResponseType::kExecutionReport:
@@ -193,12 +194,17 @@ void TradeEngine::response_run() {
   }
 }
 
-void TradeEngine::on_order_cancel_reject(const OrderCancelReject*) {
-  logger_->info("on_order_cancel_reject");
+void TradeEngine::on_order_cancel_reject(const OrderCancelReject* reject) {
+  logger_->info(
+      std::format("[OrderResult]Order cancel request is rejected. error :{}",
+                  reject->toString()));
 }
 
-void TradeEngine::on_order_mass_cancel_report(const OrderMassCancelReport*) {
-  logger_->info("on_order_mass_cancel_report");
+void TradeEngine::on_order_mass_cancel_report(
+    const OrderMassCancelReport* cancel_report) {
+  logger_->info(
+      std::format("[OrderResult]Order mass cancel is rejected. error:{}",
+                  cancel_report->toString()));
 }
 
 }  // namespace trading

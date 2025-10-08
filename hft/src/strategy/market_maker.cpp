@@ -94,9 +94,12 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
                     .price = best_bid_price - kGap,
                     .qty = Qty{round5(signal * position_variance_)}});
 
-    logger_->debug(std::format("Order Created! price:{}, qty:{}",
-                               best_bid_price.value - kGap,
-                               round5(delta * obi * position_variance_)));
+    logger_->debug(std::format(
+        "Order Created! price:{}, qty:{}, side:buy, delta:{} obi:{} signal:{} "
+        "mid:{}, "
+        "vwap:{}, spread:{}",
+        best_bid_price.value - kGap, round5(signal * position_variance_), delta,
+        obi, signal, mid, vwap, spread));
   } else if (delta * obi < -enter_threshold_) {
     const auto best_ask_price = order_book->get_bbo()->ask_price;
     intents.push_back(
@@ -104,9 +107,12 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
                     .side = Side::kSell,
                     .price = best_ask_price + kGap,
                     .qty = Qty{round5(signal * position_variance_)}});
-    logger_->debug(std::format("Order Created! price:{}, qty:{}",
-                               best_ask_price.value + kGap,
-                               round5(signal * position_variance_)));
+    logger_->debug(std::format(
+        "Order Created! price:{}, qty:{}, side:sell, delta:{} obi:{} signal:{} "
+        "mid:{}, "
+        "vwap:{}, spread:{}",
+        best_ask_price.value + kGap, round5(signal * position_variance_), delta,
+        obi, signal, mid, vwap, spread));
   }
   if (signal < exit_threshold_) {
     return;

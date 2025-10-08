@@ -38,7 +38,7 @@ OrderGateway::OrderGateway(common::Logger* logger,
         reinterpret_cast<FIX8::NewOroFix44OE::OrderMassCancelReport*>(msg));
   });
   app_->register_callback("3", [&](FIX8::Message* msg) {
-    on_order_rejected(reinterpret_cast<FIX8::NewOroFix44OE::Reject*>(msg));
+    on_rejected(reinterpret_cast<FIX8::NewOroFix44OE::Reject*>(msg));
   });
   app_->register_callback(
       "5", [this](auto&& msg) { on_logout(std::forward<decltype(msg)>(msg)); });
@@ -100,9 +100,12 @@ void OrderGateway::on_order_mass_cancel_report(
   }
 }
 
-void OrderGateway::on_order_rejected(FIX8::NewOroFix44OE::Reject* msg) const {
+void OrderGateway::on_rejected(FIX8::NewOroFix44OE::Reject* msg) const {
   const OrderReject reject = app_->create_reject_message(msg);
   logger_->error(reject.toString());
+  if (reject.session_reject_reason == "A") {
+    app_->stop();
+  }
 }
 
 void OrderGateway::on_order_mass_status_response(FIX8::Message*) const {
@@ -184,8 +187,9 @@ void OrderGateway::order_cancel_request_and_new_order_single(
     const RequestCommon& request) {
   const OrderCancelRequestAndNewOrderSingle cancel_and_reorder{
       .order_cancel_request_and_new_order_single_mode = 1,
-      .cancel_order_id = request.orig_cl_order_id,
-      .cl_order_id = request.cl_order_id,
+      .cancel_new_order_id = request.cl_cancel_order_id,
+      .cl_new_order_id = request.cl_order_id,
+      .cl_origin_order_id = request.orig_cl_order_id,
       .symbol = request.symbol,
       .side = to_common_side(request.side),
       .order_qty = request.order_qty,

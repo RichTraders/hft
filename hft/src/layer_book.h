@@ -13,6 +13,7 @@
 #ifndef LAYER_BOOK_H
 #define LAYER_BOOK_H
 #include "orders.h"
+constexpr int kStringPrecision = 5;
 
 namespace trading::order {
 struct OrderSlot {
@@ -25,6 +26,7 @@ struct OrderSlot {
 
 inline std::string toString(const OrderSlot& slot) {
   std::ostringstream ostream;
+  ostream << std::fixed << std::setprecision(kStringPrecision);
   ostream << "OrderSlot{" << "state=" << toString(slot.state) << ", "
           << "price=" << slot.price.value << ", " << "qty=" << slot.qty.value
           << ", " << "last_used=" << slot.last_used << ", "
@@ -32,9 +34,20 @@ inline std::string toString(const OrderSlot& slot) {
   return ostream.str();
 }
 
+struct PendingReplaceInfo {
+  common::Price new_price;
+  common::Qty new_qty;
+  uint64_t new_tick;
+  common::OrderId new_cl_order_id;
+  common::Qty last_qty;
+};
+
 struct SideBook {
   std::array<OrderSlot, kSlotsPerSide> slots;
   std::array<uint64_t, kSlotsPerSide> layer_ticks;
+  std::array<std::optional<PendingReplaceInfo>, kSlotsPerSide> pending_repl;
+  absl::flat_hash_map<uint64_t, int> orig_id_to_layer;
+  absl::flat_hash_map<uint64_t, int> new_id_to_layer;
   SideBook() { layer_ticks.fill(kTicksInvalid); }
 };
 
@@ -93,31 +106,29 @@ class LayerBook {
     int layer{-1};
     std::optional<int> victim_live_layer;
   };
-  static Assign get_or_assign_layer(SideBook& side_book, uint64_t tick,
-                                    uint64_t now) {
-    if (const int layer = find_layer_by_ticks(side_book, tick); layer >= 0) {
-      side_book.slots[layer].last_used = now;
-      side_book.slots[layer].cl_order_id = common::OrderId{now};
-      return {.layer = layer, .victim_live_layer = std::nullopt};
-    }
-    if (const int free_layer = find_free_layer(side_book); free_layer >= 0) {
-      side_book.layer_ticks[free_layer] = tick;
-      side_book.slots[free_layer].last_used = now;
-      side_book.slots[free_layer].cl_order_id = common::OrderId{now};
-      return {.layer = free_layer, .victim_live_layer = std::nullopt};
-    }
-    int vidx = pick_victim_layer(side_book);
-    std::optional<int> victim{};
-    if (side_book.slots[vidx].state == OMOrderState::kLive)
-      victim = vidx;
-    side_book.layer_ticks[vidx] = tick;
-    side_book.slots[vidx].last_used = now;
-    side_book.slots[vidx].cl_order_id = common::OrderId{now};
-    return {.layer = vidx, .victim_live_layer = victim};
-  }
 
   static void unmap_layer(SideBook& side_book, int layer) {
     side_book.layer_ticks[layer] = kTicksInvalid;
+
+    for (auto iter = side_book.new_id_to_layer.begin();
+         iter != side_book.new_id_to_layer.end();) {
+      if (iter->second == layer) {
+        const auto to_erase = iter;
+        ++iter;
+        side_book.new_id_to_layer.erase(to_erase);
+      } else
+        ++iter;
+    }
+    for (auto iter = side_book.orig_id_to_layer.begin();
+         iter != side_book.orig_id_to_layer.end();) {
+      if (iter->second == layer) {
+        const auto to_erase = iter;
+        ++iter;
+        side_book.orig_id_to_layer.erase(to_erase);
+      } else
+        ++iter;
+    }
+    side_book.pending_repl[layer].reset();
   }
 
   static AssignPlan plan_layer(const SideBook& side_book, uint64_t tick) {

@@ -204,7 +204,7 @@ std::string FixMdCore::create_instrument_list_request_message(
   }else {
     request << new InstrumentReqID("BTCUSDT")
             << new InstrumentListRequestType(0)
-            << new Symbol();
+            << new Symbol(symbol);
   }
 
   std::string wire;
@@ -268,8 +268,7 @@ MarketUpdateData FixMdCore::_create_market_data_message(
     const auto* price = entry->get<MDEntryPx>();       // 270
     const auto* qty = entry->get<MDEntrySize>();       // 271
     const auto* action = entry->get<MDUpdateAction>();  // 279
-    data.push_back(
-        market_data_pool_->allocate(
+    auto market_data = market_data_pool_->allocate(
         charToMarketUpdateType(action->get()),
             OrderId{kOrderIdInvalid},
             symbol->get(),
@@ -277,7 +276,20 @@ MarketUpdateData FixMdCore::_create_market_data_message(
             Price{static_cast<float>(price->get())},
             qty == nullptr
               ? Qty{kQtyInvalid}
-              : Qty{static_cast<float>(qty->get())}));
+              : Qty{static_cast<float>(qty->get())});
+    while (market_data == nullptr) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      market_data = market_data_pool_->allocate(
+        charToMarketUpdateType(action->get()),
+            OrderId{kOrderIdInvalid},
+            symbol->get(),
+            side->get(),
+            Price{static_cast<float>(price->get())},
+            qty == nullptr
+              ? Qty{kQtyInvalid}
+              : Qty{static_cast<float>(qty->get())});
+    }
+    data.push_back(market_data);
   }
   return MarketUpdateData(
     std::stoull(first_book_update_id->get()),

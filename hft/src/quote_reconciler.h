@@ -15,6 +15,7 @@
 
 #include "fast_clock.h"
 #include "layer_book.h"
+#include "logger.h"
 #include "types.h"
 
 namespace trading::order {
@@ -43,6 +44,39 @@ struct ActionCancel {
   common::OrderId original_cl_order_id;
 };
 
+inline std::string toString(const ActionNew& action) {
+  std::ostringstream stream;
+  stream << std::fixed << std::setprecision(kStringPrecision);
+  stream << "ActionNew{" << "layer=" << action.layer << ", "
+         << "price=" << action.price.value << ", " << "qty=" << action.qty.value
+         << ", " << "side=" << common::toString(action.side) << ", "
+         << "cl_order_id=" << common::toString(action.cl_order_id) << "}";
+  return stream.str();
+}
+
+inline std::string toString(const ActionReplace& action) {
+  std::ostringstream stream;
+  stream << std::fixed << std::setprecision(kStringPrecision);
+  stream << "ActionReplace{" << "layer=" << action.layer << ", "
+         << "price=" << action.price.value << ", " << "qty=" << action.qty.value
+         << ", " << "side=" << common::toString(action.side) << ", "
+         << "cl_order_id=" << common::toString(action.cl_order_id) << ", "
+         << "original_cl_order_id="
+         << common::toString(action.original_cl_order_id) << ", "
+         << "last_qty=" << common::toString(action.last_qty) << "}";
+  return stream.str();
+}
+
+inline std::string toString(const ActionCancel& action) {
+  std::ostringstream stream;
+  stream << "ActionCancel{" << "layer=" << action.layer << ", "
+         << "side=" << common::toString(action.side) << ", "
+         << "cl_order_id=" << common::toString(action.cl_order_id) << ", "
+         << "original_cl_order_id="
+         << common::toString(action.original_cl_order_id) << "}";
+  return stream.str();
+}
+
 struct Actions {
   std::vector<ActionNew> news;
   std::vector<ActionReplace> repls;
@@ -58,12 +92,13 @@ class VenuePolicy {
   VenuePolicy()
       : minimum_usdt_(INI_CONFIG.get_double("venue", "minimum_order_usdt")),
         minimum_qty_(INI_CONFIG.get_double("venue", "minimum_order_qty")),
+        maximum_qty_(INI_CONFIG.get_double("venue", "maximum_order_qty")),
         minimum_time_gap_(
             INI_CONFIG.get_double("venue", "minimum_order_time_gap")) {}
 
   ~VenuePolicy() = default;
 
-  void filter_bu_venue(const std::string& symbol, Actions& actions,
+  void filter_by_venue(const std::string& symbol, Actions& actions,
                        uint64_t current_time, LayerBook& layer_book) {
     uint64_t buy_last_used = 0;
     uint64_t sell_last_used = 0;
@@ -118,6 +153,7 @@ class VenuePolicy {
       if (order_usdt < minimum_usdt_) {
         action.qty.value = minimum_usdt_ / action.price.value;
       }
+      action.qty.value = std::min(maximum_qty_, action.qty.value);
     }
 
     for (auto& action : actions.repls) {
@@ -127,31 +163,77 @@ class VenuePolicy {
       const double order_usdt = action.price.value * action.qty.value;
 
       if (order_usdt < minimum_usdt_) {
-        action.qty.value = action.price.value / minimum_usdt_;
+        action.qty.value = minimum_usdt_ / action.price.value;
       }
+      action.qty.value = std::min(maximum_qty_, action.qty.value);
     }
   }
 
  private:
   const double minimum_usdt_;
   const double minimum_qty_;
+  const double maximum_qty_;
   const uint64_t minimum_time_gap_;
+};
+
+struct TickConverter {
+  double scale = 0;
+  double inv = 0.0;
+  static constexpr double kHalf = 0.5;
+  static constexpr int kDigitMax = 9;
+  static constexpr double kPower = 10.;
+  static constexpr double kDiff = 1e-12;
+
+  explicit TickConverter(double tick) noexcept {
+    for (int digit = 0; digit <= kDigitMax; ++digit) {
+      const double powered = std::pow(kPower, digit);
+      if (std::abs((tick * powered) - 1.0) < kDiff) {
+        scale = powered;
+        return;
+      }
+    }
+    inv = 1.0 / tick;
+  }
+
+  [[nodiscard]] uint64_t to_ticks(double price) const noexcept {
+    if (LIKELY(scale > 0.)) {
+      return static_cast<uint64_t>((price * scale) + kHalf);
+    }
+    return std::llround(price * inv);
+  }
 };
 
 class QuoteReconciler {
  public:
-  QuoteReconciler()
+  explicit QuoteReconciler(double tick_size)
       : min_replace_qty_delta_(
             INI_CONFIG.get_double("orders", "min_replace_qty_delta")),
         min_replace_tick_delta_(
-            INI_CONFIG.get_uint64_t("orders", "min_replace_tick_delta")) {}
+            INI_CONFIG.get_uint64_t("orders", "min_replace_tick_delta")),
+        tick_converter_(tick_size) {}
 
   Actions diff(const std::vector<QuoteIntent>& intents, LayerBook& layer_book,
-               double tick_size, common::FastClock& clock) const {
+               common::FastClock& clock) const {
     Actions acts;
-    if (intents.empty())
+    if (intents.empty()) {
+      // TODO(SoftPull) Implement soft-pull
+      // for (common::Side side : {common::Side::kBuy, common::Side::kSell}) {
+      //   auto& sb = layer_book.side_book("BTCUSDT", side);
+      //   for (int layer = 0; layer < kSlotsPerSide; ++layer) {
+      //     const auto& slot = sb.slots[layer];
+      //     if (slot.state != OMOrderState::kLive) continue;
+      //
+      //     const bool too_close = is_inside_bbo(sb, layer);     // 구현 예: 베스트와 tick<=N
+      //     const bool too_old   = now - slot.last_used > age_ms_threshold_;
+      //     const bool tiny_qty  = slot.qty.value < min_resting_qty_;
+      //
+      //     if (too_close || too_old || tiny_qty) {
+      //       acts.cancels.push_back(ActionCancel{/*...*/});
+      //     }
+      //   }
+      // }
       return acts;
-
+    }
     const auto& ticker_id = intents.front().ticker;
     const uint64_t now = clock.get_timestamp();
 
@@ -160,11 +242,11 @@ class QuoteReconciler {
           (side_index == 0 ? common::Side::kBuy : common::Side::kSell);
       auto& side_book = layer_book.side_book(ticker_id, side);
 
-      std::vector<uint64_t> want_ticks;
+      std::unordered_set<uint64_t> want_ticks;
       want_ticks.reserve(kSlotsPerSide);
 
-      bool did_victim_this_side = false;
-      bool active_intent = false;
+      // bool did_victim_this_side = false;
+      // bool active_intent = false;
 
       for (const auto& intent : intents) {
         if (intent.side != side)
@@ -173,10 +255,10 @@ class QuoteReconciler {
             intent.price && intent.price->isValid() && intent.qty.value > 0;
         if (!active)
           continue;
-        active_intent = true;
+        //active_intent = true;
 
-        const uint64_t tick = to_ticks(intent.price->value, tick_size);
-        want_ticks.push_back(tick);
+        const uint64_t tick = tick_converter_.to_ticks(intent.price->value);
+        want_ticks.emplace(tick);
 
         auto assign = LayerBook::plan_layer(side_book, tick);
         const OrderSlot& slot = side_book.slots[assign.layer];
@@ -191,7 +273,7 @@ class QuoteReconciler {
                             .cl_order_id = common::OrderId{now},
                             .original_cl_order_id = vslot.cl_order_id,
                             .last_qty = vslot.qty});
-          did_victim_this_side = true;
+          //did_victim_this_side = true;
           continue;
         }
 
@@ -203,8 +285,9 @@ class QuoteReconciler {
                                         .side = side,
                                         .cl_order_id = common::OrderId{now}});
         } else if (slot.state == OMOrderState::kLive) {
-          const auto slot_tick = to_ticks(slot.price.value, tick_size);
-          const auto intent_tick = to_ticks(intent.price->value, tick_size);
+          const auto slot_tick = tick_converter_.to_ticks(slot.price.value);
+          const auto intent_tick =
+              tick_converter_.to_ticks(intent.price->value);
           const bool price_diff =
               slot_tick > intent_tick
                   ? slot_tick - intent_tick >= min_replace_tick_delta_
@@ -224,22 +307,23 @@ class QuoteReconciler {
         }
       }
 
-      if (active_intent && !did_victim_this_side) {
-        for (int layer = 0; layer < kSlotsPerSide; ++layer) {
-          if (side_book.slots[layer].state == OMOrderState::kLive) {
-            const uint64_t tick = side_book.layer_ticks[layer];
-            if (tick == kTicksInvalid)
-              continue;
-            if (std::ranges::find(want_ticks, tick) == want_ticks.end()) {
-              acts.cancels.push_back(ActionCancel{
-                  .layer = layer,
-                  .side = side,
-                  .cl_order_id = common::OrderId{now},
-                  .original_cl_order_id = side_book.slots[layer].cl_order_id});
-            }
-          }
-        }
-      }
+      // Cancel all orders
+      // if (active_intent && !did_victim_this_side) {
+      //   for (int layer = 0; layer < kSlotsPerSide; ++layer) {
+      //     if (side_book.slots[layer].state == OMOrderState::kLive) {
+      //       const uint64_t tick = side_book.layer_ticks[layer];
+      //       if (tick == kTicksInvalid)
+      //         continue;
+      //       if (std::ranges::find(want_ticks, tick) == want_ticks.end()) {
+      //         acts.cancels.push_back(ActionCancel{
+      //             .layer = layer,
+      //             .side = side,
+      //             .cl_order_id = common::OrderId{now},
+      //             .original_cl_order_id = side_book.slots[layer].cl_order_id});
+      //       }
+      //     }
+      //   }
+      // }
     }
     return acts;
   }
@@ -247,6 +331,7 @@ class QuoteReconciler {
  private:
   double min_replace_qty_delta_;
   uint64_t min_replace_tick_delta_;
+  TickConverter tick_converter_;
 };
 }  // namespace trading::order
 #endif  //QUOTE_RECONCILER_H

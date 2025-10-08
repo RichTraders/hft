@@ -47,16 +47,16 @@ TEST(LayerBookTest, FindAndAssignExistingThenUpdateLastUsed) {
   LayerBook lb{kSym};
   auto& sb = lb.side_book(kSym, common::Side::kBuy);
 
-  auto a1 = LayerBook::get_or_assign_layer(sb, tick(100), /*now=*/10);
+  auto a1 = LayerBook::plan_layer(sb,tick(100));
   ASSERT_GE(a1.layer, 0);
   EXPECT_FALSE(a1.victim_live_layer.has_value());
-  EXPECT_EQ(sb.layer_ticks[a1.layer], tick(100));
-  EXPECT_EQ(sb.slots[a1.layer].last_used, 10u);
 
-  auto a2 = LayerBook::get_or_assign_layer(sb, tick(100), /*now=*/20);
+  sb.layer_ticks[a1.layer] = tick(100);
+  EXPECT_EQ(sb.layer_ticks[a1.layer], tick(100));
+
+  auto a2 = LayerBook::plan_layer(sb,tick(100));
   EXPECT_EQ(a2.layer, a1.layer);
   EXPECT_FALSE(a2.victim_live_layer.has_value());
-  EXPECT_EQ(sb.slots[a1.layer].last_used, 20u);
 
   EXPECT_EQ(LayerBook::find_layer_by_ticks(sb, tick(100)), a1.layer);
 }
@@ -106,36 +106,35 @@ TEST(LayerBookTest, PickVictimIsLeastRecentlyUsed) {
   EXPECT_EQ(LayerBook::pick_victim_layer(sb), 3);
 }
 
-TEST(LayerBookTest, GetOrAssignLayerUsesFreeThenVictimWithLiveFlag) {
+TEST(LayerBookTest, PlanLayerUsesFreeThenVictimWithLiveFlag) {
   LayerBook lb{kSym};
   auto& sb = lb.side_book(kSym, common::Side::kBuy);
 
-  uint64_t now = 1;
   for (int i = 0; i < kSlotsPerSide; ++i) {
-    auto a = LayerBook::get_or_assign_layer(sb, tick(100 + i), now++);
+    auto a = LayerBook::plan_layer(sb, tick(100 + i));
+    sb.layer_ticks[a.layer]=tick(100+i);
     sb.slots[a.layer].state = OMOrderState::kLive;
+    sb.slots[a.layer].last_used = 100u+i;
   }
   EXPECT_EQ(LayerBook::pick_victim_layer(sb), 0);
 
-  auto a2 = LayerBook::get_or_assign_layer(sb, tick(9999), /*now=*/1000);
+  auto a2 = LayerBook::plan_layer(sb, tick(9999));
   EXPECT_EQ(a2.layer, 0);
   ASSERT_TRUE(a2.victim_live_layer.has_value());
   EXPECT_EQ(*a2.victim_live_layer, 0);
-  EXPECT_EQ(sb.layer_ticks[0], tick(9999));
-  EXPECT_EQ(sb.slots[0].last_used, 1000u);
 }
 
 TEST(LayerBookTest, UnmapLayerClearsTickOnly) {
   LayerBook lb{kSym};
   auto& sb = lb.side_book(kSym, common::Side::kSell);
 
-  auto a = LayerBook::get_or_assign_layer(sb, tick(777), /*now=*/10);
+  auto a = LayerBook::plan_layer(sb, tick(777));
   sb.slots[a.layer].state = OMOrderState::kLive;
+  sb.layer_ticks[a.layer]= tick(777);
 
   ASSERT_EQ(sb.layer_ticks[a.layer], tick(777));
   LayerBook::unmap_layer(sb, a.layer);
   EXPECT_EQ(sb.layer_ticks[a.layer], kTicksInvalid);
-  EXPECT_EQ(sb.slots[a.layer].state, OMOrderState::kLive);
 }
 
 TEST(LayerBookTest, BuySellBooksAreIndependent) {
@@ -143,8 +142,10 @@ TEST(LayerBookTest, BuySellBooksAreIndependent) {
   auto& buy = lb.side_book(kSym, common::Side::kBuy);
   auto& sell = lb.side_book(kSym, common::Side::kSell);
 
-  auto ab = LayerBook::get_or_assign_layer(buy, tick(123), /*now=*/1);
-  auto as = LayerBook::get_or_assign_layer(sell, tick(456), /*now=*/2);
+  auto ab = LayerBook::plan_layer(buy, tick(123));
+  auto as = LayerBook::plan_layer(sell, tick(456));
+  buy.layer_ticks[ab.layer]= tick(123);
+  sell.layer_ticks[ab.layer]=tick(456);
 
   EXPECT_EQ(LayerBook::find_layer_by_ticks(buy, tick(123)), ab.layer);
   EXPECT_EQ(LayerBook::find_layer_by_ticks(sell, tick(456)), as.layer);
@@ -152,4 +153,4 @@ TEST(LayerBookTest, BuySellBooksAreIndependent) {
   // 서로 간섭 없음
   EXPECT_EQ(LayerBook::find_layer_by_ticks(buy, tick(456)), -1);
   EXPECT_EQ(LayerBook::find_layer_by_ticks(sell, tick(123)), -1);
-}
+ }

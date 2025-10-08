@@ -69,19 +69,37 @@ void MarketConsumer::on_login(FIX8::Message*) const {
   }
 
   const std::string instrument_message =
-      app_->request_instrument_list_message();
+      app_->request_instrument_list_message(INI_CONFIG.get("meta", "ticker"));
   if (UNLIKELY(!app_->send(instrument_message))) {
     logger_->error("[Message] failed to send instrument list");
   }
 }
 
-void MarketConsumer::on_snapshot(FIX8::Message* msg) const {
+void MarketConsumer::on_snapshot(FIX8::Message* msg) {
+  logger_->info("Snapshot made");
+
   auto* snapshot_data = market_update_data_pool_->allocate(
       app_->create_snapshot_data_message(msg));
+
+  if (UNLIKELY(snapshot_data == nullptr)) {
+    logger_->error("[Message] failed to create snapshot");
+    resubscribe();
+
+    for (auto& market_data : snapshot_data->data) {
+      market_data_pool_->deallocate(market_data);
+    }
+    market_update_data_pool_->deallocate(snapshot_data);
+    return;
+  }
+
+  state_ = StreamState::kApplyingSnapshot;
+  update_index_ = snapshot_data->end_idx;
 
   if (UNLIKELY(!trade_engine_->on_market_data_updated(snapshot_data))) {
     logger_->error("[Message] failed to send snapshot");
   }
+
+  state_ = StreamState::kRunning;
 }
 
 void MarketConsumer::on_subscribe(FIX8::Message* msg) {
@@ -98,26 +116,25 @@ void MarketConsumer::on_subscribe(FIX8::Message* msg) {
     return;
   }
 
-  if (data->type == kNone ||
-      (data->type == kMarket && data->start_idx != this->update_index_ + 1)) {
+  if (UNLIKELY(state_ == StreamState::kAwaitingSnapshot)) {
+    logger_->info("Waiting for making snapshot");
+    return;
+  }
+
+  if (UNLIKELY((data->type == kNone) ||
+               (data->type == kMarket &&
+                data->start_idx != this->update_index_ + 1 &&
+                this->update_index_ != 0ULL))) {
     logger_->error(std::format(
         "Update index is outdated. current index :{}, new index :{}",
         this->update_index_, data->start_idx));
 
-    // re-subscribe
-    {
-      const std::string msg_unsub =
-          app_->create_market_data_subscription_message(
-              "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
-              INI_CONFIG.get("meta", "ticker"), /*subscribe=*/false);
-      app_->send(msg_unsub);
+    resubscribe();
 
-      const std::string msg_sub = app_->create_market_data_subscription_message(
-          "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
-          INI_CONFIG.get("meta", "ticker"), /*subscribe=*/true);
-      app_->send(msg_sub);
+    for (const auto& market_data : data->data) {
+      market_data_pool_->deallocate(market_data);
     }
-    this->update_index_ = 0ULL;
+    market_update_data_pool_->deallocate(data);
     return;
   }
 
@@ -128,9 +145,11 @@ void MarketConsumer::on_subscribe(FIX8::Message* msg) {
 }
 
 void MarketConsumer::on_reject(FIX8::Message* msg) const {
-  logger_->info("[Message] reject data");
-  logger_->error(
-      std::format("[Message] {}", app_->create_reject_message(msg).toString()));
+  const auto rejected_message = app_->create_reject_message(msg);
+  logger_->error(std::format("[Message] {}", rejected_message.toString()));
+  if (rejected_message.session_reject_reason == "A") {
+    app_->stop();
+  }
 }
 
 void MarketConsumer::on_logout(FIX8::Message*) const {
@@ -150,4 +169,29 @@ void MarketConsumer::on_heartbeat(FIX8::Message* msg) const {
     logger_->error("[Message] failed to send heartbeat");
   }
 }
+
+void MarketConsumer::resubscribe() {
+  logger_->info("Try resubscribing");
+  current_generation_.store(
+      generation_.fetch_add(1, std::memory_order_acq_rel) + 1,
+      std::memory_order_release);
+
+  const std::string msg_unsub = app_->create_market_data_subscription_message(
+      "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
+      INI_CONFIG.get("meta", "ticker"), /*subscribe=*/false);
+  app_->send(msg_unsub);
+
+  //TODO(JB) I'm not sure, it's a good way.
+  //std::this_thread::sleep_for(std::chrono::seconds(5));
+
+  const std::string msg_sub = app_->create_market_data_subscription_message(
+      "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
+      INI_CONFIG.get("meta", "ticker"), /*subscribe=*/true);
+  app_->send(msg_sub);
+
+  ++generation_;
+  state_ = StreamState::kAwaitingSnapshot;
+  update_index_ = 0ULL;
+}
+
 }  // namespace trading

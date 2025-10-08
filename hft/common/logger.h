@@ -17,6 +17,7 @@
 #include "mpsc_queue_cas.hpp"
 #include "thread.hpp"
 
+constexpr int kTimeDigit = 6;
 namespace common {
 
 enum class LogLevel : uint8_t {
@@ -39,9 +40,8 @@ enum class QueueChunkSize : uint16_t {
 struct LogMessage {
   LogLevel level;
   uint32_t line;
-  std::string timestamp;
-  std::thread::id thread_id;
   std::string func;
+  std::thread::id thread_id;
   std::string text;
 };
 
@@ -97,18 +97,23 @@ class LogFormatter {
   static std::string format(const LogMessage& msg) {
     std::ostringstream oss;
 #ifndef LOGGER_PREFIX_DISABLED
-    auto now = std::chrono::system_clock::now();
-    auto ttime = std::chrono::system_clock::to_time_t(now);
-    auto milisec = std::chrono::duration_cast<std::chrono::milliseconds>(
-                       now.time_since_epoch() % std::chrono::seconds(1))
-                       .count();
+    const auto now = std::chrono::system_clock::now();
+    const auto sec = time_point_cast<std::chrono::seconds>(now);
+    const auto usec =
+        std::chrono::duration_cast<std::chrono::microseconds>(now - sec)
+            .count();
+    const std::time_t ttime = std::chrono::system_clock::to_time_t(sec);
     std::tm ttm;
+#ifdef _WIN32
+    localtime_s(&ttm, &ttime);
+#else
     localtime_r(&ttime, &ttm);
+#endif
+
     oss << "[" << std::put_time(&ttm, "%Y-%m-%dT%H:%M:%S") << "."
-        << std::setw(3) << std::setfill('0') << milisec << "]";
-    oss << "[" << levelToString(msg.level) << "]";
-    oss << "[tid=" << msg.thread_id << "]";
-    oss << "[" << msg.func << ": " << std::to_string(msg.line) << "] ";
+        << std::setw(kTimeDigit) << std::setfill('0') << usec << "]";
+    //oss << "[" << levelToString(msg.level) << "]";
+    //oss << "[" << msg.func << ": " << std::to_string(msg.line) << "] ";
 #endif
     oss << msg.text;
     return oss.str();

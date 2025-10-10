@@ -44,19 +44,19 @@ class MarketConsumer {
                  common::MemoryPool<MarketData>* market_data_pool);
   ~MarketConsumer();
   void stop();
-  void on_login(FIX8::Message*) const;
+  void on_login(FIX8::Message*);
   void on_snapshot(FIX8::Message* msg);
   void on_subscribe(FIX8::Message* msg);
-  void on_reject(FIX8::Message*) const;
-  void on_logout(FIX8::Message*) const;
-  void on_instrument_list(FIX8::Message* msg) const;
-  void on_heartbeat(FIX8::Message* msg) const;
+  void on_reject(FIX8::Message*);
+  void on_logout(FIX8::Message*);
+  void on_instrument_list(FIX8::Message* msg);
+  void on_heartbeat(FIX8::Message* msg);
   void resubscribe();
 
  private:
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
-  common::Logger* logger_;
+  common::Logger::Producer logger_;
   TradeEngine* trade_engine_;
   std::unique_ptr<core::FixMarketDataApp> app_;
   uint64_t update_index_ = 0ULL;

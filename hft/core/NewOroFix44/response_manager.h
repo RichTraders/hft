@@ -11,12 +11,9 @@
  */
 
 #pragma once
+#include "logger.h"
 #include "memory_pool.hpp"
 #include "order_entry.h"
-
-namespace common {
-class Logger;
-}
 
 namespace trading {
 class ResponseManager {
@@ -38,7 +35,7 @@ class ResponseManager {
       OrderMassCancelReport* order_mass_cancel_report);
 
  private:
-  common::Logger* logger_;
+  common::Logger::Producer logger_;
   common::MemoryPool<ExecutionReport>* execution_report_pool_;
   common::MemoryPool<OrderCancelReject>* order_cancel_reject_pool_;
   common::MemoryPool<OrderMassCancelReport>* order_mass_cancel_report_pool_;

@@ -28,15 +28,15 @@ FixOeCore::FixOeCore(SendId sender_comp_id, TargetId target_comp_id,
                      trading::ResponseManager* response_manager)
     : sender_comp_id_(std::move(sender_comp_id)),
       target_comp_id_(std::move(target_comp_id)),
-      logger_(logger),
+      logger_(logger->make_producer()),
       response_manager_(response_manager),
       qty_precision_(INI_CONFIG.get_int("meta", "qty_precision")),
       price_precision_(INI_CONFIG.get_int("meta", "price_precision")) {
-  logger_->info("[Constructor] FixOeCore Created");
+  logger_.info("[Constructor] FixOeCore Created");
 }
 
 FixOeCore::~FixOeCore() {
-  logger_->info("[Destructor] FixOeCore Destroy");
+  logger_.info("[Destructor] FixOeCore Destroy");
 }
 
 std::string FixOeCore::create_log_on_message(const std::string& sig_b64,
@@ -197,7 +197,7 @@ std::string FixOeCore::create_cancel_and_reorder_message(
 
   std::string wire;
   request.encode(wire);
-  logger_->info(std::format("JBJB {}",wire));
+  logger_.info(std::format("JBJB {}",wire));
   return wire;
 }
 

@@ -16,8 +16,8 @@
 namespace common {
 struct OrderId {
   uint64_t value{std::numeric_limits<uint64_t>::max()};
-  explicit OrderId() = default;
-  explicit OrderId(uint64_t data) : value(data) {}
+  explicit OrderId() noexcept = default;
+  explicit OrderId(uint64_t data) noexcept : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<uint64_t>::max();
@@ -53,8 +53,8 @@ constexpr auto kTickerIdInvalid = "";
 
 struct ClientId {
   uint32_t value{std::numeric_limits<uint32_t>::max()};
-  explicit ClientId() = default;
-  explicit ClientId(uint32_t data) : value(data) {}
+  explicit ClientId() noexcept = default;
+  explicit ClientId(uint32_t data) noexcept : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<uint32_t>::max();
@@ -75,8 +75,8 @@ constexpr auto kClientIdInvalid = std::numeric_limits<uint32_t>::max();
 struct Price {
   double value{std::numeric_limits<double>::max()};
 
-  Price() = default;
-  explicit constexpr Price(double data) : value(data) {}
+  Price() noexcept = default;
+  explicit constexpr Price(double data) noexcept : value(data) {}
 
   constexpr bool operator==(double other) const { return value == other; }
 
@@ -128,8 +128,8 @@ inline auto toString(Price price) -> std::string {
 struct Qty {
   double value{std::numeric_limits<double>::max()};
 
-  Qty() = default;
-  constexpr explicit Qty(double data) : value(data) {}
+  Qty() noexcept = default;
+  constexpr explicit Qty(double data) noexcept : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<double>::max();
@@ -211,7 +211,7 @@ constexpr auto kQtyInvalid = std::numeric_limits<double>::max();
 struct Priority {
   uint64_t value{std::numeric_limits<uint64_t>::max()};
 
-  explicit Priority(uint64_t data) : value(data) {}
+  explicit Priority(uint64_t data) noexcept : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<uint64_t>::max();
@@ -250,7 +250,7 @@ inline auto toString(const Side side) -> std::string {
   return "UNKNOWN";
 }
 
-inline Side charToSide(const char character) {
+inline Side charToSide(const char character) noexcept {
   switch (character) {
     case '0':
       return Side::kBuy;
@@ -285,7 +285,7 @@ enum class MarketUpdateType : uint8_t {
   kTrade = 5,
 };
 
-inline MarketUpdateType charToMarketUpdateType(const char character) {
+inline MarketUpdateType charToMarketUpdateType(const char character) noexcept {
   switch (character) {
     case '0':
       return MarketUpdateType::kAdd;
@@ -298,7 +298,7 @@ inline MarketUpdateType charToMarketUpdateType(const char character) {
   }
 }
 
-inline std::string toString(MarketUpdateType type) {
+inline std::string toString(MarketUpdateType type) noexcept {
   switch (type) {
     case MarketUpdateType::kClear:
       return "CLEAR";

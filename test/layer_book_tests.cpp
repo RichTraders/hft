@@ -21,7 +21,7 @@ using trading::order::SideBook;
 
 using namespace trading;
 
-const common::TickerId kSym{"TEST"};
+common::TickerId kSym{"TEST"};
 constexpr uint64_t tick(uint64_t t) {
   return t;
 }

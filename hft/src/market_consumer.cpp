@@ -22,9 +22,9 @@ MarketConsumer::MarketConsumer(
     common::MemoryPool<MarketData>* market_data_pool)
     : market_update_data_pool_(market_update_data_pool),
       market_data_pool_(market_data_pool),
-      logger_(logger),
+      logger_(logger->make_producer()),
       trade_engine_(trade_engine),
-      app_(std::make_unique<core::FixMarketDataApp>("BMDWATCH", "SPOT", logger_,
+      app_(std::make_unique<core::FixMarketDataApp>("BMDWATCH", "SPOT", logger,
                                                     market_data_pool_)) {
 
   app_->register_callback(
@@ -47,42 +47,42 @@ MarketConsumer::MarketConsumer(
       "5", [this](auto&& msg) { on_logout(std::forward<decltype(msg)>(msg)); });
 
   app_->start();
-  logger_->info("[Constructor] MarketConsumer Created");
+  logger_.info("[Constructor] MarketConsumer Created");
 }
 
 MarketConsumer::~MarketConsumer() {
-  logger_->info("[Destructor] MarketConsumer Destory");
+  logger_.info("[Destructor] MarketConsumer Destory");
 }
 
 void MarketConsumer::stop() {
   app_->stop();
 }
 
-void MarketConsumer::on_login(FIX8::Message*) const {
-  logger_->info("[Login] Market consumer successful");
+void MarketConsumer::on_login(FIX8::Message*) {
+  logger_.info("[Login] Market consumer successful");
   const std::string message = app_->create_market_data_subscription_message(
       "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
       INI_CONFIG.get("meta", "ticker"), true);
 
   if (UNLIKELY(!app_->send(message))) {
-    logger_->error("[Message] failed to send login");
+    logger_.error("[Message] failed to send login");
   }
 
   const std::string instrument_message =
       app_->request_instrument_list_message(INI_CONFIG.get("meta", "ticker"));
   if (UNLIKELY(!app_->send(instrument_message))) {
-    logger_->error("[Message] failed to send instrument list");
+    logger_.error("[Message] failed to send instrument list");
   }
 }
 
 void MarketConsumer::on_snapshot(FIX8::Message* msg) {
-  logger_->info("Snapshot made");
+  logger_.info("Snapshot made");
 
   auto* snapshot_data = market_update_data_pool_->allocate(
       app_->create_snapshot_data_message(msg));
 
   if (UNLIKELY(snapshot_data == nullptr)) {
-    logger_->error("[Message] failed to create snapshot");
+    logger_.error("[Message] failed to create snapshot");
     resubscribe();
 
     for (auto& market_data : snapshot_data->data) {
@@ -96,7 +96,7 @@ void MarketConsumer::on_snapshot(FIX8::Message* msg) {
   update_index_ = snapshot_data->end_idx;
 
   if (UNLIKELY(!trade_engine_->on_market_data_updated(snapshot_data))) {
-    logger_->error("[Message] failed to send snapshot");
+    logger_.error("[Message] failed to send snapshot");
   }
 
   state_ = StreamState::kRunning;
@@ -107,7 +107,7 @@ void MarketConsumer::on_subscribe(FIX8::Message* msg) {
       market_update_data_pool_->allocate(app_->create_market_data_message(msg));
 
   if (UNLIKELY(data == nullptr)) {
-    logger_->error(
+    logger_.error(
         "[Error] Failed to allocate market data message, but log is here");
 #ifdef NDEBUG
     app_->stop();
@@ -117,7 +117,7 @@ void MarketConsumer::on_subscribe(FIX8::Message* msg) {
   }
 
   if (UNLIKELY(state_ == StreamState::kAwaitingSnapshot)) {
-    logger_->info("Waiting for making snapshot");
+    logger_.info("Waiting for making snapshot");
     return;
   }
 
@@ -125,7 +125,7 @@ void MarketConsumer::on_subscribe(FIX8::Message* msg) {
                (data->type == kMarket &&
                 data->start_idx != this->update_index_ + 1 &&
                 this->update_index_ != 0ULL))) {
-    logger_->error(std::format(
+    logger_.error(std::format(
         "Update index is outdated. current index :{}, new index :{}",
         this->update_index_, data->start_idx));
 
@@ -140,38 +140,38 @@ void MarketConsumer::on_subscribe(FIX8::Message* msg) {
 
   this->update_index_ = data->end_idx;
   if (UNLIKELY(!trade_engine_->on_market_data_updated(data))) {
-    logger_->error("[Message] failed to send subscribe");
+    logger_.error("[Message] failed to send subscribe");
   }
 }
 
-void MarketConsumer::on_reject(FIX8::Message* msg) const {
+void MarketConsumer::on_reject(FIX8::Message* msg) {
   const auto rejected_message = app_->create_reject_message(msg);
-  logger_->error(std::format("[Message] {}", rejected_message.toString()));
+  logger_.error(std::format("[Message] {}", rejected_message.toString()));
   if (rejected_message.session_reject_reason == "A") {
     app_->stop();
   }
 }
 
-void MarketConsumer::on_logout(FIX8::Message*) const {
-  logger_->info("[Message] logout");
+void MarketConsumer::on_logout(FIX8::Message*) {
+  logger_.info("[Message] logout");
 }
 
-void MarketConsumer::on_instrument_list(FIX8::Message* msg) const {
-  logger_->info("[Message] on_instrument_list");
+void MarketConsumer::on_instrument_list(FIX8::Message* msg) {
+  logger_.info("[Message] on_instrument_list");
   const InstrumentInfo instrument_message =
       app_->create_instrument_list_message(msg);
-  logger_->info(std::format("[Message] :{}", instrument_message.toString()));
+  logger_.info(std::format("[Message] :{}", instrument_message.toString()));
 }
 
-void MarketConsumer::on_heartbeat(FIX8::Message* msg) const {
+void MarketConsumer::on_heartbeat(FIX8::Message* msg) {
   auto message = app_->create_heartbeat_message(msg);
   if (UNLIKELY(!app_->send(message))) {
-    logger_->error("[Message] failed to send heartbeat");
+    logger_.error("[Message] failed to send heartbeat");
   }
 }
 
 void MarketConsumer::resubscribe() {
-  logger_->info("Try resubscribing");
+  logger_.info("Try resubscribing");
   current_generation_.store(
       generation_.fetch_add(1, std::memory_order_acq_rel) + 1,
       std::memory_order_release);

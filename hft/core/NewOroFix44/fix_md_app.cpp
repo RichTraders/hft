@@ -33,7 +33,9 @@ FixMarketDataApp::FixMarketDataApp(const std::string& sender_comp_id,
 }
 
 FixMarketDataApp::~FixMarketDataApp() {
-
+  this->prepare_stop_after_logout();
+  this->send(create_log_out_message());
+  this->wait_logout_and_halt_io();
 }
 
 std::string FixMarketDataApp::create_log_on_message(

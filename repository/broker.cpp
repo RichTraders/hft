@@ -26,7 +26,8 @@ Broker::Broker()
               kMarketUpdateDataMemoryPoolSize)),
       market_data_pool_(
           std::make_unique<common::MemoryPool<MarketData>>(kMemoryPoolSize)),
-      log_(std::make_unique<common::Logger>()) {
+      log_(std::make_unique<common::Logger>()),
+      log_producer_(log_->make_producer()) {
 
 #ifdef TEST_NET
   INI_CONFIG.load("resources/test_config.ini");
@@ -68,7 +69,7 @@ void Broker::on_login(FIX8::Message*) {
 }
 
 void Broker::on_market_request_reject(FIX8::Message*) {
-  log_->error("Market subscription rejected");
+  log_producer_.error("Market subscription rejected");
 }
 
 void Broker::on_heartbeat(FIX8::Message* msg) {
@@ -83,7 +84,7 @@ void Broker::on_subscribe(const std::string& str_msg, FIX8::Message*,
 void Broker::on_subscribe(const std::string& str_msg, FIX8::Message* msg,
                           const std::string& event_type) {
 #endif
-  log_->info(str_msg);
+  log_producer_.info(str_msg);
 #ifndef LIGHT_LOGGER
   if (event_type != "X") {
     return;
@@ -94,7 +95,7 @@ void Broker::on_subscribe(const std::string& str_msg, FIX8::Message* msg,
       market_update_data_pool_->allocate(app_->create_market_data_message(msg));
 
   if (!data) {
-    log_->error(
+    log_producer_.error(
         "[Error] Failed to allocate market data message, but log is here");
     return;
   }
@@ -111,7 +112,7 @@ void Broker::on_subscribe(const std::string& str_msg, FIX8::Message* msg,
   if (data->type == kNone || (data->type == kMarket &&
                               (data->start_idx != this->update_index_ + 1ULL) &&
                               (this->update_index_ != 0ULL) && subscribed_)) {
-    log_->error(std::format(
+    log_producer_.error(std::format(
         "Update index is outdated. current index :{}, new index :{}",
         this->update_index_, data->start_idx));
 

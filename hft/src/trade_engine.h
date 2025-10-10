@@ -53,13 +53,13 @@ class TradeEngine {
                             MarketOrderBook* market_order_book) const;
   void on_trade_updated(const MarketData* market_data,
                         MarketOrderBook* order_book) const;
-  void on_order_updated(const ExecutionReport* report) const noexcept;
+  void on_order_updated(const ExecutionReport* report) noexcept;
   bool enqueue_response(const ResponseCommon& response);
 
   void send_request(const RequestCommon& request);
 
  private:
-  common::Logger* logger_;
+  common::Logger::Producer logger_;
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
   ResponseManager* response_manager_;

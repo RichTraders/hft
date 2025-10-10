@@ -19,9 +19,10 @@ namespace trading::order {
 struct OrderSlot {
   OMOrderState state{OMOrderState::kInvalid};
   common::Price price;
-  common::Qty qty{0.0};
+  common::Qty qty;
   uint64_t last_used{0};
   common::OrderId cl_order_id;
+  OrderSlot() = default;
 };
 
 inline std::string toString(const OrderSlot& slot) {
@@ -40,6 +41,15 @@ struct PendingReplaceInfo {
   uint64_t new_tick;
   common::OrderId new_cl_order_id;
   common::Qty last_qty;
+  PendingReplaceInfo() = default;
+  PendingReplaceInfo(const common::Price& new_price, const common::Qty& new_qty,
+                     uint64_t new_tick, const common::OrderId& new_cl_order_id,
+                     const common::Qty& last_qty)
+      : new_price(new_price),
+        new_qty(new_qty),
+        new_tick(new_tick),
+        new_cl_order_id(new_cl_order_id),
+        last_qty(last_qty) {}
 };
 
 struct SideBook {
@@ -60,10 +70,20 @@ struct AssignPlan {
 class LayerBook {
  public:
   explicit LayerBook(const common::TickerId& ticker) {
-    books_[ticker] = TwoSide{};
+    books_.reserve(1);
+    books_.try_emplace(ticker, TwoSide{});
   }
+  LayerBook(LayerBook&&) = delete;
+  LayerBook& operator=(LayerBook&&) = delete;
+  LayerBook(LayerBook const&) = delete;
+  LayerBook& operator=(LayerBook const&) = delete;
+
   SideBook& side_book(const common::TickerId& ticker, common::Side side) {
-    return books_[ticker][common::sideToIndex(side)];
+    auto book = books_.find(ticker);
+    if (book == books_.end()) {
+      book = books_.try_emplace(ticker, TwoSide{}).first;
+    }
+    return book->second[common::sideToIndex(side)];
   }
 
   static int find_layer_by_ticks(const SideBook& side_book,
@@ -132,6 +152,7 @@ class LayerBook {
   }
 
   static AssignPlan plan_layer(const SideBook& side_book, uint64_t tick) {
+    static_assert(alignof(decltype(books_)) >= alignof(void*));
     if (const int layer = find_layer_by_ticks(side_book, tick); layer >= 0)
       return {.layer = layer, .victim_live_layer = std::nullopt, .tick = tick};
     if (const int layer = find_free_layer(side_book); layer >= 0)

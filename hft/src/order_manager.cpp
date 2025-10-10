@@ -12,7 +12,6 @@
 
 #include "order_manager.h"
 #include "ini_config.hpp"
-#include "logger.h"
 #include "order_entry.h"
 #include "performance.h"
 #include "trade_engine.h"
@@ -32,7 +31,7 @@ OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
     : layer_book_(INI_CONFIG.get("meta", "ticker")),
       trade_engine_(trade_engine),
       risk_manager_(risk_manager),
-      logger_(logger),
+      logger_(logger->make_producer()),
       fast_clock_(INI_CONFIG.get_double("cpu_info", "clock"),
                   INI_CONFIG.get_int("cpu_info", "interval")),
       ticker_size_(INI_CONFIG.get_double("meta", "ticker_size")),
@@ -40,10 +39,10 @@ OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
       ttl_reserved_ns_(INI_CONFIG.get_double("orders", "ttl_reserved_ns")),
       ttl_live_ns_(INI_CONFIG.get_double("orders", "ttl_live_ns")),
       tick_converter_(ticker_size_) {
-  logger_->info("[Constructor] OrderManager Construct");
+  logger_.info("[Constructor] OrderManager Construct");
 }
 OrderManager::~OrderManager() {
-  logger_->info("[Destructor] OrderManager Destroy");
+  logger_.info("[Destructor] OrderManager Destroy");
 }
 
 void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
@@ -58,7 +57,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
         layer = LayerBook::find_layer_by_ticks(side_book, tick);
       }
       if (layer < 0) {
-        logger_->error(
+        logger_.error(
             std::format("[OrderUpdated] PendingNew: layer not found {}",
                         response->toString()));
         break;
@@ -82,8 +81,8 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
           layer = LayerBook::find_layer_by_ticks(side_book, tick);
         }
         if (layer < 0) {
-          logger_->error(std::format("[OrderUpdated] New: layer not found {}",
-                                     response->toString()));
+          logger_.error(std::format("[OrderUpdated] New: layer not found {}",
+                                    response->toString()));
           break;
         }
       }
@@ -112,7 +111,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       }
       register_expiry(response->symbol, response->side, layer,
                       response->cl_order_id, OMOrderState::kLive);
-      logger_->info(std::format("[OrderUpdated] New {}", response->toString()));
+      logger_.info(std::format("[OrderUpdated] New {}", response->toString()));
       break;
     }
     case OrdStatus::kPartiallyFilled: {
@@ -122,7 +121,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
         layer = LayerBook::find_layer_by_ticks(side_book, tick);
       }
       if (layer < 0) {
-        logger_->error(
+        logger_.error(
             std::format("[OrderUpdated] PartiallyFilled: layer not found {}",
                         response->toString()));
         break;
@@ -141,8 +140,8 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
         register_expiry(response->symbol, response->side, layer,
                         response->cl_order_id, OMOrderState::kLive);
       }
-      logger_->info(std::format("[OrderUpdated] PartiallyFilled {}",
-                                response->toString()));
+      logger_.info(std::format("[OrderUpdated] PartiallyFilled {}",
+                               response->toString()));
       break;
     }
     case OrdStatus::kFilled: {
@@ -152,8 +151,8 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
         layer = LayerBook::find_layer_by_ticks(side_book, tick);
       }
       if (layer < 0) {
-        logger_->error(std::format("[OrderUpdated] Filled: layer not found {}",
-                                   response->toString()));
+        logger_.error(std::format("[OrderUpdated] Filled: layer not found {}",
+                                  response->toString()));
         break;
       }
       auto& slot = side_book.slots[layer];
@@ -163,7 +162,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
 
-      logger_->info(
+      logger_.info(
           std::format("[OrderUpdated] Filled {}", response->toString()));
       break;
     }
@@ -174,7 +173,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
         layer = LayerBook::find_layer_by_ticks(side_book, tick);
       }
       if (layer < 0) {
-        logger_->error(
+        logger_.error(
             std::format("[OrderUpdated] PendingCancel: layer not found {}",
                         response->toString()));
         break;
@@ -192,8 +191,8 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
         side_book.orig_id_to_layer.erase(iter);
         auto& slot = side_book.slots[layer];
         slot.state = OMOrderState::kReserved;
-        logger_->info(std::format("[OrderUpdated] Canceled (for replace) {}",
-                                  response->toString()));
+        logger_.info(std::format("[OrderUpdated] Canceled (for replace) {}",
+                                 response->toString()));
         break;
       }
       layer = LayerBook::find_layer_by_id(side_book, response->cl_order_id);
@@ -202,9 +201,8 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
         layer = LayerBook::find_layer_by_ticks(side_book, tick);
       }
       if (layer < 0) {
-        logger_->error(
-            std::format("[OrderUpdated] Canceled: layer not found {}",
-                        response->toString()));
+        logger_.error(std::format("[OrderUpdated] Canceled: layer not found {}",
+                                  response->toString()));
         break;
       }
 
@@ -213,7 +211,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
       reserved_position_ -=
           static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
       LayerBook::unmap_layer(side_book, layer);
-      logger_->info(
+      logger_.info(
           std::format("[OrderUpdated] Canceled {}", response->toString()));
       break;
     }
@@ -255,19 +253,19 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
               slot.qty;
           LayerBook::unmap_layer(side_book, layer);
         } else {
-          logger_->error(std::format("[OrderUpdated] {}: layer not found {}",
-                                     trading::toString(response->ord_status),
-                                     response->toString()));
+          logger_.error(std::format("[OrderUpdated] {}: layer not found {}",
+                                    trading::toString(response->ord_status),
+                                    response->toString()));
         }
       }
 
-      logger_->error(std::format("[OrderUpdated] {} {}",
-                                 trading::toString(response->ord_status),
-                                 response->toString()));
+      logger_.error(std::format("[OrderUpdated] {} {}",
+                                trading::toString(response->ord_status),
+                                response->toString()));
       break;
     }
     default: {
-      logger_->error(
+      logger_.error(
           std::format("[OrderUpdated] on_order_updated: unknown OrdStatus {}",
                       trading::toString(response->ord_status)));
       break;
@@ -277,7 +275,7 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
 
 void OrderManager::new_order(const TickerId& ticker_id, const Price price,
                              const Side side, const Qty qty,
-                             const OrderId order_id) const noexcept {
+                             const OrderId order_id) noexcept {
   const RequestCommon new_request{
       .req_type = ReqeustType::kNewSingleOrderData,
       .cl_order_id = order_id,
@@ -289,7 +287,7 @@ void OrderManager::new_order(const TickerId& ticker_id, const Price price,
       .time_in_force = TimeInForce::kGoodTillCancel};
   trade_engine_->send_request(new_request);
 
-  logger_->info(
+  logger_.info(
       std::format("[OrderRequest]Sent new order {}", new_request.toString()));
 }
 
@@ -297,7 +295,7 @@ void OrderManager::modify_order(const TickerId& ticker_id,
                                 const OrderId& cancel_new_order_id,
                                 const OrderId& order_id,
                                 const OrderId& original_order_id, Price price,
-                                Side side, const Qty qty) const noexcept {
+                                Side side, const Qty qty) noexcept {
   const RequestCommon new_request{
       .req_type = ReqeustType::kOrderCancelRequestAndNewOrderSingle,
       .cl_cancel_order_id = cancel_new_order_id,
@@ -311,13 +309,13 @@ void OrderManager::modify_order(const TickerId& ticker_id,
       .time_in_force = TimeInForce::kGoodTillCancel};
   trade_engine_->send_request(new_request);
 
-  logger_->info(std::format("[OrderRequest]Sent modify order {}",
-                            new_request.toString()));
+  logger_.info(std::format("[OrderRequest]Sent modify order {}",
+                           new_request.toString()));
 }
 
 void OrderManager::cancel_order(const TickerId& ticker_id,
                                 const OrderId& original_order_id,
-                                const OrderId& order_id) const noexcept {
+                                const OrderId& order_id) noexcept {
   const RequestCommon cancel_request{
       .req_type = ReqeustType::kOrderCancelRequest,
       .cl_order_id = order_id,
@@ -325,7 +323,7 @@ void OrderManager::cancel_order(const TickerId& ticker_id,
       .symbol = ticker_id};
   trade_engine_->send_request(cancel_request);
 
-  logger_->info(
+  logger_.info(
       std::format("[OrderRequest]Sent cancel {}", cancel_request.toString()));
 }
 
@@ -368,7 +366,7 @@ void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
     reserved_position_ +=
         static_cast<double>(common::sideToIndex(action.side)) * action.qty;
 
-    logger_->info(
+    logger_.info(
         std::format("[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}",
                     tick, action.layer, common::toString(action.side),
                     common::toString(action.cl_order_id)));
@@ -405,12 +403,8 @@ void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
     side_book.orig_id_to_layer[action.original_cl_order_id.value] =
         action.layer;
     side_book.new_id_to_layer[action.cl_order_id.value] = action.layer;
-    side_book.pending_repl[action.layer] =
-        PendingReplaceInfo{.new_price = action.price,
-                           .new_qty = action.qty,
-                           .new_tick = tick,
-                           .new_cl_order_id = action.cl_order_id,
-                           .last_qty = action.last_qty};
+    side_book.pending_repl[action.layer] = PendingReplaceInfo{
+        action.price, action.qty, tick, action.cl_order_id, action.last_qty};
 
     const auto cancel_new_order_id = OrderId{action.cl_order_id.value - 1};
     modify_order(ticker, cancel_new_order_id, action.cl_order_id,
@@ -429,7 +423,7 @@ void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
     slot.state = OMOrderState::kCancelReserved;
     slot.last_used = fast_clock_.get_timestamp();
     cancel_order(ticker, action.original_cl_order_id, action.cl_order_id);
-    logger_->info(
+    logger_.info(
         std::format("JBJB[CANCEL]  layer={}, side:{}, order_id={}, "
                     "previous order id :{}",
                     action.layer, common::toString(action.side),
@@ -441,7 +435,7 @@ void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
 }
 
 void OrderManager::filter_by_risk(const std::vector<QuoteIntent>& intents,
-                                  order::Actions& acts) const {
+                                  order::Actions& acts) {
   const auto& ticker = intents.empty() ? std::string{} : intents.front().ticker;
   auto running = reserved_position_;
   auto allow_new = [&](auto& actions) {
@@ -483,8 +477,8 @@ void OrderManager::register_expiry(const TickerId& ticker, Side side,
                     state == OMOrderState::kCancelReserved)
                        ? ttl_reserved_ns_
                        : ttl_live_ns_;
-  logger_->info(std::format("JBJB order_id={} ttl :{}, layer={}",
-                            order_id.is_valid(), ttl, layer));
+  logger_.info(std::format("JBJB order_id={} ttl :{}, layer={}",
+                           order_id.is_valid(), ttl, layer));
   expiry_pq_.push(ExpiryKey{.expire_ts = now + ttl,
                             .symbol = ticker,
                             .side = side,
@@ -520,7 +514,7 @@ void OrderManager::sweep_expired() noexcept {
 
       cancel_order(key.symbol, slot.cl_order_id, cancel_id);
 
-      logger_->info(
+      logger_.info(
           std::format("[TTL] Cancel sent (state={}, layer={}, oid={}, "
                       "cancel_id={}, remaining_ns={})",
                       trading::toString(slot.state), key.layer,

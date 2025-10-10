@@ -85,13 +85,14 @@ int main() {
     std::unique_ptr<common::CpuManager> cpu_manager =
         std::make_unique<common::CpuManager>(logger.get());
 
+    auto log = logger->make_producer();
     std::string cpu_init_result;
     if (cpu_manager->init_cpu_group(cpu_init_result)) {
-      logger->info(std::format("don't init cpu group: {}", cpu_init_result));
+      log.info(std::format("don't init cpu group: {}", cpu_init_result));
     }
 
     if (cpu_manager->init_cpu_to_tid()) {
-      logger->info("don't init cpu to tid");
+      log.info("don't init cpu to tid");
     }
 
     constexpr int kSleepCount = 10;

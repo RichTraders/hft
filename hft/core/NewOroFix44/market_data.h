@@ -26,11 +26,11 @@ struct MarketData {
   common::Qty qty = common::Qty{common::kQtyInvalid};
 
   //For MemoryPool allocation
-  MarketData() = default;
+  MarketData() noexcept = default;
 
   MarketData(const char _type, const common::OrderId _order_id,
-             common::TickerId& _ticker_id, const char _side,
-             const common::Price _price, const common::Qty _qty)
+             common::TickerId _ticker_id, const char _side,
+             const common::Price _price, const common::Qty _qty) noexcept
       : type(common::charToMarketUpdateType(_type)),  //279
         order_id(_order_id),
         ticker_id(std::move(_ticker_id)),
@@ -39,9 +39,9 @@ struct MarketData {
         qty(_qty) {}
 
   MarketData(const common::MarketUpdateType _type,
-             const common::OrderId _order_id, common::TickerId& _ticker_id,
+             const common::OrderId _order_id, common::TickerId _ticker_id,
              const common::Side _side, const common::Price _price,
-             const common::Qty _qty)
+             const common::Qty _qty) noexcept
       : type(_type),
         order_id(_order_id),
         ticker_id(std::move(_ticker_id)),
@@ -50,8 +50,9 @@ struct MarketData {
         qty(_qty) {}
 
   MarketData(const common::MarketUpdateType type,
-             const common::OrderId order_id, common::TickerId& ticker_id,
-             const char side, const common::Price price, const common::Qty qty)
+             const common::OrderId order_id, common::TickerId ticker_id,
+             const char side, const common::Price price,
+             const common::Qty qty) noexcept
       : type(type),
         order_id(order_id),
         ticker_id(std::move(ticker_id)),
@@ -59,7 +60,7 @@ struct MarketData {
         price(price),
         qty(qty) {}
 
-  [[nodiscard]] auto toString() const noexcept {
+  [[nodiscard]] auto toString() const {
     std::ostringstream stream;
     stream << "MarketUpdate" << " [" << " type:" << common::toString(type)
            << " ticker:" << ticker_id << " oid:" << common::toString(order_id)

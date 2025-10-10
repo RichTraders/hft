@@ -26,15 +26,15 @@ constexpr int kEntries = 268;
 
 FixMdCore::FixMdCore(SendId sender_comp_id, TargetId target_comp_id,
                      Logger* logger, MemoryPool<MarketData>* pool)
-  : logger_(logger),
+  : logger_(logger->make_producer()),
     sender_comp_id_(std::move(sender_comp_id)),
     target_comp_id_(std::move(target_comp_id)),
     market_data_pool_(pool) {
-  logger_->info("[Constructor] FixMdCore Created");
+  logger_.info("[Constructor] FixMdCore Created");
 }
 
 FixMdCore::~FixMdCore() {
-  logger_->info("[Destructor] FixMdCore Destroy");
+  logger_.info("[Destructor] FixMdCore Destroy");
 }
 
 std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
@@ -253,7 +253,7 @@ MarketUpdateData FixMdCore::_create_market_data_message(
     market_data_pool_->allocate(
       charToMarketUpdateType( first_action->get()),
       OrderId{kOrderIdInvalid},
-      symbol->get(),
+      TickerId{symbol->get()},
       first_side->get(),
       Price{static_cast<float>(first_price->get())},
       first_qty == nullptr
@@ -271,7 +271,7 @@ MarketUpdateData FixMdCore::_create_market_data_message(
     auto market_data = market_data_pool_->allocate(
         charToMarketUpdateType(action->get()),
             OrderId{kOrderIdInvalid},
-            symbol->get(),
+            TickerId{symbol->get()},
             side->get(),
             Price{static_cast<float>(price->get())},
             qty == nullptr
@@ -282,7 +282,7 @@ MarketUpdateData FixMdCore::_create_market_data_message(
       market_data = market_data_pool_->allocate(
         charToMarketUpdateType(action->get()),
             OrderId{kOrderIdInvalid},
-            symbol->get(),
+            TickerId{symbol->get()},
             side->get(),
             Price{static_cast<float>(price->get())},
             qty == nullptr
@@ -317,7 +317,7 @@ MarketUpdateData FixMdCore::_create_trade_data_message(
    market_data_pool_->allocate(
      MarketUpdateType::kTrade,
      OrderId{kOrderIdInvalid},
-     symbol->get(),
+     TickerId{symbol->get()},
      first_side->get(),
      Price{static_cast<float>(first_price->get())},
      first_qty == nullptr
@@ -335,7 +335,7 @@ MarketUpdateData FixMdCore::_create_trade_data_message(
         market_data_pool_->allocate(
           MarketUpdateType::kTrade,
           OrderId{kOrderIdInvalid},
-          symbol->get(),
+          TickerId{symbol->get()},
           side->get(),
           Price{static_cast<float>(price->get())},
           qty == nullptr
@@ -427,7 +427,7 @@ MarketDataReject FixMdCore::create_reject_message(FIX8::Message* msg) {
   const auto error_code = msg->get<ErrorCode>();
 
   if (ref_sequence != nullptr)
-    logger_->info(std::format("failed sequence :{}", ref_sequence->get()));
+    logger_.info(std::format("failed sequence :{}", ref_sequence->get()));
 
   return MarketDataReject{
       .session_reject_reason =

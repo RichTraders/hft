@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.28)
 project(hft)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 add_compile_options(-Wall -Wextra -Werror -Wno-pedantic)
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(-march=native)
@@ -22,3 +24,4 @@ add_subdirectory(test)
 set(RESOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 file(COPY ${RESOURCES_DIR} DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY set_cpu.sh DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY ${RESOURCES_DIR} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

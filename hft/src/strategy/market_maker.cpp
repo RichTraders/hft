@@ -56,7 +56,7 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
       bbo->bid_price.value == common::kPriceInvalid ||
       bbo->ask_price.value == common::kPriceInvalid ||
       bbo->ask_price.value < bbo->bid_price.value) {
-    logger_->debug("Invalid BBO. Skipping quoting.");
+    logger_.debug("Invalid BBO. Skipping quoting.");
     return;
   }
 
@@ -74,7 +74,7 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
   const double denom = std::max({spread, 0.01});
   const auto delta = (mid - vwap) / denom;
   if (!std::isfinite(spread) || spread <= 0.0) {
-    logger_->trace(
+    logger_.trace(
         std::format("Non-positive spread ({}). Using denom={}", spread, denom));
   }
   const auto signal = std::abs(delta * obi);
@@ -82,7 +82,7 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
   std::vector<QuoteIntent> intents;
   intents.reserve(4);
 
-  logger_->info(std::format(
+  logger_.info(std::format(
       "[Updated] delta:{} obi:{} signal:{} mid:{}, vwap:{}, spread:{}", delta,
       obi, signal, mid, vwap, spread));
 
@@ -94,7 +94,7 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
                     .price = best_bid_price - kGap,
                     .qty = Qty{round5(signal * position_variance_)}});
 
-    logger_->debug(std::format(
+    logger_.debug(std::format(
         "Order Created! price:{}, qty:{}, side:buy, delta:{} obi:{} signal:{} "
         "mid:{}, "
         "vwap:{}, spread:{}",
@@ -107,7 +107,7 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
                     .side = Side::kSell,
                     .price = best_ask_price + kGap,
                     .qty = Qty{round5(signal * position_variance_)}});
-    logger_->debug(std::format(
+    logger_.debug(std::format(
         "Order Created! price:{}, qty:{}, side:sell, delta:{} obi:{} signal:{} "
         "mid:{}, "
         "vwap:{}, spread:{}",

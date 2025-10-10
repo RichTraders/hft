@@ -37,15 +37,14 @@ class OrderGateway {
   void init_trade_engine(TradeEngine* trade_engine);
   void stop() const;
 
-  void on_login(FIX8::Message*) const;
-  void on_execution_report(FIX8::NewOroFix44OE::ExecutionReport* msg) const;
-  void on_order_cancel_reject(
-      FIX8::NewOroFix44OE::OrderCancelReject* msg) const;
+  void on_login(FIX8::Message*);
+  void on_execution_report(FIX8::NewOroFix44OE::ExecutionReport* msg);
+  void on_order_cancel_reject(FIX8::NewOroFix44OE::OrderCancelReject* msg);
   void on_order_mass_cancel_report(
-      FIX8::NewOroFix44OE::OrderMassCancelReport* msg) const;
-  void on_rejected(FIX8::NewOroFix44OE::Reject* msg) const;
-  void on_order_mass_status_response(FIX8::Message* msg) const;
-  void on_logout(FIX8::Message*) const;
+      FIX8::NewOroFix44OE::OrderMassCancelReport* msg);
+  void on_rejected(FIX8::NewOroFix44OE::Reject* msg);
+  void on_order_mass_status_response(FIX8::Message* msg);
+  void on_logout(FIX8::Message*);
   void on_heartbeat(FIX8::Message* msg);
   void order_request(const RequestCommon& request);
 
@@ -55,7 +54,7 @@ class OrderGateway {
   void order_cancel_request_and_new_order_single(const RequestCommon& request);
   void order_mass_cancel_request(const RequestCommon& request);
 
-  common::Logger* logger_;
+  common::Logger::Producer logger_;
   TradeEngine* trade_engine_;
 
   std::unique_ptr<core::FixOrderEntryApp> app_;

@@ -141,7 +141,7 @@ class MarketOrderBook final {
  private:
   const common::TickerId ticker_id_;
   TradeEngine* trade_engine_ = nullptr;
-  common::Logger* logger_ = nullptr;
+  common::Logger::Producer logger_;
 
   std::array<Bucket*, kBucketCount> bidBuckets_{};
   std::array<Bucket*, kBucketCount> askBuckets_{};

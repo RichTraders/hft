@@ -62,7 +62,7 @@ public:
 
  private:
   int64_t sequence_{1};
-  common::Logger* logger_;
+  common::Logger::Producer logger_;
   const std::string sender_comp_id_;
   const std::string target_comp_id_;
   common::MemoryPool<MarketData>* market_data_pool_;

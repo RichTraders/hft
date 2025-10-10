@@ -47,6 +47,7 @@ class FeatureEngineTest : public ::testing::Test {
     delete trade_engine;
     delete market_pool;
     delete market_update_pool;
+    delete ticker_cfg;
   }
 
   TradeEngine* trade_engine;

@@ -13,11 +13,10 @@
 #include "cpu_manager.h"
 #include <sys/resource.h>
 #include "ini_config.hpp"
-#include "logger.h"
 
 namespace common {
 CpuManager::CpuManager(Logger* logger) {
-  logger_ = logger;
+  logger_ = logger->make_producer();
 
   const int cpu_use_count = INI_CONFIG.get_int("cpu_id", "count");
   use_cpu_group_ =
@@ -51,7 +50,7 @@ CpuManager::CpuManager(Logger* logger) {
     const auto& iter = cpu_info_list_.find(info.cpu_id);
 
     if (iter == cpu_info_list_.end()) {
-      logger_->error("[Init] failed to get cpu_id info");
+      logger_.error("[Init] failed to get cpu_id info");
     }
 
     if (iter->second.type <= SCHED_RR) {
@@ -64,7 +63,7 @@ CpuManager::CpuManager(Logger* logger) {
     thread_info_list_.emplace(thread_name, info);
   }
 
-  logger_->info("[Constructor] cpu manager start");
+  logger_.info("[Constructor] cpu manager start");
 }
 
 CpuManager::~CpuManager() {
@@ -72,7 +71,7 @@ CpuManager::~CpuManager() {
   detach(getpid(), result);
   undo(result);
 
-  logger_->info("[Destructor] cpu manager start");
+  logger_.info("[Destructor] cpu manager start");
 }
 
 bool CpuManager::init_cpu_to_tid() {
@@ -287,7 +286,7 @@ int CpuManager::set_rt(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
 
   std::string result;
   if (set_cpu_to_tid(cpu_id, tid, result)) {
-    logger_->error("[init] failed to cpu to tid");
+    logger_.error("[init] failed to cpu to tid");
     return -1;
   }
 
@@ -302,7 +301,7 @@ int CpuManager::set_rt(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
   }*/
 
   if (set_chrt(tid, prio, static_cast<int>(policy), result)) {
-    logger_->error("[init] failed to chrt to tid");
+    logger_.error("[init] failed to chrt to tid");
     return -1;
   }
 
@@ -317,7 +316,7 @@ int CpuManager::set_cfs(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
 
   std::string result;
   if (set_cpu_to_tid(cpu_id, tid, result)) {
-    logger_->error("[init] failed to cpu to tid");
+    logger_.error("[init] failed to cpu to tid");
     return -1;
   }
 
@@ -328,7 +327,7 @@ int CpuManager::set_cfs(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
   }*/
 
   if (set_chrt(tid, 0, static_cast<int>(policy), result)) {
-    logger_->error("[init] failed to chrt to tid");
+    logger_.error("[init] failed to chrt to tid");
     return -1;
   }
 
@@ -339,7 +338,7 @@ int CpuManager::set_cfs(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
   result.clear();
 
   if (set_priority(nicev, tid, result)) {
-    logger_->error("[init] failed to priority to tid");
+    logger_.error("[init] failed to priority to tid");
     return -1;
   }
 

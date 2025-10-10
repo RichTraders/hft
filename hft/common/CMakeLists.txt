@@ -5,7 +5,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
         GIT_TAG        20250512.1
 )
-
+set(ABSL_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(abseil)
 
 set(_no_ignored_attr
@@ -27,6 +27,9 @@ file(GLOB_RECURSE LIB_SRC_FILES
 )
 
 add_library(Common STATIC ${LIB_SRC_FILES})
+add_library(concurrentqueue INTERFACE)
+target_include_directories(concurrentqueue INTERFACE
+        ${CMAKE_SOURCE_DIR}/extern/concurrentqueue)
 
 target_precompile_headers(Common PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
 target_include_directories(Common PUBLIC
@@ -36,4 +39,5 @@ target_include_directories(Common PUBLIC
 target_link_libraries(Common
         PUBLIC
         absl::flat_hash_map
+        concurrentqueue
 )

@@ -76,7 +76,7 @@ private:
   int64_t sequence_{1};
   const std::string sender_comp_id_;
   const std::string target_comp_id_;
-  common::Logger* logger_;
+  common::Logger::Producer logger_;
   trading::ResponseManager* response_manager_;
   const int qty_precision_;
   const int price_precision_;

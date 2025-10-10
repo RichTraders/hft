@@ -43,6 +43,23 @@ class SPSCQueue final {
     return true;
   }
 
+  void enqueue_spin(const T& item) noexcept {
+    auto head = producer_.head.load(std::memory_order_relaxed);
+    for (;;) {
+      auto tail = consumer_.tail.load(std::memory_order_acquire);
+      if (head - tail != Capacity)
+        break;
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || \
+    defined(_M_IX86)
+      _mm_pause();
+#else
+      std::this_thread::yield();
+#endif
+    }
+    buffer_[head & kMask] = item;
+    producer_.head.store(head + 1, std::memory_order_release);
+  }
+
   bool dequeue(T& item) noexcept {
     auto tail = consumer_.tail.load(std::memory_order_relaxed);
     auto head = producer_.head.load(std::memory_order_acquire);

@@ -48,6 +48,9 @@ class FixApp {
   bool start();
 
   void stop();
+  void prepare_stop_after_logout() noexcept;
+  void wait_logout_and_halt_io() noexcept;
+  void note_logout_ack() noexcept;
 
   bool send(const std::string& msg) const;
 
@@ -87,7 +90,7 @@ class FixApp {
 
   void process_message(const std::string& raw_msg);
 
-  common::Logger* logger_;
+  common::Logger::Producer logger_;
   std::unique_ptr<SSLSocket> tls_sock_;
   std::map<std::string, std::function<void(FIX8::Message*)>> callbacks_;
 
@@ -99,11 +102,16 @@ class FixApp {
 
   common::Thread<WriteThreadName> write_thread_;
   common::Thread<ReadThreadName> read_thread_;
-  bool thread_running_{true};
+  std::atomic<bool> thread_running_{false};
 
   bool log_on_{false};
   const std::string sender_id_;
   const std::string target_id_;
+
+  std::atomic<bool> logout_ack_{false};
+  std::mutex stop_mtx_;
+  std::condition_variable stop_cv_;
+  static constexpr auto kLogoutWait = std::chrono::milliseconds(5000);
 };
 }  // namespace core
 

@@ -32,7 +32,7 @@ TradeEngine::TradeEngine(
     common::MemoryPool<MarketData>* market_data_pool,
     ResponseManager* response_manager,
     const common::TradeEngineCfgHashMap& ticker_cfg)
-    : logger_(logger),
+    : logger_(logger->make_producer()),
       market_update_data_pool_(market_update_data_pool),
       market_data_pool_(market_data_pool),
       response_manager_(response_manager),
@@ -52,11 +52,11 @@ TradeEngine::TradeEngine(
   ticker_order_book_.insert({ticker, std::move(orderbook)});
 
   strategy_ = std::make_unique<MarketMaker>(
-      order_manager_.get(), feature_engine_.get(), logger_, ticker_cfg);
+      order_manager_.get(), feature_engine_.get(), logger, ticker_cfg);
 
   thread_.start(&TradeEngine::run, this);
   response_thread_.start(&TradeEngine::response_run, this);
-  logger_->info("[Constructor] TradeEngine Created");
+  logger_.info("[Constructor] TradeEngine Created");
 }
 
 TradeEngine::~TradeEngine() {
@@ -66,9 +66,9 @@ TradeEngine::~TradeEngine() {
   thread_.join();
   response_thread_.join();
 
-  logger_->info("[Thread] Trade Engine TEMarketData finish");
-  logger_->info("[Thread] Trade Engine TEResponse finish");
-  logger_->info("[Destructor] TradeEngine Destroy");
+  logger_.info("[Thread] Trade Engine TEMarketData finish");
+  logger_.info("[Thread] Trade Engine TEResponse finish");
+  logger_.info("[Destructor] TradeEngine Destroy");
 }
 
 void TradeEngine::init_order_gateway(OrderGateway* order_gateway) {
@@ -101,15 +101,14 @@ void TradeEngine::on_trade_updated(const MarketData* market_data,
   END_MEASURE(TRADE_UPDATED, logger_);
 }
 
-void TradeEngine::on_order_updated(
-    const ExecutionReport* report) const noexcept {
+void TradeEngine::on_order_updated(const ExecutionReport* report) noexcept {
   START_MEASURE(Trading_TradeEngine_on_order_updated);
   position_keeper_->add_fill(report);
   strategy_->on_order_updated(report);
   order_manager_->on_order_updated(report);
   END_MEASURE(Trading_TradeEngine_on_order_updated, logger_);
 
-  logger_->info(std::format("[OrderResult]{}", report->toString()));
+  logger_.info(std::format("[OrderResult]{}", report->toString()));
 }
 
 bool TradeEngine::enqueue_response(const ResponseCommon& response) {
@@ -195,14 +194,14 @@ void TradeEngine::response_run() {
 }
 
 void TradeEngine::on_order_cancel_reject(const OrderCancelReject* reject) {
-  logger_->info(
+  logger_.info(
       std::format("[OrderResult]Order cancel request is rejected. error :{}",
                   reject->toString()));
 }
 
 void TradeEngine::on_order_mass_cancel_report(
     const OrderMassCancelReport* cancel_report) {
-  logger_->info(
+  logger_.info(
       std::format("[OrderResult]Order mass cancel is rejected. error:{}",
                   cancel_report->toString()));
 }

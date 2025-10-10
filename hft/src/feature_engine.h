@@ -28,14 +28,14 @@ namespace trading {
 class FeatureEngine {
  public:
   explicit FeatureEngine(common::Logger* logger)
-      : logger_(logger),
+      : logger_(logger->make_producer()),
         vwap_size_(INI_CONFIG.get_int("strategy", "vwap_size", kVwapSize)),
         vwap_qty_(vwap_size_),
         vwap_price_(vwap_size_) {
-    logger_->info("[Constructor] FeatureEngine Created");
+    logger_.info("[Constructor] FeatureEngine Created");
   }
 
-  ~FeatureEngine() { logger_->info("[Destructor] FeatureEngine Destory"); }
+  ~FeatureEngine() { logger_.info("[Destructor] FeatureEngine Destory"); }
   auto on_trade_updated(const MarketData* market_update,
                         MarketOrderBook* book) noexcept -> void;
   auto on_order_book_updated(common::Price price, common::Side side,
@@ -65,7 +65,7 @@ class FeatureEngine {
 
  private:
   constexpr static int kVwapSize = 64;
-  common::Logger* logger_ = nullptr;
+  common::Logger::Producer logger_;
   double mkt_price_ = common::kPriceInvalid;
   double agg_trade_qty_ratio_ = common::kQtyInvalid;
   double spread_ = common::kPriceInvalid;

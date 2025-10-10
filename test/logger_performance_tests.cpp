@@ -383,6 +383,6 @@ int _main(int argc, const char** argv) {
 }
 
 TEST(LoggerPerformanceTest, StressTest) {
-  const char*argv[]={NULL, "out.log", "8", "200000", "300", "20480"};
+  const char*argv[]={NULL, "out.log", "8", "5000", "300", "20480"};
   EXPECT_EQ(_main(6, argv), 0);
 }

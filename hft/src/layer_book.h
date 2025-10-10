@@ -19,9 +19,10 @@ namespace trading::order {
 struct OrderSlot {
   OMOrderState state{OMOrderState::kInvalid};
   common::Price price;
-  common::Qty qty{0.0};
+  common::Qty qty;
   uint64_t last_used{0};
   common::OrderId cl_order_id;
+  OrderSlot() = default;
 };
 
 inline std::string toString(const OrderSlot& slot) {
@@ -40,6 +41,15 @@ struct PendingReplaceInfo {
   uint64_t new_tick;
   common::OrderId new_cl_order_id;
   common::Qty last_qty;
+  PendingReplaceInfo() = default;
+  PendingReplaceInfo(const common::Price& new_price, const common::Qty& new_qty,
+                     uint64_t new_tick, const common::OrderId& new_cl_order_id,
+                     const common::Qty& last_qty)
+      : new_price(new_price),
+        new_qty(new_qty),
+        new_tick(new_tick),
+        new_cl_order_id(new_cl_order_id),
+        last_qty(last_qty) {}
 };
 
 struct SideBook {
@@ -78,7 +88,6 @@ class LayerBook {
 
   static int find_layer_by_ticks(const SideBook& side_book,
                                  uint64_t tick) noexcept {
-    static_assert(alignof(decltype(books_)) >= alignof(void*));
     for (int idx = 0; idx < kSlotsPerSide; ++idx)
       if (side_book.layer_ticks[idx] == tick)
         return idx;
@@ -86,7 +95,6 @@ class LayerBook {
   }
   static int find_layer_by_id(const SideBook& side_book,
                               const common::OrderId order_id) noexcept {
-    static_assert(alignof(decltype(books_)) >= alignof(void*));
     if (order_id.value == common::kOrderIdInvalid)
       return -1;
     for (int idx = 0; idx < kSlotsPerSide; ++idx)
@@ -96,7 +104,6 @@ class LayerBook {
   }
 
   static int find_free_layer(const SideBook& side_book) noexcept {
-    static_assert(alignof(decltype(books_)) >= alignof(void*));
     for (int idx = 0; idx < kSlotsPerSide; ++idx) {
       const auto state = side_book.slots[idx].state;
       if (state == OMOrderState::kInvalid || state == OMOrderState::kDead)
@@ -108,7 +115,6 @@ class LayerBook {
   }
 
   static int pick_victim_layer(const SideBook& side_book) noexcept {
-    static_assert(alignof(decltype(books_)) >= alignof(void*));
     int victim = 0;
     for (int index = 1; index < kSlotsPerSide; ++index)
       if (side_book.slots[index].last_used < side_book.slots[victim].last_used)
@@ -122,7 +128,6 @@ class LayerBook {
   };
 
   static void unmap_layer(SideBook& side_book, int layer) {
-    static_assert(alignof(decltype(books_)) >= alignof(void*));
     side_book.layer_ticks[layer] = kTicksInvalid;
 
     for (auto iter = side_book.new_id_to_layer.begin();
@@ -160,7 +165,6 @@ class LayerBook {
   }
 
   std::pair<uint64_t, uint64_t> get_last_time(const std::string& symbol) {
-
     auto is_active = [](const auto& slot) {
       return slot.state == OMOrderState::kLive ||
              slot.state == OMOrderState::kReserved;

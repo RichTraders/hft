@@ -5,7 +5,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
         GIT_TAG        20250512.1
 )
-
+set(ABSL_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(abseil)
 
 set(_no_ignored_attr

@@ -12,9 +12,7 @@
 
 #pragma once
 
-#include <pch.h>
 #include <source_location>
-#include "mpsc_queue_cas.hpp"
 #include "thread.hpp"
 
 namespace common {
@@ -120,8 +118,6 @@ class LogFormatter {
     out.reserve(msg.text.size());
 #endif
     std::format_to(std::back_inserter(out), "{}", msg.text);
-
-    out += msg.text;
     return out;
   }
 
@@ -158,7 +154,7 @@ class LogFormatter {
     gmtime_r(&time, &calendar_date);
 
     const auto* time_format = std::format_to(
-        out, "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:06}Z",
+        out, "[{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:06}Z]",
         calendar_date.tm_year + k1900, calendar_date.tm_mon + 1,
         calendar_date.tm_mday, calendar_date.tm_hour, calendar_date.tm_min,
         calendar_date.tm_sec, nano / k1000);

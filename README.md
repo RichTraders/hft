@@ -174,6 +174,9 @@ popd
 sudo supervisorctl reread
 sudo supervisorctl update
 sudo supervisorctl status
+
+# Stop hft
+sudo supervisorctl stop hft
 ```
 
 # ASAN Test

@@ -403,12 +403,8 @@ void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
     side_book.orig_id_to_layer[action.original_cl_order_id.value] =
         action.layer;
     side_book.new_id_to_layer[action.cl_order_id.value] = action.layer;
-    side_book.pending_repl[action.layer] =
-        PendingReplaceInfo{.new_price = action.price,
-                           .new_qty = action.qty,
-                           .new_tick = tick,
-                           .new_cl_order_id = action.cl_order_id,
-                           .last_qty = action.last_qty};
+    side_book.pending_repl[action.layer] = PendingReplaceInfo{
+        action.price, action.qty, tick, action.cl_order_id, action.last_qty};
 
     const auto cancel_new_order_id = OrderId{action.cl_order_id.value - 1};
     modify_order(ticker, cancel_new_order_id, action.cl_order_id,

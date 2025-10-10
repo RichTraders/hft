@@ -32,7 +32,7 @@ class BaseStrategy {
                common::Logger* logger)
       : order_manager_(order_manager),
         feature_engine_(feature_engine),
-        logger_(logger) {}
+        logger_(logger->make_producer()) {}
 
   void on_orderbook_updated(common::TickerId& ticker_id, common::Price price,
                             common::Side side,
@@ -54,7 +54,7 @@ class BaseStrategy {
  protected:
   OrderManager* order_manager_;
   const FeatureEngine* feature_engine_;
-  common::Logger* logger_;
+  common::Logger::Producer logger_;
 };
 }  // namespace trading
 

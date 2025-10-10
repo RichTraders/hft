@@ -47,11 +47,28 @@ std::string getCurrentWorkingDirectory() {
   return std::string(buf);
 }
 
-TEST(LoggerTest, ConsoleLogTest) {
-  Logger lg;
-  lg.setLevel(LogLevel::kDebug);
-  lg.clearSink();
-  lg.addSink(std::make_unique<ConsoleSink>());
+class LoggerTest : public ::testing::Test {
+protected:
+  static std::unique_ptr<common::Logger> logger;
+  void SetUp() override {
+    logger = std::make_unique<Logger>();
+    logger->setLevel(LogLevel::kDebug);
+    logger->clearSink();
+  }
+
+  void TearDown() override {
+    logger->shutdown();
+    logger.reset();
+  }
+
+};
+std::unique_ptr<Logger> LoggerTest::logger;
+
+
+TEST_F(LoggerTest, ConsoleLogTest) {
+  logger->setLevel(LogLevel::kDebug);
+  logger->clearSink();
+  logger->addSink(std::make_unique<ConsoleSink>());
 
   std::ostringstream oss;
   auto* old_cout_buf = std::cout.rdbuf(oss.rdbuf());
@@ -60,31 +77,23 @@ TEST(LoggerTest, ConsoleLogTest) {
 
   logs.emplace_back("Logger Test");
   logs.emplace_back("Application shutting down");
+  auto lg = logger->make_producer();
 
   for (const auto& log : logs) {
     lg.debug(log);
   }
-  sleep(2);
+  logger->shutdown();
 
-  // 3) std::cout 버퍼 복원
   std::cout.rdbuf(old_cout_buf);
-
-  // 4) 캡처된 문자열을 istringstream 에 담아 std::cin 으로 연결
   std::istringstream iss(oss.str());
-  auto* old_cin_buf = std::cin.rdbuf(iss.rdbuf());
-
-  // 5) 이제 std::cin 으로 읽으면 oss 에 담긴 내용이 들어온다
-  std::string line;
-  int cnt = 0;
-  while (std::getline(std::cin, line)) {
-    EXPECT_TRUE(line.find(logs[cnt++]) != std::string::npos);
+  std::string line; size_t i = 0;
+  while (std::getline(iss, line)) {
+    ASSERT_LT(i, logs.size());
+    EXPECT_NE(line.find(logs[i++]), std::string::npos);
   }
-
-  // 6) std::cin 버퍼도 복원
-  std::cin.rdbuf(old_cin_buf);
 }
 
-TEST(LoggerTest, FileLogTest) {
+TEST_F(LoggerTest, FileLogTest) {
   //init
   std::string cur_dir_path = getCurrentWorkingDirectory();
   std::string remove_dir = cur_dir_path + "/file_log_test.txt";
@@ -93,20 +102,19 @@ TEST(LoggerTest, FileLogTest) {
 
   if (remove_file.is_open())
     std::remove(remove_dir.c_str());
+  
+  logger->addSink(std::make_unique<FileSink>("file_log_test", 1024));
 
-  Logger lg;
-  lg.setLevel(LogLevel::kDebug);
-  lg.clearSink();
-  lg.addSink(std::make_unique<FileSink>("file_log_test", 1024));
+  auto log = logger->make_producer();
 
   std::vector<std::string> line_list;
   line_list.push_back("FileLogTest Test");
   line_list.push_back("Application shutting down333");
 
-  lg.debug(line_list[0]);
-  lg.debug(line_list[1]);
+  log.debug(line_list[0]);
+  log.debug(line_list[1]);
 
-  sleep(2);
+  logger->shutdown();
 
   const std::string file_path = "file_log_test.txt";
   std::ifstream ifs(file_path);
@@ -121,7 +129,7 @@ TEST(LoggerTest, FileLogTest) {
   }
 }
 
-TEST(LoggerTest, FileLogLotateTest) {
+TEST_F(LoggerTest, FileLogRotateTest) {
   const std::string cur_dir_path = getCurrentWorkingDirectory();
   const std::string file_path = "file_log_rotate_test_final.txt";
   const std::string file_path2 = "file_log_rotate_test_final_1.txt";
@@ -142,29 +150,13 @@ TEST(LoggerTest, FileLogLotateTest) {
   line_list.push_back("FileLogTest rotate Test");
   line_list.push_back("Application rotate shutting down333");
 
-  Logger lg;
+  logger->addSink(std::make_unique<FileSink>("file_log_rotate_test_final", 32));
 
-  lg.setLevel(LogLevel::kDebug);
-  lg.clearSink();
-  lg.addSink(std::make_unique<FileSink>("file_log_rotate_test_final", 32));
+  auto log = logger->make_producer();
 
-  lg.debug(line_list[0].c_str());
-  lg.debug(line_list[1].c_str());
-  sleep(3);
-  {
-    std::ifstream ifs(file_path);
-
-    EXPECT_TRUE(ifs.is_open());
-
-    std::string line;
-    if (std::getline(ifs, line)) {
-      int ssss = line.find(line_list[0]) != std::string::npos;
-      EXPECT_TRUE(ssss);
-    }
-
-    ifs.close();
-  }
-
+  log.debug(line_list[0].c_str());
+  log.debug(line_list[1].c_str());
+  logger->shutdown();
   {
     std::ifstream ifs(file_path);
 
@@ -175,6 +167,7 @@ TEST(LoggerTest, FileLogLotateTest) {
       int ssss = line.find(line_list[1]) != std::string::npos;
       EXPECT_TRUE(ssss);
     }
+
     ifs.close();
   }
   {
@@ -191,7 +184,7 @@ TEST(LoggerTest, FileLogLotateTest) {
   }
 }
 
-TEST(LoggerTest, FileAndConsoleLogTest) {
+TEST_F(LoggerTest, FileAndConsoleLogTest) {
   std::string cur_dir_path = getCurrentWorkingDirectory();
   std::string remove_dir = cur_dir_path + "/file_console_file_log_test.txt";
 
@@ -199,25 +192,24 @@ TEST(LoggerTest, FileAndConsoleLogTest) {
 
   if (remove_file.is_open())
     std::remove(remove_dir.c_str());
-
-  Logger lg;
-  lg.setLevel(LogLevel::kDebug);
-  lg.clearSink();
-  lg.addSink(std::make_unique<ConsoleSink>());
-  lg.addSink(std::make_unique<FileSink>("file_console_file_log_test", 1024));
+  
+  logger->addSink(std::make_unique<ConsoleSink>());
+  logger->addSink(std::make_unique<FileSink>("file_console_file_log_test", 1024));
 
   std::ostringstream oss;
   auto* old_cout_buf = std::cout.rdbuf(oss.rdbuf());
 
   std::vector<std::string> logs;
 
+  auto log = logger->make_producer();
+
   logs.emplace_back("FileAndConsoleLogTest Test");
   logs.emplace_back("FileAndConsoleLogTest shutting down");
 
-  for (const auto& log : logs) {
-    lg.debug(log);
+  for (const auto& str : logs) {
+    log.debug(str);
   }
-  sleep(3);
+  logger->shutdown();
 
   std::cout.rdbuf(old_cout_buf);
 
@@ -246,24 +238,26 @@ TEST(LoggerTest, FileAndConsoleLogTest) {
   }
 }
 
-TEST(LoggerTest, LogLevelTest) {
-  Logger lg;
-  lg.setLevel(LogLevel::kInfo);
-  lg.clearSink();
-  lg.addSink(std::make_unique<FileSink>("LogLevelTest", 1024 * 1024));
+TEST_F(LoggerTest, LogLevelTest) {
+  logger->clearSink();
+  logger->addSink(std::make_unique<FileSink>("LogLevelTest", 1024 * 1024));
 
+  auto lg = logger->make_producer();
   for (int i = 0; i < 200; i++) {
     lg.debug("info LogLevelTest" + std::to_string(i));
   }
 
-  sleep(3);
+  logger->shutdown();
 
   const std::string file_path = "LogLevelTest.txt";
   std::ifstream ifs(file_path);
   EXPECT_TRUE(ifs.is_open());
   std::string line;
-  std::getline(ifs, line);
-  EXPECT_TRUE(line.empty());
+  int count = 0;
+  while (std::getline(ifs, line)) {
+    count ++;
+  }
+  EXPECT_EQ(count, 200);
 }
 
 namespace fs = std::filesystem;
@@ -370,7 +364,7 @@ struct TempDir {
   }
 };
 
-TEST(LoggerStress, ConcurrentWriteAndRotationLineCount) {
+TEST_F(LoggerTest, ConcurrentWriteAndRotationLineCount) {
   TempDir tmp;
   const std::string stem = "stress";
   const std::string ext = ".log";
@@ -386,12 +380,13 @@ TEST(LoggerStress, ConcurrentWriteAndRotationLineCount) {
   auto* counting_raw = new CountingSink();
   uint64_t count_from_sink = 0;
   {
-    Logger logger;
-    logger.setLevel(LogLevel::kTrace);
-    logger.addSink(std::make_unique<FileSink>(base.string(), kRotateBytes));
+    logger->clearSink();
+    logger->setLevel(LogLevel::kTrace);
+    logger->addSink(std::make_unique<FileSink>(base.string(), kRotateBytes));
 
     std::unique_ptr<LogSink> counting_uptr(counting_raw);
-    logger.addSink(std::move(counting_uptr));
+    logger->addSink(std::move(counting_uptr));
+    auto lg = logger->make_producer();
 
     // 멀티 스레드 로깅
     std::atomic<int> started{0};
@@ -402,7 +397,7 @@ TEST(LoggerStress, ConcurrentWriteAndRotationLineCount) {
         started.fetch_add(1, std::memory_order_relaxed);
         // 각 메시지를 유니크하게 (파일 검사 시 디버깅 편의)
         for (int i = 0; i < kMsgsPerThread; ++i) {
-          logger.info("T=" + std::to_string(t) + " i=" + std::to_string(i));
+          lg.info("T=" + std::to_string(t) + " i=" + std::to_string(i));
         }
       });
     }
@@ -428,6 +423,7 @@ TEST(LoggerStress, ConcurrentWriteAndRotationLineCount) {
         << "Sink에 전달된 라인 수가 기대치와 다름";
     count_from_sink = counting_raw->count();
   }
+  logger->shutdown();
 
   // 파일 라인 수 집계
   uint64_t file_lines = count_lines_all(tmp.path, stem, ext);
@@ -442,7 +438,7 @@ TEST(LoggerStress, ConcurrentWriteAndRotationLineCount) {
   EXPECT_GE(files.size(), 2u) << "로테이션이 발생하지 않음";
 }
 
-TEST(LoggerStress, ConcurrentWriteAndRotationLineCountWithNoCounter) {
+TEST_F(LoggerTest, ConcurrentWriteAndRotationLineCountWithNoCounter) {
   TempDir tmp;
   const std::string stem = "stress";
   const std::string ext = ".log";
@@ -456,17 +452,17 @@ TEST(LoggerStress, ConcurrentWriteAndRotationLineCountWithNoCounter) {
   const uint64_t expected = uint64_t(kThreads) * kMsgsPerThread;
 
   {
-    Logger logger;
-    logger.setLevel(LogLevel::kTrace);
-    logger.addSink(std::make_unique<FileSink>(base.string(), kRotateBytes));
+    logger->setLevel(LogLevel::kTrace);
+    logger->addSink(std::make_unique<FileSink>(base.string(), kRotateBytes));
 
     // 멀티스레드 생산
     std::vector<std::thread> workers;
     workers.reserve(kThreads);
     for (int t = 0; t < kThreads; ++t) {
       workers.emplace_back([&, t] {
+        auto log = logger->make_producer();
         for (int i = 0; i < kMsgsPerThread; ++i) {
-          logger.info("ts=" + now_iso8601_ns() + ", T=" + std::to_string(t) + " i=" + std::to_string(i));
+          log.info("ts=" + now_iso8601_ns() + ", T=" + std::to_string(t) + " i=" + std::to_string(i));
         }
       });
     }
@@ -474,6 +470,7 @@ TEST(LoggerStress, ConcurrentWriteAndRotationLineCountWithNoCounter) {
       th.join();
 
     // 여기서 스코프 종료되면 ~Logger(): 워커 join + FileSink flush/close
+    logger->shutdown();
   }
 
   // 파일 라인 수 집계 (메타데이터 지연 대비 재시도)

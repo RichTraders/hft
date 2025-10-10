@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include <immintrin.h>
+
 namespace common {
 
 constexpr int kDefaultChunkSize = 512;
@@ -59,10 +61,8 @@ class MPSCSegQueue {
   static constexpr size_t kScanThreshold = 64;
 
   void retire_chunk(Chunk* chunk) noexcept {
-    if (chunk->refs.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-      delete chunk;
-      return;
-    }
+    chunk->refs.fetch_sub(1, std::memory_order_acq_rel);
+
     auto* node = new RetiredNode{chunk, nullptr};
     RetiredNode* head = retired_head_.load(std::memory_order_relaxed);
     do {
@@ -110,13 +110,14 @@ class MPSCSegQueue {
   MPSCSegQueue() {
     auto* dummy = new Chunk();
     head_ = dummy;
-    dummy->refs.store(1, std::memory_order_relaxed);
+    dummy->refs.store(2, std::memory_order_relaxed);
     tail_.store(dummy, std::memory_order_relaxed);
   }
 
   ~MPSCSegQueue() {
     T tmp;
     while (dequeue(tmp)) {}
+
     Chunk* chunk = head_;
     bool first = true;
     const size_t start_pos = head_pos_;
@@ -125,31 +126,32 @@ class MPSCSegQueue {
       const size_t begin = first ? start_pos : 0;
       const size_t limit =
           std::min(chunk->idx.load(std::memory_order_acquire), ChunkSize);
+
       for (size_t idx = begin; idx < limit; ++idx) {
         Slot& slot = chunk->slots[idx];
         if (slot.ready.load(std::memory_order_acquire)) {
           std::destroy_at(slot.ptr());
+          slot.ready.store(0, std::memory_order_relaxed);
         }
       }
+
       Chunk* next = chunk->next.load(std::memory_order_acquire);
-      if (chunk->refs.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-        delete chunk;
-      } else {
-        retire_chunk(chunk);
-      }
+      retire_chunk(chunk);
+
       chunk = next;
       first = false;
     }
 
+    // 남은 것 정리: 여기서만 refs==0 인 것 delete
     try_reclaim();
     RetiredNode* rest =
         retired_head_.exchange(nullptr, std::memory_order_acquire);
     while (rest) {
-      RetiredNode* next = rest;
+      RetiredNode* node = rest;
       rest = rest->next;
-      if (next->chunk->refs.load(std::memory_order_acquire) == 0)
-        delete next->chunk;
-      delete next;
+      if (node->chunk->refs.load(std::memory_order_acquire) == 0)
+        delete node->chunk;
+      delete node;
     }
   }
 
@@ -159,14 +161,16 @@ class MPSCSegQueue {
   MPSCSegQueue& operator=(MPSCSegQueue&&) = delete;
 
   template <typename U>
-    requires(std::constructible_from<T, U &&>,
-             std::is_nothrow_move_constructible_v<T>,
-             std::is_nothrow_move_assignable_v<T> ||
-                 std::is_trivially_copyable_v<T>)
+    requires(std::constructible_from<T, U &&> &&
+             std::is_nothrow_move_constructible_v<T> &&
+             (std::is_nothrow_move_assignable_v<T> ||
+              std::is_trivially_copyable_v<T>))
   void enqueue(U&& input) noexcept(noexcept(T(std::forward<U>(input)))) {
     unsigned spin = 0;
     while (true) {
       Chunk* cur = tail_.load(std::memory_order_acquire);
+
+      // producers' temporary ref
       cur->refs.fetch_add(1, std::memory_order_acq_rel);
       if (cur != tail_.load(std::memory_order_acquire)) {
         cur->refs.fetch_sub(1, std::memory_order_acq_rel);
@@ -203,6 +207,9 @@ class MPSCSegQueue {
           spin = 0;
           std::this_thread::yield();
         }
+      } else {
+        next->refs.fetch_add(1, std::memory_order_acq_rel);
+        cur->refs.fetch_sub(1, std::memory_order_acq_rel);
       }
 
       cur->refs.fetch_sub(1, std::memory_order_acq_rel);
@@ -217,6 +224,7 @@ class MPSCSegQueue {
           return false;
         out = std::move(*slot.ptr());
         std::destroy_at(slot.ptr());
+        slot.ready.store(0, std::memory_order_relaxed);
         ++head_pos_;
 
         if (head_pos_ == ChunkSize) {
@@ -232,9 +240,11 @@ class MPSCSegQueue {
         }
         return true;
       }
+
       Chunk* next = head_->next.load(std::memory_order_acquire);
       if (!next)
         return false;
+
       next->refs.fetch_add(1, std::memory_order_acq_rel);
       Chunk* old = head_;
       head_ = next;

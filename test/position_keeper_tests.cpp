@@ -28,6 +28,7 @@ protected:
     INI_CONFIG.load("resources/config.ini");
     logger = new Logger();
     keeper = new PositionKeeper(logger);
+
   }
 
   void TearDown() override {
@@ -62,6 +63,7 @@ TEST_F(PositionKeeperTest, AddFillIncreasesPosition) {
 
 TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
   PositionInfo pos;
+  auto log = logger->make_producer();
 
   // 1. Long 2 BTC @ 100
   ExecutionReport buy1{
@@ -74,7 +76,7 @@ TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
       .side = Side::kBuy
 
   };
-  pos.add_fill(&buy1, logger);
+  pos.add_fill(&buy1, log);
   EXPECT_DOUBLE_EQ(pos.position_, 2.0);
   EXPECT_DOUBLE_EQ(pos.real_pnl_, 0.0);
 
@@ -89,7 +91,7 @@ TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
       .side = Side::kSell,
 
   };
-  pos.add_fill(&sell1, logger);
+  pos.add_fill(&sell1, log);
 
   EXPECT_DOUBLE_EQ(pos.position_, -1.0);
 
@@ -101,6 +103,7 @@ TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
 
 TEST_F(PositionKeeperTest, UnrealPnL_PositiveCase) {
   PositionInfo pos;
+  auto log = logger->make_producer();
 
   // 1. 2 BTC 매수 @ 100
   ExecutionReport buy1{
@@ -113,7 +116,7 @@ TEST_F(PositionKeeperTest, UnrealPnL_PositiveCase) {
       .side = Side::kBuy,
 
   };
-  pos.add_fill(&buy1, logger);
+  pos.add_fill(&buy1, log);
 
   EXPECT_DOUBLE_EQ(pos.position_, 2.0);
   EXPECT_DOUBLE_EQ(pos.real_pnl_, 0.0);
@@ -122,7 +125,7 @@ TEST_F(PositionKeeperTest, UnrealPnL_PositiveCase) {
   BBO bbo{
       .bid_price = Price{110},
       .ask_price = Price{112}};
-  pos.update_bbo(&bbo, logger);
+  pos.update_bbo(&bbo, log);
 
   EXPECT_NEAR(pos.unreal_pnl_, (111.0 - 100.0) * 2.0, 1e-6);
   EXPECT_NEAR(pos.total_pnl_, pos.unreal_pnl_ + pos.real_pnl_, 1e-6);
@@ -133,6 +136,7 @@ TEST_F(PositionKeeperTest, AddFill_AvgPriceCalculation) {
   PositionInfo pos;
   Logger logger;
 
+  auto log = logger.make_producer();
   // 1. Buy 1 BTC @ 100
   const ExecutionReport buy1{
       .cl_order_id = OrderId{1},
@@ -143,7 +147,7 @@ TEST_F(PositionKeeperTest, AddFill_AvgPriceCalculation) {
       .price = Price{100},
       .side = Side::kBuy,
   };
-  pos.add_fill(&buy1, &logger);
+  pos.add_fill(&buy1, log);
 
   // 2. Buy 3 BTC @ 110
   const ExecutionReport buy2{
@@ -156,7 +160,7 @@ TEST_F(PositionKeeperTest, AddFill_AvgPriceCalculation) {
       .side = Side::kBuy,
 
   };
-  pos.add_fill(&buy2, &logger);
+  pos.add_fill(&buy2, log);
 
   EXPECT_DOUBLE_EQ(pos.position_, 4.0);
   EXPECT_NEAR(pos.open_vwap_[sideToIndex(Side::kBuy)] / 4.0, 107.5, 1e-6);
@@ -165,6 +169,7 @@ TEST_F(PositionKeeperTest, AddFill_AvgPriceCalculation) {
 
 TEST_F(PositionKeeperTest, AddFill_FullCloseRealizesPnL) {
   PositionInfo pos;
+  auto log = logger->make_producer();
 
   // 1. Buy 2 BTC @ 50
   ExecutionReport buy{
@@ -176,7 +181,7 @@ TEST_F(PositionKeeperTest, AddFill_FullCloseRealizesPnL) {
       .price = Price{50},
       .side = Side::kBuy,
   };
-  pos.add_fill(&buy, logger);
+  pos.add_fill(&buy, log);
 
   // 2. Sell 2 BTC @ 70
   ExecutionReport sell{
@@ -188,7 +193,7 @@ TEST_F(PositionKeeperTest, AddFill_FullCloseRealizesPnL) {
       .price = Price{70},
       .side = Side::kSell,
   };
-  pos.add_fill(&sell, logger);
+  pos.add_fill(&sell, log);
 
   EXPECT_DOUBLE_EQ(pos.position_, 0.0);
   EXPECT_NEAR(pos.real_pnl_, 40.0, 1e-6);

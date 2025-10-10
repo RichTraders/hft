@@ -3,7 +3,8 @@
 //
 
 #pragma once
-#include <string>
+
+#include "logger.h"
 
 namespace common {
 struct sched_attr;
@@ -80,10 +81,8 @@ class CpuManager {
   static int set_priority(int value, pid_t tid, std::string& result);
   static int run_commnad(const std::string& command, std::string& result);
 
-  Logger* logger_;
+  common::Logger::Producer logger_;
   std::string set_cpu_file_path_;
-  uint8_t cpu_id_start_;
-  uint8_t cpu_id_end_;
   std::map<uint8_t, CpuInfo> cpu_info_list_;
   std::map<std::string, ThreadInfo> thread_info_list_;
   bool use_cpu_group_ = false;

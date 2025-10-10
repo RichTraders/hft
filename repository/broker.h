@@ -29,6 +29,7 @@ class Broker {
       market_update_data_pool_;
   std::unique_ptr<common::MemoryPool<MarketData>> market_data_pool_;
   std::unique_ptr<common::Logger> log_;
+  common::Logger::Producer log_producer_;
   std::unique_ptr<core::FixMarketDataApp> app_;
 
 #ifndef LIGHT_LOGGER

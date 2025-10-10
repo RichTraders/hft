@@ -16,17 +16,18 @@
 
 namespace core {
 class SSLSocket {
-public:
+ public:
   SSLSocket(const std::string& host, int port);
   ~SSLSocket();
+  void interrupt();
 
   int read(char* buf, int len) const;
 
   int write(const char* buf, int len) const;
 
-private:
-  int sockfd;
-  SSL_CTX* ctx;
-  SSL* ssl;
+ private:
+  int sockfd_;
+  SSL_CTX* ctx_;
+  SSL* ssl_;
 };
-}
+}  // namespace core

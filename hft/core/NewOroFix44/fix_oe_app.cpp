@@ -14,6 +14,20 @@
 
 namespace core {
 
+FixOrderEntryApp::FixOrderEntryApp(const std::string& sender_comp_id,
+                                   const std::string& target_comp_id,
+                                   common::Logger* logger,
+                                   trading::ResponseManager* response_manager)
+    : FixApp(AUTHORIZATION.get_od_address(), AUTHORIZATION.get_port(),
+             sender_comp_id, target_comp_id, logger) {
+  fix_oe_core_ = std::make_unique<FixOeCore>(sender_comp_id, target_comp_id,
+                                             logger, response_manager);
+}
+FixOrderEntryApp::~FixOrderEntryApp() {
+  this->prepare_stop_after_logout();
+  this->send(create_log_out_message());
+  this->wait_logout_and_halt_io();
+}
 std::string FixOrderEntryApp::create_log_on_message(
     const std::string& sig_b64, const std::string& timestamp) {
   return fix_oe_core_->create_log_on_message(sig_b64, timestamp);

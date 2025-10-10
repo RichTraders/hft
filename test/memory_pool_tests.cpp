@@ -136,8 +136,16 @@ TEST(MemoryPool, BasicAllocateDeallocate) {
   EXPECT_EQ(p1b->id, 42);
   EXPECT_EQ(pool.free_count(), 0u);
 
-  // double free 방지
-  EXPECT_FALSE(pool.deallocate(p1));   // 이미 free 됐던 p1은 false
+  if (p1b == p1) {
+    // 같은 슬롯 재사용: p1은 현재 live 객체의 포인터
+    EXPECT_TRUE(pool.deallocate(p1));      // 첫 해제 → true
+    EXPECT_FALSE(pool.deallocate(p1b));    // 두 번째 해제 → false
+  } else {
+    // 다른 슬롯: p1은 이미 free 상태였음
+    EXPECT_FALSE(pool.deallocate(p1));     // 이미 free → false
+    EXPECT_TRUE(pool.deallocate(p1b));     // 정상 해제 → true
+  }
+
   // 잘못된 포인터 방지
   int dummy;
   EXPECT_FALSE(pool.deallocate(reinterpret_cast<Tracked*>(&dummy)));

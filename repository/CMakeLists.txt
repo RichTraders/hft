@@ -93,6 +93,8 @@ target_link_libraries(BrokerCommon
         PUBLIC
         absl::flat_hash_map
 )
+target_include_directories(BrokerCommon PRIVATE
+        ${CMAKE_SOURCE_DIR}/extern/concurrentqueue)
 ######################################
 
 set(CMAKE_CXX_STANDARD 20)
@@ -108,6 +110,7 @@ target_link_libraries(Repository PRIVATE
         BrokerFix8Schema
         BrokerCommon
 )
+
 
 set(RESOURCES_DIR "${CMAKE_SOURCE_DIR}/resources")
 file(COPY ${RESOURCES_DIR} DESTINATION ${CMAKE_BINARY_DIR}/repository)

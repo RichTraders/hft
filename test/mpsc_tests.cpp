@@ -255,3 +255,11 @@ TEST(MPSCSegQueue_Orig_Memory, Leak_During_Run) {
   // LSan 설정에 따라 보고될 수도 있음.
   SUCCEED();
 }
+
+TEST(QueueLeakCheck, SingleThreadDrain) {
+  common::MPSCSegQueue<int, 1> q;
+  for (int i=0;i<100000;i++) q.enqueue(i);
+  int x;
+  while (q.dequeue(x)) {}
+  SUCCEED();
+}

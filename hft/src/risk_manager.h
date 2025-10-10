@@ -52,7 +52,7 @@ struct RiskInfo {
 
   [[nodiscard]] RiskCheckResult checkPreTradeRisk(
       common::Side side, common::Qty qty, common::Qty reserved_position,
-      common::Logger* logger) const noexcept;
+      common::Logger::Producer& logger) noexcept;
 
   [[nodiscard]] auto toString() const {
     std::ostringstream stream;
@@ -73,7 +73,7 @@ class RiskManager {
   ~RiskManager();
   [[nodiscard]] auto checkPreTradeRisk(
       const common::TickerId& ticker_id, const common::Side side,
-      const common::Qty qty, const common::Qty reserved_qty) const noexcept {
+      const common::Qty qty, const common::Qty reserved_qty) noexcept {
     return ticker_risk_.at(ticker_id).checkPreTradeRisk(side, qty, reserved_qty,
                                                         logger_);
   }
@@ -89,7 +89,7 @@ class RiskManager {
   RiskManager& operator=(const RiskManager&&) = delete;
 
  private:
-  common::Logger* logger_;
+  common::Logger::Producer logger_;
   TickerRiskInfoHashMap ticker_risk_;
 };
 }  // namespace trading

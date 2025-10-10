@@ -324,7 +324,6 @@ struct OrderMassCancelRequest {
 };
 
 struct ExecutionReport {
-  explicit ExecutionReport() noexcept = default;
   common::OrderId cl_order_id = common::OrderId(common::kOrderIdInvalid);
   std::string symbol;
   ExecType exec_type;
@@ -353,7 +352,6 @@ struct ExecutionReport {
 };
 
 struct OrderCancelReject {
-  explicit OrderCancelReject() noexcept = default;
   common::OrderId cl_order_id = common::OrderId(common::kOrderIdInvalid);
   std::string symbol;
   int error_code;
@@ -369,7 +367,6 @@ struct OrderCancelReject {
 };
 
 struct OrderMassCancelReport {
-  explicit OrderMassCancelReport() noexcept = default;
   common::OrderId cl_order_id = common::OrderId(common::kOrderIdInvalid);
   std::string symbol;
   char mass_cancel_request_type;

@@ -28,21 +28,20 @@ SSLSocket::SSLSocket(const std::string& host, int port) {
   serv_addr.sin_port = htons(port);
   memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
 
-  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  sockfd_ = socket(AF_INET, SOCK_STREAM, 0);
   int flag = 1;
-  setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(int));
-  int const ret = connect(sockfd, reinterpret_cast<sockaddr*>(&serv_addr),
+  setsockopt(sockfd_, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(int));
+  int const ret = connect(sockfd_, reinterpret_cast<sockaddr*>(&serv_addr),
                           sizeof(serv_addr));
   if (ret < 0) {
     throw std::runtime_error("socket connection failed");
   }
 
-  SSL_library_init();
-  ctx = SSL_CTX_new(TLS_client_method());
-  ssl = SSL_new(ctx);
-  SSL_set_fd(ssl, sockfd);
+  ctx_ = SSL_CTX_new(TLS_client_method());
+  ssl_ = SSL_new(ctx_);
+  SSL_set_fd(ssl_, sockfd_);
 
-  if (SSL_connect(ssl) <= 0) {
+  if (SSL_connect(ssl_) <= 0) {
     ERR_print_errors_fp(stderr);
     throw std::runtime_error("SSL connection failed");
   }
@@ -50,11 +49,11 @@ SSLSocket::SSLSocket(const std::string& host, int port) {
 }
 
 int SSLSocket::read(char* buf, int len) const {
-  const int read = SSL_read(ssl, buf, len);
+  const int read = SSL_read(ssl_, buf, len);
   if (read > 0)
     return read;
 
-  const int err = SSL_get_error(ssl, read);
+  const int err = SSL_get_error(ssl_, read);
   switch (err) {
     case SSL_ERROR_ZERO_RETURN:
       return 0;
@@ -71,13 +70,18 @@ int SSLSocket::read(char* buf, int len) const {
 }
 
 int SSLSocket::write(const char* buf, int len) const {
-  return SSL_write(ssl, buf, len);
+  return SSL_write(ssl_, buf, len);
 }
 
 SSLSocket::~SSLSocket() {
-  SSL_shutdown(ssl);
-  SSL_free(ssl);
-  close(sockfd);
-  SSL_CTX_free(ctx);
+  SSL_shutdown(ssl_);
+  SSL_free(ssl_);
+  close(sockfd_);
+  SSL_CTX_free(ctx_);
+}
+
+void SSLSocket::interrupt() {
+  SSL_shutdown(ssl_);
+  ::shutdown(sockfd_, SHUT_RDWR);
 }
 }  // namespace core

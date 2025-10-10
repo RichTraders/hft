@@ -69,6 +69,9 @@ protected:
 
     fix = std::make_unique<FixOeCore>("SENDER", "TARGET", logger.get(), response_manager.get());
   }
+  void TearDown() override {
+    fix.reset();
+  }
 
   std::unique_ptr<FixOeCore> fix;
 };

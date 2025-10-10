@@ -34,6 +34,7 @@ protected:
                                 market_data_pool_.get());
   }
   static void TearDownTestSuite() {
+    app_.reset();
     std::cout << "TearDown OrderGatewayTest" << std::endl;
   }
 

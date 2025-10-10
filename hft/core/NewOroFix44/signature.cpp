@@ -39,6 +39,10 @@ EVP_PKEY* Util::load_ed25519(const std::string& pem, const char* password)
   return private_key;
 }
 
+void Util::free_key(EVP_PKEY* private_key) {
+  EVP_PKEY_free(private_key);
+}
+
 EVP_PKEY* Util::load_public_ed25519(const char* pem) {
   FILE* pub_fp = fopen(pem, "r");
   EVP_PKEY* pubkey = PEM_read_PUBKEY(pub_fp, nullptr, nullptr, nullptr);

@@ -26,15 +26,15 @@ constexpr int kEntries = 268;
 
 FixMdCore::FixMdCore(SendId sender_comp_id, TargetId target_comp_id,
                      Logger* logger, MemoryPool<MarketData>* pool)
-  : logger_(logger),
+  : logger_(logger->make_producer()),
     sender_comp_id_(std::move(sender_comp_id)),
     target_comp_id_(std::move(target_comp_id)),
     market_data_pool_(pool) {
-  logger_->info("[Constructor] FixMdCore Created");
+  logger_.info("[Constructor] FixMdCore Created");
 }
 
 FixMdCore::~FixMdCore() {
-  logger_->info("[Destructor] FixMdCore Destroy");
+  logger_.info("[Destructor] FixMdCore Destroy");
 }
 
 std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
@@ -427,7 +427,7 @@ MarketDataReject FixMdCore::create_reject_message(FIX8::Message* msg) {
   const auto error_code = msg->get<ErrorCode>();
 
   if (ref_sequence != nullptr)
-    logger_->info(std::format("failed sequence :{}", ref_sequence->get()));
+    logger_.info(std::format("failed sequence :{}", ref_sequence->get()));
 
   return MarketDataReject{
       .session_reject_reason =

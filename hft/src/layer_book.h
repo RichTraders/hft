@@ -60,14 +60,25 @@ struct AssignPlan {
 class LayerBook {
  public:
   explicit LayerBook(const common::TickerId& ticker) {
-    books_[ticker] = TwoSide{};
+    books_.reserve(1);
+    books_.try_emplace(ticker, TwoSide{});
   }
+  LayerBook(LayerBook&&) = delete;
+  LayerBook& operator=(LayerBook&&) = delete;
+  LayerBook(LayerBook const&) = delete;
+  LayerBook& operator=(LayerBook const&) = delete;
+
   SideBook& side_book(const common::TickerId& ticker, common::Side side) {
-    return books_[ticker][common::sideToIndex(side)];
+    auto book = books_.find(ticker);
+    if (book == books_.end()) {
+      book = books_.try_emplace(ticker, TwoSide{}).first;
+    }
+    return book->second[common::sideToIndex(side)];
   }
 
   static int find_layer_by_ticks(const SideBook& side_book,
                                  uint64_t tick) noexcept {
+    static_assert(alignof(decltype(books_)) >= alignof(void*));
     for (int idx = 0; idx < kSlotsPerSide; ++idx)
       if (side_book.layer_ticks[idx] == tick)
         return idx;
@@ -75,6 +86,7 @@ class LayerBook {
   }
   static int find_layer_by_id(const SideBook& side_book,
                               const common::OrderId order_id) noexcept {
+    static_assert(alignof(decltype(books_)) >= alignof(void*));
     if (order_id.value == common::kOrderIdInvalid)
       return -1;
     for (int idx = 0; idx < kSlotsPerSide; ++idx)
@@ -84,6 +96,7 @@ class LayerBook {
   }
 
   static int find_free_layer(const SideBook& side_book) noexcept {
+    static_assert(alignof(decltype(books_)) >= alignof(void*));
     for (int idx = 0; idx < kSlotsPerSide; ++idx) {
       const auto state = side_book.slots[idx].state;
       if (state == OMOrderState::kInvalid || state == OMOrderState::kDead)
@@ -95,6 +108,7 @@ class LayerBook {
   }
 
   static int pick_victim_layer(const SideBook& side_book) noexcept {
+    static_assert(alignof(decltype(books_)) >= alignof(void*));
     int victim = 0;
     for (int index = 1; index < kSlotsPerSide; ++index)
       if (side_book.slots[index].last_used < side_book.slots[victim].last_used)
@@ -108,6 +122,7 @@ class LayerBook {
   };
 
   static void unmap_layer(SideBook& side_book, int layer) {
+    static_assert(alignof(decltype(books_)) >= alignof(void*));
     side_book.layer_ticks[layer] = kTicksInvalid;
 
     for (auto iter = side_book.new_id_to_layer.begin();
@@ -132,6 +147,7 @@ class LayerBook {
   }
 
   static AssignPlan plan_layer(const SideBook& side_book, uint64_t tick) {
+    static_assert(alignof(decltype(books_)) >= alignof(void*));
     if (const int layer = find_layer_by_ticks(side_book, tick); layer >= 0)
       return {.layer = layer, .victim_live_layer = std::nullopt, .tick = tick};
     if (const int layer = find_free_layer(side_book); layer >= 0)
@@ -144,6 +160,7 @@ class LayerBook {
   }
 
   std::pair<uint64_t, uint64_t> get_last_time(const std::string& symbol) {
+
     auto is_active = [](const auto& slot) {
       return slot.state == OMOrderState::kLive ||
              slot.state == OMOrderState::kReserved;

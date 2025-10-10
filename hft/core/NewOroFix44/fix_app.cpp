@@ -20,18 +20,19 @@
 #include "ssl_socket.h"
 
 namespace core {
-constexpr std::string kFixSignature = "8=FIX";
+static constexpr std::string kFixSignature = "8=FIX";
 
 template <typename Derived, FixedString ReadThreadName,
           FixedString WriteThreadName>
 FixApp<Derived, ReadThreadName, WriteThreadName>::FixApp(
     const std::string& address, int port, std::string sender_comp_id,
     std::string target_comp_id, common::Logger* logger)
-    : logger_(logger),
+    : logger_(logger->make_producer()),
       tls_sock_(std::make_unique<SSLSocket>(address, port)),
       queue_(std::make_unique<common::SPSCQueue<std::string, kQueueSize>>()),
       sender_id_(std::move(sender_comp_id)),
       target_id_(std::move(target_comp_id)) {
+  thread_running_.store(true, std::memory_order_release);
   write_thread_.start(&FixApp::write_loop, this);
   read_thread_.start(&FixApp::read_loop, this);
 }
@@ -39,11 +40,10 @@ FixApp<Derived, ReadThreadName, WriteThreadName>::FixApp(
 template <typename Derived, FixedString ReadThreadName,
           FixedString WriteThreadName>
 FixApp<Derived, ReadThreadName, WriteThreadName>::~FixApp() {
-  thread_running_ = false;
   write_thread_.join();
   read_thread_.join();
-  logger_->info("[Thread] Fix write finish");
-  logger_->info("[Thread] Fix read finish");
+  logger_.info("[Thread] Fix write finish");
+  logger_.info("[Thread] Fix read finish");
 }
 
 template <typename Derived, FixedString ReadThreadName,
@@ -62,6 +62,47 @@ template <typename Derived, FixedString ReadThreadName,
 void FixApp<Derived, ReadThreadName, WriteThreadName>::stop() {
   auto msg = static_cast<Derived*>(this)->create_log_out_message();
   send(msg);
+
+  wait_logout_and_halt_io();
+}
+
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+void FixApp<Derived, ReadThreadName,
+            WriteThreadName>::prepare_stop_after_logout() noexcept {
+  logout_ack_.store(false, std::memory_order_relaxed);
+}
+
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+void FixApp<Derived, ReadThreadName,
+            WriteThreadName>::wait_logout_and_halt_io() noexcept {
+  {
+    std::unique_lock lock(stop_mtx_);
+    (void)stop_cv_.wait_for(lock, kLogoutWait, [&] {
+      return logout_ack_.load(std::memory_order_relaxed);
+    });
+  }
+
+  const bool was_running =
+      thread_running_.exchange(false, std::memory_order_acq_rel);
+
+  // writer 깨우기용 센티넬
+  if (queue_)
+    queue_->enqueue(std::string{});
+
+  if (was_running && tls_sock_) {
+    // read()를 깨워서 빠르게 빠지게
+    tls_sock_->interrupt();
+  }
+}
+
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+void FixApp<Derived, ReadThreadName,
+            WriteThreadName>::note_logout_ack() noexcept {
+  logout_ack_.store(true, std::memory_order_relaxed);
+  stop_cv_.notify_all();
 }
 
 template <typename Derived, FixedString ReadThreadName,
@@ -74,19 +115,24 @@ bool FixApp<Derived, ReadThreadName, WriteThreadName>::send(
 template <typename Derived, FixedString ReadThreadName,
           FixedString WriteThreadName>
 void FixApp<Derived, ReadThreadName, WriteThreadName>::write_loop() {
-  while (thread_running_) {
+  while (thread_running_.load(std::memory_order_relaxed)) {
     std::string msg;
 
     while (queue_->dequeue(msg)) {
       // START_MEASURE(TLS_WRITE);
+      // Close sentinel
+      if (UNLIKELY(msg.empty())) {
+        return;
+      }
       auto result = tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
       if (result < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
           queue_->enqueue(msg);
           break;
         }
-        logger_->error("send failed");
-        thread_running_ = false;
+        logger_.error("send failed");
+        thread_running_.store(false, std::memory_order_release);
+        tls_sock_->interrupt();
         break;
       }
       // END_MEASURE(TLS_WRITE, logger_);
@@ -99,13 +145,14 @@ template <typename Derived, FixedString ReadThreadName,
           FixedString WriteThreadName>
 void FixApp<Derived, ReadThreadName, WriteThreadName>::read_loop() {
   std::string received_buffer;
-  while (thread_running_) {
+  while (thread_running_.load(std::memory_order_relaxed)) {
     // START_MEASURE(TLS_READ);
     std::array<char, kReadBufferSize> buf;
     const int read = tls_sock_->read(buf.data(), buf.size());
     // END_MEASURE(TLS_READ, logger_);
-    if (read < 0) {
-      logger_->error("TLS socket has failed to read. Stop read loop");
+    if (read <= 0) {
+      logger_.error("TLS socket has failed to read. Stop read loop");
+      thread_running_.store(false, std::memory_order_release);
       return;
     }
     received_buffer.append(buf.data(), read);
@@ -124,7 +171,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::register_callback(
   if (!callbacks_.contains(type)) {
     callbacks_[type] = callback;
   } else {
-    logger_->info("already registered type");
+    logger_.info("already registered type");
   }
 }
 
@@ -216,7 +263,9 @@ FixApp<Derived, ReadThreadName, WriteThreadName>::get_signature_base64(
   const std::string payload = std::string("A") + SOH + sender_id_ + SOH +
                               target_id_ + SOH + "1" + SOH + timestamp;
 
-  return Util::sign_and_base64(private_key, payload);
+  auto result = Util::sign_and_base64(private_key, payload);
+  Util::free_key(private_key);
+  return result;
 }
 
 template <typename Derived, FixedString ReadThreadName,
@@ -264,6 +313,10 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::process_message(
 
   if (UNLIKELY(type == "A")) {
     log_on_ = true;
+  } else if (UNLIKELY(type == "5")) {
+    log_on_ = false;
+    logout_ack_.store(true, std::memory_order_relaxed);
+    stop_cv_.notify_all();
   }
 
   if (callbacks_.contains(type)) {

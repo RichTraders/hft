@@ -60,17 +60,19 @@ std::string timestamp() {
 class FixTest : public ::testing::Test {
 protected:
   void SetUp() override {
-    INI_CONFIG.load("resources/config.ini");
-
-    logger_ = std::make_unique<common::Logger>();
-    pool_ = std::make_unique<common::MemoryPool<MarketData>>(1024);
-    fix = std::make_unique<FixMdCore>("SENDER", "TARGET", logger_.get(),
-                                      pool_.get());
+   INI_CONFIG.load("resources/config.ini");
+   pool_ = std::make_unique<common::MemoryPool<MarketData>>(1024);
+   logger_ = std::make_unique<common::Logger>();
+   fix = std::make_unique<FixMdCore>("SENDER", "TARGET", logger_.get(),
+                                     pool_.get());
+ }
+  void TearDown() override {
+    fix.reset();
   }
 
-  std::unique_ptr<FixMdCore> fix;
-  std::unique_ptr<common::Logger> logger_;
-  std::unique_ptr<common::MemoryPool<MarketData>> pool_;
+ std::unique_ptr<common::Logger> logger_;
+ std::unique_ptr<FixMdCore> fix;
+ std::unique_ptr<common::MemoryPool<MarketData>> pool_;
 };
 
 TEST_F(FixTest, CreateLogOnMessageProducesValidFixMessage) {

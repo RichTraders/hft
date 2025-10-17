@@ -25,6 +25,7 @@ set(FIX8_SRC
         ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/fix_md_app.cpp
         ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/fix_oe_app.cpp
         ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/response_manager.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/fix_sequence_counter.cpp
 )
 
 add_library(BrokerFix8Schema STATIC ${FIX8_SRC})

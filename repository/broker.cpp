@@ -15,7 +15,6 @@
 #include "common/logger.h"
 #include "fix_md_app.h"
 #include "ini_config.hpp"
-#include "scope_exit.h"
 
 using common::FileSink;
 using common::LogLevel;
@@ -85,36 +84,11 @@ void Broker::on_subscribe(const std::string& str_msg, FIX8::Message* msg,
                           const std::string& event_type) {
 #endif
   log_producer_.info(str_msg);
-#ifndef LIGHT_LOGGER
-  if (event_type != "X") {
-    return;
-  }
+#ifdef LIGHT_LOGGER
   subscribed_ = true;
 
-  MarketUpdateData* data =
-      market_update_data_pool_->allocate(app_->create_market_data_message(msg));
-
-  if (!data) {
-    log_producer_.error(
-        "[Error] Failed to allocate market data message, but log is here");
-    return;
-  }
-
-  auto cleanup = MakeScopeExit([&] {
-    for (auto* iter : data->data) {
-      if (iter)
-        market_data_pool_->deallocate(iter);
-    }
-    market_update_data_pool_->deallocate(data);
-    data = nullptr;
-  });
-
-  if (data->type == kNone || (data->type == kMarket &&
-                              (data->start_idx != this->update_index_ + 1ULL) &&
-                              (this->update_index_ != 0ULL) && subscribed_)) {
-    log_producer_.error(std::format(
-        "Update index is outdated. current index :{}, new index :{}",
-        this->update_index_, data->start_idx));
+  if (!fix_seq_counter_.is_valid(str_msg)) {
+    log_producer_.error("Fix data skipped. Need to re subscribe.");
 
     // re-subscribe
     {
@@ -122,19 +96,19 @@ void Broker::on_subscribe(const std::string& str_msg, FIX8::Message* msg,
           app_->create_market_data_subscription_message(
               "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
               INI_CONFIG.get("meta", "ticker"), /*subscribe=*/false);
-      app_->send(msg_unsub);
+      while (!app_->send(msg_unsub)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(kSleep));
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(kSleep));
 
       const std::string msg_sub = app_->create_market_data_subscription_message(
           "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
           INI_CONFIG.get("meta", "ticker"), /*subscribe=*/true);
-      app_->send(msg_sub);
+      while (!app_->send(msg_sub)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(kSleep));
+      }
       subscribed_ = false;
     }
-    this->update_index_ = 0ULL;
-
-    return;
   }
-
-  this->update_index_ = data->end_idx;
 #endif
 }

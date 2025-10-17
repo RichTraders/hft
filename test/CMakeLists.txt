@@ -62,6 +62,7 @@ add_unit_test(layer_book)
 add_unit_test(quote_reconcile)
 add_unit_test(extract)
 add_unit_test(logger_performance)
+add_unit_test(fix_sequence_counter)
 
 file(COPY set_cpu.sh DESTINATION ${CMAKE_BINARY_DIR}/test)
 

@@ -20,6 +20,7 @@ set(FIX8_SRC
         fix_app.cpp
         fix_md_app.cpp
         fix_oe_app.cpp
+        fix_sequence_counter.cpp
 )
 
 add_library(Fix8Schema STATIC ${FIX8_SRC})

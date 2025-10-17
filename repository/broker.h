@@ -15,6 +15,7 @@
 
 #include "common/logger.h"
 #include "core/NewOroFix44/fix_md_app.h"
+#include "fix_sequence_counter.h"
 #include "memory_pool.hpp"
 
 class Broker {
@@ -24,6 +25,7 @@ class Broker {
  private:
   static constexpr int kMemoryPoolSize = 65536;
   static constexpr int kMarketUpdateDataMemoryPoolSize = 1024;
+  static constexpr int kSleep = 10;
 
   std::unique_ptr<common::MemoryPool<MarketUpdateData>>
       market_update_data_pool_;
@@ -32,9 +34,9 @@ class Broker {
   common::Logger::Producer log_producer_;
   std::unique_ptr<core::FixMarketDataApp> app_;
 
-#ifndef LIGHT_LOGGER
+  core::FixSequenceCounter fix_seq_counter_;
+#ifdef LIGHT_LOGGER
   bool subscribed_ = false;
-  uint64_t update_index_ = 0ULL;
 #endif
 
   void on_login(FIX8::Message*);

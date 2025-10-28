@@ -7,9 +7,7 @@ set(TEST_TARGETS "")
 
 set(TEST_RUNTIME_DIR "${CMAKE_BINARY_DIR}/test")
 
-set(RESOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 file(MAKE_DIRECTORY "${TEST_RUNTIME_DIR}")
-file(COPY "${RESOURCE_DIR}" DESTINATION "${TEST_RUNTIME_DIR}")
 
 option(ENABLE_ASAN "Build with AddressSanitizer" OFF)
 
@@ -43,26 +41,14 @@ endmacro()
 
 add_definitions(-DGOOGLEMOCK_INCLUDE_GMOCK_INTERNAL_GMOCK_GENERATED_FUNCTION_MOCKER_H_)
 
-add_unit_test(spsc)
-add_unit_test(thread)
-add_unit_test(fix_md_core)
-add_unit_test(fix_oe_core)
-add_unit_test(logger)
-#add_unit_test(mpsc)
-add_unit_test(memory_pool)
-add_unit_test(order_book)
-add_unit_test(feature_engine)
-add_unit_test(position_keeper)
-add_unit_test(risk_manager)
-add_unit_test(ini_config)
-add_unit_test(order_gateway)
-add_unit_test(fix_md_app)
-add_unit_test(cpu_priority)
-add_unit_test(layer_book)
-add_unit_test(quote_reconcile)
-add_unit_test(extract)
-add_unit_test(logger_performance)
-add_unit_test(fix_sequence_counter)
+file(GLOB TEST_SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/*_tests.cpp")
+
+foreach(test_src IN LISTS TEST_SOURCES)
+    get_filename_component(fname "${test_src}" NAME_WE)
+    string(REGEX REPLACE "_tests$" "" test_name "${fname}")
+    add_unit_test(${test_name})
+endforeach()
 
 file(COPY set_cpu.sh DESTINATION ${CMAKE_BINARY_DIR}/test)
 
@@ -72,3 +58,4 @@ add_custom_target(RUN_ALL_TESTS
         DEPENDS ${TEST_TARGETS}
 )
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION "${TEST_RUNTIME_DIR}")

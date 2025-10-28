@@ -22,7 +22,7 @@
 #include "risk_manager.h"
 #include "wait_strategy.h"
 
-#include "strategy/market_maker.h"
+#include "strategy/strategies.hpp"
 constexpr int kWaitStrategyLimit = 4096;
 
 namespace trading {
@@ -51,8 +51,33 @@ TradeEngine::TradeEngine(
   orderbook->set_trade_engine(this);
   ticker_order_book_.insert({ticker, std::move(orderbook)});
 
-  strategy_ = std::make_unique<MarketMaker>(
+  const std::string algorithm = INI_CONFIG.get("strategy", "algorithm");
+  strategy_vtable_ = StrategyDispatch::instance().get_vtable(algorithm);
+
+  if (!strategy_vtable_) {
+    logger_.error(
+        std::format("[Constructor] Failed to load strategy '{}'. Available "
+                    "strategies: [{}]",
+                    algorithm, [&]() {
+                      std::string names;
+                      for (const auto& name :
+                           StrategyDispatch::instance().get_strategy_names()) {
+                        if (!names.empty())
+                          names += ", ";
+                        names += name;
+                      }
+                      return names;
+                    }()));
+    throw std::runtime_error("Invalid strategy name in config: " + algorithm);
+  }
+
+  void* strategy_data = strategy_vtable_->create_data(
       order_manager_.get(), feature_engine_.get(), logger, ticker_cfg);
+  strategy_context_ = std::make_unique<StrategyContext>(
+      order_manager_.get(), feature_engine_.get(), logger, strategy_data);
+
+  logger_.info(std::format("[Constructor] Strategy '{}' loaded successfully",
+                           algorithm));
 
   thread_.start(&TradeEngine::run, this);
   response_thread_.start(&TradeEngine::response_run, this);
@@ -66,6 +91,11 @@ TradeEngine::~TradeEngine() {
   thread_.join();
   response_thread_.join();
 
+  if (strategy_vtable_ && strategy_context_ &&
+      strategy_context_->strategy_data) {
+    strategy_vtable_->destroy_data(strategy_context_->strategy_data);
+    strategy_context_->strategy_data = nullptr;
+  }
   logger_.info("[Thread] Trade Engine TEMarketData finish");
   logger_.info("[Thread] Trade Engine TEResponse finish");
   logger_.info("[Destructor] TradeEngine Destroy");
@@ -89,7 +119,8 @@ void TradeEngine::on_orderbook_updated(const common::TickerId& ticker,
                                        MarketOrderBook* order_book) const {
   START_MEASURE(ORDERBOOK_UPDATED);
   feature_engine_->on_order_book_updated(price, side, order_book);
-  strategy_->on_orderbook_updated(ticker, price, side, order_book);
+  strategy_vtable_->on_orderbook_updated(*strategy_context_, ticker, price,
+                                         side, order_book);
   END_MEASURE(ORDERBOOK_UPDATED, logger_);
 }
 
@@ -97,14 +128,15 @@ void TradeEngine::on_trade_updated(const MarketData* market_data,
                                    MarketOrderBook* order_book) const {
   START_MEASURE(TRADE_UPDATED);
   feature_engine_->on_trade_updated(market_data, order_book);
-  strategy_->on_trade_updated(market_data, order_book);
+  strategy_vtable_->on_trade_updated(*strategy_context_, market_data,
+                                     order_book);
   END_MEASURE(TRADE_UPDATED, logger_);
 }
 
 void TradeEngine::on_order_updated(const ExecutionReport* report) noexcept {
   START_MEASURE(Trading_TradeEngine_on_order_updated);
   position_keeper_->add_fill(report);
-  strategy_->on_order_updated(report);
+  strategy_vtable_->on_order_updated(*strategy_context_, report);
   order_manager_->on_order_updated(report);
   END_MEASURE(Trading_TradeEngine_on_order_updated, logger_);
 

@@ -21,6 +21,7 @@
 #include "types.h"
 
 #include "order_book.h"
+#include "strategy/strategy_dispatch.hpp"
 
 namespace trading {
 class PositionKeeper;
@@ -30,7 +31,6 @@ class RiskManager;
 class OrderManager;
 class ResponseManager;
 class OrderGateway;
-class MarketMaker;
 
 constexpr std::size_t kMarketDataCapacity = 128;
 constexpr int kResponseQueueSize = 64;
@@ -78,8 +78,9 @@ class TradeEngine {
   std::unique_ptr<PositionKeeper> position_keeper_;
   std::unique_ptr<RiskManager> risk_manager_;
   std::unique_ptr<OrderManager> order_manager_;
-  //TODO(JB): 전략 변화
-  std::unique_ptr<MarketMaker> strategy_;
+
+  const StrategyVTable* strategy_vtable_;
+  mutable std::unique_ptr<StrategyContext> strategy_context_;
 
   void run();
   void response_run();

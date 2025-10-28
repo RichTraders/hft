@@ -122,4 +122,8 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
 }
 
 void MarketMaker::on_order_updated(const ExecutionReport*) noexcept {}
+
+void register_market_maker_strategy() {
+  const static Registrar<MarketMaker> kReg("maker");
+}
 }  // namespace trading

@@ -57,8 +57,14 @@ class IniConfig : public Singleton<IniConfig> {
   }
 
   // NOLINTBEGIN(bugprone-easily-swappable-parameters,-warnings-as-errors)
-  std::string get(const std::string_view section, const std::string_view key,
-                  const std::string_view def = "") const {
+  void set(const std::string& section, const std::string& key,
+           const std::string& value) {
+    const std::string full_key = std::string(section) + "." + std::string(key);
+    data_[full_key] = value;
+  }
+  [[nodiscard]] std::string get(const std::string_view section,
+                                const std::string_view key,
+                                const std::string_view def = "") const {
     const std::string full_key = std::string(section) + "." + std::string(key);
     if (const auto iter = data_.find(full_key); iter != data_.end()) {
       return iter->second;

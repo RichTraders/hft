@@ -11,6 +11,7 @@
  */
 #include "fix_sequence_counter.h"
 #include "gtest/gtest.h"
+using namespace core;
 TEST(FixCounterTest, CheckFirstCome) {
   FixSequenceCounter counter;
   std::string test_message =

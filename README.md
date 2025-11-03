@@ -75,7 +75,7 @@ use_cpu_to_tid = 1
 count = 5
 
 [thread]
-count = 7
+count = 6
 
 [cpu_0]
 use_irq = 0
@@ -118,18 +118,13 @@ cpu_id = 1
 prio = 50
 
 [thread_4]
-name = TEMarketData
+name = TradeEngine
 cpu_id = 2
 prio = 99
 
 [thread_5]
-name = TEResponse
-cpu_id = 3
-prio = 99
-
-[thread_6]
 name = Logger
-cpu_id = 4
+cpu_id = 3
 prio = 50
 
 ```

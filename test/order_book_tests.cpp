@@ -11,22 +11,30 @@
  */
 #include "../hft/core/NewOroFix44/response_manager.h"
 #include "gtest/gtest.h"
-#include "order_book.h"
-#include "trade_engine.h"
 #include "ini_config.hpp"
+#include "order_book.h"
+#include "strategy/strategies.hpp"
+#include "trade_engine.h"
 
 using namespace trading;
 using namespace common;
 
 class MarketOrderBookTest : public ::testing::Test {
+public:
+  static std::unique_ptr<Logger> logger;
  protected:
-  Logger logger_;
+
   MarketOrderBook* book_;
   ResponseManager* response_manager_;
   TradeEngine* trade_engine_;
 
-  void SetUp() override {
+  static void SetUpTestSuite() {
+    logger = std::make_unique<Logger>();
     INI_CONFIG.load("resources/config.ini");
+    register_all_strategies();
+  }
+
+  void SetUp() override {
     TradeEngineCfgHashMap temp;
     RiskCfg risk = {.max_order_size_ = Qty{1000.},
                     .max_position_ = Qty{1000.},
@@ -43,8 +51,6 @@ class MarketOrderBookTest : public ::testing::Test {
         std::make_unique<MemoryPool<OrderCancelReject>>(1024);
     auto order_mass_cancel_report_pool =
         std::make_unique<MemoryPool<OrderMassCancelReport>>(1024);
-
-    auto logger = std::make_unique<Logger>();
     response_manager_ = new ResponseManager(
         logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
         order_mass_cancel_report_pool.get());
@@ -52,7 +58,7 @@ class MarketOrderBookTest : public ::testing::Test {
     trade_engine_ = new TradeEngine(logger.get(), pool.get(),
                                                  pool2.get(), response_manager_, temp);
     // trade_engine_ 주입
-    book_ = new MarketOrderBook{INI_CONFIG.get("meta", "ticker"), &logger_};
+    book_ = new MarketOrderBook{INI_CONFIG.get("meta", "ticker"), logger.get()};
     book_->set_trade_engine(trade_engine_);
   }
 
@@ -67,6 +73,7 @@ class MarketOrderBookTest : public ::testing::Test {
       delete book_;
   }
 };
+std::unique_ptr<Logger> MarketOrderBookTest::logger;
 
 TEST_F(MarketOrderBookTest, ClearResetsOrderBookAndUpdatesBBO) {
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
@@ -107,7 +114,6 @@ TEST_F(MarketOrderBookTest, TradeInvokesTradeEngineAndSkipsOrderBookUpdate) {
   EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
 }
 
-// Add
 TEST_F(MarketOrderBookTest, AddOrder) {
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
   const Price price = Price{100000.00};

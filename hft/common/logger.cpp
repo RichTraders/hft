@@ -136,6 +136,12 @@ void Logger::shutdown() {
       file->flush();
   }
 }
+void Logger::flush() {
+  for (auto& sink : sinks_) {
+    if (auto* file = dynamic_cast<FileSink*>(sink.get()))
+      file->flush();
+  }
+}
 
 void Logger::dispatch(const LogMessage& msg) const {
   for (const auto& sink : sinks_)

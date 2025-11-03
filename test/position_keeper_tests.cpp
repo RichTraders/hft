@@ -10,47 +10,48 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "position_keeper.h"
+#include <gtest/gtest.h>
 #include "logger.h"
+#include "position_keeper.h"
 
+#include "ini_config.hpp"
 #include "order_book.h"
 #include "order_entry.h"
-#include "ini_config.hpp"
 
 using namespace trading;
 using namespace common;
 
 class PositionKeeperTest : public ::testing::Test {
-protected:
-  void SetUp() override {
+ public:
+  static Logger* logger;
+
+ protected:
+  static void SetUpTestSuite() {
     INI_CONFIG.load("resources/config.ini");
     logger = new Logger();
-    keeper = new PositionKeeper(logger);
-
   }
-
+  void SetUp() override { keeper = new PositionKeeper(logger); }
   void TearDown() override {
-    delete logger;
-    delete keeper;
+    if (keeper)
+      delete keeper;
   }
 
-  Logger* logger;
+  static void TearDownTestSuite() {
+    delete logger;
+  }
   PositionKeeper* keeper;
-
 };
+Logger* PositionKeeperTest::logger;
 
 TEST_F(PositionKeeperTest, AddFillIncreasesPosition) {
-  ExecutionReport report{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{1.0},
-      .last_qty = Qty{1.0},
-      .price = Price{100000.0},
-      .side = Side::kBuy
-  };
+  ExecutionReport report{.cl_order_id = OrderId{1},
+                         .symbol = INI_CONFIG.get("meta", "ticker"),
+                         .ord_status = OrdStatus::kFilled,
+                         .cum_qty = Qty{1.0},
+                         .last_qty = Qty{1.0},
+                         .price = Price{100000.0},
+                         .side = Side::kBuy};
 
   keeper->add_fill(&report);
 
@@ -66,14 +67,13 @@ TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
   auto log = logger->make_producer();
 
   // 1. Long 2 BTC @ 100
-  ExecutionReport buy1{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{100},
-      .side = Side::kBuy
+  ExecutionReport buy1{.cl_order_id = OrderId{1},
+                       .symbol = INI_CONFIG.get("meta", "ticker"),
+                       .ord_status = OrdStatus::kFilled,
+                       .cum_qty = Qty{2},
+                       .last_qty = Qty{2},
+                       .price = Price{100},
+                       .side = Side::kBuy
 
   };
   pos.add_fill(&buy1, log);
@@ -122,15 +122,12 @@ TEST_F(PositionKeeperTest, UnrealPnL_PositiveCase) {
   EXPECT_DOUBLE_EQ(pos.real_pnl_, 0.0);
   EXPECT_DOUBLE_EQ(pos.unreal_pnl_, 0.0);
 
-  BBO bbo{
-      .bid_price = Price{110},
-      .ask_price = Price{112}};
+  BBO bbo{.bid_price = Price{110}, .ask_price = Price{112}};
   pos.update_bbo(&bbo, log);
 
   EXPECT_NEAR(pos.unreal_pnl_, (111.0 - 100.0) * 2.0, 1e-6);
   EXPECT_NEAR(pos.total_pnl_, pos.unreal_pnl_ + pos.real_pnl_, 1e-6);
 }
-
 
 TEST_F(PositionKeeperTest, AddFill_AvgPriceCalculation) {
   PositionInfo pos;

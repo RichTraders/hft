@@ -66,14 +66,12 @@ class TradeEngine {
   OrderGateway* order_gateway_;
   std::unique_ptr<common::SPSCQueue<MarketUpdateData*, kMarketDataCapacity>>
       queue_;
-  common::Thread<"TEMarketData"> thread_;
-  common::Thread<"TEResponse"> response_thread_;
+  common::Thread<"TradeEngine"> thread_;
   std::unique_ptr<common::SPSCQueue<ResponseCommon, kResponseQueueSize>>
       response_queue_;
   MarketOrderBookHashMap ticker_order_book_;
 
   bool running_{true};
-  bool response_running_{true};
   std::unique_ptr<FeatureEngine> feature_engine_;
   std::unique_ptr<PositionKeeper> position_keeper_;
   std::unique_ptr<RiskManager> risk_manager_;
@@ -83,8 +81,6 @@ class TradeEngine {
   mutable std::unique_ptr<StrategyContext> strategy_context_;
 
   void run();
-  void response_run();
-  void on_execution_report(const ExecutionReport*);
   void on_order_cancel_reject(const OrderCancelReject*);
   void on_order_mass_cancel_report(const OrderMassCancelReport*);
 };

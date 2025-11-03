@@ -182,6 +182,7 @@ class Logger {
   static LogLevel string_to_level(const std::string& level) noexcept;
   static std::string level_to_string(LogLevel level) noexcept;
   void shutdown();
+  void flush();
 
   Producer make_producer();
 

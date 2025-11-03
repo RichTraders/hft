@@ -52,6 +52,8 @@ std::string timestamp() {
 }
 
 class FixTest : public ::testing::Test {
+public:
+  static std::unique_ptr<Logger> logger;
 protected:
   void SetUp() override {
     INI_CONFIG.load("resources/config.ini");
@@ -62,7 +64,7 @@ protected:
     auto order_mass_cancel_report_pool = std::make_unique<MemoryPool<
       trading::OrderMassCancelReport>>(1024);
     auto pool = std::make_unique<common::MemoryPool<OrderData>>(1024);
-    auto logger = std::make_unique<common::Logger>();
+    logger = std::make_unique<Logger>();
     std::unique_ptr<ResponseManager> response_manager = std::make_unique<ResponseManager>(
        logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
        order_mass_cancel_report_pool.get());
@@ -75,6 +77,7 @@ protected:
 
   std::unique_ptr<FixOeCore> fix;
 };
+std::unique_ptr<Logger> FixTest::logger;
 
 TEST_F(FixTest, CreateLogOnMessageProducesValidFixMessage) {
   std::string sig = timestamp();

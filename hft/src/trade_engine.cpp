@@ -23,7 +23,9 @@
 #include "wait_strategy.h"
 
 #include "strategy/strategies.hpp"
-constexpr int kWaitStrategyLimit = 4096;
+
+constexpr int kMarketDataBatchLimit = 128;
+constexpr int kResponseBatchLimit = 64;
 
 namespace trading {
 TradeEngine::TradeEngine(
@@ -80,24 +82,20 @@ TradeEngine::TradeEngine(
                            algorithm));
 
   thread_.start(&TradeEngine::run, this);
-  response_thread_.start(&TradeEngine::response_run, this);
   logger_.info("[Constructor] TradeEngine Created");
 }
 
 TradeEngine::~TradeEngine() {
   running_ = false;
-  response_running_ = false;
 
   thread_.join();
-  response_thread_.join();
 
   if (strategy_vtable_ && strategy_context_ &&
       strategy_context_->strategy_data) {
     strategy_vtable_->destroy_data(strategy_context_->strategy_data);
     strategy_context_->strategy_data = nullptr;
   }
-  logger_.info("[Thread] Trade Engine TEMarketData finish");
-  logger_.info("[Thread] Trade Engine TEResponse finish");
+  logger_.info("[Thread] TradeEngine finish");
   logger_.info("[Destructor] TradeEngine Destroy");
 }
 
@@ -111,7 +109,6 @@ bool TradeEngine::on_market_data_updated(MarketUpdateData* data) const {
 
 void TradeEngine::stop() {
   running_ = false;
-  response_running_ = false;
 }
 
 void TradeEngine::on_orderbook_updated(const common::TickerId& ticker,
@@ -154,12 +151,13 @@ void TradeEngine::send_request(const RequestCommon& request) {
 void TradeEngine::run() {
   common::WaitStrategy wait;
   while (running_) {
-    int processed = 0;
+    int md_processed = 0;
     MarketUpdateData* message;
 
-    while (queue_->dequeue(message)) {
+    while (queue_->dequeue(message) && md_processed < kMarketDataBatchLimit) {
       if (UNLIKELY(message == nullptr))
         continue;
+      wait.reset();
       START_MEASURE(MAKE_ORDERBOOK_ALL);
       for (auto& market_data : message->data) {
         START_MEASURE(MAKE_ORDERBOOK_UNIT);
@@ -173,24 +171,13 @@ void TradeEngine::run() {
         market_update_data_pool_->deallocate(message);
       }
       END_MEASURE(MAKE_ORDERBOOK_ALL, logger_);
-      ++processed;
-
-      if (processed >= kWaitStrategyLimit)
-        break;
+      ++md_processed;
     }
 
-    if (processed == 0) {
-      wait.idle_hot();
-    }
-  }
-}
-
-void TradeEngine::response_run() {
-  common::WaitStrategy wait;
-  while (response_running_) {
-    int processed = 0;
+    int resp_processed = 0;
     ResponseCommon response;
-    while (response_queue_->dequeue(response)) {
+    while (response_queue_->dequeue(response) &&
+           resp_processed < kResponseBatchLimit) {
       wait.reset();
       START_MEASURE(RESPONSE_COMMON);
       switch (response.res_type) {
@@ -214,12 +201,10 @@ void TradeEngine::response_run() {
           break;
       }
       END_MEASURE(RESPONSE_COMMON, logger_);
-      processed++;
-
-      if (processed >= kWaitStrategyLimit)
-        break;
+      ++resp_processed;
     }
-    if (processed == 0) {
+
+    if (md_processed == 0 && resp_processed == 0) {
       wait.idle_hot();
     }
   }

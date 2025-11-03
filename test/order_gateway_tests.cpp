@@ -9,16 +9,18 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
+#include <fix8/f8includes.hpp>
 #include "../hft/core/NewOroFix44/response_manager.h"
-#include "gtest/gtest.h"
+#include "fix_oe_app.h"
 #include "gmock/gmock.h"
-#include "order_gateway.h"
+#include "gtest/gtest.h"
 #include "ini_config.hpp"
 #include "logger.h"
-#include "fix_oe_app.h"
+#include "order_gateway.h"
 #include "trade_engine.h"
 #include "types.h"
-#include <fix8/f8includes.hpp>
+
+#include "strategy/strategies.hpp"
 
 using namespace core;
 using namespace common;
@@ -27,16 +29,17 @@ using namespace trading;
 int cl_order_id = 2075;
 
 class OrderGatewayTest : public ::testing::Test  {
+public:
+  static std::unique_ptr<Logger> logger;
 protected:
 
   static void SetUpTestSuite() {
     INI_CONFIG.load("resources/config.ini");
-
-    auto logger = std::make_unique<Logger>();
-
+    logger = std::make_unique<Logger>();
     TradeEngineCfgHashMap temp;
     TradeEngineCfg tempcfg;
     temp.emplace(INI_CONFIG.get("meta", "ticker"), tempcfg);
+    register_all_strategies();
     market_update_data_pool_ = std::make_unique<MemoryPool<MarketUpdateData>>(1024);
     market_data_pool_ = std::make_unique<MemoryPool<MarketData>>(1024);
 
@@ -81,6 +84,7 @@ public:
   static std::unique_ptr<OrderGateway> order_gateway_;
 
 };
+std::unique_ptr<Logger> OrderGatewayTest::logger;
 
 TEST_F(OrderGatewayTest, NewOrderSingle) {
   RequestCommon request;

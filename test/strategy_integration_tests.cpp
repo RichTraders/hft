@@ -23,10 +23,12 @@ using namespace common;
 class StrategyIntegrationTest : public ::testing::Test {
  protected:
   static std::unique_ptr<Logger> logger;
+  static void SetUpTestSuite() {
+    logger =std::make_unique<Logger>();
+  }
   void SetUp() override {
     INI_CONFIG.load("resources/config.ini");
     register_all_strategies();
-    logger =std::make_unique<Logger>();
   }
 };
 std::unique_ptr<Logger> StrategyIntegrationTest::logger;

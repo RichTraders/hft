@@ -36,228 +36,15 @@ inline std::string now_iso8601_ns() {
 
   std::ostringstream oss;
   oss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%S") << '.' << std::setw(9)
-      << std::setfill('0') << nsec;  // 나노초 9자리
+      << std::setfill('0') << nsec;
   return oss.str();
 }
 
-std::string getCurrentWorkingDirectory() {
+std::string get_current_working_directory() {
   char buf[PATH_MAX];
   if (!::getcwd(buf, sizeof(buf)))
     throw std::runtime_error("getcwd failed");
   return std::string(buf);
-}
-
-class LoggerTest : public ::testing::Test {
-protected:
-  static std::unique_ptr<common::Logger> logger;
-  void SetUp() override {
-    logger = std::make_unique<Logger>();
-    logger->setLevel(LogLevel::kDebug);
-    logger->clearSink();
-  }
-
-  void TearDown() override {
-    logger->shutdown();
-    logger.reset();
-  }
-
-};
-std::unique_ptr<Logger> LoggerTest::logger;
-
-
-TEST_F(LoggerTest, ConsoleLogTest) {
-  logger->setLevel(LogLevel::kDebug);
-  logger->clearSink();
-  logger->addSink(std::make_unique<ConsoleSink>());
-
-  std::ostringstream oss;
-  auto* old_cout_buf = std::cout.rdbuf(oss.rdbuf());
-
-  std::vector<std::string> logs;
-
-  logs.emplace_back("Logger Test");
-  logs.emplace_back("Application shutting down");
-  auto lg = logger->make_producer();
-
-  for (const auto& log : logs) {
-    lg.debug(log);
-  }
-  logger->shutdown();
-
-  std::cout.rdbuf(old_cout_buf);
-  std::istringstream iss(oss.str());
-  std::string line; size_t i = 0;
-  while (std::getline(iss, line)) {
-    ASSERT_LT(i, logs.size());
-    EXPECT_NE(line.find(logs[i++]), std::string::npos);
-  }
-}
-
-TEST_F(LoggerTest, FileLogTest) {
-  //init
-  std::string cur_dir_path = getCurrentWorkingDirectory();
-  std::string remove_dir = cur_dir_path + "/file_log_test.txt";
-
-  std::ifstream remove_file(remove_dir);
-
-  if (remove_file.is_open())
-    std::remove(remove_dir.c_str());
-  
-  logger->addSink(std::make_unique<FileSink>("file_log_test", 1024));
-
-  auto log = logger->make_producer();
-
-  std::vector<std::string> line_list;
-  line_list.push_back("FileLogTest Test");
-  line_list.push_back("Application shutting down333");
-
-  log.debug(line_list[0]);
-  log.debug(line_list[1]);
-
-  logger->shutdown();
-
-  const std::string file_path = "file_log_test.txt";
-  std::ifstream ifs(file_path);
-
-  EXPECT_TRUE(ifs.is_open());
-
-  for (uint i = 0; i < line_list.size(); i++) {
-    std::string line;
-    if (std::getline(ifs, line)) {
-      EXPECT_TRUE(line.find(line_list[i]) != std::string::npos);
-    }
-  }
-}
-
-TEST_F(LoggerTest, FileLogRotateTest) {
-  const std::string cur_dir_path = getCurrentWorkingDirectory();
-  const std::string file_path = "file_log_rotate_test_final.txt";
-  const std::string file_path2 = "file_log_rotate_test_final_1.txt";
-  const std::string remove_dir1 = cur_dir_path + file_path;
-  const std::string remove_dir2 = cur_dir_path + file_path2;
-
-  std::ifstream remove_file(remove_dir1);
-
-  if (remove_file.is_open())
-    std::remove(remove_dir1.c_str());
-
-  std::ifstream remove_file2(remove_dir2);
-
-  if (remove_file2.is_open())
-    std::remove(remove_dir2.c_str());
-
-  std::vector<std::string> line_list;
-  line_list.push_back("FileLogTest rotate Test");
-  line_list.push_back("Application rotate shutting down333");
-
-  logger->addSink(std::make_unique<FileSink>("file_log_rotate_test_final", 32));
-
-  auto log = logger->make_producer();
-
-  log.debug(line_list[0].c_str());
-  log.debug(line_list[1].c_str());
-  logger->shutdown();
-  {
-    std::ifstream ifs(file_path);
-
-    EXPECT_TRUE(ifs.is_open());
-
-    std::string line;
-    if (std::getline(ifs, line)) {
-      int ssss = line.find(line_list[1]) != std::string::npos;
-      EXPECT_TRUE(ssss);
-    }
-
-    ifs.close();
-  }
-  {
-    std::ifstream ifs(file_path2);
-
-    EXPECT_TRUE(ifs.is_open());
-
-    std::string line;
-    if (std::getline(ifs, line)) {
-      int ssss = line.find(line_list[0]) != std::string::npos;
-      EXPECT_TRUE(ssss);
-    }
-    ifs.close();
-  }
-}
-
-TEST_F(LoggerTest, FileAndConsoleLogTest) {
-  std::string cur_dir_path = getCurrentWorkingDirectory();
-  std::string remove_dir = cur_dir_path + "/file_console_file_log_test.txt";
-
-  std::ifstream remove_file(remove_dir);
-
-  if (remove_file.is_open())
-    std::remove(remove_dir.c_str());
-  
-  logger->addSink(std::make_unique<ConsoleSink>());
-  logger->addSink(std::make_unique<FileSink>("file_console_file_log_test", 1024));
-
-  std::ostringstream oss;
-  auto* old_cout_buf = std::cout.rdbuf(oss.rdbuf());
-
-  std::vector<std::string> logs;
-
-  auto log = logger->make_producer();
-
-  logs.emplace_back("FileAndConsoleLogTest Test");
-  logs.emplace_back("FileAndConsoleLogTest shutting down");
-
-  for (const auto& str : logs) {
-    log.debug(str);
-  }
-  logger->shutdown();
-
-  std::cout.rdbuf(old_cout_buf);
-
-  std::istringstream iss(oss.str());
-  auto* old_cin_buf = std::cin.rdbuf(iss.rdbuf());
-
-  std::string line;
-  int cnt = 0;
-  while (std::getline(std::cin, line)) {
-    EXPECT_TRUE(line.find(logs[cnt]) != std::string::npos);
-    cnt++;
-  }
-
-  std::cin.rdbuf(old_cin_buf);
-
-  const std::string file_path = "file_console_file_log_test.txt";
-  std::ifstream ifs(file_path);
-
-  EXPECT_TRUE(ifs.is_open());
-
-  for (uint i = 0; i < logs.size(); i++) {
-    std::string line;
-    if (std::getline(ifs, line)) {
-      EXPECT_TRUE(line.find(logs[i]) != std::string::npos);
-    }
-  }
-}
-
-TEST_F(LoggerTest, LogLevelTest) {
-  logger->clearSink();
-  logger->addSink(std::make_unique<FileSink>("LogLevelTest", 1024 * 1024));
-
-  auto lg = logger->make_producer();
-  for (int i = 0; i < 200; i++) {
-    lg.debug("info LogLevelTest" + std::to_string(i));
-  }
-
-  logger->shutdown();
-
-  const std::string file_path = "LogLevelTest.txt";
-  std::ifstream ifs(file_path);
-  EXPECT_TRUE(ifs.is_open());
-  std::string line;
-  int count = 0;
-  while (std::getline(ifs, line)) {
-    count ++;
-  }
-  EXPECT_EQ(count, 200);
 }
 
 namespace fs = std::filesystem;
@@ -267,7 +54,6 @@ using common::Logger;
 using common::LogLevel;
 using common::LogSink;
 
-// ---- 유틸: 로그 파일 라인수 카운트 & 정리 ----
 uint64_t count_lines_in_file(const fs::path& f) {
   std::ifstream ifs(f);
   if (!ifs)
@@ -313,25 +99,10 @@ void remove_log_files(const fs::path& dir, const std::string& stem,
   }
 }
 
-// ---- 검증용 CountingSink ----
-class CountingSink final : public LogSink {
- public:
-  void write(const std::string& msg) override {
-    (void)msg;
-    count_.fetch_add(1, std::memory_order_relaxed);
-  }
-  uint64_t count() const { return count_.load(std::memory_order_relaxed); }
-
- private:
-  std::atomic<uint64_t> count_{0};
-};
-
-// ---- 임시 디렉토리 ----
 struct TempDir {
   fs::path path;
 
   static std::string make_suffix() {
-    // 타임스탬프 + tid 해시 + 랜덤값 섞어서 충돌 확률 낮춤
     const auto now =
         std::chrono::high_resolution_clock::now().time_since_epoch().count();
     const auto tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
@@ -364,13 +135,244 @@ struct TempDir {
   }
 };
 
+class LoggerTest : public ::testing::Test {
+ public:
+  static std::unique_ptr<common::Logger> logger;
+
+ protected:
+  static void SetUpTestSuite() {
+    logger = std::make_unique<Logger>();
+    logger->setLevel(LogLevel::kDebug);
+    logger->clearSink();
+  }
+
+  static void TearDownTestSuite() {
+    logger->shutdown();
+    logger.reset();
+  }
+  void SetUp() override {
+    logger->setLevel(LogLevel::kDebug);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
+  void TearDown() override {
+    logger->flush();
+    logger->clearSink();
+  }
+};
+std::unique_ptr<Logger> LoggerTest::logger;
+
+TEST_F(LoggerTest, ConsoleLogTest) {
+  logger->setLevel(LogLevel::kDebug);
+  logger->clearSink();
+  logger->addSink(std::make_unique<ConsoleSink>());
+
+  std::ostringstream oss;
+  auto* old_cout_buf = std::cout.rdbuf(oss.rdbuf());
+
+  std::vector<std::string> logs;
+
+  logs.emplace_back("Logger Test");
+  logs.emplace_back("Application shutting down");
+  auto lg = logger->make_producer();
+
+  for (const auto& log : logs) {
+    lg.debug(log);
+  }
+  logger->flush();
+
+  std::cout.rdbuf(old_cout_buf);
+  std::istringstream iss(oss.str());
+  std::string line;
+  size_t i = 0;
+  while (std::getline(iss, line)) {
+    ASSERT_LT(i, logs.size());
+    EXPECT_NE(line.find(logs[i++]), std::string::npos);
+  }
+}
+
+TEST_F(LoggerTest, FileLogTest) {
+  std::string cur_dir_path = get_current_working_directory();
+  std::string remove_dir = cur_dir_path + "/file_log_test.txt";
+
+  std::ifstream remove_file(remove_dir);
+
+  if (remove_file.is_open())
+    std::remove(remove_dir.c_str());
+
+  logger->addSink(std::make_unique<FileSink>("file_log_test", 1024));
+
+  auto log = logger->make_producer();
+
+  std::vector<std::string> line_list;
+  line_list.push_back("FileLogTest Test");
+  line_list.push_back("Application shutting down333");
+
+  log.debug(line_list[0]);
+  log.debug(line_list[1]);
+
+  logger->flush();
+
+  const std::string file_path = "file_log_test.txt";
+  std::ifstream ifs(file_path);
+
+  EXPECT_TRUE(ifs.is_open());
+
+  for (uint i = 0; i < line_list.size(); i++) {
+    std::string line;
+    if (std::getline(ifs, line)) {
+      EXPECT_TRUE(line.find(line_list[i]) != std::string::npos);
+    }
+  }
+}
+
+TEST_F(LoggerTest, FileLogRotateTest) {
+  const std::string cur_dir_path = get_current_working_directory();
+  const std::string file_path = "file_log_rotate_test_final.txt";
+  const std::string file_path2 = "file_log_rotate_test_final_1.txt";
+  const std::string remove_dir1 = cur_dir_path + file_path;
+  const std::string remove_dir2 = cur_dir_path + file_path2;
+
+  std::ifstream remove_file(remove_dir1);
+
+  if (remove_file.is_open())
+    std::remove(remove_dir1.c_str());
+
+  std::ifstream remove_file2(remove_dir2);
+
+  if (remove_file2.is_open())
+    std::remove(remove_dir2.c_str());
+
+  std::vector<std::string> line_list;
+  line_list.push_back("FileLogTest rotate Test");
+  line_list.push_back("Application rotate shutting down333");
+
+  logger->addSink(std::make_unique<FileSink>("file_log_rotate_test_final", 32));
+
+  auto log = logger->make_producer();
+
+  log.debug(line_list[0].c_str());
+  log.debug(line_list[1].c_str());
+  logger->flush();
+  {
+    std::ifstream ifs(file_path);
+
+    EXPECT_TRUE(ifs.is_open());
+
+    std::string line;
+    if (std::getline(ifs, line)) {
+      int ssss = line.find(line_list[1]) != std::string::npos;
+      EXPECT_TRUE(ssss);
+    }
+
+    ifs.close();
+  }
+  {
+    std::ifstream ifs(file_path2);
+
+    EXPECT_TRUE(ifs.is_open());
+
+    std::string line;
+    if (std::getline(ifs, line)) {
+      int ssss = line.find(line_list[0]) != std::string::npos;
+      EXPECT_TRUE(ssss);
+    }
+    ifs.close();
+  }
+}
+
+TEST_F(LoggerTest, FileAndConsoleLogTest) {
+  std::string cur_dir_path = get_current_working_directory();
+  std::string remove_dir = cur_dir_path + "/file_console_file_log_test.txt";
+
+  std::ifstream remove_file(remove_dir);
+
+  if (remove_file.is_open())
+    std::remove(remove_dir.c_str());
+
+  logger->addSink(std::make_unique<ConsoleSink>());
+  logger->addSink(
+      std::make_unique<FileSink>("file_console_file_log_test", 1024));
+
+  std::ostringstream oss;
+  auto* old_cout_buf = std::cout.rdbuf(oss.rdbuf());
+
+  std::vector<std::string> logs;
+
+  auto log = logger->make_producer();
+
+  logs.emplace_back("FileAndConsoleLogTest Test");
+  logs.emplace_back("FileAndConsoleLogTest shutting down");
+
+  for (const auto& str : logs) {
+    log.debug(str);
+  }
+
+  std::cout.rdbuf(old_cout_buf);
+
+  std::istringstream iss(oss.str());
+  auto* old_cin_buf = std::cin.rdbuf(iss.rdbuf());
+
+  std::string line;
+  int cnt = 0;
+  while (std::getline(std::cin, line)) {
+    EXPECT_TRUE(line.find(logs[cnt]) != std::string::npos);
+    cnt++;
+  }
+
+  std::cin.rdbuf(old_cin_buf);
+
+  const std::string file_path = "file_console_file_log_test.txt";
+  std::ifstream ifs(file_path);
+
+  EXPECT_TRUE(ifs.is_open());
+
+  for (uint i = 0; i < logs.size(); i++) {
+    std::string line;
+    if (std::getline(ifs, line)) {
+      EXPECT_TRUE(line.find(logs[i]) != std::string::npos);
+    }
+  }
+}
+
+TEST_F(LoggerTest, LogLevelTest) {
+  logger->addSink(std::make_unique<FileSink>("LogLevelTest", 1024 * 1024));
+
+  auto lg = logger->make_producer();
+  for (int i = 0; i < 200; i++) {
+    lg.debug("info LogLevelTest" + std::to_string(i));
+  }
+  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  logger->flush();
+
+  const std::string file_path = "LogLevelTest.txt";
+  std::ifstream ifs(file_path);
+  EXPECT_TRUE(ifs.is_open());
+  std::string line;
+  int count = 0;
+  while (std::getline(ifs, line)) {
+    count++;
+  }
+  EXPECT_EQ(count, 200);
+}
+
+class CountingSink final : public LogSink {
+ public:
+  void write(const std::string& msg) override {
+    (void)msg;
+    count_.fetch_add(1, std::memory_order_relaxed);
+  }
+  uint64_t count() const { return count_.load(std::memory_order_relaxed); }
+
+ private:
+  std::atomic<uint64_t> count_{0};
+};
+
 TEST_F(LoggerTest, ConcurrentWriteAndRotationLineCount) {
   TempDir tmp;
   const std::string stem = "stress";
   const std::string ext = ".log";
   const fs::path base = tmp.path / (stem + ext);
 
-  // 혹시 남아있을 잔여 파일 제거
   remove_log_files(tmp.path, stem, ext);
 
   const int kThreads = 8;
@@ -388,20 +390,17 @@ TEST_F(LoggerTest, ConcurrentWriteAndRotationLineCount) {
     logger->addSink(std::move(counting_uptr));
     auto lg = logger->make_producer();
 
-    // 멀티 스레드 로깅
     std::atomic<int> started{0};
     std::vector<std::thread> workers;
     workers.reserve(kThreads);
     for (int t = 0; t < kThreads; ++t) {
       workers.emplace_back([&, t] {
         started.fetch_add(1, std::memory_order_relaxed);
-        // 각 메시지를 유니크하게 (파일 검사 시 디버깅 편의)
         for (int i = 0; i < kMsgsPerThread; ++i) {
           lg.info("T=" + std::to_string(t) + " i=" + std::to_string(i));
         }
       });
     }
-    // 모두 시작될 때까지 대기(짧게)
     while (started.load() < kThreads)
       std::this_thread::sleep_for(1ms);
     for (auto& th : workers)
@@ -409,31 +408,24 @@ TEST_F(LoggerTest, ConcurrentWriteAndRotationLineCount) {
 
     const uint64_t expected = static_cast<uint64_t>(kThreads) * kMsgsPerThread;
 
-    // 워커 스레드가 큐를 비우는 시간을 조금 준다.
-    // (네 현재 구현은 sleep(1) 등이 있어 드레인에 시간이 걸릴 수 있음)
     const auto t0 = std::chrono::steady_clock::now();
     while (counting_raw->count() < expected &&
            std::chrono::steady_clock::now() - t0 < 10s) {
       std::this_thread::sleep_for(5us);
     }
 
-    // 아직 덜 썼다면, 이 시점에서 테스트가 실패할 가능성 ↑
-    // (그 자체로 버그 신호: 종료 전에 큐를 다 못 비움)
     EXPECT_EQ(counting_raw->count(), expected)
         << "Sink에 전달된 라인 수가 기대치와 다름";
     count_from_sink = counting_raw->count();
   }
-  logger->shutdown();
+  logger->flush();
 
-  // 파일 라인 수 집계
   uint64_t file_lines = count_lines_all(tmp.path, stem, ext);
 
-  // 파일에 실제로 쓴 라인 수 == Sink가 받은 라인 수
   EXPECT_EQ(file_lines, count_from_sink)
       << "파일 총 라인수와 CountingSink 수 불일치 (로테이션/flush/종료 경로 "
          "점검 필요)";
 
-  // 로테이션이 실제로 발생했는지(파일이 1개 초과)
   auto files = list_log_files(tmp.path, stem, ext);
   EXPECT_GE(files.size(), 2u) << "로테이션이 발생하지 않음";
 }
@@ -455,25 +447,23 @@ TEST_F(LoggerTest, ConcurrentWriteAndRotationLineCountWithNoCounter) {
     logger->setLevel(LogLevel::kTrace);
     logger->addSink(std::make_unique<FileSink>(base.string(), kRotateBytes));
 
-    // 멀티스레드 생산
     std::vector<std::thread> workers;
     workers.reserve(kThreads);
     for (int t = 0; t < kThreads; ++t) {
       workers.emplace_back([&, t] {
         auto log = logger->make_producer();
         for (int i = 0; i < kMsgsPerThread; ++i) {
-          log.info("ts=" + now_iso8601_ns() + ", T=" + std::to_string(t) + " i=" + std::to_string(i));
+          log.info("ts=" + now_iso8601_ns() + ", T=" + std::to_string(t) +
+                   " i=" + std::to_string(i));
         }
       });
     }
     for (auto& th : workers)
       th.join();
 
-    // 여기서 스코프 종료되면 ~Logger(): 워커 join + FileSink flush/close
     logger->shutdown();
   }
 
-  // 파일 라인 수 집계 (메타데이터 지연 대비 재시도)
   uint64_t file_lines = 0;
   for (int i = 0; i < 10; ++i) {
     file_lines = count_lines_all(tmp.path, stem, ext);
@@ -484,5 +474,5 @@ TEST_F(LoggerTest, ConcurrentWriteAndRotationLineCountWithNoCounter) {
 
   EXPECT_EQ(file_lines, expected);
   auto files = list_log_files(tmp.path, stem, ext);
-  EXPECT_GE(files.size(), 2u);  // 로테이션 확인
+  EXPECT_GE(files.size(), 2u);
 }

@@ -46,4 +46,7 @@ target_link_libraries(Fix8Schema PUBLIC
         crypto
 )
 
-target_compile_options(Fix8Schema PRIVATE -Wno-missing-field-initializers -Wno-error=unused-parameter)
+target_compile_options(Fix8Schema PRIVATE
+    -Wno-missing-field-initializers
+    -Wno-unused-parameter
+)

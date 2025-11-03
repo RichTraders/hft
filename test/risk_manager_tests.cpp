@@ -20,16 +20,22 @@ using namespace trading;
 using namespace common;
 
 class RiskManagerTest : public ::testing::Test {
+public:
+  static Logger* logger;
 protected:
   PositionKeeper* keeper_;
-  Logger* logger_;
+  
   TradeEngineCfgHashMap* ticker_cfg_;
   RiskManager* rm_ = nullptr;
 
+  static void SetUpTestSuite() {
+    logger = new Logger();
+  }
+
   void SetUp() override {
     INI_CONFIG.load("resources/config.ini");
-    logger_ = new Logger();
-    keeper_ = new PositionKeeper(logger_);
+    
+    keeper_ = new PositionKeeper(logger);
 
     TradeEngineCfg cfg;
     cfg.risk_cfg_.max_order_size_ = Qty{10};
@@ -38,16 +44,19 @@ protected:
 
     ticker_cfg_ = new TradeEngineCfgHashMap{{INI_CONFIG.get("meta", "ticker"), cfg}};
 
-    rm_ = new RiskManager(logger_, keeper_, *ticker_cfg_);
+    rm_ = new RiskManager(logger, keeper_, *ticker_cfg_);
+  }
+  static void TearDownTestSuite() {
+    delete logger;
   }
 
   void TearDown() override {
     delete keeper_;
-    delete logger_;
     delete ticker_cfg_;
     delete rm_;
   }
 };
+Logger* RiskManagerTest::logger;
 
 TEST_F(RiskManagerTest, OrderTooLarge) {
   auto result = rm_->checkPreTradeRisk(INI_CONFIG.get("meta", "ticker"),

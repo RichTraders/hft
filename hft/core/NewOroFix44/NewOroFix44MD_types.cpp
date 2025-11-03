@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-26 15:49:22 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-11-03 15:42:15 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -224,6 +224,8 @@ const NewOroFix44MD_BaseEntry::Pair fldpairs[]
    { 1003, { Type2Type<NewOroFix44MD::TradeID>(), "TradeID", 1003 } },
    { 1140, { Type2Type<NewOroFix44MD::MaxTradeVol>(), "MaxTradeVol", 1140 } },
    { 2446, { Type2Type<NewOroFix44MD::AggressorSide, char>(), "AggressorSide", 2446, &NewOroFix44MD::realmbases[12] } },
+   { 2551, { Type2Type<NewOroFix44MD::StartPriceRange>(), "StartPriceRange", 2551 } },
+   { 2552, { Type2Type<NewOroFix44MD::EndPriceRange>(), "EndPriceRange", 2552 } },
    { 6136, { Type2Type<NewOroFix44MD::ReqID>(), "ReqID", 6136 } },
    { 25000, { Type2Type<NewOroFix44MD::RecvWindow>(), "RecvWindow", 25000 } },
    { 25003, { Type2Type<NewOroFix44MD::NoLimitIndicators>(), "NoLimitIndicators", 25003 } },
@@ -241,7 +243,7 @@ const NewOroFix44MD_BaseEntry::Pair fldpairs[]
    { 25042, { Type2Type<NewOroFix44MD::MarketMinQtyIncrement>(), "MarketMinQtyIncrement", 25042 } },
    { 25043, { Type2Type<NewOroFix44MD::FirstBookUpdateID>(), "FirstBookUpdateID", 25043 } },
    { 25044, { Type2Type<NewOroFix44MD::LastBookUpdateID>(), "LastBookUpdateID", 25044 } }
-}; // 61
+}; // 63
 } // namespace NewOroFix44MD
 
 } // namespace FIX8

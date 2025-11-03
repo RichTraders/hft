@@ -7,6 +7,26 @@ resources/test_config.ini (for test)
 
 resources/private.pem (pem key auth)
 
+# FIX8 Schema Compilation
+
+To compile FIX protocol schemas using fix8, navigate to the schema directory and run:
+
+```bash
+cd hft/core/NewOroFix44
+
+# Compile Market Data schema
+f8c -p NewOroFix44MD -n NewOroFix44MD -o . fix-md.xml
+
+# Compile Order Entry schema
+f8c -p NewOroFix44OE -n NewOroFix44OE -o . fix-oe.xml
+```
+
+This generates the necessary C++ source files (*_types.hpp, *_types.cpp, *_traits.cpp, *_router.hpp, *_classes.hpp, *_classes.cpp) for FIX protocol handling.
+
+# config.ini example
+Need resources/config.ini file like below.
+Thread name is required for cpu affinity.
+
 ```
 [auth]
 md_address = {MARKET_DATA_ADDRESS}

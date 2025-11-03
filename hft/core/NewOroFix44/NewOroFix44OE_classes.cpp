@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-26 15:49:19 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-11-03 14:30:15 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -94,7 +94,8 @@ const char *cn[] // Component names
    "",
    "ListTriggeringInstruction", // 1
    "NewOrder", // 2
-   "TriggeringInstruction", // 3
+   "PegInstructions", // 3
+   "TriggeringInstruction", // 4
 };
 
 } // namespace
@@ -131,7 +132,7 @@ extern const NewOroFix44OE_BaseEntry::Pair fldpairs[];
 const F8MetaCntx& ctx() // avoid SIOF
 {
    static const NewOroFix44OE_BaseMsgEntry bme(msgpairs, 21);
-   static const NewOroFix44OE_BaseEntry be(fldpairs, 108);
+   static const NewOroFix44OE_BaseEntry be(fldpairs, 113);
    static const F8MetaCntx _ctx(4400, bme, be, cn, "FIX.4.4");
    return _ctx;
 }

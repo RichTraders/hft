@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-26 15:49:19 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-11-03 14:30:15 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -103,9 +103,9 @@ const char OrdStatus_realm[]
 const char *OrdStatus_descriptions[]  
    { "NEW", "PARTIALLY_FILLED", "FILLED", "CANCELED", "PENDING_CANCEL", "REJECTED", "PENDING_NEW", "EXPIRED" };
 const char OrdType_realm[]  
-   { '1', '2', '3', '4' };
+   { '1', '2', '3', '4', 'P' };
 const char *OrdType_descriptions[]  
-   { "MARKET", "LIMIT", "STOP", "STOP_LIMIT" };
+   { "MARKET", "LIMIT", "STOP", "STOP_LIMIT", "PEGGED" };
 const char Side_realm[]  
    { '1', '2' };
 const char *Side_descriptions[]  
@@ -166,10 +166,22 @@ const f8String MatchType_realm[]
    { "1", "4" };
 const char *MatchType_descriptions[]  
    { "ONE_PARTY_TRADE_REPORT", "AUTO_MATCH" };
+const int PegMoveType_realm[]  
+   { 1 };
+const char *PegMoveType_descriptions[]  
+   { "FIXED" };
+const char PegOffsetType_realm[]  
+   { '3' };
+const char *PegOffsetType_descriptions[]  
+   { "PRICE_TIER" };
 const char AggressorIndicator_realm[]  
    { 'N', 'Y' };
 const char *AggressorIndicator_descriptions[]  
    { "ORDER_INITIATOR_IS_PASSIVE", "ORDER_INITIATOR_IS_AGGRESSOR" };
+const char PegPriceType_realm[]  
+   { '4', '5' };
+const char *PegPriceType_descriptions[]  
+   { "MARKET_PEG", "PRIMARY_PEG" };
 const char TriggerType_realm[]  
    { '4' };
 const char *TriggerType_descriptions[]  
@@ -246,7 +258,7 @@ const RealmBase realmbases[]
    { reinterpret_cast<const void *>(ExecInst_realm), RealmBase::dt_set, FieldTrait::ft_char, 1, ExecInst_descriptions },
    { reinterpret_cast<const void *>(MsgType_realm), RealmBase::dt_set, FieldTrait::ft_string, 19, MsgType_descriptions },
    { reinterpret_cast<const void *>(OrdStatus_realm), RealmBase::dt_set, FieldTrait::ft_char, 8, OrdStatus_descriptions },
-   { reinterpret_cast<const void *>(OrdType_realm), RealmBase::dt_set, FieldTrait::ft_char, 4, OrdType_descriptions },
+   { reinterpret_cast<const void *>(OrdType_realm), RealmBase::dt_set, FieldTrait::ft_char, 5, OrdType_descriptions },
    { reinterpret_cast<const void *>(Side_realm), RealmBase::dt_set, FieldTrait::ft_char, 2, Side_descriptions },
    { reinterpret_cast<const void *>(TimeInForce_realm), RealmBase::dt_set, FieldTrait::ft_char, 3, TimeInForce_descriptions },
    { reinterpret_cast<const void *>(EncryptMethod_realm), RealmBase::dt_set, FieldTrait::ft_int, 1, EncryptMethod_descriptions },
@@ -262,7 +274,10 @@ const RealmBase realmbases[]
    { reinterpret_cast<const void *>(MassCancelResponse_realm), RealmBase::dt_set, FieldTrait::ft_char, 2, MassCancelResponse_descriptions },
    { reinterpret_cast<const void *>(MassCancelRejectReason_realm), RealmBase::dt_set, FieldTrait::ft_int, 1, MassCancelRejectReason_descriptions },
    { reinterpret_cast<const void *>(MatchType_realm), RealmBase::dt_set, FieldTrait::ft_string, 2, MatchType_descriptions },
+   { reinterpret_cast<const void *>(PegMoveType_realm), RealmBase::dt_set, FieldTrait::ft_int, 1, PegMoveType_descriptions },
+   { reinterpret_cast<const void *>(PegOffsetType_realm), RealmBase::dt_set, FieldTrait::ft_char, 1, PegOffsetType_descriptions },
    { reinterpret_cast<const void *>(AggressorIndicator_realm), RealmBase::dt_set, FieldTrait::ft_Boolean, 2, AggressorIndicator_descriptions },
+   { reinterpret_cast<const void *>(PegPriceType_realm), RealmBase::dt_set, FieldTrait::ft_char, 2, PegPriceType_descriptions },
    { reinterpret_cast<const void *>(TriggerType_realm), RealmBase::dt_set, FieldTrait::ft_char, 1, TriggerType_descriptions },
    { reinterpret_cast<const void *>(TriggerAction_realm), RealmBase::dt_set, FieldTrait::ft_char, 1, TriggerAction_descriptions },
    { reinterpret_cast<const void *>(TriggerPriceType_realm), RealmBase::dt_set, FieldTrait::ft_char, 1, TriggerPriceType_descriptions },
@@ -335,6 +350,7 @@ const NewOroFix44OE_BaseEntry::Pair fldpairs[]
    { 150, { Type2Type<NewOroFix44OE::ExecType, char>(), "ExecType", 150, &NewOroFix44OE::realmbases[11] } },
    { 151, { Type2Type<NewOroFix44OE::LeavesQty>(), "LeavesQty", 151 } },
    { 152, { Type2Type<NewOroFix44OE::CashOrderQty>(), "CashOrderQty", 152 } },
+   { 211, { Type2Type<NewOroFix44OE::PegOffsetValue>(), "PegOffsetValue", 211 } },
    { 371, { Type2Type<NewOroFix44OE::RefTagID>(), "RefTagID", 371 } },
    { 372, { Type2Type<NewOroFix44OE::RefMsgType>(), "RefMsgType", 372 } },
    { 373, { Type2Type<NewOroFix44OE::SessionRejectReason, int>(), "SessionRejectReason", 373, &NewOroFix44OE::realmbases[12] } },
@@ -348,39 +364,43 @@ const NewOroFix44OE_BaseEntry::Pair fldpairs[]
    { 553, { Type2Type<NewOroFix44OE::Username>(), "Username", 553 } },
    { 574, { Type2Type<NewOroFix44OE::MatchType, f8String>(), "MatchType", 574, &NewOroFix44OE::realmbases[19] } },
    { 636, { Type2Type<NewOroFix44OE::WorkingIndicator>(), "WorkingIndicator", 636 } },
+   { 835, { Type2Type<NewOroFix44OE::PegMoveType, int>(), "PegMoveType", 835, &NewOroFix44OE::realmbases[20] } },
+   { 836, { Type2Type<NewOroFix44OE::PegOffsetType, char>(), "PegOffsetType", 836, &NewOroFix44OE::realmbases[21] } },
+   { 839, { Type2Type<NewOroFix44OE::PeggedPrice>(), "PeggedPrice", 839 } },
    { 847, { Type2Type<NewOroFix44OE::TargetStrategy>(), "TargetStrategy", 847 } },
    { 1003, { Type2Type<NewOroFix44OE::TradeID>(), "TradeID", 1003 } },
-   { 1057, { Type2Type<NewOroFix44OE::AggressorIndicator, char>(), "AggressorIndicator", 1057, &NewOroFix44OE::realmbases[20] } },
-   { 1100, { Type2Type<NewOroFix44OE::TriggerType, char>(), "TriggerType", 1100, &NewOroFix44OE::realmbases[21] } },
-   { 1101, { Type2Type<NewOroFix44OE::TriggerAction, char>(), "TriggerAction", 1101, &NewOroFix44OE::realmbases[22] } },
+   { 1057, { Type2Type<NewOroFix44OE::AggressorIndicator, char>(), "AggressorIndicator", 1057, &NewOroFix44OE::realmbases[22] } },
+   { 1094, { Type2Type<NewOroFix44OE::PegPriceType, char>(), "PegPriceType", 1094, &NewOroFix44OE::realmbases[23] } },
+   { 1100, { Type2Type<NewOroFix44OE::TriggerType, char>(), "TriggerType", 1100, &NewOroFix44OE::realmbases[24] } },
+   { 1101, { Type2Type<NewOroFix44OE::TriggerAction, char>(), "TriggerAction", 1101, &NewOroFix44OE::realmbases[25] } },
    { 1102, { Type2Type<NewOroFix44OE::TriggerPrice>(), "TriggerPrice", 1102 } },
-   { 1107, { Type2Type<NewOroFix44OE::TriggerPriceType, char>(), "TriggerPriceType", 1107, &NewOroFix44OE::realmbases[23] } },
-   { 1109, { Type2Type<NewOroFix44OE::TriggerPriceDirection, char>(), "TriggerPriceDirection", 1109, &NewOroFix44OE::realmbases[24] } },
-   { 1385, { Type2Type<NewOroFix44OE::ContingencyType, int>(), "ContingencyType", 1385, &NewOroFix44OE::realmbases[25] } },
-   { 1386, { Type2Type<NewOroFix44OE::ListRejectReason, int>(), "ListRejectReason", 1386, &NewOroFix44OE::realmbases[26] } },
+   { 1107, { Type2Type<NewOroFix44OE::TriggerPriceType, char>(), "TriggerPriceType", 1107, &NewOroFix44OE::realmbases[26] } },
+   { 1109, { Type2Type<NewOroFix44OE::TriggerPriceDirection, char>(), "TriggerPriceDirection", 1109, &NewOroFix44OE::realmbases[27] } },
+   { 1385, { Type2Type<NewOroFix44OE::ContingencyType, int>(), "ContingencyType", 1385, &NewOroFix44OE::realmbases[28] } },
+   { 1386, { Type2Type<NewOroFix44OE::ListRejectReason, int>(), "ListRejectReason", 1386, &NewOroFix44OE::realmbases[29] } },
    { 6136, { Type2Type<NewOroFix44OE::ReqID>(), "ReqID", 6136 } },
    { 7940, { Type2Type<NewOroFix44OE::StrategyID>(), "StrategyID", 7940 } },
    { 9406, { Type2Type<NewOroFix44OE::DropCopyFlag>(), "DropCopyFlag", 9406 } },
    { 25000, { Type2Type<NewOroFix44OE::RecvWindow>(), "RecvWindow", 25000 } },
-   { 25001, { Type2Type<NewOroFix44OE::SelfTradePreventionMode, char>(), "SelfTradePreventionMode", 25001, &NewOroFix44OE::realmbases[27] } },
-   { 25002, { Type2Type<NewOroFix44OE::CancelRestrictions, int>(), "CancelRestrictions", 25002, &NewOroFix44OE::realmbases[28] } },
+   { 25001, { Type2Type<NewOroFix44OE::SelfTradePreventionMode, char>(), "SelfTradePreventionMode", 25001, &NewOroFix44OE::realmbases[30] } },
+   { 25002, { Type2Type<NewOroFix44OE::CancelRestrictions, int>(), "CancelRestrictions", 25002, &NewOroFix44OE::realmbases[31] } },
    { 25003, { Type2Type<NewOroFix44OE::NoLimitIndicators>(), "NoLimitIndicators", 25003 } },
-   { 25004, { Type2Type<NewOroFix44OE::LimitType, char>(), "LimitType", 25004, &NewOroFix44OE::realmbases[29] } },
+   { 25004, { Type2Type<NewOroFix44OE::LimitType, char>(), "LimitType", 25004, &NewOroFix44OE::realmbases[32] } },
    { 25005, { Type2Type<NewOroFix44OE::LimitCount>(), "LimitCount", 25005 } },
    { 25006, { Type2Type<NewOroFix44OE::LimitMax>(), "LimitMax", 25006 } },
    { 25007, { Type2Type<NewOroFix44OE::LimitResetInterval>(), "LimitResetInterval", 25007 } },
-   { 25008, { Type2Type<NewOroFix44OE::LimitResetIntervalResolution, char>(), "LimitResetIntervalResolution", 25008, &NewOroFix44OE::realmbases[30] } },
+   { 25008, { Type2Type<NewOroFix44OE::LimitResetIntervalResolution, char>(), "LimitResetIntervalResolution", 25008, &NewOroFix44OE::realmbases[33] } },
    { 25009, { Type2Type<NewOroFix44OE::TriggerTrailingDeltaBips>(), "TriggerTrailingDeltaBips", 25009 } },
    { 25010, { Type2Type<NewOroFix44OE::NoListTriggeringInstructions>(), "NoListTriggeringInstructions", 25010 } },
-   { 25011, { Type2Type<NewOroFix44OE::ListTriggerType, char>(), "ListTriggerType", 25011, &NewOroFix44OE::realmbases[31] } },
+   { 25011, { Type2Type<NewOroFix44OE::ListTriggerType, char>(), "ListTriggerType", 25011, &NewOroFix44OE::realmbases[34] } },
    { 25012, { Type2Type<NewOroFix44OE::ListTriggerTriggerIndex>(), "ListTriggerTriggerIndex", 25012 } },
-   { 25013, { Type2Type<NewOroFix44OE::ListTriggerAction, char>(), "ListTriggerAction", 25013, &NewOroFix44OE::realmbases[32] } },
+   { 25013, { Type2Type<NewOroFix44OE::ListTriggerAction, char>(), "ListTriggerAction", 25013, &NewOroFix44OE::realmbases[35] } },
    { 25014, { Type2Type<NewOroFix44OE::ClListID>(), "ClListID", 25014 } },
    { 25015, { Type2Type<NewOroFix44OE::OrigClListID>(), "OrigClListID", 25015 } },
    { 25016, { Type2Type<NewOroFix44OE::ErrorCode>(), "ErrorCode", 25016 } },
    { 25017, { Type2Type<NewOroFix44OE::CumQuoteQty>(), "CumQuoteQty", 25017 } },
    { 25018, { Type2Type<NewOroFix44OE::OrderCreationTime>(), "OrderCreationTime", 25018 } },
-   { 25021, { Type2Type<NewOroFix44OE::WorkingFloor, int>(), "WorkingFloor", 25021, &NewOroFix44OE::realmbases[33] } },
+   { 25021, { Type2Type<NewOroFix44OE::WorkingFloor, int>(), "WorkingFloor", 25021, &NewOroFix44OE::realmbases[36] } },
    { 25022, { Type2Type<NewOroFix44OE::TrailingTime>(), "TrailingTime", 25022 } },
    { 25023, { Type2Type<NewOroFix44OE::WorkingTime>(), "WorkingTime", 25023 } },
    { 25024, { Type2Type<NewOroFix44OE::PreventedMatchID>(), "PreventedMatchID", 25024 } },
@@ -392,13 +412,13 @@ const NewOroFix44OE_BaseEntry::Pair fldpairs[]
    { 25030, { Type2Type<NewOroFix44OE::PreventedQty>(), "PreventedQty", 25030 } },
    { 25031, { Type2Type<NewOroFix44OE::LastPreventedQty>(), "LastPreventedQty", 25031 } },
    { 25032, { Type2Type<NewOroFix44OE::SOR>(), "SOR", 25032 } },
-   { 25033, { Type2Type<NewOroFix44OE::OrderCancelRequestAndNewOrderSingleMode, int>(), "OrderCancelRequestAndNewOrderSingleMode", 25033, &NewOroFix44OE::realmbases[34] } },
+   { 25033, { Type2Type<NewOroFix44OE::OrderCancelRequestAndNewOrderSingleMode, int>(), "OrderCancelRequestAndNewOrderSingleMode", 25033, &NewOroFix44OE::realmbases[37] } },
    { 25034, { Type2Type<NewOroFix44OE::CancelClOrdID>(), "CancelClOrdID", 25034 } },
-   { 25035, { Type2Type<NewOroFix44OE::MessageHandling, int>(), "MessageHandling", 25035, &NewOroFix44OE::realmbases[35] } },
-   { 25036, { Type2Type<NewOroFix44OE::ResponseMode, int>(), "ResponseMode", 25036, &NewOroFix44OE::realmbases[36] } },
+   { 25035, { Type2Type<NewOroFix44OE::MessageHandling, int>(), "MessageHandling", 25035, &NewOroFix44OE::realmbases[38] } },
+   { 25036, { Type2Type<NewOroFix44OE::ResponseMode, int>(), "ResponseMode", 25036, &NewOroFix44OE::realmbases[39] } },
    { 25037, { Type2Type<NewOroFix44OE::UUID>(), "UUID", 25037 } },
-   { 25038, { Type2Type<NewOroFix44OE::OrderRateLimitExceededMode, int>(), "OrderRateLimitExceededMode", 25038, &NewOroFix44OE::realmbases[37] } }
-}; // 108
+   { 25038, { Type2Type<NewOroFix44OE::OrderRateLimitExceededMode, int>(), "OrderRateLimitExceededMode", 25038, &NewOroFix44OE::realmbases[40] } }
+}; // 113
 } // namespace NewOroFix44OE
 
 } // namespace FIX8

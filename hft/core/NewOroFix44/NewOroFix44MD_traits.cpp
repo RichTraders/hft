@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-26 15:49:21 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-11-03 15:42:15 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -163,7 +163,7 @@ const MsgType MarketDataRequest::NoMDEntryTypes::_msgtype("NoMDEntryTypes");
 //-------------------------------------------------------------------------------------------------
 const FieldTrait MarketDataSnapshot::_traits[]
 {
-   {  55,15,  2,  0,0x05}, { 262,15,  1,  0,0x05}, { 268, 1,  4,  0,0x0d}, {25044, 1,  3,  0,0x04}
+   {  55,15,  2,  0,0x05}, { 262,15,  1,  0,0x05}, { 268, 1,  4,  0,0x0d}, {25044,15,  3,  0,0x04}
 };
 const FieldTrait_Hash_Array MarketDataSnapshot::_ftha(MarketDataSnapshot::_traits, MarketDataSnapshot::_fieldcnt);
 const MsgType MarketDataSnapshot::_msgtype("W");
@@ -187,7 +187,7 @@ const FieldTrait MarketDataIncrementalRefresh::NoMDEntries::_traits[]
 {
    {  55,15,  5,  0,0x04}, {  60,22,  6,  0,0x04}, { 269, 7,  4,  0,0x05}, { 270,11,  2,  0,0x05},
    { 271,10,  3,  0,0x04}, { 279, 7,  1,  0,0x05}, {1003, 1,  7,  0,0x04}, {2446, 7,  8,  0,0x04},
-   {25043, 1,  9,  0,0x04}, {25044, 1, 10,  0,0x04}
+   {25043,15,  9,  0,0x04}, {25044,15, 10,  0,0x04}
 };
 const FieldTrait_Hash_Array 
    MarketDataIncrementalRefresh::NoMDEntries::_ftha(MarketDataIncrementalRefresh::NoMDEntries::_traits, NoMDEntries::_fieldcnt);
@@ -226,7 +226,7 @@ const MsgType MarketDataRequestReject::_msgtype("Y");
 const FieldTrait header::_traits[]
 {
    {   8,15,  1,  0,0x64}, {   9, 2,  2,  0,0x64}, {  34, 4,  6,  0,0x05}, {  35,15,  3,  0,0x44},
-   {  49,15,  4,  0,0x05}, {  52,22,  7,  0,0x05}, {  56,15,  5,  0,0x05}, {25000, 1,  8,  0,0x04}
+   {  49,15,  4,  0,0x05}, {  52,22,  7,  0,0x05}, {  56,15,  5,  0,0x05}, {25000, 9,  8,  0,0x04}
 };
 const FieldTrait_Hash_Array header::_ftha(header::_traits, header::_fieldcnt);
 const MsgType header::_msgtype("header");
@@ -254,9 +254,9 @@ const MsgType InstrumentList::_msgtype("y");
 //-------------------------------------------------------------------------------------------------
 const FieldTrait InstrumentList::NoRelatedSym::_traits[]
 {
-   {  15,15,  2,  0,0x05}, {  55,15,  1,  0,0x05}, { 562,10,  3,  0,0x05}, { 969,11,  9,  0,0x05},
-   {1140,10,  4,  0,0x05}, {25039,10,  5,  0,0x05}, {25040,10,  6,  0,0x05}, {25041,10,  7,  0,0x05},
-   {25042,10,  8,  0,0x05}
+   {  15,15,  2,  0,0x05}, {  55,15,  1,  0,0x05}, { 562,10,  3,  0,0x04}, { 969,11, 11,  0,0x04},
+   {1140,10,  4,  0,0x04}, {2551,11,  9,  0,0x04}, {2552,11, 10,  0,0x04}, {25039,10,  5,  0,0x04},
+   {25040,10,  6,  0,0x04}, {25041,10,  7,  0,0x04}, {25042,10,  8,  0,0x04}
 };
 const FieldTrait_Hash_Array 
    InstrumentList::NoRelatedSym::_ftha(InstrumentList::NoRelatedSym::_traits, NoRelatedSym::_fieldcnt);

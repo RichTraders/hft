@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-26 15:49:19 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-11-03 14:30:15 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -154,13 +154,13 @@ public:
 };
 
 //-------------------------------------------------------------------------------------------------
-/// ExecutionReport (8), application, 53 fields, 1 group.
+/// ExecutionReport (8), application, 58 fields, 1 group.
 class ExecutionReport : public Message
 {
    static F8_NewOroFix44OE_API const FieldTrait _traits[];
    static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
    static F8_NewOroFix44OE_API const MsgType _msgtype;
-   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 53;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 58;
 
 public:
    explicit ExecutionReport(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha)
@@ -248,13 +248,13 @@ public:
 };
 
 //-------------------------------------------------------------------------------------------------
-/// NewOrderSingle (D), application, 20 fields, 0 groups.
+/// NewOrderSingle (D), application, 24 fields, 0 groups.
 class NewOrderSingle : public Message
 {
    static F8_NewOroFix44OE_API const FieldTrait _traits[];
    static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
    static F8_NewOroFix44OE_API const MsgType _msgtype;
-   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 20;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 24;
 
 public:
    explicit NewOrderSingle(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}
@@ -286,14 +286,14 @@ public:
    GroupBase *create_nested_group(unsigned short fnum) const
       { return fnum == 73 ? new NoOrders : nullptr; }
 
-   /// NoOrders (73), application, 20 fields, 1 group, is unique, hash: 0x13d63e62
+   /// NoOrders (73), application, 24 fields, 1 group, is unique, hash: 0xc1156fdc
    // NewOrderList::NoOrders
    class NoOrders : public GroupBase // depth: 1
    {
       static F8_NewOroFix44OE_API const FieldTrait _traits[];
       static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha;
       static F8_NewOroFix44OE_API const MsgType _msgtype;
-      static const unsigned _fieldcnt = 20;
+      static const unsigned _fieldcnt = 24;
 
    public:
       enum { _fnum = 73 };
@@ -456,13 +456,13 @@ public:
 };
 
 //-------------------------------------------------------------------------------------------------
-/// OrderCancelRequestAndNewOrderSingle (XCN), application, 25 fields, 0 groups.
+/// OrderCancelRequestAndNewOrderSingle (XCN), application, 29 fields, 0 groups.
 class OrderCancelRequestAndNewOrderSingle : public Message
 {
    static F8_NewOroFix44OE_API const FieldTrait _traits[];
    static F8_NewOroFix44OE_API const FieldTrait_Hash_Array _ftha; 
    static F8_NewOroFix44OE_API const MsgType _msgtype;
-   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 25;
+   static F8_NewOroFix44OE_API const unsigned _fieldcnt = 29;
 
 public:
    explicit OrderCancelRequestAndNewOrderSingle(bool deepctor=true) : Message(ctx(), _msgtype(), _traits, _fieldcnt, &_ftha) {}

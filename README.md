@@ -57,11 +57,13 @@ minimum_order_qty = {MINIUM_ORDER_QTY}
 minimum_order_time_gap = {MININUM_GAP_BETWEEN_ORDERS}
 
 [strategy]
-algorithm = {NOT_USED_NOW}
+algorithm = {STRATEGY_NAME: maker or taker}
 position_variance = {MAKER_POSITION_VARIANCE}
 variance_denominator = {MAKER_VARIANCE_DENOMINATOR}
 enter_threshold = {MAKER_ENTER_THRESHOLD}
 exit_threshold = {MAKER_EXIT_THRESHOLD}
+vwap_size = {VWAP_WINDOW_SIZE}
+obi_level = {ORDER_BOOK_IMBALANCE_LEVEL}
 
 [cpu_init]
 clock = {CPU_BASE_CLOCK}
@@ -184,4 +186,53 @@ sudo supervisorctl stop hft
 cmake -S . -B test-build -DENABLE_ASAN=ON
 cmake --build test-build -j
 ASAN_OPTIONS=allocator_may_return_null=0:detect_leaks=1 ctest --test-dir test-build/test -V
+```
+
+# Strategy System
+
+The HFT system supports dynamic strategy loading via configuration. Strategies are selected at runtime based on the `algorithm` field in `config.ini`:
+
+Available strategies:
+- `maker`: Market maker strategy
+- `taker`: Liquidity taker strategy
+
+To add a new strategy:
+1. Create strategy class inheriting from `BaseStrategy`
+2. Implement `on_orderbook_updated()`, `on_trade_updated()`, `on_order_updated()`
+3. Create registration function using `Registrar<YourStrategy>`
+4. **Add registration call to `register_all_strategies()` in `strategies.hpp`**
+
+Example `strategies.hpp`:
+```cpp
+#include "liquid_taker.h"
+#include "market_maker.h"
+#include "your_new_strategy.h"  // Add your strategy header
+
+namespace trading {
+inline void register_all_strategies() {
+  register_market_maker_strategy();
+  register_liquid_taker_strategy();
+  register_your_new_strategy();  // Add your registration function
+}
+}
+```
+
+# Testing Notes
+
+When writing tests that use `Logger`, declare the Logger instance globally or as a static fixture member to avoid thread-local storage issues with ProducerTokens. Logger uses thread_local storage for performance optimization, so creating and destroying Logger instances within individual test scopes can cause use-after-free issues.
+
+**Important**: Static member variables must be defined outside the class declaration to avoid linker errors (`undefined reference`).
+
+Example:
+```cpp
+class NeworoTest : public ::testing::Test {
+ protected:
+  static std::unique_ptr<Logger> logger;
+  void SetUp() override {
+    logger = std::make_unique<Logger>();
+  }
+};
+
+// Static member definition (required!)
+std::unique_ptr<Logger> NeworoTest::logger;
 ```

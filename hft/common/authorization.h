@@ -10,16 +10,30 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#ifndef AUTHORIZATION_H
-#define AUTHORIZATION_H
+#pragma once
+#include <string>
 
-struct Authorization {
-  std::string md_address;
-  std::string oe_address;
-  int port;
-  std::string api_key;
-  std::string pem_file_path;
-  std::string private_password;
+#include "singleton.h"
+
+namespace common {
+class Authorization : public Singleton<Authorization> {
+ public:
+  Authorization();
+  [[nodiscard]] std::string get_md_address() const;
+  [[nodiscard]] std::string get_od_address() const;
+  [[nodiscard]] int get_port() const;
+  [[nodiscard]] std::string get_api_key() const;
+  [[nodiscard]] std::string get_pem_file_path() const;
+  [[nodiscard]] std::string get_private_password() const;
+
+ private:
+  std::string md_address_;
+  std::string oe_address_;
+  int port_;
+  std::string api_key_;
+  std::string pem_file_path_;
+  std::string private_password_;
 };
+}  // namespace common
 
-#endif  //AUTHORIZATION_H
+#define AUTHORIZATION common::Authorization::instance()

@@ -13,7 +13,10 @@
 #ifndef INI_READER_H
 #define INI_READER_H
 
-class IniConfig {
+#include "singleton.h"
+
+namespace common {
+class IniConfig : public Singleton<IniConfig> {
  public:
   bool load(const std::string& filename) {
     std::ifstream file(filename);
@@ -54,20 +57,30 @@ class IniConfig {
   }
 
   // NOLINTBEGIN(bugprone-easily-swappable-parameters,-warnings-as-errors)
-  std::string get(const std::string_view section, const std::string_view key,
-                  const std::string_view def = "") const {
+  void set(const std::string& section, const std::string& key,
+           const std::string& value) {
+    const std::string full_key = std::string(section) + "." + std::string(key);
+    data_[full_key] = value;
+  }
+  [[nodiscard]] std::string get(const std::string_view section,
+                                const std::string_view key,
+                                const std::string_view def = "") const {
     const std::string full_key = std::string(section) + "." + std::string(key);
     if (const auto iter = data_.find(full_key); iter != data_.end()) {
       return iter->second;
     }
     return std::string(def);
   }
+
   // NOLINTEND(bugprone-easily-swappable-parameters,-warnings-as-errors)
 
   int get_int(const std::string_view section, const std::string_view key,
               const int def = 0) const {
     try {
-      return std::stoi(get(section, key));
+      auto value = get(section, key);
+      std::erase(value, '\'');
+      std::erase(value, ',');
+      return std::stoi(value);
     } catch (...) {
       return def;
     }
@@ -76,7 +89,10 @@ class IniConfig {
   uint64_t get_uint64_t(const std::string_view section,
                         const std::string_view key, const int def = 0) const {
     try {
-      return std::stoull(get(section, key));
+      auto value = get(section, key);
+      std::erase(value, '\'');
+      std::erase(value, ',');
+      return std::stoull(value);
     } catch (...) {
       return def;
     }
@@ -85,7 +101,10 @@ class IniConfig {
   double get_double(const std::string_view section, const std::string_view key,
                     const double def = 0.0) const {
     try {
-      return std::stod(get(section, key));
+      auto value = get(section, key);
+      std::erase(value, '\'');
+      std::erase(value, ',');
+      return std::stod(value);
     } catch (...) {
       return def;
     }
@@ -112,5 +131,8 @@ class IniConfig {
               str.end());
   }
 };
+}  // namespace common
+
+#define INI_CONFIG common::IniConfig::instance()
 
 #endif  //INI_READER_H

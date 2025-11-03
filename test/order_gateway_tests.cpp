@@ -9,16 +9,18 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
+#include <fix8/f8includes.hpp>
 #include "../hft/core/NewOroFix44/response_manager.h"
-#include "gtest/gtest.h"
+#include "fix_oe_app.h"
 #include "gmock/gmock.h"
-#include "order_gateway.h"
+#include "gtest/gtest.h"
 #include "ini_config.hpp"
 #include "logger.h"
-#include "fix_oe_app.h"
+#include "order_gateway.h"
 #include "trade_engine.h"
 #include "types.h"
-#include <fix8/f8includes.hpp>
+
+#include "strategy/strategies.hpp"
 
 using namespace core;
 using namespace common;
@@ -27,24 +29,17 @@ using namespace trading;
 int cl_order_id = 2075;
 
 class OrderGatewayTest : public ::testing::Test  {
+public:
+  static std::unique_ptr<Logger> logger;
 protected:
 
   static void SetUpTestSuite() {
-    IniConfig config;
-    config.load("resources/config.ini");
-    const Authorization authorization{
-      .md_address = config.get("auth", "md_address"),
-      .oe_address = config.get("auth", "oe_address"),
-      .port = config.get_int("auth", "port"),
-      .api_key = config.get("auth", "api_key"),
-      .pem_file_path = config.get("auth", "pem_file_path"),
-      .private_password = config.get("auth", "private_password")};
-
-    auto logger = std::make_unique<Logger>();
-
+    INI_CONFIG.load("resources/config.ini");
+    logger = std::make_unique<Logger>();
     TradeEngineCfgHashMap temp;
     TradeEngineCfg tempcfg;
-    temp.emplace("BTCUSDT", tempcfg);
+    temp.emplace(INI_CONFIG.get("meta", "ticker"), tempcfg);
+    register_all_strategies();
     market_update_data_pool_ = std::make_unique<MemoryPool<MarketUpdateData>>(1024);
     market_data_pool_ = std::make_unique<MemoryPool<MarketData>>(1024);
 
@@ -59,7 +54,7 @@ protected:
         logger.get(), execution_report_pool_.get(), order_cancel_reject_pool_.get(),
         order_mass_cancel_report_pool_.get());
 
-    order_gateway_= std::make_unique<trading::OrderGateway>(authorization, logger.get(), response_manager_.get());
+    order_gateway_= std::make_unique<trading::OrderGateway>(logger.get(), response_manager_.get());
     trade_engine_ = std::make_unique<TradeEngine>(logger.get(), market_update_data_pool_.get(),
                                                  market_data_pool_.get(), response_manager_.get(), temp);
 
@@ -89,13 +84,14 @@ public:
   static std::unique_ptr<OrderGateway> order_gateway_;
 
 };
+std::unique_ptr<Logger> OrderGatewayTest::logger;
 
 TEST_F(OrderGatewayTest, NewOrderSingle) {
   RequestCommon request;
 
   request.req_type = ReqeustType::kNewSingleOrderData;
   request.cl_order_id.value = cl_order_id;
-  request.symbol = "BTCUSDT";
+  request.symbol = INI_CONFIG.get("meta", "ticker");
   request.side = common::Side::kSell;
   request.order_qty.value = 0.01;
   request.price.value = 120000;
@@ -116,7 +112,7 @@ TEST_F(OrderGatewayTest, OrderCancel) {
   request.req_type = ReqeustType::kOrderCancelRequest;
   request.cl_order_id.value = cl_order_id + 1;
   request.orig_cl_order_id.value = cl_order_id;
-  request.symbol = "BTCUSDT";
+  request.symbol = INI_CONFIG.get("meta", "ticker");
 
   trade_engine_->send_request(request);
 
@@ -124,21 +120,11 @@ TEST_F(OrderGatewayTest, OrderCancel) {
 }
 
 TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
-  IniConfig config;
-  config.load("resources/config.ini");
-  const Authorization authorization{
-      .md_address = config.get("auth", "md_address"),
-      .oe_address = config.get("auth", "oe_address"),
-      .port = config.get_int("auth", "port"),
-      .api_key = config.get("auth", "api_key"),
-      .pem_file_path = config.get("auth", "pem_file_path"),
-      .private_password = config.get("auth", "private_password")};
-
   auto logger = std::make_unique<Logger>();
 
   TradeEngineCfgHashMap temp;
   TradeEngineCfg tempcfg;
-  temp.emplace("BTCUSDT", tempcfg);
+  temp.emplace(INI_CONFIG.get("meta", "ticker"), tempcfg);
   auto pool = std::make_unique<MemoryPool<MarketUpdateData>>(1024);
   auto pool2 = std::make_unique<MemoryPool<MarketData>>(1024);
 
@@ -152,7 +138,7 @@ TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
   auto response_manager = std::make_unique<ResponseManager>(
       logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
       order_mass_cancel_report_pool.get());
-  OrderGateway og(authorization, logger.get(), response_manager.get());
+  OrderGateway og(logger.get(), response_manager.get());
   auto trade_engine = new TradeEngine(logger.get(), pool.get(),
                                                pool2.get(), response_manager.get(), temp);
   og.init_trade_engine(trade_engine);
@@ -162,7 +148,7 @@ TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
 
   request.req_type = ReqeustType::kOrderMassCancelRequest;
   request.cl_order_id.value = cl_order_id;
-  request.symbol = "BTCUSDT";
+  request.symbol = INI_CONFIG.get("meta", "ticker");
 
   sleep(2);
 

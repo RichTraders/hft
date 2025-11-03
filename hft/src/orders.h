@@ -13,6 +13,7 @@
 #ifndef OM_ORDER_H
 #define OM_ORDER_H
 
+#include "ini_config.hpp"
 #include "types.h"
 
 namespace trading {
@@ -21,7 +22,9 @@ enum class OMOrderState : int8_t {
   kPendingNew = 1,
   kLive = 2,
   kPendingCancel = 3,
-  kDead = 4
+  kDead = 4,
+  kReserved = 5,
+  kCancelReserved = 6,
 };
 
 inline auto toString(OMOrderState side) -> std::string {
@@ -36,6 +39,10 @@ inline auto toString(OMOrderState side) -> std::string {
       return "DEAD";
     case OMOrderState::kInvalid:
       return "INVALID";
+    case OMOrderState::kReserved:
+      return "RESERVED";
+    case OMOrderState::kCancelReserved:
+      return "CANCEL_RESERVED";
   }
 
   return "UNKNOWN";
@@ -90,8 +97,6 @@ using OMOrderTickerSideHashMap =
     absl::flat_hash_map<std::string, OMOrderSideHashMap>;
 
 constexpr uint64_t kTicksInvalid = std::numeric_limits<uint64_t>::min();
-constexpr double kMinReplaceQtyDelta = 1e-9;
-constexpr int kMinReplaceTickDelta = 1;
 
 inline uint64_t to_ticks(double price, double tick) noexcept {
   return std::llround(price / tick);

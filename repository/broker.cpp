@@ -16,42 +16,42 @@
 #include "fix_md_app.h"
 #include "ini_config.hpp"
 
-constexpr int kKilo = 1024;
-constexpr int kThirty = 30;
-
 using common::FileSink;
 using common::LogLevel;
 
 Broker::Broker()
-    : pool_(std::make_unique<common::MemoryPool<MarketData>>(kMemoryPoolSize)),
-      log_(std::make_unique<common::Logger>()) {
+    : market_update_data_pool_(
+          std::make_unique<common::MemoryPool<MarketUpdateData>>(
+              kMarketUpdateDataMemoryPoolSize)),
+      market_data_pool_(
+          std::make_unique<common::MemoryPool<MarketData>>(kMemoryPoolSize)),
+      log_(std::make_unique<common::Logger>()),
+      log_producer_(log_->make_producer()) {
 
-  IniConfig config;
 #ifdef TEST_NET
-  config.load("resources/test_config.ini");
+  INI_CONFIG.load("resources/test_config.ini");
 #else
-  config.load("resources/config.ini");
+  INI_CONFIG.load("resources/config.ini");
 #endif
 
-  const Authorization authorization{
-      .md_address = config.get("auth", "md_address"),
-      .oe_address = config.get("auth", "oe_address"),
-      .port = config.get_int("auth", "port"),
-      .api_key = config.get("auth", "api_key"),
-      .pem_file_path = config.get("auth", "pem_file_path"),
-      .private_password = config.get("auth", "private_password")};
-
   app_ = std::make_unique<core::FixMarketDataApp>(
-      authorization, "BMDWATCH", "SPOT", log_.get(), pool_.get());
+      "BMDWATCH", "SPOT", log_.get(), market_data_pool_.get());
 
   log_->setLevel(LogLevel::kInfo);
   log_->clearSink();
-  log_->addSink(
-      std::make_unique<FileSink>("repository", kKilo * kKilo * kThirty));
+  log_->addSink(std::make_unique<common::FileSink>(
+      "repository", INI_CONFIG.get_int("log", "size")));
+  log_->addSink(std::make_unique<common::ConsoleSink>());
 
   app_->register_callback(
       "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });
-  app_->register_callback([this](auto&& msg) { on_subscribe(msg); });
+  app_->register_callback("Y", [this](auto&& msg) {
+    on_market_request_reject(std::forward<decltype(msg)>(msg));
+  });
+  app_->register_callback(
+      [this](auto&& str_msg, auto&& msg, auto&& event_type) {
+        on_subscribe(str_msg, msg, event_type);
+      });
   app_->register_callback("1", [this](auto&& msg) {
     on_heartbeat(std::forward<decltype(msg)>(msg));
   });
@@ -61,9 +61,14 @@ Broker::Broker()
 void Broker::on_login(FIX8::Message*) {
   std::cout << "login successful\n";
   const std::string message = app_->create_market_data_subscription_message(
-      "DEPTH_STREAM", "5000", "BTCUSDT");
-  std::cout << "snapshot : " << message << "\n";
+      "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
+      INI_CONFIG.get("meta", "ticker"), true);
+  std::cout << "Market subscription message : " << message << "\n";
   app_->send(message);
+}
+
+void Broker::on_market_request_reject(FIX8::Message*) {
+  log_producer_.error("Market subscription rejected");
 }
 
 void Broker::on_heartbeat(FIX8::Message* msg) {
@@ -71,6 +76,39 @@ void Broker::on_heartbeat(FIX8::Message* msg) {
   app_->send(message);
 }
 
-void Broker::on_subscribe(const std::string& msg) {
-  log_->info(msg);
+#ifdef LIGHT_LOGGER
+void Broker::on_subscribe(const std::string& str_msg, FIX8::Message*,
+                          const std::string&) {
+#else
+void Broker::on_subscribe(const std::string& str_msg, FIX8::Message* msg,
+                          const std::string& event_type) {
+#endif
+  log_producer_.info(str_msg);
+#ifdef LIGHT_LOGGER
+  subscribed_ = true;
+
+  if (!fix_seq_counter_.is_valid(str_msg)) {
+    log_producer_.error("Fix data skipped. Need to re subscribe.");
+
+    // re-subscribe
+    {
+      const std::string msg_unsub =
+          app_->create_market_data_subscription_message(
+              "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
+              INI_CONFIG.get("meta", "ticker"), /*subscribe=*/false);
+      while (!app_->send(msg_unsub)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(kSleep));
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(kSleep));
+
+      const std::string msg_sub = app_->create_market_data_subscription_message(
+          "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
+          INI_CONFIG.get("meta", "ticker"), /*subscribe=*/true);
+      while (!app_->send(msg_sub)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(kSleep));
+      }
+      subscribed_ = false;
+    }
+  }
+#endif
 }

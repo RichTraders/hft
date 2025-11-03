@@ -20,6 +20,7 @@ set(FIX8_SRC
         fix_app.cpp
         fix_md_app.cpp
         fix_oe_app.cpp
+        fix_sequence_counter.cpp
 )
 
 add_library(Fix8Schema STATIC ${FIX8_SRC})
@@ -45,4 +46,7 @@ target_link_libraries(Fix8Schema PUBLIC
         crypto
 )
 
-target_compile_options(Fix8Schema PRIVATE -Wno-missing-field-initializers -Wno-error=unused-parameter)
+target_compile_options(Fix8Schema PRIVATE
+    -Wno-missing-field-initializers
+    -Wno-unused-parameter
+)

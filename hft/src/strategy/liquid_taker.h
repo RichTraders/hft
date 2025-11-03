@@ -12,10 +12,22 @@
 
 #ifndef LIQUID_TAKER_H
 #define LIQUID_TAKER_H
-#include "strategy.hpp"
+#include "base_strategy.hpp"
+#include "strategy_dispatch.hpp"
+
+struct MarketData;
 
 namespace trading {
-class LiquidTaker : public BaseStrategy<LiquidTaker> {
+class FeatureEngine;
+class MarketOrderBook;
+}  // namespace trading
+namespace trading {
+class LiquidTaker : public BaseStrategy {
+ public:
+  LiquidTaker(OrderManager* order_manager, const FeatureEngine* feature_engine,
+              common::Logger* logger,
+              const common::TradeEngineCfgHashMap& ticker_cfg);
+
   void on_orderbook_updated(const common::TickerId&, common::Price,
                             common::Side, const MarketOrderBook*) noexcept;
 
@@ -23,6 +35,8 @@ class LiquidTaker : public BaseStrategy<LiquidTaker> {
 
   void on_order_updated(const ExecutionReport*) noexcept;
 };
+
+void register_liquid_taker_strategy();
 }  // namespace trading
 
 #endif  //LIQUID_TAKER_H

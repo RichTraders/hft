@@ -12,6 +12,7 @@
 
 #ifndef POSITIONKEEPER_H
 #define POSITIONKEEPER_H
+#include "ini_config.hpp"
 #include "logger.h"
 #include "types.h"
 
@@ -34,25 +35,27 @@ struct PositionInfo {
 
   [[nodiscard]] std::string toString() const;
 
-  void add_fill(const ExecutionReport* report, common::Logger* logger) noexcept;
+  void add_fill(const ExecutionReport* report,
+                common::Logger::Producer& logger) noexcept;
 
-  void update_bbo(const BBO* bbo, common::Logger* logger) noexcept;
+  void update_bbo(const BBO* bbo, common::Logger::Producer& logger) noexcept;
 };
 
 class PositionKeeper {
  public:
   explicit PositionKeeper(common::Logger* logger)
-      : logger_(logger), ticker_position_{{"BTCUSDT", PositionInfo{}}} {
-    logger_->info("[Constructor] PositionKeeper Created");
+      : logger_(logger->make_producer()),
+        ticker_position_{{INI_CONFIG.get("meta", "ticker"), PositionInfo{}}} {
+    logger_.info("[Constructor] PositionKeeper Created");
   }
-  ~PositionKeeper() { logger_->info("[Destructor] PositionKeeper Destory"); }
+  ~PositionKeeper() { logger_.info("[Destructor] PositionKeeper Destory"); }
 
   void add_fill(const ExecutionReport* report) noexcept;
 
   void update_bbo(const common::TickerId& ticker_id, const BBO* bbo) noexcept;
 
   [[nodiscard]] auto get_position_info(
-      const common::TickerId& ticker_id) const noexcept {
+      const common::TickerId& ticker_id) noexcept {
     return &(ticker_position_.at(ticker_id));
   }
 
@@ -69,7 +72,7 @@ class PositionKeeper {
   PositionKeeper& operator=(const PositionKeeper&&) = delete;
 
  private:
-  common::Logger* logger_ = nullptr;
+  common::Logger::Producer logger_;
 
   std::unordered_map<std::string, PositionInfo> ticker_position_;
 };

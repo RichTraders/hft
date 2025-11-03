@@ -14,12 +14,12 @@
 #include "ini_config.hpp"
 
 TEST(IniConfigTest, LoadAndReadValues) {
-  IniConfig config;
-  ASSERT_TRUE(config.load("resources/config.ini"));
+  ASSERT_TRUE(INI_CONFIG.load("resources/config.ini"));
 
-  EXPECT_EQ(config.get_int("risk", "max_order_size"), 100);
-  EXPECT_EQ(config.get_int("risk", "max_position"), 1);
-  EXPECT_EQ(config.get_int("risk", "max_loss"), -100);
+  EXPECT_EQ(INI_CONFIG.get_double("risk", "max_order_size"), 0.0001);
+  EXPECT_EQ(INI_CONFIG.get_double("risk", "max_position"), 0.0004);
+  EXPECT_EQ(INI_CONFIG.get_double("risk", "max_loss"), -0.3);
 
-  EXPECT_EQ(config.get("database", "username", "root"), "root");
+  EXPECT_EQ(INI_CONFIG.get_int("risk", "not_exist"), 0);
+  EXPECT_EQ(INI_CONFIG.get("database", "username", "root"), "root");
 }

@@ -12,8 +12,12 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+
+#include <strategy/strategies.hpp>
+
 #include "feature_engine.h"
 
+#include "ini_config.hpp"
 #include "logger.h"
 #include "order_book.h"
 #include "trade_engine.h"
@@ -24,8 +28,13 @@ using namespace common;
 using namespace trading;
 
 class FeatureEngineTest : public ::testing::Test {
+ public:
+  static Logger logger;
+
  protected:
   void SetUp() override {
+    INI_CONFIG.load("resources/config.ini");
+    register_all_strategies();
     market_pool = new MemoryPool<MarketData>(8);
     market_update_pool = new MemoryPool<MarketUpdateData>(8);
 
@@ -34,7 +43,8 @@ class FeatureEngineTest : public ::testing::Test {
     cfg.risk_cfg_.max_position_ = Qty{50};
     cfg.risk_cfg_.max_loss_ = -1000;
 
-    ticker_cfg = new TradeEngineCfgHashMap{{"BTCUSDT", cfg}};
+    ticker_cfg =
+        new TradeEngineCfgHashMap{{INI_CONFIG.get("meta", "ticker"), cfg}};
 
     trade_engine = new TradeEngine(&logger, market_update_pool, market_pool,
                                    nullptr, *ticker_cfg);
@@ -45,14 +55,15 @@ class FeatureEngineTest : public ::testing::Test {
     delete trade_engine;
     delete market_pool;
     delete market_update_pool;
+    delete ticker_cfg;
   }
 
   TradeEngine* trade_engine;
-  Logger logger;
   MemoryPool<MarketData>* market_pool;
   MemoryPool<MarketUpdateData>* market_update_pool;
   TradeEngineCfgHashMap* ticker_cfg;
 };
+Logger FeatureEngineTest::logger;
 
 TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
 
@@ -96,12 +107,12 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
 
 TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
   FeatureEngine engine(&logger);
-
   std::string symbol = "ETHUSDT";
   // BBO 세팅
   MarketOrderBook book(symbol, &logger);
   book.set_trade_engine(trade_engine);
   {
+    std::string symbol = "ETHUSDT";
     const Price p = Price{100'000.};
     const Qty q{20.0};
     const MarketData md{MarketUpdateType::kAdd,
@@ -113,6 +124,7 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
     book.on_market_data_updated(&md);
   }
   {
+    std::string symbol = "ETHUSDT";
     const Price p = Price{200'000.};
     const Qty q{80.0};
     const MarketData md{MarketUpdateType::kAdd,
@@ -124,6 +136,7 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
     book.on_market_data_updated(&md);
   }
 
+  symbol = "ETHUSDT";
   const MarketData md{MarketUpdateType::kTrade,
                       OrderId{kOrderIdInvalid},
                       symbol,
@@ -161,6 +174,7 @@ TEST_F(FeatureEngineTest, OnTradeUpdate) {
 
   double sum_pq = 0.0, sum_q = 0.0;
   for (auto& t : ticks) {
+    std::string symbol = "ETHUSDT";
     MarketData md(common::MarketUpdateType::kTrade, common::OrderId{0L}, symbol,
                   t.s, t.p, t.q);
     engine.on_trade_updated(&md, &book);
@@ -171,38 +185,35 @@ TEST_F(FeatureEngineTest, OnTradeUpdate) {
   EXPECT_FLOAT_EQ(engine.get_vwap(), expected);
 }
 
-TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction)
-{
+TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction) {
   FeatureEngine engine(&logger);
 
   std::string symbol = "ETHUSDT";
   MarketOrderBook book(symbol, &logger);
 
-  const size_t W = kVwapSize;
+  const size_t W = 64;
   const size_t N = W + 7;
   double sum_pq = 0.0, sum_q = 0.0;
-  std::deque<std::pair<double,double>> win;      // (price, qty)
+  std::deque<std::pair<double, double>> win;  // (price, qty)
 
   for (size_t i = 0; i < N; ++i) {
-    const double px  = 100.0 + static_cast<double>(i);
-    const double qty = 1.0  + static_cast<double>(i % 5);
+    const double px = 100.0 + static_cast<double>(i);
+    const double qty = 1.0 + static_cast<double>(i % 5);
+    std::string symbol = "ETHUSDT";
 
-    MarketData md(common::MarketUpdateType::kTrade,
-                  common::OrderId{0},
-                  symbol,
-                  common::Side::kTrade,
-                  Price{px},
-                  Qty{qty});
+    MarketData md(common::MarketUpdateType::kTrade, common::OrderId{0}, symbol,
+                  common::Side::kTrade, Price{px}, Qty{qty});
 
     engine.on_trade_updated(&md, &book);
 
     win.emplace_back(px, qty);
     sum_pq += px * qty;
-    sum_q  += qty;
+    sum_q += qty;
     if (win.size() > W) {
-      auto [opx, oq] = win.front(); win.pop_front();
+      auto [opx, oq] = win.front();
+      win.pop_front();
       sum_pq -= opx * oq;
-      sum_q  -= oq;
+      sum_q -= oq;
     }
 
     if (sum_q > 0.0) {
@@ -215,41 +226,38 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction)
   }
 }
 
-TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_MultiWraps)
-{
+TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_MultiWraps) {
   FeatureEngine engine(&logger);
 
   std::string symbol = "ETHUSDT";
   MarketOrderBook book(symbol, &logger);
 
-  const size_t W = kVwapSize;
+  const size_t W = 64;
   const size_t N = 3 * W + 11;
 
   double sum_pq = 0.0, sum_q = 0.0;
-  std::deque<std::pair<double,double>> win;
+  std::deque<std::pair<double, double>> win;
 
   for (size_t i = 0; i < N; ++i) {
-    const double px  = 200.0 + 0.25 * static_cast<double>(i);
+    const double px = 200.0 + 0.25 * static_cast<double>(i);
     const double qty = (i % 7 == 0) ? 10.0 : (1.0 + static_cast<double>(i % 3));
+    std::string symbol = "ETHUSDT";
 
-    MarketData md(common::MarketUpdateType::kTrade,
-                  common::OrderId{42},
-                  symbol,
-                  common::Side::kTrade,
-                  Price{px},
-                  Qty{qty});
+    MarketData md(common::MarketUpdateType::kTrade, common::OrderId{42}, symbol,
+                  common::Side::kTrade, Price{px}, Qty{qty});
 
     engine.on_trade_updated(&md, &book);
 
     win.emplace_back(px, qty);
     sum_pq += px * qty;
-    sum_q  += qty;
+    sum_q += qty;
     if (win.size() > W) {
-      auto [opx, oq] = win.front(); win.pop_front();
+      auto [opx, oq] = win.front();
+      win.pop_front();
       sum_pq -= opx * oq;
-      sum_q  -= oq;
+      sum_q -= oq;
     }
-    
+
     if (i % (W / 3 + 1) == 0 || i + 1 == N) {
       ASSERT_GT(sum_q, 0.0);
       const double expected = sum_pq / sum_q;

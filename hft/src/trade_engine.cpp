@@ -12,6 +12,7 @@
 
 #include "trade_engine.h"
 #include "feature_engine.h"
+#include "ini_config.hpp"
 #include "order_entry.h"
 #include "order_gateway.h"
 #include "order_manager.h"
@@ -19,10 +20,12 @@
 #include "position_keeper.h"
 #include "response_manager.h"
 #include "risk_manager.h"
+#include "wait_strategy.h"
 
-#include "strategy/market_maker.h"
+#include "strategy/strategies.hpp"
 
-constexpr std::size_t kCapacity = 64;
+constexpr int kMarketDataBatchLimit = 128;
+constexpr int kResponseBatchLimit = 64;
 
 namespace trading {
 TradeEngine::TradeEngine(
@@ -31,44 +34,69 @@ TradeEngine::TradeEngine(
     common::MemoryPool<MarketData>* market_data_pool,
     ResponseManager* response_manager,
     const common::TradeEngineCfgHashMap& ticker_cfg)
-    : logger_(logger),
+    : logger_(logger->make_producer()),
       market_update_data_pool_(market_update_data_pool),
       market_data_pool_(market_data_pool),
       response_manager_(response_manager),
-      queue_(std::make_unique<common::SPSCQueue<MarketUpdateData*>>(kCapacity)),
+      queue_(std::make_unique<
+             common::SPSCQueue<MarketUpdateData*, kMarketDataCapacity>>()),
       feature_engine_(std::make_unique<FeatureEngine>(logger)),
       position_keeper_(std::make_unique<PositionKeeper>(logger)),
       risk_manager_(std::make_unique<RiskManager>(
           logger, position_keeper_.get(), ticker_cfg)),
       order_manager_(
           std::make_unique<OrderManager>(logger, this, *risk_manager_)) {
-  auto orderbook = std::make_unique<MarketOrderBook>("BTCUSDT", logger);
-
-  constexpr int kResponseQueueSize = 64;
-  response_queue_ =
-      std::make_unique<common::SPSCQueue<trading::ResponseCommon>>(
-          kResponseQueueSize);
+  const std::string ticker = INI_CONFIG.get("meta", "ticker");
+  auto orderbook = std::make_unique<MarketOrderBook>(ticker, logger);
+  response_queue_ = std::make_unique<
+      common::SPSCQueue<trading::ResponseCommon, kResponseQueueSize>>();
   orderbook->set_trade_engine(this);
-  ticker_order_book_.insert({"BTCUSDT", std::move(orderbook)});
+  ticker_order_book_.insert({ticker, std::move(orderbook)});
 
-  strategy_ = std::make_unique<MarketMaker>(
-      order_manager_.get(), feature_engine_.get(), logger_, ticker_cfg);
+  const std::string algorithm = INI_CONFIG.get("strategy", "algorithm");
+  strategy_vtable_ = StrategyDispatch::instance().get_vtable(algorithm);
+
+  if (!strategy_vtable_) {
+    logger_.error(
+        std::format("[Constructor] Failed to load strategy '{}'. Available "
+                    "strategies: [{}]",
+                    algorithm, [&]() {
+                      std::string names;
+                      for (const auto& name :
+                           StrategyDispatch::instance().get_strategy_names()) {
+                        if (!names.empty())
+                          names += ", ";
+                        names += name;
+                      }
+                      return names;
+                    }()));
+    throw std::runtime_error("Invalid strategy name in config: " + algorithm);
+  }
+
+  void* strategy_data = strategy_vtable_->create_data(
+      order_manager_.get(), feature_engine_.get(), logger, ticker_cfg);
+  strategy_context_ = std::make_unique<StrategyContext>(
+      order_manager_.get(), feature_engine_.get(), logger, strategy_data);
+
+  logger_.info(std::format("[Constructor] Strategy '{}' loaded successfully",
+                           algorithm));
 
   thread_.start(&TradeEngine::run, this);
-  response_thread_.start(&TradeEngine::response_run, this);
-  logger_->info("[Constructor] TradeEngine Created");
+  logger_.info("[Constructor] TradeEngine Created");
 }
 
 TradeEngine::~TradeEngine() {
   running_ = false;
-  response_running_ = false;
 
   thread_.join();
-  response_thread_.join();
 
-  logger_->info("[Thread] Trade Engine TEMarketData finish");
-  logger_->info("[Thread] Trade Engine TEResponse finish");
-  logger_->info("[Destructor] TradeEngine Destroy");
+  if (strategy_vtable_ && strategy_context_ &&
+      strategy_context_->strategy_data) {
+    strategy_vtable_->destroy_data(strategy_context_->strategy_data);
+    strategy_context_->strategy_data = nullptr;
+  }
+  logger_.info("[Thread] TradeEngine finish");
+  logger_.info("[Destructor] TradeEngine Destroy");
 }
 
 void TradeEngine::init_order_gateway(OrderGateway* order_gateway) {
@@ -81,26 +109,35 @@ bool TradeEngine::on_market_data_updated(MarketUpdateData* data) const {
 
 void TradeEngine::stop() {
   running_ = false;
-  response_running_ = false;
 }
 
 void TradeEngine::on_orderbook_updated(const common::TickerId& ticker,
                                        common::Price price, common::Side side,
                                        MarketOrderBook* order_book) const {
+  START_MEASURE(ORDERBOOK_UPDATED);
   feature_engine_->on_order_book_updated(price, side, order_book);
-  strategy_->on_orderbook_updated(ticker, price, side, order_book);
+  strategy_vtable_->on_orderbook_updated(*strategy_context_, ticker, price,
+                                         side, order_book);
+  END_MEASURE(ORDERBOOK_UPDATED, logger_);
 }
 
 void TradeEngine::on_trade_updated(const MarketData* market_data,
                                    MarketOrderBook* order_book) const {
+  START_MEASURE(TRADE_UPDATED);
   feature_engine_->on_trade_updated(market_data, order_book);
-  strategy_->on_trade_updated(market_data, order_book);
+  strategy_vtable_->on_trade_updated(*strategy_context_, market_data,
+                                     order_book);
+  END_MEASURE(TRADE_UPDATED, logger_);
 }
 
-void TradeEngine::on_order_updated(
-    const ExecutionReport* report) const noexcept {
+void TradeEngine::on_order_updated(const ExecutionReport* report) noexcept {
+  START_MEASURE(Trading_TradeEngine_on_order_updated);
   position_keeper_->add_fill(report);
-  strategy_->on_order_updated(report);
+  strategy_vtable_->on_order_updated(*strategy_context_, report);
+  order_manager_->on_order_updated(report);
+  END_MEASURE(Trading_TradeEngine_on_order_updated, logger_);
+
+  logger_.info(std::format("[OrderResult]{}", report->toString()));
 }
 
 bool TradeEngine::enqueue_response(const ResponseCommon& response) {
@@ -112,29 +149,36 @@ void TradeEngine::send_request(const RequestCommon& request) {
 }
 
 void TradeEngine::run() {
+  common::WaitStrategy wait;
   while (running_) {
+    int md_processed = 0;
     MarketUpdateData* message;
-    while (queue_->dequeue(message)) {
-      START_MEASURE(MAKE_ORDERBOOK);
+
+    while (queue_->dequeue(message) && md_processed < kMarketDataBatchLimit) {
+      if (UNLIKELY(message == nullptr))
+        continue;
+      wait.reset();
+      START_MEASURE(MAKE_ORDERBOOK_ALL);
       for (auto& market_data : message->data) {
+        START_MEASURE(MAKE_ORDERBOOK_UNIT);
         ticker_order_book_[market_data->ticker_id]->on_market_data_updated(
             market_data);
         market_data_pool_->deallocate(market_data);
+        END_MEASURE(MAKE_ORDERBOOK_UNIT, logger_);
       }
 
       if (message) {
         market_update_data_pool_->deallocate(message);
       }
-      END_MEASURE(MAKE_ORDERBOOK, logger_);
+      END_MEASURE(MAKE_ORDERBOOK_ALL, logger_);
+      ++md_processed;
     }
-    std::this_thread::yield();
-  }
-}
 
-void TradeEngine::response_run() {
-  while (response_running_) {
+    int resp_processed = 0;
     ResponseCommon response;
-    while (response_queue_->dequeue(response)) {
+    while (response_queue_->dequeue(response) &&
+           resp_processed < kResponseBatchLimit) {
+      wait.reset();
       START_MEASURE(RESPONSE_COMMON);
       switch (response.res_type) {
         case ResponseType::kExecutionReport:
@@ -157,17 +201,26 @@ void TradeEngine::response_run() {
           break;
       }
       END_MEASURE(RESPONSE_COMMON, logger_);
+      ++resp_processed;
     }
-    std::this_thread::yield();
+
+    if (md_processed == 0 && resp_processed == 0) {
+      wait.idle_hot();
+    }
   }
 }
 
-void TradeEngine::on_order_cancel_reject(const OrderCancelReject*) {
-  logger_->info("on_order_cancel_reject");
+void TradeEngine::on_order_cancel_reject(const OrderCancelReject* reject) {
+  logger_.info(
+      std::format("[OrderResult]Order cancel request is rejected. error :{}",
+                  reject->toString()));
 }
 
-void TradeEngine::on_order_mass_cancel_report(const OrderMassCancelReport*) {
-  logger_->info("on_order_mass_cancel_report");
+void TradeEngine::on_order_mass_cancel_report(
+    const OrderMassCancelReport* cancel_report) {
+  logger_.info(
+      std::format("[OrderResult]Order mass cancel is rejected. error:{}",
+                  cancel_report->toString()));
 }
 
 }  // namespace trading

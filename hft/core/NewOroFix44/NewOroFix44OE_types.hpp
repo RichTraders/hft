@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-26 15:49:19 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-11-03 14:30:15 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -127,7 +127,8 @@ const char OrdType_MARKET('1');
 const char OrdType_LIMIT('2');
 const char OrdType_STOP('3');
 const char OrdType_STOP_LIMIT('4');
-const size_t OrdType_realm_els(4);
+const char OrdType_PEGGED('P');
+const size_t OrdType_realm_els(5);
 //-------------------------------------------------------------------------------------------------
 using OrigClOrdID = Field<f8String, 41>;
 //-------------------------------------------------------------------------------------------------
@@ -212,6 +213,8 @@ using LeavesQty = Field<Qty, 151>;
 //-------------------------------------------------------------------------------------------------
 using CashOrderQty = Field<Qty, 152>;
 //-------------------------------------------------------------------------------------------------
+using PegOffsetValue = Field<fp_type, 211>;
+//-------------------------------------------------------------------------------------------------
 using RefTagID = Field<int, 371>;
 //-------------------------------------------------------------------------------------------------
 using RefMsgType = Field<f8String, 372>;
@@ -273,6 +276,16 @@ const size_t MatchType_realm_els(2);
 //-------------------------------------------------------------------------------------------------
 using WorkingIndicator = Field<Boolean, 636>;
 //-------------------------------------------------------------------------------------------------
+using PegMoveType = Field<int, 835>;
+const int PegMoveType_FIXED(1);
+const size_t PegMoveType_realm_els(1);
+//-------------------------------------------------------------------------------------------------
+using PegOffsetType = Field<char, 836>;
+const char PegOffsetType_PRICE_TIER('3');
+const size_t PegOffsetType_realm_els(1);
+//-------------------------------------------------------------------------------------------------
+using PeggedPrice = Field<price, 839>;
+//-------------------------------------------------------------------------------------------------
 using TargetStrategy = Field<int, 847>;
 //-------------------------------------------------------------------------------------------------
 using TradeID = Field<int, 1003>;
@@ -281,6 +294,11 @@ using AggressorIndicator = Field<Boolean, 1057>;
 const char AggressorIndicator_ORDER_INITIATOR_IS_PASSIVE('N');
 const char AggressorIndicator_ORDER_INITIATOR_IS_AGGRESSOR('Y');
 const size_t AggressorIndicator_realm_els(2);
+//-------------------------------------------------------------------------------------------------
+using PegPriceType = Field<char, 1094>;
+const char PegPriceType_MARKET_PEG('4');
+const char PegPriceType_PRIMARY_PEG('5');
+const size_t PegPriceType_realm_els(2);
 //-------------------------------------------------------------------------------------------------
 using TriggerType = Field<char, 1100>;
 const char TriggerType_PRICE_MOVEMENT('4');
@@ -316,7 +334,7 @@ using StrategyID = Field<int, 7940>;
 //-------------------------------------------------------------------------------------------------
 using DropCopyFlag = Field<Boolean, 9406>;
 //-------------------------------------------------------------------------------------------------
-using RecvWindow = Field<int, 25000>;
+using RecvWindow = Field<fp_type, 25000>;
 //-------------------------------------------------------------------------------------------------
 using SelfTradePreventionMode = Field<char, 25001>;
 const char SelfTradePreventionMode_NONE('1');

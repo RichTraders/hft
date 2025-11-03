@@ -40,19 +40,18 @@ auto MarketOrder::toString() const -> std::string {
 MarketOrderBook::MarketOrderBook(const TickerId& ticker_id,
                                  common::Logger* logger)
     : ticker_id_(std::move(ticker_id)),
-      logger_(logger),
+      logger_(logger->make_producer()),
       bid_bucket_pool_(
           std::make_unique<common::MemoryPool<Bucket>>(kBucketPoolSize)),
       ask_bucket_pool_(
           std::make_unique<common::MemoryPool<Bucket>>(kBucketPoolSize)) {
-  logger_->info("[Constructor] MarketOrderBook Created");
+  logger_.info("[Constructor] MarketOrderBook Created");
 }
 
 MarketOrderBook::~MarketOrderBook() {
-  logger_->info("[Destructor] MarketOrderBook Destory");
+  logger_.info("[Destructor] MarketOrderBook Destory");
 
   trade_engine_ = nullptr;
-  logger_ = nullptr;
 }
 
 void MarketOrderBook::update_bid(int idx, Qty qty) {
@@ -260,7 +259,7 @@ auto MarketOrderBook::on_market_data_updated(
                    market_update->price.value ||
                market_update->price.value <
                    (static_cast<double>(kMinPriceInt) / kTickMultiplierInt))) {
-    logger_->error(
+    logger_.error(
         std::format("Price[{}] is invalid", market_update->price.value));
     return;
   }
@@ -303,15 +302,15 @@ auto MarketOrderBook::on_market_data_updated(
               .ask_price = Price{common::kPriceInvalid},
               .bid_qty = Qty{common::kQtyInvalid},
               .ask_qty = Qty{common::kQtyInvalid}};
-      break;
+      return;
     }
     case MarketUpdateType::kInvalid:
-      logger_->error("error in market update data");
+      logger_.error("error in market update data");
       break;
   }
 
-  logger_->debug(std::format("[Updated] {} {}", market_update->toString(),
-                             bbo_.toString()));
+  logger_.debug(std::format("[Updated] {} {}", market_update->toString(),
+                            bbo_.toString()));
 
   trade_engine_->on_orderbook_updated(market_update->ticker_id,
                                       market_update->price, market_update->side,

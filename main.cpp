@@ -18,87 +18,83 @@
 #include "order_entry.h"
 #include "order_gateway.h"
 #include "risk_manager.h"
+#include "strategy/strategies.hpp"
 #include "thread.hpp"
 #include "trade_engine.h"
 
-constexpr int kMarketUpdateDataPoolSize = 64;
-constexpr int kMarketDataPoolSize = 16384;
-
 int main() {
   try {
-    IniConfig config;
 #ifdef TEST_NET
-    config.load("resources/test_config.ini");
+    INI_CONFIG.load("resources/test_config.ini");
 #else
-    config.load("resources/config.ini");
+    INI_CONFIG.load("resources/config.ini");
 #endif
-
-    const Authorization authorization{
-        .md_address = config.get("auth", "md_address"),
-        .oe_address = config.get("auth", "oe_address"),
-        .port = config.get_int("auth", "port"),
-        .api_key = config.get("auth", "api_key"),
-        .pem_file_path = config.get("auth", "pem_file_path"),
-        .private_password = config.get("auth", "private_password")};
+    trading::register_all_strategies();
 
     std::unique_ptr<common::Logger> logger = std::make_unique<common::Logger>();
-    logger->setLevel(common::LogLevel::kInfo);
+    logger->setLevel(logger->string_to_level(INI_CONFIG.get("log", "level")));
     logger->clearSink();
     logger->addSink(std::make_unique<common::ConsoleSink>());
+    logger->addSink(std::make_unique<common::FileSink>(
+        "log", INI_CONFIG.get_int("log", "size")));
 
     auto market_update_data_pool =
         std::make_unique<common::MemoryPool<MarketUpdateData>>(
-            kMarketUpdateDataPoolSize);
-    auto market_data_pool =
-        std::make_unique<common::MemoryPool<MarketData>>(kMarketDataPoolSize);
+            INI_CONFIG.get_int("main_init", "mud_pool_size"));
+    auto market_data_pool = std::make_unique<common::MemoryPool<MarketData>>(
+        INI_CONFIG.get_int("main_init", "md_pool_size"));
 
-    constexpr int kResponseMemoryPoolSize = 1024;
+    const int k_response_memory_pool_size =
+        INI_CONFIG.get_int("main_init", "response_memory_size");
 
     auto execution_report_pool =
         std::make_unique<common::MemoryPool<trading::ExecutionReport>>(
-            kResponseMemoryPoolSize);
+            k_response_memory_pool_size);
     auto order_cancel_reject_pool =
         std::make_unique<common::MemoryPool<trading::OrderCancelReject>>(
-            kResponseMemoryPoolSize);
+            k_response_memory_pool_size);
     auto order_mass_cancel_report_pool =
         std::make_unique<common::MemoryPool<trading::OrderMassCancelReport>>(
-            kResponseMemoryPoolSize);
+            k_response_memory_pool_size);
 
     common::TradeEngineCfgHashMap config_map;
-    config_map["BTCUSDT"] = {
+    config_map[INI_CONFIG.get("meta", "ticker")] = {
         .clip_ = common::Qty{0},
         .threshold_ = 0,
         .risk_cfg_ = common::RiskCfg(
-            common::Qty{config.get_double("risk", "max_order_size")},
-            common::Qty{config.get_double("risk", "max_position")},
-            config.get_double("risk", "max_loss"))};
+            common::Qty{INI_CONFIG.get_double("risk", "max_order_size")},
+            common::Qty{INI_CONFIG.get_double("risk", "max_position")},
+            common::Qty{INI_CONFIG.get_double("risk", "min_position", 0.)},
+            INI_CONFIG.get_double("risk", "max_loss"))};
 
     auto response_manager = std::make_unique<trading::ResponseManager>(
         logger.get(), execution_report_pool.get(),
         order_cancel_reject_pool.get(), order_mass_cancel_report_pool.get());
 
     auto order_gateway = std::make_unique<trading::OrderGateway>(
-        authorization, logger.get(), response_manager.get());
+        logger.get(), response_manager.get());
 
     auto engine = std::make_unique<trading::TradeEngine>(
         logger.get(), market_update_data_pool.get(), market_data_pool.get(),
         response_manager.get(), config_map);
     engine->init_order_gateway(order_gateway.get());
+    order_gateway->init_trade_engine(engine.get());
 
-    const trading::MarketConsumer consumer(
-        logger.get(), engine.get(), market_update_data_pool.get(),
-        market_data_pool.get(), authorization);
+    const trading::MarketConsumer consumer(logger.get(), engine.get(),
+                                           market_update_data_pool.get(),
+                                           market_data_pool.get());
 
     std::unique_ptr<common::CpuManager> cpu_manager =
         std::make_unique<common::CpuManager>(logger.get());
 
+    auto log = logger->make_producer();
     std::string cpu_init_result;
     if (cpu_manager->init_cpu_group(cpu_init_result)) {
-      logger->info(std::format("don't init cpu group: {}", cpu_init_result));
+      log.info(std::format("don't init cpu group: {}", cpu_init_result));
     }
 
     if (cpu_manager->init_cpu_to_tid()) {
-      logger->info("don't init cpu to tid");
+      log.info("don't init cpu to tid");
     }
 
     constexpr int kSleepCount = 10;

@@ -12,27 +12,30 @@
 
 #include "fix_md_app.h"
 #include "fix_md_core.h"
+#include "authorization.h"
 
+namespace FIX8::NewOroFix44MD {
+class InstrumentList;
+}
 namespace core {
 
-FixMarketDataApp::FixMarketDataApp(const Authorization& authorization,
-                   const std::string& sender_comp_id,
+FixMarketDataApp::FixMarketDataApp(const std::string& sender_comp_id,
                    const std::string& target_comp_id, common::Logger* logger,
                    common::MemoryPool<MarketData>* market_data_pool):
-    FixApp(authorization.md_address,
-           authorization.port,
+    FixApp(AUTHORIZATION.get_md_address(),
+           AUTHORIZATION.get_port(),
            sender_comp_id,
            target_comp_id,
-           logger,
-           authorization)
+           logger)
     , market_data_pool_(market_data_pool) {
   fix_md_core_ = std::make_unique<FixMdCore>(sender_comp_id, target_comp_id,
-                                             logger, market_data_pool,
-                                             authorization);
+                                             logger, market_data_pool);
 }
 
 FixMarketDataApp::~FixMarketDataApp() {
-
+  this->prepare_stop_after_logout();
+  this->send(create_log_out_message());
+  this->wait_logout_and_halt_io();
 }
 
 std::string FixMarketDataApp::create_log_on_message(
@@ -50,9 +53,9 @@ std::string FixMarketDataApp::create_heartbeat_message(FIX8::Message* message) {
 
 std::string FixMarketDataApp::create_market_data_subscription_message(
     const RequestId& request_id, const MarketDepthLevel& level,
-    const SymbolId& symbol) {
-  return fix_md_core_->create_market_data_subscription_message(request_id,
-    level, symbol);
+    const SymbolId& symbol, const bool subscribe) const {
+  return fix_md_core_->create_market_data_subscription_message(
+      request_id, level, symbol, subscribe);
 }
 
 std::string FixMarketDataApp::create_trade_data_subscription_message(
@@ -70,6 +73,19 @@ MarketUpdateData FixMarketDataApp::create_market_data_message(
 MarketUpdateData FixMarketDataApp::create_snapshot_data_message(
     FIX8::Message* msg) {
   return fix_md_core_->create_snapshot_data_message(msg);
+}
+
+std::string FixMarketDataApp::request_instrument_list_message(const std::string& symbol) {
+  return fix_md_core_->create_instrument_list_request_message(symbol);
+}
+
+InstrumentInfo FixMarketDataApp::create_instrument_list_message(
+    FIX8::Message* msg) {
+  return fix_md_core_->create_instrument_list_message(msg);
+}
+
+MarketDataReject FixMarketDataApp::create_reject_message(FIX8::Message* msg) {
+  return fix_md_core_->create_reject_message(msg);
 }
 
 FIX8::Message* FixMarketDataApp::decode(const std::string& message) {

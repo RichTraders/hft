@@ -11,9 +11,7 @@
  */
 
 #pragma once
-#include <pch.h>
 
-#include "authorization.h"
 #include "logger.h"
 #include "memory_pool.hpp"
 #include "order_entry.h"
@@ -26,6 +24,7 @@ namespace NewOroFix44OE {
 class ExecutionReport;
 class OrderCancelReject;
 class OrderMassCancelReport;
+class Reject;
 }
 }
 
@@ -48,8 +47,7 @@ public:
 
   FixOeCore(SendId sender_comp_id,
             TargetId target_comp_id,
-            common::Logger* logger, trading::ResponseManager* response_manager,
-            const Authorization& authorization);
+            common::Logger* logger, trading::ResponseManager* response_manager);
 
   ~FixOeCore();
 
@@ -71,14 +69,16 @@ public:
       FIX8::NewOroFix44OE::OrderCancelReject* msg);
   trading::OrderMassCancelReport* create_order_mass_cancel_report_message(
       FIX8::NewOroFix44OE::OrderMassCancelReport* msg);
+  trading::OrderReject create_reject_message(FIX8::NewOroFix44OE::Reject* msg);
   FIX8::Message* decode(const std::string& message);
 
 private:
   int64_t sequence_{1};
   const std::string sender_comp_id_;
   const std::string target_comp_id_;
-  common::Logger* logger_;
+  common::Logger::Producer logger_;
   trading::ResponseManager* response_manager_;
-  Authorization authorization_;
+  const int qty_precision_;
+  const int price_precision_;
 };
 }

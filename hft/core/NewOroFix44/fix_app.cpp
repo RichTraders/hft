@@ -11,43 +11,44 @@
  */
 
 #include <fix8/f8includes.hpp>
-
-#include "fix_oe_app.h"
+#include "authorization.h"
 #include "fix_md_app.h"
+#include "fix_oe_app.h"
 #include "performance.h"
 #include "signature.h"
+#include "spsc_queue.h"
 #include "ssl_socket.h"
 
 namespace core {
+static constexpr std::string kFixSignature = "8=FIX";
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
-FixApp<Derived, ReadThreadName, WriteThreadName>::FixApp(const std::string& address,
-                             int port,
-                             std::string sender_comp_id,
-                             std::string target_comp_id,
-                             common::Logger* logger,
-                             const Authorization& authorization)
-  : logger_(logger),
-    tls_sock_(std::make_unique<SSLSocket>(address, port)),
-    queue_(std::make_unique<common::SPSCQueue<std::string>>(kQueueSize)),
-    sender_id_(std::move(sender_comp_id)),
-    target_id_(std::move(target_comp_id)),
-    authorization_(authorization) {
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+FixApp<Derived, ReadThreadName, WriteThreadName>::FixApp(
+    const std::string& address, int port, std::string sender_comp_id,
+    std::string target_comp_id, common::Logger* logger)
+    : logger_(logger->make_producer()),
+      tls_sock_(std::make_unique<SSLSocket>(address, port)),
+      queue_(std::make_unique<common::SPSCQueue<std::string, kQueueSize>>()),
+      sender_id_(std::move(sender_comp_id)),
+      target_id_(std::move(target_comp_id)) {
+  thread_running_.store(true, std::memory_order_release);
   write_thread_.start(&FixApp::write_loop, this);
   read_thread_.start(&FixApp::read_loop, this);
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
 FixApp<Derived, ReadThreadName, WriteThreadName>::~FixApp() {
-  thread_running_ = false;
   write_thread_.join();
   read_thread_.join();
-  logger_->info("[Thread] Fix write finish");
-  logger_->info("[Thread] Fix read finish");
+  logger_.info("[Thread] Fix write finish");
+  logger_.info("[Thread] Fix read finish");
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
-bool FixApp<Derived, ReadThreadName, WriteThreadName>:: start() {
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+bool FixApp<Derived, ReadThreadName, WriteThreadName>::start() {
   const std::string cur_timestamp = timestamp();
   const std::string sig_b64 = get_signature_base64(cur_timestamp);
 
@@ -56,52 +57,103 @@ bool FixApp<Derived, ReadThreadName, WriteThreadName>:: start() {
   return send(fixmsg);
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
 void FixApp<Derived, ReadThreadName, WriteThreadName>::stop() {
   auto msg = static_cast<Derived*>(this)->create_log_out_message();
   send(msg);
+
+  wait_logout_and_halt_io();
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
-bool FixApp<Derived, ReadThreadName, WriteThreadName>::send(const std::string& msg) const {
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+void FixApp<Derived, ReadThreadName,
+            WriteThreadName>::prepare_stop_after_logout() noexcept {
+  logout_ack_.store(false, std::memory_order_relaxed);
+}
+
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+void FixApp<Derived, ReadThreadName,
+            WriteThreadName>::wait_logout_and_halt_io() noexcept {
+  {
+    std::unique_lock lock(stop_mtx_);
+    (void)stop_cv_.wait_for(lock, kLogoutWait, [&] {
+      return logout_ack_.load(std::memory_order_relaxed);
+    });
+  }
+
+  const bool was_running =
+      thread_running_.exchange(false, std::memory_order_acq_rel);
+
+  // writer 깨우기용 센티넬
+  if (queue_)
+    queue_->enqueue(std::string{});
+
+  if (was_running && tls_sock_) {
+    // read()를 깨워서 빠르게 빠지게
+    tls_sock_->interrupt();
+  }
+}
+
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+void FixApp<Derived, ReadThreadName,
+            WriteThreadName>::note_logout_ack() noexcept {
+  logout_ack_.store(true, std::memory_order_relaxed);
+  stop_cv_.notify_all();
+}
+
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+bool FixApp<Derived, ReadThreadName, WriteThreadName>::send(
+    const std::string& msg) const {
   return queue_->enqueue(msg);
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
 void FixApp<Derived, ReadThreadName, WriteThreadName>::write_loop() {
-  while (thread_running_) {
+  while (thread_running_.load(std::memory_order_relaxed)) {
     std::string msg;
 
     while (queue_->dequeue(msg)) {
-      START_MEASURE(TLS_WRITE);
-      auto result =
-          tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
+      // START_MEASURE(TLS_WRITE);
+      // Close sentinel
+      if (UNLIKELY(msg.empty())) {
+        return;
+      }
+      auto result = tls_sock_->write(msg.data(), static_cast<int>(msg.size()));
       if (result < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
           queue_->enqueue(msg);
           break;
         }
-        perror("send failed");
-        thread_running_ = false;
+        logger_.error("send failed");
+        thread_running_.store(false, std::memory_order_release);
+        tls_sock_->interrupt();
         break;
       }
-      END_MEASURE(TLS_WRITE, logger_);
+      // END_MEASURE(TLS_WRITE, logger_);
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(kWriteThreadSleep));
   }
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
 void FixApp<Derived, ReadThreadName, WriteThreadName>::read_loop() {
   std::string received_buffer;
-  while (thread_running_) {
-    START_MEASURE(TLS_READ);
+  while (thread_running_.load(std::memory_order_relaxed)) {
+    // START_MEASURE(TLS_READ);
     std::array<char, kReadBufferSize> buf;
     const int read = tls_sock_->read(buf.data(), buf.size());
-    END_MEASURE(TLS_READ, logger_);
+    // END_MEASURE(TLS_READ, logger_);
     if (read <= 0) {
-      std::this_thread::yield();
-      continue;
+      logger_.error("TLS socket has failed to read. Stop read loop");
+      thread_running_.store(false, std::memory_order_release);
+      return;
     }
     received_buffer.append(buf.data(), read);
 
@@ -112,37 +164,42 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::read_loop() {
   }
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
-void FixApp<Derived, ReadThreadName, WriteThreadName>::register_callback(const MsgType& type,
-                                             const std::function<void(
-                                                 FIX8::Message*)>& callback) {
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+void FixApp<Derived, ReadThreadName, WriteThreadName>::register_callback(
+    const MsgType& type, const std::function<void(FIX8::Message*)>& callback) {
   if (!callbacks_.contains(type)) {
     callbacks_[type] = callback;
   } else {
-    std::cout << "already registered type" << type << "\n";
+    logger_.info("already registered type");
   }
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
-[[nodiscard]] std::string FixApp<Derived, ReadThreadName, WriteThreadName>::create_log_on(
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+[[nodiscard]] std::string
+FixApp<Derived, ReadThreadName, WriteThreadName>::create_log_on(
     const std::string& sig_b64, const std::string& timestamp) {
-  return static_cast<Derived*>(this)->create_log_on_message(sig_b64,
-    timestamp);
+  return static_cast<Derived*>(this)->create_log_on_message(sig_b64, timestamp);
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
 std::string FixApp<Derived, ReadThreadName, WriteThreadName>::create_heartbeat(
     FIX8::Message* message) {
   return static_cast<Derived*>(this)->create_heartbeat_message(message);
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
-void FixApp<Derived, ReadThreadName, WriteThreadName>::encode(std::string& data, FIX8::Message* msg) const {
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+void FixApp<Derived, ReadThreadName, WriteThreadName>::encode(
+    std::string& data, FIX8::Message* msg) const {
   auto* ptr = data.data();
   msg->encode(&ptr);
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
 std::string FixApp<Derived, ReadThreadName, WriteThreadName>::timestamp() {
   using std::chrono::days;
   using std::chrono::duration_cast;
@@ -177,39 +234,45 @@ std::string FixApp<Derived, ReadThreadName, WriteThreadName>::timestamp() {
   return std::string(buf);
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
-bool FixApp<Derived, ReadThreadName, WriteThreadName>::strip_to_header(std::string& buffer) {
-  const size_t pos = buffer.find("8=FIX");
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+bool FixApp<Derived, ReadThreadName, WriteThreadName>::strip_to_header(
+    std::string& buffer) {
+  const size_t pos = buffer.find(kFixSignature);
   if (pos == std::string::npos) {
-    // 헤더가 없으면 entire buffer 가 garbage
-    buffer.clear();
+    if (buffer.size() > kFixSignature.size() - 1) {
+      buffer.erase(0, buffer.size() - (kFixSignature.size() - 1));
+    }
     return false;
   }
-  if (pos > 0) {
+  if (pos > 0)
     buffer.erase(0, pos);
-  }
   return true;
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
-std::string FixApp<Derived, ReadThreadName, WriteThreadName>::get_signature_base64(
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+std::string
+FixApp<Derived, ReadThreadName, WriteThreadName>::get_signature_base64(
     const std::string& timestamp) const {
-  EVP_PKEY* private_key = Util::load_ed25519(
-      authorization_.pem_file_path,
-      authorization_.private_password.c_str());
+  EVP_PKEY* private_key =
+      Util::load_ed25519(AUTHORIZATION.get_pem_file_path(),
+                         AUTHORIZATION.get_private_password().c_str());
 
   // payload = "A<SOH>Sender<SOH>Target<SOH>1<SOH>20250709-00:49:41.041346"
   const std::string payload = std::string("A") + SOH + sender_id_ + SOH +
                               target_id_ + SOH + "1" + SOH + timestamp;
 
-  return Util::sign_and_base64(private_key, payload);
+  auto result = Util::sign_and_base64(private_key, payload);
+  Util::free_key(private_key);
+  return result;
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
-bool FixApp<Derived, ReadThreadName, WriteThreadName>::peek_full_message_len(const std::string& buffer,
-                                                 size_t& msg_len) {
-  constexpr size_t kBegin = 0;
-  const size_t body_start = buffer.find("9=", kBegin);
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+bool FixApp<Derived, ReadThreadName, WriteThreadName>::peek_full_message_len(
+    const std::string& buffer, size_t& msg_len) {
+  const size_t body_start = buffer.find("9=");
   if (body_start == std::string::npos)
     return false;
 
@@ -219,15 +282,16 @@ bool FixApp<Derived, ReadThreadName, WriteThreadName>::peek_full_message_len(con
 
   const int body_len =
       std::stoi(buffer.substr(body_start + 2, body_end - (body_start + 2)));
-  const size_t header_len = (body_end + 1) - kBegin;
+  const size_t header_len = (body_end + 1);
   msg_len = header_len + body_len +
-            7; // NOLINT(readability-magic-numbers) 7 = "10=" + 3bytes + SOH
+            7;  // NOLINT(readability-magic-numbers) 7 = "10=" + 3bytes + SOH
   return buffer.size() >= msg_len;
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
-bool FixApp<Derived, ReadThreadName, WriteThreadName>::extract_next_message(std::string& buffer,
-                                                std::string& msg) {
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+bool FixApp<Derived, ReadThreadName, WriteThreadName>::extract_next_message(
+    std::string& buffer, std::string& msg) {
   if (!strip_to_header(buffer))
     return false;
 
@@ -240,13 +304,19 @@ bool FixApp<Derived, ReadThreadName, WriteThreadName>::extract_next_message(std:
   return true;
 }
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
-void FixApp<Derived, ReadThreadName, WriteThreadName>::process_message(const std::string& raw_msg) {
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
+void FixApp<Derived, ReadThreadName, WriteThreadName>::process_message(
+    const std::string& raw_msg) {
   auto* msg = static_cast<Derived*>(this)->decode(raw_msg);
   const auto type = msg->get_msgtype();
 
   if (UNLIKELY(type == "A")) {
     log_on_ = true;
+  } else if (UNLIKELY(type == "5")) {
+    log_on_ = false;
+    logout_ack_.store(true, std::memory_order_relaxed);
+    stop_cv_.notify_all();
   }
 
   if (callbacks_.contains(type)) {
@@ -254,7 +324,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::process_message(const std
   }
 #ifdef REPOSITORY
   if (raw_data_callback_) {
-    raw_data_callback_(raw_msg);
+    raw_data_callback_(raw_msg, msg, type);
   }
 #endif
   delete msg;
@@ -262,4 +332,4 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::process_message(const std
 
 template class FixApp<FixMarketDataApp, "MDRead", "MDWrite">;
 template class FixApp<FixOrderEntryApp, "OERead", "OEWrite">;
-}
+}  // namespace core

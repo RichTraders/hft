@@ -42,7 +42,7 @@ std::string PositionInfo::toString() const {
 }
 
 void PositionInfo::add_fill(const ExecutionReport* report,
-                            common::Logger* logger) noexcept {
+                            common::Logger::Producer& logger) noexcept {
   const auto old_position = position_;
   const auto idx = sideToIndex(report->side);
   const auto opp_side_index = oppIndex(idx);
@@ -81,10 +81,11 @@ void PositionInfo::add_fill(const ExecutionReport* report,
 
   total_pnl_ = unreal_pnl_ + real_pnl_;
 
-  logger->info(std::format("[Fill] {} {}", toString(), report->toString()));
+  logger.info(std::format("[Fill] {} {}", toString(), report->toString()));
 }
 
-void PositionInfo::update_bbo(const BBO* bbo, common::Logger* logger) noexcept {
+void PositionInfo::update_bbo(const BBO* bbo,
+                              common::Logger::Producer& logger) noexcept {
   bbo_ = bbo;
 
   if (position_ != 0 && bbo->bid_price != common::kPriceInvalid &&
@@ -104,8 +105,7 @@ void PositionInfo::update_bbo(const BBO* bbo, common::Logger* logger) noexcept {
     total_pnl_ = unreal_pnl_ + real_pnl_;
 
     if (total_pnl_ != old_total_pnl)
-      logger->info(
-          std::format("[Updated] {} {}", toString(), bbo_->toString()));
+      logger.info(std::format("[Updated] {} {}", toString(), bbo_->toString()));
   }
 }
 

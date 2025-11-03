@@ -12,16 +12,20 @@
 
 #pragma once
 
-#include <pch.h>
 #include <source_location>
-#include "mpsc_queue_cas.hpp"
 #include "thread.hpp"
 
-//fsink 추가 필요
-
 namespace common {
-// 로그 레벨 정의
-enum class LogLevel : uint8_t { kTrace, kDebug, kInfo, kWarn, kError, kFatal };
+
+enum class LogLevel : uint8_t {
+  kTrace,
+  kDebug,
+  kInfo,
+  kWarn,
+  kError,
+  kFatal,
+  kNone
+};
 
 enum class QueueChunkSize : uint16_t {
   kDefaultSize = 64,
@@ -30,89 +34,91 @@ enum class QueueChunkSize : uint16_t {
   kBigSize = 1024,
 };
 
-// 로그 메시지 구조체
 struct LogMessage {
-  LogLevel level;
-  uint32_t line;
-  std::string timestamp;
-  std::thread::id thread_id;
-  std::string func;
+  enum class Kind : uint8_t { kNormal, kStop };
+
+  Kind kind{Kind::kNormal};
+  LogLevel level{};
+  //uint32_t line = 0;
+  //std::string func;
+  //std::thread::id thread_id;
+  uint64_t ts_ns = 0;
   std::string text;
+
+  static LogMessage make_stop_sentinel() {
+    LogMessage msg;
+    msg.kind = Kind::kStop;
+    return msg;
+  }
+  [[nodiscard]] bool is_stop() const noexcept { return kind == Kind::kStop; }
 };
 
-// 로그 싱크 인터페이스
 class LogSink {
  public:
   virtual ~LogSink() = default;
   virtual void write(const std::string& msg) = 0;
 };
 
-// 콘솔 싱크
 class ConsoleSink final : public LogSink {
  public:
   ConsoleSink() = default;
   void write(const std::string& msg) override;
 };
 
-// 파일 싱크 (회전 기능 지원)
 class FileSink final : public LogSink {
  public:
   FileSink() = delete;
   FileSink(const std::string& filename, std::size_t max_size)
-      : max_size_(max_size), index_(0) {
+      : max_size_(max_size) {
     auto pos = filename.find_last_of('.');
-    const std::string name = (pos == std::string::npos)
-                                 ? filename                  // 확장자 없음
-                                 : filename.substr(0, pos);  // “file_name”
+    const std::string name =
+        (pos == std::string::npos) ? filename : filename.substr(0, pos);
 
-    const std::string ext = (pos == std::string::npos) ? ""  // 확장자 없음
-                                                       : filename.substr(pos);
+    const std::string ext =
+        (pos == std::string::npos) ? "" : filename.substr(pos);
 
     filename_ = name;
     file_extension_ = ext;
 
     if (file_extension_.empty())
       file_extension_ = ".txt";
-
-    ofs_.open(filename_ + '_' + std::to_string(index_) + file_extension_,
-              std::ios::out | std::ios::app);
-
-    line_cnt_ = 0;
+    ofs_.open(filename_ + file_extension_);
   }
   void write(const std::string& msg) override;
 
+  void flush() { ofs_.flush(); }
+
  private:
   void rotate();
+  void reopen_fallback();
 
   std::string filename_;
   std::string file_extension_;
   std::size_t max_size_;
   std::ofstream ofs_;
-  uint32_t line_cnt_;
-  int index_;
+  uint32_t line_cnt_{0};
+  int index_{0};
 };
 
-// 포맷터
 class LogFormatter {
  public:
   static std::string format(const LogMessage& msg) {
-    std::ostringstream oss;
+    if (msg.is_stop())
+      return {};
+
+    std::string out;
+
 #ifndef LOGGER_PREFIX_DISABLED
-    auto now = std::chrono::system_clock::now();
-    auto ttime = std::chrono::system_clock::to_time_t(now);
-    auto milisec = std::chrono::duration_cast<std::chrono::milliseconds>(
-                       now.time_since_epoch() % std::chrono::seconds(1))
-                       .count();
-    std::tm ttm;
-    localtime_r(&ttime, &ttm);
-    oss << "[" << std::put_time(&ttm, "%Y-%m-%dT%H:%M:%S") << "."
-        << std::setw(3) << std::setfill('0') << milisec << "]";
-    oss << "[" << levelToString(msg.level) << "]";
-    oss << "[tid=" << msg.thread_id << "]";
-    oss << "[" << msg.func << ": " << std::to_string(msg.line) << "] ";
+    out.reserve(kBufferSize + msg.text.size());
+    std::array<char, kBufferSize> buf;
+    size_t blen = 0;
+    format_iso8601_utc(buf.data(), blen, msg.ts_ns);
+    out.append(buf.data(), blen);
+#else
+    out.reserve(msg.text.size());
 #endif
-    oss << msg.text;
-    return oss.str();
+    std::format_to(std::back_inserter(out), "{}", msg.text);
+    return out;
   }
 
  private:
@@ -130,60 +136,112 @@ class LogFormatter {
         return "Error";
       case LogLevel::kFatal:
         return "Fatal";
+      default:
+        return "Unknown";
     }
-    return "UNKNOWN";
   }
+
+  static void format_iso8601_utc(char* out, size_t& len, uint64_t ts_ns) {
+    const auto time_p = std::chrono::time_point<std::chrono::system_clock>(
+        std::chrono::nanoseconds(ts_ns));
+    const auto sec = time_point_cast<std::chrono::seconds>(time_p);
+    const auto nano =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(time_p - sec)
+            .count();
+
+    const std::time_t time = std::chrono::system_clock::to_time_t(sec);
+    std::tm calendar_date;
+    gmtime_r(&time, &calendar_date);
+
+    const auto* time_format = std::format_to(
+        out, "[{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:06}Z]",
+        calendar_date.tm_year + k1900, calendar_date.tm_mon + 1,
+        calendar_date.tm_mday, calendar_date.tm_hour, calendar_date.tm_min,
+        calendar_date.tm_sec, nano / k1000);
+    len = static_cast<size_t>(time_format - out);
+  }
+  static constexpr int kTimeDigit = 6;
+  static constexpr int k1900 = 1900;
+  static constexpr int k1000 = 1000;
+  static constexpr int kBufferSize = 64;
 };
 
 class Logger {
  public:
-  Logger() {
-    stop_ = static_cast<bool>(worker_.start(&Logger::process, this));
-    level_ = LogLevel::kInfo;
-    info("[Constructor] Logge Start");
-  }
+  class Producer;
 
-  ~Logger() {
-    stop_ = true;
-    worker_.join();
-    info("[Destructor] Logger finish");
-  }
+  Logger();
+  ~Logger() noexcept;
 
   void setLevel(LogLevel lvl) { level_.store(lvl, std::memory_order_relaxed); }
 
   void addSink(std::unique_ptr<LogSink> sink) {
     sinks_.push_back(std::move(sink));
   }
-
-  void trace(const std::string& text,
-             const std::source_location& loc = std::source_location::current());
-  void debug(const std::string& text,
-             const std::source_location& loc = std::source_location::current());
-  void info(const std::string& text,
-            const std::source_location& loc = std::source_location::current());
-  void warn(const std::string& text,
-            const std::source_location& loc = std::source_location::current());
-  void error(const std::string& text,
-             const std::source_location& loc = std::source_location::current());
-  void fatal(const std::string& text,
-             const std::source_location& loc = std::source_location::current());
-
   void clearSink() { sinks_.clear(); }
+  static LogLevel string_to_level(const std::string& level) noexcept;
+  static std::string level_to_string(LogLevel level) noexcept;
+  void shutdown();
+  void flush();
+
+  Producer make_producer();
+
+  class Producer {
+   public:
+    Producer() = default;
+    Producer(Producer&&) noexcept;
+    Producer& operator=(Producer&&) noexcept;
+    ~Producer();
+
+    explicit operator bool() const noexcept { return impl_ != nullptr; }
+
+    void log(LogLevel lvl, std::string_view text,
+             std::source_location loc = std::source_location::current());
+
+    void info(std::string_view str,
+              std::source_location loc = std::source_location::current()) {
+      log(LogLevel::kInfo, str, loc);
+    }
+    void debug(std::string_view str,
+               std::source_location loc = std::source_location::current()) {
+      log(LogLevel::kDebug, str, loc);
+    }
+    void trace(std::string_view str,
+               std::source_location loc = std::source_location::current()) {
+
+      log(LogLevel::kTrace, str, loc);
+    }
+    void warn(std::string_view str,
+              std::source_location loc = std::source_location::current()) {
+      log(LogLevel::kWarn, str, loc);
+    }
+    void error(std::string_view str,
+               std::source_location loc = std::source_location::current()) {
+      log(LogLevel::kError, str, loc);
+    }
+    void fatal(std::string_view str,
+               std::source_location loc = std::source_location::current()) {
+      log(LogLevel::kFatal, str, loc);
+    }
+
+   private:
+    struct Impl;  // per-producer (ProducerToken 보유)
+    Impl* impl_{nullptr};
+    explicit Producer(Impl* producer) : impl_(producer) {}
+    friend class Logger;
+  };
 
  private:
-  void process();
-  void log(LogLevel lvl, const std::string& text,
-           const std::source_location& loc);
+  void process() const;
+  void dispatch(const LogMessage& msg) const;
 
   std::atomic<LogLevel> level_;
   std::vector<std::unique_ptr<LogSink>> sinks_;
-  MPSCSegQueue<LogMessage, static_cast<int>(QueueChunkSize::kDefaultSize)>
-      queue_;
-#ifdef UNIT_TEST
+
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
+
   Thread<"Logger"> worker_;
-#else
-  Thread<"Logger"> worker_;
-#endif
   std::atomic<bool> stop_{false};
 };
 

@@ -25,6 +25,7 @@ set(FIX8_SRC
         ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/fix_md_app.cpp
         ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/fix_oe_app.cpp
         ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/response_manager.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/fix_sequence_counter.cpp
 )
 
 add_library(BrokerFix8Schema STATIC ${FIX8_SRC})
@@ -93,6 +94,8 @@ target_link_libraries(BrokerCommon
         PUBLIC
         absl::flat_hash_map
 )
+target_include_directories(BrokerCommon PRIVATE
+        ${CMAKE_SOURCE_DIR}/extern/concurrentqueue)
 ######################################
 
 set(CMAKE_CXX_STANDARD 20)
@@ -102,11 +105,13 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 endif ()
 
 add_executable(Repository main.cpp broker.cpp)
+target_compile_definitions(Repository PUBLIC LIGHT_LOGGER)
 target_precompile_headers(Repository PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
 target_link_libraries(Repository PRIVATE
         BrokerFix8Schema
         BrokerCommon
 )
+
 
 set(RESOURCES_DIR "${CMAKE_SOURCE_DIR}/resources")
 file(COPY ${RESOURCES_DIR} DESTINATION ${CMAKE_BINARY_DIR}/repository)

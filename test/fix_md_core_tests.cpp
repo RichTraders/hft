@@ -60,24 +60,19 @@ std::string timestamp() {
 class FixTest : public ::testing::Test {
 protected:
   void SetUp() override {
-    IniConfig config;
-    config.load("resources/config.ini");
-    Authorization authorization{
-        .md_address = config.get("auth", "md_address"),
-        .port = config.get_int("auth", "port"),
-        .api_key = config.get("auth", "api_key"),
-        .pem_file_path = config.get("auth", "pem_file_path"),
-        .private_password = config.get("auth", "private_password")};
-
-    logger_ = std::make_unique<common::Logger>();
-    pool_ = std::make_unique<common::MemoryPool<MarketData>>(1024);
-    fix = std::make_unique<FixMdCore>("SENDER", "TARGET", logger_.get(),
-                                      pool_.get(), authorization);
+   INI_CONFIG.load("resources/config.ini");
+   pool_ = std::make_unique<common::MemoryPool<MarketData>>(1024);
+   logger_ = std::make_unique<common::Logger>();
+   fix = std::make_unique<FixMdCore>("SENDER", "TARGET", logger_.get(),
+                                     pool_.get());
+ }
+  void TearDown() override {
+    fix.reset();
   }
 
-  std::unique_ptr<FixMdCore> fix;
-  std::unique_ptr<common::Logger> logger_;
-  std::unique_ptr<common::MemoryPool<MarketData>> pool_;
+ std::unique_ptr<common::Logger> logger_;
+ std::unique_ptr<FixMdCore> fix;
+ std::unique_ptr<common::MemoryPool<MarketData>> pool_;
 };
 
 TEST_F(FixTest, CreateLogOnMessageProducesValidFixMessage) {
@@ -163,7 +158,7 @@ TEST_F(FixTest, CreateSubscriptionMessage_ContainsCorrectFields) {
   FixMdCore::SymbolId symbol = "BTCUSD";
 
   std::string const msg_str = fix->create_market_data_subscription_message(
-      req_id, depth, symbol);
+      req_id, depth, symbol, true);
   FIX8::Message* msg = fix->decode(msg_str);
   ASSERT_NE(msg, nullptr);
 

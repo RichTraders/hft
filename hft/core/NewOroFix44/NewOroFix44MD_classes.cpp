@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// *** f8c generated file: DO NOT EDIT! Created: 2025-07-26 15:49:21 ***
+// *** f8c generated file: DO NOT EDIT! Created: 2025-11-03 15:42:15 ***
 //-------------------------------------------------------------------------------------------------
 /*
 
@@ -123,7 +123,7 @@ extern const NewOroFix44MD_BaseEntry::Pair fldpairs[];
 const F8MetaCntx& ctx() // avoid SIOF
 {
    static const NewOroFix44MD_BaseMsgEntry bme(msgpairs, 16);
-   static const NewOroFix44MD_BaseEntry be(fldpairs, 61);
+   static const NewOroFix44MD_BaseEntry be(fldpairs, 63);
    static const F8MetaCntx _ctx(4400, bme, be, cn, "FIX.4.4");
    return _ctx;
 }

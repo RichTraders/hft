@@ -21,8 +21,9 @@ enum class RiskCheckResult : uint8_t {
   kInvalid = 0,
   kOrderTooLarge = 1,
   kPositionTooLarge = 2,
-  kLossTooLarge = 3,
-  kAllowed = 4
+  kPositionTooSmall = 3,
+  kLossTooLarge = 4,
+  kAllowed = 5
 };
 
 inline auto riskCheckResultToString(RiskCheckResult result) {
@@ -33,6 +34,8 @@ inline auto riskCheckResultToString(RiskCheckResult result) {
       return "ORDER_TOO_LARGE";
     case RiskCheckResult::kPositionTooLarge:
       return "POSITION_TOO_LARGE";
+    case RiskCheckResult::kPositionTooSmall:
+      return "POSITION_TOO_Small";
     case RiskCheckResult::kLossTooLarge:
       return "LOSS_TOO_LARGE";
     case RiskCheckResult::kAllowed:
@@ -43,12 +46,13 @@ inline auto riskCheckResultToString(RiskCheckResult result) {
 }
 
 struct RiskInfo {
-  const PositionInfo* position_info_ = nullptr;
+  PositionInfo* position_info_ = nullptr;
 
   common::RiskCfg risk_cfg_;
 
   [[nodiscard]] RiskCheckResult checkPreTradeRisk(
-      common::Side side, common::Qty qty) const noexcept;
+      common::Side side, common::Qty qty, common::Qty reserved_position,
+      common::Logger::Producer& logger) noexcept;
 
   [[nodiscard]] auto toString() const {
     std::ostringstream stream;
@@ -63,14 +67,15 @@ using TickerRiskInfoHashMap = std::unordered_map<std::string, RiskInfo>;
 
 class RiskManager {
  public:
-  RiskManager(common::Logger* logger, const PositionKeeper* position_keeper,
+  RiskManager(common::Logger* logger, PositionKeeper* position_keeper,
               const common::TradeEngineCfgHashMap& ticker_cfg);
 
   ~RiskManager();
-  [[nodiscard]] auto checkPreTradeRisk(const common::TickerId& ticker_id,
-                                       const common::Side side,
-                                       const common::Qty qty) const noexcept {
-    return ticker_risk_.at(ticker_id).checkPreTradeRisk(side, qty);
+  [[nodiscard]] auto checkPreTradeRisk(
+      const common::TickerId& ticker_id, const common::Side side,
+      const common::Qty qty, const common::Qty reserved_qty) noexcept {
+    return ticker_risk_.at(ticker_id).checkPreTradeRisk(side, qty, reserved_qty,
+                                                        logger_);
   }
 
   RiskManager() = delete;
@@ -84,7 +89,7 @@ class RiskManager {
   RiskManager& operator=(const RiskManager&&) = delete;
 
  private:
-  common::Logger* logger_;
+  common::Logger::Producer logger_;
   TickerRiskInfoHashMap ticker_risk_;
 };
 }  // namespace trading

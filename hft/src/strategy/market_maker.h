@@ -12,14 +12,16 @@
 
 #ifndef MARKETMAKER_H
 #define MARKETMAKER_H
-#include "strategy.hpp"
+#include "base_strategy.hpp"
+#include "strategy_dispatch.hpp"
 
+struct MarketData;
 namespace trading {
 class FeatureEngine;
 class MarketOrderBook;
 }  // namespace trading
 namespace trading {
-class MarketMaker : public BaseStrategy<MarketMaker> {
+class MarketMaker : public BaseStrategy {
  public:
   MarketMaker(OrderManager* order_manager, const FeatureEngine* feature_engine,
               common::Logger* logger,
@@ -31,7 +33,18 @@ class MarketMaker : public BaseStrategy<MarketMaker> {
   void on_trade_updated(const MarketData*, MarketOrderBook*) noexcept;
 
   void on_order_updated(const ExecutionReport*) noexcept;
+
+ private:
+  const double variance_denominator_;
+  const double position_variance_;
+  const double enter_threshold_;
+  const double exit_threshold_;
+  const int obi_level_;
+  std::vector<double> bid_qty_;
+  std::vector<double> ask_qty_;
 };
+
+void register_market_maker_strategy();
 }  // namespace trading
 
 #endif  //MARKETMAKER_H

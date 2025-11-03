@@ -13,13 +13,11 @@
 #ifndef FIX_PROTOCOL_H
 #define FIX_PROTOCOL_H
 
-#include "common/spsc_queue.h"
+#include <common/spsc_queue.h>
 #include <common/thread.hpp>
-
-#include "authorization.h"
 #include "logger.h"
 
-constexpr int kQueueSize = 8;
+constexpr int kQueueSize = 64;
 constexpr int kReadBufferSize = 1024;
 constexpr int kWriteThreadSleep = 100;
 
@@ -30,15 +28,12 @@ class Message;
 namespace core {
 class SSLSocket;
 
-template <typename Derived, FixedString ReadThreadName, FixedString WriteThreadName>
+template <typename Derived, FixedString ReadThreadName,
+          FixedString WriteThreadName>
 class FixApp {
-public:
-  FixApp(const std::string& address,
-         int port,
-         std::string sender_comp_id,
-         std::string target_comp_id,
-         common::Logger* logger,
-         const Authorization& authorization);
+ public:
+  FixApp(const std::string& address, int port, std::string sender_comp_id,
+         std::string target_comp_id, common::Logger* logger);
 
   ~FixApp();
 
@@ -53,6 +48,9 @@ public:
   bool start();
 
   void stop();
+  void prepare_stop_after_logout() noexcept;
+  void wait_logout_and_halt_io() noexcept;
+  void note_logout_ack() noexcept;
 
   bool send(const std::string& msg) const;
 
@@ -64,13 +62,15 @@ public:
                          const std::function<void(FIX8::Message*)>& callback);
 
 #ifdef REPOSITORY
-  void register_callback(std::function<void(const std::string&)> cb) {
+  void register_callback(std::function<void(const std::string&, FIX8::Message*,
+                                            const std::string&)>
+                             cb) {
     raw_data_callback_ = std::move(cb);
   }
 #endif
 
-  [[nodiscard]] std::string create_log_on(
-      const std::string& sig_b64, const std::string& timestamp);
+  [[nodiscard]] std::string create_log_on(const std::string& sig_b64,
+                                          const std::string& timestamp);
 
   [[nodiscard]] std::string create_log_out();
 
@@ -79,7 +79,7 @@ public:
 
   std::string timestamp();
 
-private:
+ private:
   static bool strip_to_header(std::string& buffer);
 
   std::string get_signature_base64(const std::string& timestamp) const;
@@ -90,24 +90,29 @@ private:
 
   void process_message(const std::string& raw_msg);
 
-  common::Logger* logger_;
+  common::Logger::Producer logger_;
   std::unique_ptr<SSLSocket> tls_sock_;
   std::map<std::string, std::function<void(FIX8::Message*)>> callbacks_;
 
 #ifdef REPOSITORY
-  std::function<void(const std::string&)> raw_data_callback_;
+  std::function<void(const std::string&, FIX8::Message*, const std::string&)>
+      raw_data_callback_;
 #endif
-  std::unique_ptr<common::SPSCQueue<std::string>> queue_;
+  std::unique_ptr<common::SPSCQueue<std::string, kQueueSize>> queue_;
 
   common::Thread<WriteThreadName> write_thread_;
   common::Thread<ReadThreadName> read_thread_;
-  bool thread_running_{true};
+  std::atomic<bool> thread_running_{false};
 
   bool log_on_{false};
   const std::string sender_id_;
   const std::string target_id_;
-  const Authorization authorization_;
+
+  std::atomic<bool> logout_ack_{false};
+  std::mutex stop_mtx_;
+  std::condition_variable stop_cv_;
+  static constexpr auto kLogoutWait = std::chrono::milliseconds(5000);
 };
-} // namespace core
+}  // namespace core
 
 #endif  //FIX_PROTOCOL_H

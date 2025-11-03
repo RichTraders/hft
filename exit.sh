@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 대상 호스트와 포트
-HOST="fix-md.testnet.binance.vision"
+HOST="fix-md.binance.com"
 PORT="9000"
 
 # SOH 문자 (ASCII 0x01)

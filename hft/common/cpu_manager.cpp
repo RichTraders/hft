@@ -13,25 +13,23 @@
 #include "cpu_manager.h"
 #include <sys/resource.h>
 #include "ini_config.hpp"
-#include "logger.h"
 
 namespace common {
 CpuManager::CpuManager(Logger* logger) {
-  logger_ = logger;
+  logger_ = logger->make_producer();
 
-  IniConfig cfg;
-  cfg.load("resources/config.ini");
-
-  const int cpu_use_count = cfg.get_int("cpu_id", "count");
-  use_cpu_group_ = static_cast<bool>(cfg.get_int("cpu_id", "use_cpu_group"));
-  use_cpu_to_tid_ = static_cast<bool>(cfg.get_int("cpu_id", "use_cpu_to_tid"));
+  const int cpu_use_count = INI_CONFIG.get_int("cpu_id", "count");
+  use_cpu_group_ =
+      static_cast<bool>(INI_CONFIG.get_int("cpu_id", "use_cpu_group"));
+  use_cpu_to_tid_ =
+      static_cast<bool>(INI_CONFIG.get_int("cpu_id", "use_cpu_to_tid"));
 
   for (int i = 0; i < cpu_use_count; i++) {
     CpuInfo info;
     const std::string cpu_id = "cpu_" + std::to_string(i);
 
-    info.use_irq = static_cast<bool>(cfg.get_int(cpu_id, "use_irq"));
-    info.type = static_cast<uint8_t>(cfg.get_int(cpu_id, "cpu_type"));
+    info.use_irq = static_cast<bool>(INI_CONFIG.get_int(cpu_id, "use_irq"));
+    info.type = static_cast<uint8_t>(INI_CONFIG.get_int(cpu_id, "cpu_type"));
     if (info.use_irq) {
       // irq 추가 필요, 현재 없으니 필요 없음
     }
@@ -39,26 +37,33 @@ CpuManager::CpuManager(Logger* logger) {
     cpu_info_list_.emplace(i, info);
   }
 
-  const int thread_count = cfg.get_int("thread", "count");
+  const int thread_count = INI_CONFIG.get_int("thread", "count");
 
   for (int i = 0; i < thread_count; i++) {
     ThreadInfo info;
     const std::string thread_id = "thread_" + std::to_string(i);
 
-    const std::string thread_name = cfg.get(thread_id, "name");
+    const std::string thread_name = INI_CONFIG.get(thread_id, "name");
 
-    info.cpu_id = static_cast<uint8_t>(cfg.get_int(thread_id, "cpu_id"));
-    if (info.cpu_id <= SCHED_RR) {
-      info.value = cfg.get_int(thread_id, "prio");
+    info.cpu_id = static_cast<uint8_t>(INI_CONFIG.get_int(thread_id, "cpu_id"));
+
+    const auto& iter = cpu_info_list_.find(info.cpu_id);
+
+    if (iter == cpu_info_list_.end()) {
+      logger_.error("[Init] failed to get cpu_id info");
+    }
+
+    if (iter->second.type <= SCHED_RR) {
+      info.value = INI_CONFIG.get_int(thread_id, "prio");
     } else {
-      info.value = cfg.get_int(thread_id, "nicev");
+      info.value = INI_CONFIG.get_int(thread_id, "nicev");
     }
 
     info.tid = get_tid_by_thread_name(thread_name);
     thread_info_list_.emplace(thread_name, info);
   }
 
-  logger_->info("[Constructor] cpu manager start");
+  logger_.info("[Constructor] cpu manager start");
 }
 
 CpuManager::~CpuManager() {
@@ -66,7 +71,7 @@ CpuManager::~CpuManager() {
   detach(getpid(), result);
   undo(result);
 
-  logger_->info("[Destructor] cpu manager start");
+  logger_.info("[Destructor] cpu manager start");
 }
 
 bool CpuManager::init_cpu_to_tid() {
@@ -203,7 +208,7 @@ pid_t CpuManager::get_tid_by_thread_name(const std::string& target_name) {
       }
     }
   }
-  return 0;  // not found
+  return 0;
 }
 
 int CpuManager::setup(std::string& result) {
@@ -279,32 +284,107 @@ int CpuManager::set_rt(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
     return -1;
   }
 
-  if (set_affinity(AffinityInfo(CpuId(cpu_id), ThreadId(tid))) != 0) {
+  std::string result;
+  if (set_cpu_to_tid(cpu_id, tid, result)) {
+    logger_.error("[init] failed to cpu to tid");
     return -1;
   }
 
-  struct sched_param sched_params {};
+  // if (set_affinity(AffinityInfo(CpuId(cpu_id), ThreadId(tid))) != 0) {
+  //   return -1;
+  // }
+
+  /*struct sched_param sched_params{};
   sched_params.sched_priority = prio;
   if (sched_setscheduler(tid, static_cast<int>(policy), &sched_params) != 0) {
     return -1;
+  }*/
+
+  if (set_chrt(tid, prio, static_cast<int>(policy), result)) {
+    logger_.error("[init] failed to chrt to tid");
+    return -1;
   }
+
   return 0;
 }
 
 int CpuManager::set_cfs(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
                         int nicev) {
-  if (set_affinity(AffinityInfo(CpuId(cpu_id), ThreadId(tid))) != 0) {
+  // if (set_affinity(AffinityInfo(CpuId(cpu_id), ThreadId(tid))) != 0) {
+  //   return -1;
+  // }
+
+  std::string result;
+  if (set_cpu_to_tid(cpu_id, tid, result)) {
+    logger_.error("[init] failed to cpu to tid");
     return -1;
   }
 
-  const struct sched_param sched_params {};
+  result.clear();
+  /*const struct sched_param sched_params{};
   if (sched_setscheduler(tid, static_cast<int>(policy), &sched_params) != 0) {
     return -1;
-  }
-  if (setpriority(PRIO_PROCESS, tid, nicev) != 0) {
+  }*/
+
+  if (set_chrt(tid, 0, static_cast<int>(policy), result)) {
+    logger_.error("[init] failed to chrt to tid");
     return -1;
   }
+
+  /*if (setpriority(PRIO_PROCESS, tid, nicev) != 0) {
+    return -1;
+  }*/
+
+  result.clear();
+
+  if (set_priority(nicev, tid, result)) {
+    logger_.error("[init] failed to priority to tid");
+    return -1;
+  }
+
   return 0;
+}
+
+int CpuManager::set_cpu_to_tid(uint8_t cpu_id, pid_t tid, std::string& result) {
+  return run_commnad(
+      "sudo taskset -cp " + std::to_string(cpu_id) + " " + std::to_string(tid),
+      result);
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+int CpuManager::set_chrt(pid_t tid, int value, int sched, std::string& result) {
+  std::string command = "sudo chrt ";
+  switch (sched) {
+    case SCHED_OTHER:
+      command += "-o ";
+      break;
+    case SCHED_RR:
+      command += "-r ";
+      break;
+    case SCHED_FIFO:
+      command += "-f ";
+      break;
+    case SCHED_BATCH:
+      command += "-b ";
+      break;
+    case SCHED_IDLE:
+      command += "-i ";
+      break;
+    case SCHED_DEADLINE:
+    case SCHED_ISO:
+    default:
+      return -1;
+  }
+  command += "-p " + std::to_string(value) + " " + std::to_string(tid);
+
+  return run_commnad(command, result);
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+int CpuManager::set_priority(int value, pid_t tid, std::string& result) {
+  return run_commnad(
+      "sudo renice -n -" + std::to_string(value) + " -p " + std::to_string(tid),
+      result);
 }
 
 int CpuManager::run_commnad(const std::string& command, std::string& result) {

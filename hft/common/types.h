@@ -16,8 +16,8 @@
 namespace common {
 struct OrderId {
   uint64_t value{std::numeric_limits<uint64_t>::max()};
-  explicit OrderId() = default;
-  explicit OrderId(uint64_t data) : value(data) {}
+  explicit OrderId() noexcept = default;
+  explicit OrderId(uint64_t data) noexcept : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<uint64_t>::max();
@@ -53,8 +53,8 @@ constexpr auto kTickerIdInvalid = "";
 
 struct ClientId {
   uint32_t value{std::numeric_limits<uint32_t>::max()};
-  explicit ClientId() = default;
-  explicit ClientId(uint32_t data) : value(data) {}
+  explicit ClientId() noexcept = default;
+  explicit ClientId(uint32_t data) noexcept : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<uint32_t>::max();
@@ -75,8 +75,8 @@ constexpr auto kClientIdInvalid = std::numeric_limits<uint32_t>::max();
 struct Price {
   double value{std::numeric_limits<double>::max()};
 
-  Price() = default;
-  explicit Price(double data) : value(data) {}
+  Price() noexcept = default;
+  explicit constexpr Price(double data) noexcept : value(data) {}
 
   constexpr bool operator==(double other) const { return value == other; }
 
@@ -86,6 +86,26 @@ struct Price {
   }
   constexpr bool operator==(const Price& other) const {
     return value == other.value;
+  }
+
+  constexpr Price operator-(const Price& other) const {
+    return Price{value - other.value};
+  }
+
+  constexpr Price operator-(double other) const { return Price{value - other}; }
+
+  friend constexpr Price operator-(double lhs, const Price& rhs) {
+    return Price{lhs - rhs.value};
+  }
+
+  constexpr Price operator+(const Price& other) const {
+    return Price{value + other.value};
+  }
+
+  constexpr Price operator+(double other) const { return Price{value + other}; }
+
+  friend constexpr Price operator+(double lhs, const Price& rhs) {
+    return Price{lhs + rhs.value};
   }
 
   [[nodiscard]] constexpr bool isValid() const {
@@ -108,8 +128,8 @@ inline auto toString(Price price) -> std::string {
 struct Qty {
   double value{std::numeric_limits<double>::max()};
 
-  Qty() = default;
-  explicit Qty(double data) : value(data) {}
+  Qty() noexcept = default;
+  constexpr explicit Qty(double data) noexcept : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<double>::max();
@@ -127,43 +147,63 @@ struct Qty {
     value += other.value;
     return *this;
   }
-
   constexpr Qty& operator+=(double other) {
     value += other;
     return *this;
   }
-
   constexpr Qty& operator-=(const Qty& other) {
     value -= other.value;
     return *this;
   }
-
   constexpr Qty& operator-=(double other) {
     value -= other;
     return *this;
   }
-
-  constexpr Qty& operator*(const Qty& other) {
-    value *= other.value;
-    return *this;
-  }
-
-  constexpr Qty& operator*(double other) {
-    value *= other;
-    return *this;
-  }
-
   constexpr Qty& operator*=(double other) {
     value *= other;
     return *this;
   }
+  constexpr Qty operator-() const noexcept { return Qty{-value}; }
 
   explicit operator double() const { return value; }
+
+  friend constexpr Qty operator+(Qty lhs, const Qty& rhs) noexcept {
+    lhs += rhs;
+    return lhs;
+  }
+  friend constexpr Qty operator+(Qty lhs, double rhs) noexcept {
+    lhs += rhs;
+    return lhs;
+  }
+  friend constexpr Qty operator+(double lhs, Qty rhs) noexcept {
+    rhs += lhs;
+    return rhs;
+  }
+
+  friend constexpr Qty operator-(Qty lhs, const Qty& rhs) noexcept {
+    lhs -= rhs;
+    return lhs;
+  }
+  friend constexpr Qty operator-(Qty lhs, double rhs) noexcept {
+    lhs -= rhs;
+    return lhs;
+  }
+  friend constexpr Qty operator-(double lhs, const Qty& rhs) noexcept {
+    return Qty{lhs - rhs.value};
+  }
+
+  friend constexpr Qty operator*(Qty lhs, double rhs) noexcept {
+    lhs *= rhs;
+    return lhs;
+  }
+  friend constexpr Qty operator*(double lhs, Qty rhs) noexcept {
+    rhs *= lhs;
+    return rhs;
+  }
 };
 
 inline auto toString(Qty qty) -> std::string {
-  return UNLIKELY(!qty.is_valid()) ? "INVALID"
-                                   : std::to_string(static_cast<double>(qty));
+  return UNLIKELY(!qty.is_valid()) ? "INVALID" : std::to_string(qty.value);
 }
 
 constexpr auto kQtyInvalid = std::numeric_limits<double>::max();
@@ -171,7 +211,7 @@ constexpr auto kQtyInvalid = std::numeric_limits<double>::max();
 struct Priority {
   uint64_t value{std::numeric_limits<uint64_t>::max()};
 
-  explicit Priority(uint64_t data) : value(data) {}
+  explicit Priority(uint64_t data) noexcept : value(data) {}
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<uint64_t>::max();
@@ -207,11 +247,10 @@ inline auto toString(const Side side) -> std::string {
     case Side::kInvalid:
       return "INVALID";
   }
-
   return "UNKNOWN";
 }
 
-inline Side charToSide(const char character) {
+inline Side charToSide(const char character) noexcept {
   switch (character) {
     case '0':
       return Side::kBuy;
@@ -246,7 +285,7 @@ enum class MarketUpdateType : uint8_t {
   kTrade = 5,
 };
 
-inline MarketUpdateType charToMarketUpdateType(const char character) {
+inline MarketUpdateType charToMarketUpdateType(const char character) noexcept {
   switch (character) {
     case '0':
       return MarketUpdateType::kAdd;
@@ -259,7 +298,7 @@ inline MarketUpdateType charToMarketUpdateType(const char character) {
   }
 }
 
-inline std::string toString(MarketUpdateType type) {
+inline std::string toString(MarketUpdateType type) noexcept {
   switch (type) {
     case MarketUpdateType::kClear:
       return "CLEAR";
@@ -280,6 +319,7 @@ inline std::string toString(MarketUpdateType type) {
 struct RiskCfg {
   Qty max_order_size_ = Qty{0};
   Qty max_position_ = Qty{0};
+  Qty min_position_ = Qty{0};
   double max_loss_ = 0;
 
   [[nodiscard]] auto toString() const {
@@ -288,6 +328,7 @@ struct RiskCfg {
     stream << "RiskCfg{"
            << "max-order-size:" << common::toString(max_order_size_) << " "
            << "max-position:" << common::toString(max_position_) << " "
+           << "min-position:" << common::toString(min_position_) << " "
            << "max-loss:" << max_loss_ << "}";
 
     return stream.str();

@@ -18,6 +18,7 @@
 #include "order_entry.h"
 #include "order_gateway.h"
 #include "risk_manager.h"
+#include "strategy/strategies.hpp"
 #include "thread.hpp"
 #include "trade_engine.h"
 
@@ -28,6 +29,7 @@ int main() {
 #else
     INI_CONFIG.load("resources/config.ini");
 #endif
+    trading::register_all_strategies();
 
     std::unique_ptr<common::Logger> logger = std::make_unique<common::Logger>();
     logger->setLevel(logger->string_to_level(INI_CONFIG.get("log", "level")));

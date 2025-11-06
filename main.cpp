@@ -12,6 +12,8 @@
 
 #include "cpu_manager.h"
 #include "hft/core/NewOroFix44/response_manager.h"
+#include "hft/src/gateway/fix_market_data_gateway.h"
+#include "hft/src/gateway/fix_order_gateway.h"
 #include "ini_config.hpp"
 #include "logger.h"
 #include "market_consumer.h"
@@ -71,18 +73,28 @@ int main() {
         logger.get(), execution_report_pool.get(),
         order_cancel_reject_pool.get(), order_mass_cancel_report_pool.get());
 
-    auto order_gateway = std::make_unique<trading::OrderGateway>(
-        logger.get(), response_manager.get());
-
     auto engine = std::make_unique<trading::TradeEngine>(
         logger.get(), market_update_data_pool.get(), market_data_pool.get(),
         response_manager.get(), config_map);
+
+    // Create gateway (FixGateway for production)
+    auto gateway = std::make_unique<trading::FixGateway>(
+        "BMDWATCH", "SPOT", logger.get(), response_manager.get(), engine.get());
+
+    auto order_gateway =
+        std::make_unique<trading::OrderGateway>(logger.get(), gateway.get());
+
     engine->init_order_gateway(order_gateway.get());
     order_gateway->init_trade_engine(engine.get());
 
-    const trading::MarketConsumer consumer(logger.get(), engine.get(),
-                                           market_update_data_pool.get(),
-                                           market_data_pool.get());
+    // Create market data gateway (FixMarketDataGateway for production)
+    auto market_gateway = std::make_unique<trading::FixMarketDataGateway>(
+        "BMDWATCH", "SPOT", logger.get(), engine.get(),
+        market_update_data_pool.get(), market_data_pool.get());
+
+    const trading::MarketConsumer consumer(
+        logger.get(), market_gateway.get(), "DEPTH_STREAM",
+        INI_CONFIG.get("meta", "level"), INI_CONFIG.get("meta", "ticker"));
 
     std::unique_ptr<common::CpuManager> cpu_manager =
         std::make_unique<common::CpuManager>(logger.get());

@@ -72,11 +72,11 @@ class CpuManager {
   int set_cpu_batch(uint8_t cpu_id, pid_t tid, int nicev);
   int set_cpu_idle(uint8_t cpu_id, pid_t tid, int nicev);
 
-  int set_rt(uint8_t cpu_id, pid_t tid, SchedPolicy policy, int prio);
+  int set_rt(uint8_t cpu_id, pid_t tid, SchedPolicy policy, int priority);
   int set_cfs(uint8_t cpu_id, pid_t tid, SchedPolicy policy, int nicev);
   int set_cpu_to_tid(uint8_t cpu_id, pid_t tid);
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-  static int set_chrt(pid_t tid, int value, int sched, std::string& result);
+  int set_scheduler(pid_t tid, int priority, int scheduler_policy);
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   static int set_priority(int value, pid_t tid, std::string& result);
   static int run_command(const std::string& command, std::string& result);

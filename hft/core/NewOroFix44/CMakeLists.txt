@@ -49,4 +49,5 @@ target_link_libraries(Fix8Schema PUBLIC
 target_compile_options(Fix8Schema PRIVATE
     -Wno-missing-field-initializers
     -Wno-unused-parameter
+    -Wno-return-type-c-linkage
 )

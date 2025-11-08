@@ -63,7 +63,7 @@ CpuManager::CpuManager(Logger* logger) {
     thread_info_list_.emplace(thread_name, info);
   }
 
-  logger_.info("[Constructor] cpu manager start");
+  logger_.info("[Constructor] Cpu manager Created");
 }
 
 CpuManager::~CpuManager() {
@@ -71,7 +71,7 @@ CpuManager::~CpuManager() {
   detach(getpid(), result);
   undo(result);
 
-  logger_.info("[Destructor] cpu manager start");
+  logger_.info("[Destructor] Cpu manager Destroy");
 }
 
 bool CpuManager::init_cpu_to_tid() {
@@ -212,31 +212,31 @@ pid_t CpuManager::get_tid_by_thread_name(const std::string& target_name) {
 }
 
 int CpuManager::setup(std::string& result) {
-  return run_commnad("sudo ./set_cpu.sh setup", result);
+  return run_command("sudo ./set_cpu.sh setup", result);
 }
 
 int CpuManager::verify(std::string& result) {
-  return run_commnad("sudo ./set_cpu.sh verify", result);
+  return run_command("sudo ./set_cpu.sh verify", result);
 }
 
 int CpuManager::undo(std::string& result) {
-  return run_commnad("sudo ./set_cpu.sh undo", result);
+  return run_command("sudo ./set_cpu.sh undo", result);
 }
 
 int CpuManager::part_fix(std::string& result) {
-  return run_commnad("sudo ./set_cpu.sh part-fix", result);
+  return run_command("sudo ./set_cpu.sh part-fix", result);
 }
 
 int CpuManager::overlap(std::string& result) {
-  return run_commnad("sudo ./set_cpu.sh overlap", result);
+  return run_command("sudo ./set_cpu.sh overlap", result);
 }
 
 int CpuManager::attach(int pid, std::string& result) {
-  return run_commnad("sudo ./set_cpu.sh attach " + std::to_string(pid), result);
+  return run_command("sudo ./set_cpu.sh attach " + std::to_string(pid), result);
 }
 
 int CpuManager::detach(int pid, std::string& result) {
-  return run_commnad("sudo ./set_cpu.sh detach " + std::to_string(pid), result);
+  return run_command("sudo ./set_cpu.sh detach " + std::to_string(pid), result);
 }
 
 int CpuManager::sched_setattr_syscall(pid_t tid, const struct sched_attr* attr,
@@ -251,6 +251,14 @@ int CpuManager::set_affinity(const AffinityInfo& info) {
   CPU_SET(info.cpu_id_, &cpu_info);
 
   if (sched_setaffinity(info.tid_, sizeof(cpu_info), &cpu_info) != 0) {
+    logger_.error(
+        std::format("[CpuManager] sched_setaffinity :{}", strerror(errno)));
+    return -1;
+  }
+
+  if (sched_getaffinity(info.tid_, sizeof(cpu_info), &cpu_info) == -1) {
+    logger_.error(
+        std::format("[CpuManager] sched_getaffinity :{}", strerror(errno)));
     return -1;
   }
   return 0;
@@ -285,7 +293,7 @@ int CpuManager::set_rt(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
   }
 
   std::string result;
-  if (set_cpu_to_tid(cpu_id, tid, result)) {
+  if (set_cpu_to_tid(cpu_id, tid)) {
     logger_.error("[init] failed to cpu to tid");
     return -1;
   }
@@ -310,12 +318,12 @@ int CpuManager::set_rt(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
 
 int CpuManager::set_cfs(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
                         int nicev) {
-  // if (set_affinity(AffinityInfo(CpuId(cpu_id), ThreadId(tid))) != 0) {
-  //   return -1;
-  // }
+  if (set_affinity(AffinityInfo(CpuId(cpu_id), ThreadId(tid))) != 0) {
+    return -1;
+  }
 
   std::string result;
-  if (set_cpu_to_tid(cpu_id, tid, result)) {
+  if (set_cpu_to_tid(cpu_id, tid)) {
     logger_.error("[init] failed to cpu to tid");
     return -1;
   }
@@ -345,10 +353,25 @@ int CpuManager::set_cfs(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
   return 0;
 }
 
-int CpuManager::set_cpu_to_tid(uint8_t cpu_id, pid_t tid, std::string& result) {
-  return run_commnad(
-      "sudo taskset -cp " + std::to_string(cpu_id) + " " + std::to_string(tid),
-      result);
+int CpuManager::set_cpu_to_tid(uint8_t cpu_id, pid_t tid) {
+  cpu_set_t cpu_set;
+  CPU_ZERO(&cpu_set);
+  CPU_SET(cpu_id, &cpu_set);
+  if (sched_setaffinity(tid, sizeof(cpu_set), &cpu_set) != 0) {
+    logger_.error(std::format("[CpuManager] failed to set cpu({}) to tid({})",
+                              cpu_id, tid));
+    return -1;
+  }
+  CPU_ZERO(&cpu_set);
+  if (sched_getaffinity(tid, sizeof(cpu_set), &cpu_set) == -1) {
+    logger_.error(
+        std::format("[CpuManager] sched_getaffinity: {} cpu({}) to tid({})",
+                    strerror(errno), cpu_id, tid));
+    return -1;
+  }
+  logger_.info(
+      std::format("[CpuManager] tid {} allowed CPU : {} ", tid, cpu_id));
+  return 0;
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -377,17 +400,17 @@ int CpuManager::set_chrt(pid_t tid, int value, int sched, std::string& result) {
   }
   command += "-p " + std::to_string(value) + " " + std::to_string(tid);
 
-  return run_commnad(command, result);
+  return run_command(command, result);
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 int CpuManager::set_priority(int value, pid_t tid, std::string& result) {
-  return run_commnad(
+  return run_command(
       "sudo renice -n -" + std::to_string(value) + " -p " + std::to_string(tid),
       result);
 }
 
-int CpuManager::run_commnad(const std::string& command, std::string& result) {
+int CpuManager::run_command(const std::string& command, std::string& result) {
   constexpr int kCommandBufSize = 4096;
   std::array<char, kCommandBufSize> buf{};
 

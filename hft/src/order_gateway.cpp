@@ -47,7 +47,7 @@ OrderGateway::OrderGateway(common::Logger* logger,
     logger_.info("Fix Order Entry Start");
   }
 
-  logger_.info("[Constructor] OrderGateway Constructor");
+  logger_.info("[Constructor] OrderGateway Created");
 }
 
 OrderGateway::~OrderGateway() {

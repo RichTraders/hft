@@ -39,7 +39,7 @@ OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
       ttl_reserved_ns_(INI_CONFIG.get_double("orders", "ttl_reserved_ns")),
       ttl_live_ns_(INI_CONFIG.get_double("orders", "ttl_live_ns")),
       tick_converter_(ticker_size_) {
-  logger_.info("[Constructor] OrderManager Construct");
+  logger_.info("[Constructor] OrderManager Created");
 }
 OrderManager::~OrderManager() {
   logger_.info("[Destructor] OrderManager Destroy");

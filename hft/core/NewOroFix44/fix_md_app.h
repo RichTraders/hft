@@ -51,7 +51,6 @@ class FixMarketDataApp : public FixApp<FixMarketDataApp, "MDRead", "MDWrite"> {
   FIX8::Message* decode(const std::string& message);
 
  private:
-  common::MemoryPool<MarketData>* market_data_pool_;
   std::unique_ptr<FixMdCore> fix_md_core_;
 };
 }  // namespace core

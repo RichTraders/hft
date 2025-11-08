@@ -26,8 +26,7 @@ FixMarketDataApp::FixMarketDataApp(const std::string& sender_comp_id,
            AUTHORIZATION.get_port(),
            sender_comp_id,
            target_comp_id,
-           logger)
-    , market_data_pool_(market_data_pool) {
+           logger) {
   fix_md_core_ = std::make_unique<FixMdCore>(sender_comp_id, target_comp_id,
                                              logger, market_data_pool);
 }

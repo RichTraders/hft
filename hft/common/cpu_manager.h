@@ -65,21 +65,21 @@ class CpuManager {
   static int detach(int pid, std::string& result);
   static int sched_setattr_syscall(pid_t tid, const struct sched_attr* attr,
                                    unsigned int flags);
-  static int set_affinity(const AffinityInfo& info);
+  int set_affinity(const AffinityInfo& info);
   int set_cpu_fifo(uint8_t cpu_id, pid_t tid, int prio);
   int set_cpu_rr(uint8_t cpu_id, pid_t tid, int prio);
   int set_cpu_other(uint8_t cpu_id, pid_t tid, int nicev);
   int set_cpu_batch(uint8_t cpu_id, pid_t tid, int nicev);
   int set_cpu_idle(uint8_t cpu_id, pid_t tid, int nicev);
 
-  int set_rt(uint8_t cpu_id, pid_t tid, SchedPolicy policy, int prio);
+  int set_rt(uint8_t cpu_id, pid_t tid, SchedPolicy policy, int priority);
   int set_cfs(uint8_t cpu_id, pid_t tid, SchedPolicy policy, int nicev);
-  static int set_cpu_to_tid(uint8_t cpu_id, pid_t tid, std::string& result);
+  int set_cpu_to_tid(uint8_t cpu_id, pid_t tid);
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-  static int set_chrt(pid_t tid, int value, int sched, std::string& result);
+  int set_scheduler(pid_t tid, int priority, int scheduler_policy);
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   static int set_priority(int value, pid_t tid, std::string& result);
-  static int run_commnad(const std::string& command, std::string& result);
+  static int run_command(const std::string& command, std::string& result);
 
   common::Logger::Producer logger_;
   std::string set_cpu_file_path_;

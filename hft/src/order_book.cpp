@@ -255,10 +255,10 @@ void MarketOrderBook::add_order(const MarketData* market_update, const int idx,
 /// Process market data update and update the limit order book.
 auto MarketOrderBook::on_market_data_updated(
     const MarketData* market_update) noexcept -> void {
-  if (UNLIKELY((static_cast<double>(kMaxPriceInt) / kTickMultiplierInt) <
-                   market_update->price.value ||
-               market_update->price.value <
-                   (static_cast<double>(kMinPriceInt) / kTickMultiplierInt))) {
+  if (static_cast<double>(kMaxPriceInt) / kTickMultiplierInt <
+          market_update->price.value ||
+      market_update->price.value <
+          (static_cast<double>(kMinPriceInt) / kTickMultiplierInt)) {
     logger_.error(
         std::format("Price[{}] is invalid", market_update->price.value));
     return;

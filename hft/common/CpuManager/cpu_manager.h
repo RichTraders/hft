@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "logger.h"
+#include "../logger.h"
+#include "cgroup_controller.h"
 
 namespace common {
 struct sched_attr;
@@ -56,13 +57,6 @@ class CpuManager {
  private:
   static void trim_newline(std::string& str);
   static pid_t get_tid_by_thread_name(const std::string& target_name);
-  static int setup(std::string& result);
-  static int verify(std::string& result);
-  static int undo(std::string& result);
-  static int part_fix(std::string& result);
-  static int overlap(std::string& result);
-  static int attach(int pid, std::string& result);
-  static int detach(int pid, std::string& result);
   static int sched_setattr_syscall(pid_t tid, const struct sched_attr* attr,
                                    unsigned int flags);
   int set_affinity(const AffinityInfo& info);
@@ -77,9 +71,6 @@ class CpuManager {
   int set_cpu_to_tid(uint8_t cpu_id, pid_t tid);
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   int set_scheduler(pid_t tid, int priority, int scheduler_policy);
-  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-  static int set_priority(int value, pid_t tid, std::string& result);
-  static int run_command(const std::string& command, std::string& result);
 
   common::Logger::Producer logger_;
   std::string set_cpu_file_path_;

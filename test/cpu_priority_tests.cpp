@@ -9,14 +9,14 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "cpu_manager.h"
+#include <gtest/gtest.h>
+#include "../hft/common/CpuManager/cpu_manager.h"
+#include "ini_config.hpp"
 #include "logger.h"
 #include "thread.hpp"
-#include "ini_config.hpp"
 
-#include "cpu_manager.h"
+#include "../hft/common/CpuManager/cpu_manager.h"
 
 using namespace common;
 

@@ -10,9 +10,12 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "cpu_manager.h"
+
 #include <sys/resource.h>
-#include "ini_config.hpp"
+#include <variant>
+#include "../ini_config.hpp"
+#include "cgroup_controller.h"
+#include "cpu_manager.h"
 
 namespace common {
 CpuManager::CpuManager(Logger* logger) {
@@ -67,9 +70,14 @@ CpuManager::CpuManager(Logger* logger) {
 }
 
 CpuManager::~CpuManager() {
-  std::string result;
-  detach(getpid(), result);
-  undo(result);
+  try {
+    CgroupController::detach_pid(getpid());
+    CgroupConfig config;
+    CgroupController controller(config);
+    controller.undo();
+  } catch (const std::exception& e) {
+    // Ignore exceptions in destructor
+  }
 
   logger_.info("[Destructor] Cpu manager Destroy");
 }
@@ -136,34 +144,21 @@ int CpuManager::init_cpu_group(std::string& result) const {
     return 1;
   }
 
-  if (setup(result)) {
+  try {
+    CgroupConfig config;
+    CgroupController controller(config);
+
+    controller.setup();
+    controller.part_fix();
+    controller.overlap_scan();
+    controller.verify();
+    controller.attach_pid(getpid());
+
+    return 0;
+  } catch (const std::exception& e) {
+    result = e.what();
     return 1;
   }
-
-  result.clear();
-
-  if (part_fix(result)) {
-    return 1;
-  }
-
-  result.clear();
-
-  if (overlap(result)) {
-    return 1;
-  }
-
-  result.clear();
-
-  if (verify(result)) {
-    return 1;
-  }
-
-  result.clear();
-
-  if (attach(getpid(), result))
-    return 1;
-
-  return 0;
 }
 
 void CpuManager::trim_newline(std::string& str) {
@@ -209,34 +204,6 @@ pid_t CpuManager::get_tid_by_thread_name(const std::string& target_name) {
     }
   }
   return 0;
-}
-
-int CpuManager::setup(std::string& result) {
-  return run_command("sudo ./set_cpu.sh setup", result);
-}
-
-int CpuManager::verify(std::string& result) {
-  return run_command("sudo ./set_cpu.sh verify", result);
-}
-
-int CpuManager::undo(std::string& result) {
-  return run_command("sudo ./set_cpu.sh undo", result);
-}
-
-int CpuManager::part_fix(std::string& result) {
-  return run_command("sudo ./set_cpu.sh part-fix", result);
-}
-
-int CpuManager::overlap(std::string& result) {
-  return run_command("sudo ./set_cpu.sh overlap", result);
-}
-
-int CpuManager::attach(int pid, std::string& result) {
-  return run_command("sudo ./set_cpu.sh attach " + std::to_string(pid), result);
-}
-
-int CpuManager::detach(int pid, std::string& result) {
-  return run_command("sudo ./set_cpu.sh detach " + std::to_string(pid), result);
 }
 
 int CpuManager::sched_setattr_syscall(pid_t tid, const struct sched_attr* attr,
@@ -368,29 +335,6 @@ int CpuManager::set_scheduler(pid_t tid, int priority, int scheduler_policy) {
     return -1;
   }
   return 0;
-}
-
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-int CpuManager::set_priority(int value, pid_t tid, std::string& result) {
-  return run_command(
-      "sudo renice -n -" + std::to_string(value) + " -p " + std::to_string(tid),
-      result);
-}
-
-int CpuManager::run_command(const std::string& command, std::string& result) {
-  constexpr int kCommandBufSize = 4096;
-  std::array<char, kCommandBufSize> buf{};
-
-  std::unique_ptr<FILE, int (*)(FILE*)> pipe(popen(command.c_str(), "r"),
-                                             pclose);
-  if (!pipe) {
-    return 1;
-  }
-
-  while (fgets(buf.data(), buf.size(), pipe.get()))
-    result += buf.data();
-
-  return pclose(pipe.release());
 }
 
 }  // namespace common

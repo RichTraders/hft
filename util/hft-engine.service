@@ -1,0 +1,29 @@
+[Unit]
+Description=HFT engine
+After=network-online.target
+
+[Service]
+Type=simple
+Slice=iso.slice
+
+LimitRTPRIO=99
+LimitNICE=-20
+
+User=neworo
+Group=neworo
+
+# Restrict other slices to non-isolated CPUs before starting HFT
+ExecStartPre=+/home/neworo/CLionProjects/hft/util/manage_cpu_isolation.sh start
+
+# Start HFT engine
+ExecStart=/home/neworo/CLionProjects/hft/cmake-build-release-clang/HFT
+WorkingDirectory=/home/neworo/CLionProjects/hft/cmake-build-release-clang
+
+# Restore all slices to full CPU range after stopping HFT
+ExecStopPost=+/home/neworo/CLionProjects/hft/util/manage_cpu_isolation.sh stop
+
+Restart=on-failure
+RestartSec=60s
+
+[Install]
+WantedBy=multi-user.target

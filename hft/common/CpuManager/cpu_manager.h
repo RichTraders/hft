@@ -1,11 +1,18 @@
-//
-// Created by neworo2 on 25. 8. 15.
-//
+/*
+* MIT License
+ *
+ * Copyright (c) 2025 NewOro Corporation
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
+ * copyright notice appears in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ */
 
 #pragma once
 
 #include "../logger.h"
-#include "cgroup_controller.h"
 
 namespace common {
 struct sched_attr;
@@ -72,7 +79,7 @@ class CpuManager {
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   int set_scheduler(pid_t tid, int priority, int scheduler_policy);
 
-  common::Logger::Producer logger_;
+  Logger::Producer logger_;
   std::string set_cpu_file_path_;
   std::map<uint8_t, CpuInfo> cpu_info_list_;
   std::map<std::string, ThreadInfo> thread_info_list_;

@@ -424,7 +424,7 @@ void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
     slot.last_used = fast_clock_.get_timestamp();
     cancel_order(ticker, action.original_cl_order_id, action.cl_order_id);
     logger_.info(
-        std::format("JBJB[CANCEL]  layer={}, side:{}, order_id={}, "
+        std::format("[OrderManager][CANCEL]  layer={}, side:{}, order_id={}, "
                     "previous order id :{}",
                     action.layer, common::toString(action.side),
                     common::toString(action.cl_order_id),
@@ -477,8 +477,6 @@ void OrderManager::register_expiry(const TickerId& ticker, Side side,
                     state == OMOrderState::kCancelReserved)
                        ? ttl_reserved_ns_
                        : ttl_live_ns_;
-  logger_.info(std::format("JBJB order_id={} ttl :{}, layer={}",
-                           order_id.is_valid(), ttl, layer));
   expiry_pq_.push(ExpiryKey{.expire_ts = now + ttl,
                             .symbol = ticker,
                             .side = side,

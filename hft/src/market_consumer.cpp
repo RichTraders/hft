@@ -157,10 +157,10 @@ void MarketConsumer::on_logout(FIX8::Message*) {
 }
 
 void MarketConsumer::on_instrument_list(FIX8::Message* msg) {
-  logger_.info("[Message] on_instrument_list");
   const InstrumentInfo instrument_message =
       app_->create_instrument_list_message(msg);
-  logger_.info(std::format("[Message] :{}", instrument_message.toString()));
+  logger_.info(std::format("[Message] on_instrument_list :{}",
+                           instrument_message.toString()));
 }
 
 void MarketConsumer::on_heartbeat(FIX8::Message* msg) {
@@ -181,7 +181,7 @@ void MarketConsumer::resubscribe() {
       INI_CONFIG.get("meta", "ticker"), /*subscribe=*/false);
   app_->send(msg_unsub);
 
-  //TODO(JB) I'm not sure, it's a good way.
+  //TODO(JB) I'm not sure whether it's a good way.
   //std::this_thread::sleep_for(std::chrono::seconds(5));
 
   const std::string msg_sub = app_->create_market_data_subscription_message(

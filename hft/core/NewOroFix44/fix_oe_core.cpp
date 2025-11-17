@@ -197,7 +197,6 @@ std::string FixOeCore::create_cancel_and_reorder_message(
 
   std::string wire;
   request.encode(wire);
-  logger_.info(std::format("JBJB {}",wire));
   return wire;
 }
 

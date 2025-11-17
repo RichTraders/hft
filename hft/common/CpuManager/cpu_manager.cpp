@@ -10,12 +10,10 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-
-#include <sys/resource.h>
-#include <variant>
-#include "../ini_config.hpp"
-#include "cgroup_controller.h"
 #include "cpu_manager.h"
+#include <sys/resource.h>
+#include <fstream>
+#include "../ini_config.hpp"
 
 namespace common {
 CpuManager::CpuManager(Logger* logger) {
@@ -62,7 +60,7 @@ CpuManager::CpuManager(Logger* logger) {
       info.value = INI_CONFIG.get_int(thread_id, "nicev");
     }
 
-    info.tid = get_tid_by_thread_name(thread_name);
+    info.tid = 0;
     thread_info_list_.emplace(thread_name, info);
   }
 
@@ -70,15 +68,6 @@ CpuManager::CpuManager(Logger* logger) {
 }
 
 CpuManager::~CpuManager() {
-  try {
-    CgroupController::detach_pid(getpid());
-    CgroupConfig config;
-    CgroupController controller(config);
-    controller.undo();
-  } catch (const std::exception& e) {
-    // Ignore exceptions in destructor
-  }
-
   logger_.info("[Destructor] Cpu manager Destroy");
 }
 
@@ -87,10 +76,21 @@ bool CpuManager::init_cpu_to_tid() {
     return true;
   }
 
-  for (const auto& info : thread_info_list_) {
+  for (auto& info : thread_info_list_) {
+    const std::string& thread_name = info.first;
     const int value = info.second.value;
     const uint8_t cpu_id = info.second.cpu_id;
-    const int tid = info.second.tid;
+
+    const int tid = get_tid_by_thread_name(thread_name);
+    if (tid == 0) {
+      logger_.error(
+          std::format("[CpuManager] Thread '{}' not found", thread_name));
+      return true;
+    }
+
+    info.second.tid = tid;
+    logger_.info(std::format("[CpuManager] Found thread '{}' with TID {}",
+                             thread_name, tid));
 
     const auto& cpu_info = cpu_info_list_.find(cpu_id);
 
@@ -145,18 +145,20 @@ int CpuManager::init_cpu_group(std::string& result) const {
   }
 
   try {
-    CgroupConfig config;
-    CgroupController controller(config);
+    std::ifstream cgroup_file("/proc/self/cgroup");
+    std::string cgroup_line;
+    std::getline(cgroup_file, cgroup_line);
 
-    controller.setup();
-    controller.part_fix();
-    controller.overlap_scan();
-    controller.verify();
-    controller.attach_pid(getpid());
+    if (cgroup_line.find("iso.slice") == std::string::npos) {
+      result =
+          "Process not in iso.slice. Please run with: sudo systemd-run --scope "
+          "--slice=iso.slice -p AllowedCPUs=0-4 ./HFT";
+      return 1;
+    }
 
     return 0;
-  } catch (const std::exception& e) {
-    result = e.what();
+  } catch (const std::exception& exception) {
+    result = exception.what();
     return 1;
   }
 }
@@ -302,8 +304,9 @@ int CpuManager::set_cpu_to_tid(uint8_t cpu_id, pid_t tid) {
   CPU_ZERO(&cpu_set);
   CPU_SET(cpu_id, &cpu_set);
   if (sched_setaffinity(tid, sizeof(cpu_set), &cpu_set) != 0) {
-    logger_.error(std::format("[CpuManager] failed to set cpu({}) to tid({})",
-                              cpu_id, tid));
+    logger_.error(std::format(
+        "[CpuManager] failed to set cpu({}) to tid({}): {} (errno={})", cpu_id,
+        tid, strerror(errno), errno));
     return -1;
   }
   CPU_ZERO(&cpu_set);

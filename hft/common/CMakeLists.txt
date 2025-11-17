@@ -21,9 +21,6 @@ foreach(t IN ITEMS absl_crc_internal absl_crc_cpu_detect)
     endif()
 endforeach()
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBC_GROUP REQUIRED IMPORTED_TARGET libcgroup)
-
 file(GLOB_RECURSE LIB_SRC_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
@@ -44,5 +41,4 @@ target_link_libraries(Common
         PUBLIC
         absl::flat_hash_map
         concurrentqueue
-        PkgConfig::LIBC_GROUP
 )

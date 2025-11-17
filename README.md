@@ -27,6 +27,17 @@ $ ulimit -e
 
 ```
 
+## Set systemd for cgroup
+
+For detailed instructions on setting up the HFT engine as a systemd service with CPU isolation, see [util/README.md](util/README.md).
+
+Quick setup:
+1. Configure iso.slice for CPU isolation
+2. Install the HFT service using provided service file
+3. CPU isolation is managed automatically on service start/stop
+
+See [util/README.md](util/README.md) for complete documentation.
+
 Based on Binance fix protocol, you need to install some files.
 
 3 files needed. \

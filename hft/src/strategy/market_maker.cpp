@@ -20,7 +20,7 @@
 using common::Qty;
 using common::Side;
 constexpr int kLevel10 = 10;
-constexpr int kGap = 50;
+constexpr int kGap = 5;
 inline double round5(double value) {
   constexpr double kFactor = 100000.0;
   constexpr double kInvFactor = 1.0 / kFactor;
@@ -94,8 +94,9 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
                     .price = best_bid_price - kGap,
                     .qty = Qty{round5(signal * position_variance_)}});
 
-    logger_.debug(std::format(
-        "Order Created! price:{}, qty:{}, side:buy, delta:{} obi:{} signal:{} "
+    logger_.info(std::format(
+        "[MarketMaker]Order Submitted! price:{}, qty:{}, side:buy, delta:{} "
+        "obi:{} signal:{} "
         "mid:{}, "
         "vwap:{}, spread:{}",
         best_bid_price.value - kGap, round5(signal * position_variance_), delta,
@@ -107,8 +108,9 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
                     .side = Side::kSell,
                     .price = best_ask_price + kGap,
                     .qty = Qty{round5(signal * position_variance_)}});
-    logger_.debug(std::format(
-        "Order Created! price:{}, qty:{}, side:sell, delta:{} obi:{} signal:{} "
+    logger_.info(std::format(
+        "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, delta:{} "
+        "obi:{} signal:{} "
         "mid:{}, "
         "vwap:{}, spread:{}",
         best_ask_price.value + kGap, round5(signal * position_variance_), delta,

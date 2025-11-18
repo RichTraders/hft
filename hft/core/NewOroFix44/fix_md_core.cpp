@@ -22,7 +22,24 @@
 namespace core {
 using namespace FIX8::NewOroFix44MD;
 using namespace common;
+
+// FIX field tags
 constexpr int kEntries = 268;
+constexpr int kNoRelatedSym = 146;
+
+// FIX message type codes (strings for FIX8 API)
+const std::string kMsgTypeLogon = "A";
+const std::string kMsgTypeLogout = "5";
+const std::string kMsgTypeHeartbeat = "0";
+const std::string kMsgTypeMarketDataRequest = "V";
+
+// MD entry types
+constexpr char kMDEntryTypeBid = '0';
+constexpr char kMDEntryTypeAsk = '1';
+constexpr char kMDEntryTypeTrade = '2';
+
+// Default values
+const std::string kDefaultInstrumentId = "BTCUSDT";
 
 FixMdCore::FixMdCore(SendId sender_comp_id, TargetId target_comp_id,
                      Logger* logger, MemoryPool<MarketData>* pool)
@@ -37,17 +54,82 @@ FixMdCore::~FixMdCore() {
   logger_.debug("[Destructor] FixMdCore Destroy");
 }
 
-std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
-                                             const std::string& timestamp) {
-  FIX8::NewOroFix44MD_ctx();
-  Logon request;
+// Helper method implementations
 
+template<typename MessageType>
+void FixMdCore::populate_standard_header(MessageType& request) {
+  request.Header()->add_field(new SenderCompID(sender_comp_id_));
+  request.Header()->add_field(new TargetCompID(target_comp_id_));
+  request.Header()->add_field(new MsgSeqNum(sequence_++));
+  request.Header()->add_field(new SendingTime());
+}
+
+template<typename MessageType>
+void FixMdCore::populate_standard_header(MessageType& request, const std::string& timestamp) {
   FIX8::MessageBase* header = request.Header();
   *header
       << new SenderCompID(sender_comp_id_)
       << new TargetCompID(target_comp_id_)
       << new MsgSeqNum(sequence_++)
       << new SendingTime(timestamp);
+}
+
+MarketData* FixMdCore::allocate_with_retry(
+    common::MarketUpdateType type,
+    const std::string& symbol,
+    char side,
+    double price,
+    const void* qty_ptr,
+    const char* context) {
+
+  auto allocate_fn = [&]() -> MarketData* {
+    const auto* qty = static_cast<const MDEntrySize*>(qty_ptr);
+    return market_data_pool_->allocate(
+        type,
+        OrderId{kOrderIdInvalid},
+        TickerId{symbol},
+        side,
+        Price{static_cast<float>(price)},
+        qty == nullptr ? Qty{kQtyInvalid} : Qty{static_cast<float>(qty->get())});
+  };
+
+  auto* market_data = allocate_fn();
+  while (market_data == nullptr) {
+    logger_.info(std::format("{} message queue is full", context));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    market_data = allocate_fn();
+  }
+  return market_data;
+}
+
+template<typename RequestType>
+void FixMdCore::add_md_entry_types(RequestType& request, const std::vector<char>& types) {
+  auto* entry_types = new typename RequestType::NoMDEntryTypes();
+  for (char type : types) {
+    FIX8::MessageBase* mb = entry_types->create_group(true);
+    mb->add_field(new MDEntryType(type));
+    entry_types->add(mb);
+  }
+  request.add_field(new NoMDEntryTypes(types.size()));
+  request.add_group(entry_types);
+}
+
+template<typename RequestType>
+void FixMdCore::add_symbol_group(RequestType& request, const std::string& symbol) {
+  auto* entry_types = new typename RequestType::NoRelatedSym();
+  FIX8::MessageBase* group = entry_types->create_group(true);
+  group->add_field(new Symbol(symbol));
+  entry_types->add(group);
+  request.add_field(new NoRelatedSym(1));
+  request.add_group(entry_types);
+}
+
+std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
+                                             const std::string& timestamp) {
+  FIX8::NewOroFix44MD_ctx();
+  Logon request;
+
+  populate_standard_header(request, timestamp);
 
   request << new EncryptMethod(EncryptMethod_NONE)
       << new HeartBtInt(30)
@@ -57,7 +139,7 @@ std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
       << new MessageHandling(2);
 
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))
-    scid->set("A");
+    scid->set(kMsgTypeLogon);
 
   std::string wire;
   request.encode(wire);
@@ -66,12 +148,10 @@ std::string FixMdCore::create_log_on_message(const std::string& sig_b64,
 
 std::string FixMdCore::create_log_out_message() {
   Logout request;
-  request.Header()->add_field(new SenderCompID(sender_comp_id_));
-  request.Header()->add_field(new TargetCompID(target_comp_id_));
-  request.Header()->add_field(new MsgSeqNum(sequence_++));
-  request.Header()->add_field(new SendingTime());
+  populate_standard_header(request);
+
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))
-    scid->set("5");
+    scid->set(kMsgTypeLogout);
 
   std::string wire;
   request.encode(wire);
@@ -82,13 +162,12 @@ std::string FixMdCore::create_heartbeat_message(FIX8::Message* message) {
   auto test_req_id = message->get<TestReqID>();
 
   Heartbeat request;
-  request.Header()->add_field(new SenderCompID(sender_comp_id_));
-  request.Header()->add_field(new TargetCompID(target_comp_id_));
-  request.Header()->add_field(new MsgSeqNum(sequence_++));
-  request.Header()->add_field(new SendingTime());
+  populate_standard_header(request);
+
   request << new TestReqID(*test_req_id);
+
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))
-    scid->set("0");
+    scid->set(kMsgTypeHeartbeat);
 
   std::string wire;
   request.encode(wire);
@@ -99,50 +178,21 @@ std::string FixMdCore::create_market_data_subscription_message(
     const RequestId& request_id, const MarketDepthLevel& level,
     const SymbolId& symbol, const bool subscribe) {
   MarketDataRequest request(false);
-  request.Header()->add_field(new SenderCompID(sender_comp_id_));
-  request.Header()->add_field(new TargetCompID(target_comp_id_));
-  request.Header()->add_field(new MsgSeqNum(sequence_++));
-  request.Header()->add_field(new SendingTime());
+  populate_standard_header(request);
 
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))
-    scid->set("V");
+    scid->set(kMsgTypeMarketDataRequest);
 
-  {
-    int count = 0;
-    auto* entry_types = new MarketDataRequest::NoMDEntryTypes();
-    FIX8::MessageBase* mb = entry_types->create_group(true);
-    mb->add_field(new MDEntryType('0'));  // Bid
-    entry_types->add(mb);
-    count++;
+  // Add MD entry types: Bid, Ask, Trade
+  add_md_entry_types(request, {kMDEntryTypeBid, kMDEntryTypeAsk, kMDEntryTypeTrade});
 
-    mb = entry_types->create_group(true);
-    mb->add_field(new MDEntryType('1'));  // Ask
-    entry_types->add(mb);
-    count++;
-
-    mb = entry_types->create_group(true);
-    mb->add_field(new MDEntryType('2'));  // Trade
-    entry_types->add(mb);
-    count++;
-
-    request.add_field(new NoMDEntryTypes(count));
-    request.add_group(entry_types);
-  }
-
-  {
-    auto* entry_types = new MarketDataRequest::NoRelatedSym();
-    FIX8::MessageBase* group = entry_types->create_group(true);
-    group->add_field(new Symbol(symbol));  // Bid
-
-    entry_types->add(group);
-    request.add_field(new NoRelatedSym(1));
-    request.add_group(entry_types);
-  }
+  // Add symbol
+  add_symbol_group(request, symbol);
 
   request << new MDReqID(request_id)
           << new SubscriptionRequestType(subscribe ? '1': '2')
           << new MarketDepth(level)
-  << new AggregatedBook(true);
+          << new AggregatedBook(true);
 
   std::string wire;
   request.encode(wire);
@@ -154,37 +204,21 @@ std::string FixMdCore::create_trade_data_subscription_message(
     const RequestId& request_id, const MarketDepthLevel& level,
     const SymbolId& symbol) {
   MarketDataRequest request(false);
-  request.Header()->add_field(new SenderCompID(sender_comp_id_));
-  request.Header()->add_field(new TargetCompID(target_comp_id_));
-  request.Header()->add_field(new MsgSeqNum(sequence_++));
-  request.Header()->add_field(new SendingTime());
+  populate_standard_header(request);
 
   if (auto* scid = static_cast<MsgType*>(request.Header()->get_field(35)))
-    scid->set("V");
+    scid->set(kMsgTypeMarketDataRequest);
 
-  {
-    auto* entry_types = new MarketDataRequest::NoMDEntryTypes();
-    FIX8::MessageBase* message = entry_types->create_group(true);
-    message->add_field(new MDEntryType('2'));  // Bid
-    entry_types->add(message);
+  // Add MD entry type: Trade only
+  add_md_entry_types(request, {kMDEntryTypeTrade});
 
-    request.add_field(new NoMDEntryTypes(1));
-    request.add_group(entry_types);
-  }
+  // Add symbol
+  add_symbol_group(request, symbol);
 
-  {
-    auto* entry_types = new MarketDataRequest::NoRelatedSym();
-    FIX8::MessageBase* group = entry_types->create_group(true);
-    group->add_field(new Symbol(symbol));
-
-    entry_types->add(group);
-    request.add_field(new NoRelatedSym(1));
-    request.add_group(entry_types);
-  }
-
-  request << new MDReqID(request_id) << new SubscriptionRequestType('1')
-
-          << new MarketDepth(level) << new AggregatedBook(true);
+  request << new MDReqID(request_id)
+          << new SubscriptionRequestType('1')
+          << new MarketDepth(level)
+          << new AggregatedBook(true);
 
   std::string wire;
   request.encode(wire);
@@ -194,15 +228,13 @@ std::string FixMdCore::create_trade_data_subscription_message(
 std::string FixMdCore::create_instrument_list_request_message(
     const std::string& symbol) {
   FIX8::NewOroFix44MD::InstrumentListRequest request(false);
-  request.Header()->add_field(new SenderCompID(sender_comp_id_));
-  request.Header()->add_field(new TargetCompID(target_comp_id_));
-  request.Header()->add_field(new MsgSeqNum(sequence_++));
-  request.Header()->add_field(new SendingTime());
+  populate_standard_header(request);
+
   if (symbol.empty()) {
-    request << new InstrumentReqID("BTCUSDT")
+    request << new InstrumentReqID(kDefaultInstrumentId)
             << new InstrumentListRequestType(4);
-  }else {
-    request << new InstrumentReqID("BTCUSDT")
+  } else {
+    request << new InstrumentReqID(kDefaultInstrumentId)
             << new InstrumentListRequestType(0)
             << new Symbol(symbol);
   }
@@ -228,7 +260,7 @@ MarketUpdateData FixMdCore::create_market_data_message(FIX8::Message* msg) {
 }
 
 MarketUpdateData FixMdCore::_create_market_data_message(
-    const FIX8::GroupBase* entries) const {
+    const FIX8::GroupBase* entries) {
   std::vector<MarketData*> data;
   data.reserve(entries->size());
   const auto* symbol = entries->get_element(0)->get<Symbol>();  //55
@@ -249,46 +281,33 @@ MarketUpdateData FixMdCore::_create_market_data_message(
   const auto* first_qty = entry->get<MDEntrySize>();
   const auto* first_action = entry->get<MDUpdateAction>();
 
-  data.push_back(
-    market_data_pool_->allocate(
-      charToMarketUpdateType( first_action->get()),
-      OrderId{kOrderIdInvalid},
-      TickerId{symbol->get()},
+  // Allocate first entry with retry logic
+  auto* first_market_data = allocate_with_retry(
+      charToMarketUpdateType(first_action->get()),
+      symbol->get(),
       first_side->get(),
-      Price{static_cast<float>(first_price->get())},
-      first_qty == nullptr
-        ? Qty{kQtyInvalid}
-        : Qty{static_cast<float>(first_qty->get())}));
+      first_price->get(),
+      first_qty,
+      "market data");
+  data.push_back(first_market_data);
 
+  // Process remaining entries with retry logic
   for (size_t i = 1; i < entries->size(); ++i) {
     const FIX8::MessageBase* entry = entries->get_element(i);
     if (unlikely(!entry))
       continue;
-    const auto* side = entry->get<MDEntryType>();       // 269
-    const auto* price = entry->get<MDEntryPx>();       // 270
-    const auto* qty = entry->get<MDEntrySize>();       // 271
-    const auto* action = entry->get<MDUpdateAction>();  // 279
-    auto market_data = market_data_pool_->allocate(
+    const auto* side = entry->get<MDEntryType>();
+    const auto* price = entry->get<MDEntryPx>();
+    const auto* qty = entry->get<MDEntrySize>();
+    const auto* action = entry->get<MDUpdateAction>();
+
+    auto* market_data = allocate_with_retry(
         charToMarketUpdateType(action->get()),
-            OrderId{kOrderIdInvalid},
-            TickerId{symbol->get()},
-            side->get(),
-            Price{static_cast<float>(price->get())},
-            qty == nullptr
-              ? Qty{kQtyInvalid}
-              : Qty{static_cast<float>(qty->get())});
-    while (market_data == nullptr) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      market_data = market_data_pool_->allocate(
-        charToMarketUpdateType(action->get()),
-            OrderId{kOrderIdInvalid},
-            TickerId{symbol->get()},
-            side->get(),
-            Price{static_cast<float>(price->get())},
-            qty == nullptr
-              ? Qty{kQtyInvalid}
-              : Qty{static_cast<float>(qty->get())});
-    }
+        symbol->get(),
+        side->get(),
+        price->get(),
+        qty,
+        "market data");
     data.push_back(market_data);
   }
   return MarketUpdateData(
@@ -299,7 +318,7 @@ MarketUpdateData FixMdCore::_create_market_data_message(
 }
 
 MarketUpdateData FixMdCore::_create_trade_data_message(
-    const FIX8::GroupBase* entries) const {
+    const FIX8::GroupBase* entries) {
   std::vector<MarketData*> data;
   data.reserve(entries->size());
   const auto* symbol = entries->get_element(0)->get<Symbol>();  //55
@@ -313,34 +332,33 @@ MarketUpdateData FixMdCore::_create_trade_data_message(
   const auto* first_price = entry->get<MDEntryPx>();
   const auto* first_qty = entry->get<MDEntrySize>();
 
-  data.push_back(
-   market_data_pool_->allocate(
-     MarketUpdateType::kTrade,
-     OrderId{kOrderIdInvalid},
-     TickerId{symbol->get()},
-     first_side->get(),
-     Price{static_cast<float>(first_price->get())},
-     first_qty == nullptr
-       ? Qty{kQtyInvalid}
-       : Qty{static_cast<float>(first_qty->get())}));
+  // Allocate first entry with retry logic
+  auto* first_market_data = allocate_with_retry(
+      MarketUpdateType::kTrade,
+      symbol->get(),
+      first_side->get(),
+      first_price->get(),
+      first_qty,
+      "trade data");
+  data.push_back(first_market_data);
 
+  // Process remaining entries with retry logic
   for (size_t i = 1; i < entries->size(); ++i) {
     const FIX8::MessageBase* entry = entries->get_element(i);
     if (unlikely(!entry))
       continue;
-    const auto* side = entry->get<MDEntryType>();       // 269
-    const auto* price = entry->get<MDEntryPx>();       // 270
-    const auto* qty = entry->get<MDEntrySize>();       // 271
-    data.push_back(
-        market_data_pool_->allocate(
-          MarketUpdateType::kTrade,
-          OrderId{kOrderIdInvalid},
-          TickerId{symbol->get()},
-          side->get(),
-          Price{static_cast<float>(price->get())},
-          qty == nullptr
-            ? Qty{kQtyInvalid}
-            : Qty{static_cast<float>(qty->get())}));
+    const auto* side = entry->get<MDEntryType>();
+    const auto* price = entry->get<MDEntryPx>();
+    const auto* qty = entry->get<MDEntrySize>();
+
+    auto* market_data = allocate_with_retry(
+        MarketUpdateType::kTrade,
+        symbol->get(),
+        side->get(),
+        price->get(),
+        qty,
+        "trade data");
+    data.push_back(market_data);
   }
   return MarketUpdateData(kTrade, std::move(data));
 }

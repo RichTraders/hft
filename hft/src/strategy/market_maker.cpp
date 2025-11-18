@@ -82,7 +82,7 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
   std::vector<QuoteIntent> intents;
   intents.reserve(4);
 
-  logger_.info(std::format(
+  logger_.debug(std::format(
       "[Updated] delta:{} obi:{} signal:{} mid:{}, vwap:{}, spread:{}", delta,
       obi, signal, mid, vwap, spread));
 
@@ -95,7 +95,7 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
                     .qty = Qty{round5(signal * position_variance_)}});
 
     logger_.info(std::format(
-        "[MarketMaker]Order Submitted! price:{}, qty:{}, side:buy, delta:{} "
+        "[MarketMaker]Order Submitted. price:{}, qty:{}, side:buy, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
         "vwap:{}, spread:{}",

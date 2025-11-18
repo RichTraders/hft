@@ -68,8 +68,29 @@ public:
   common::MemoryPool<MarketData>* market_data_pool_;
 
   MarketUpdateData _create_market_data_message(
-      const FIX8::GroupBase* msg) const;
-  MarketUpdateData _create_trade_data_message(const FIX8::GroupBase* msg) const;
+      const FIX8::GroupBase* msg);
+  MarketUpdateData _create_trade_data_message(const FIX8::GroupBase* msg);
+
+  // Helper methods to reduce code duplication
+  template<typename MessageType>
+  void populate_standard_header(MessageType& request);
+
+  template<typename MessageType>
+  void populate_standard_header(MessageType& request, const std::string& timestamp);
+
+  MarketData* allocate_with_retry(
+      common::MarketUpdateType type,
+      const std::string& symbol,
+      char side,
+      double price,
+      const void* qty,
+      const char* context);
+
+  template<typename RequestType>
+  void add_md_entry_types(RequestType& request, const std::vector<char>& types);
+
+  template<typename RequestType>
+  void add_symbol_group(RequestType& request, const std::string& symbol);
 };
 }
 

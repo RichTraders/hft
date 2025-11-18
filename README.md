@@ -1,4 +1,43 @@
 # Prerequisite
+## Linux Account Setting
+To allow to change cpu schduler policy([scheduler](https://linux.die.net/man/2/sched_getscheduler)) and nice([nice](https://linux.die.net/man/2/nice)), you need PAM
+```shell
+1. Check pam_limits.so is loaded
+$ grep -n 'pam_limits.so' /etc/pam.d/common-session /etc/pam.d/common-session-noninteractive /etc/pam.d/sshd
+/etc/pam.d/sshd:40:session    required     pam_limits.so
+
+If you use sshd, activate PAM
+echo 'UsePAM yes' |sudo tee /etc/ssh/sshd_config
+
+2. Add your limit allowance
+PRIORITY='priority what you want(1~99)'
+echo "$USER - rtprio $PRORITY" | sudo tee /etc/security/limits.d/99-rtprio.conf
+
+NICE='nice value what you want (-20~19). Higher number is lower priority'
+echo "$USER - nice $NICE" | sudo tee /etc/security/limits.d/99-nice.conf
+
+3.Check limits
+rt
+$ ulimit -r
+99
+
+nice
+$ ulimit -e
+40
+
+```
+
+## Set systemd for cgroup
+
+For detailed instructions on setting up the HFT engine as a systemd service with CPU isolation, see [util/README.md](util/README.md).
+
+Quick setup:
+1. Configure iso.slice for CPU isolation
+2. Install the HFT service using provided service file
+3. CPU isolation is managed automatically on service start/stop
+
+See [util/README.md](util/README.md) for complete documentation.
+
 Based on Binance fix protocol, you need to install some files.
 
 3 files needed. \

@@ -1,0 +1,22 @@
+[Unit]
+Description=Slack Notifier for HFT Engine
+After=network-online.target hft-engine.service
+
+[Service]
+Type=simple
+User=neworo
+Group=neworo
+WorkingDirectory=/home/neworo/CLionProjects/hft/util
+ExecStart=/usr/bin/python3 /home/neworo/CLionProjects/hft/util/slack_notifier.py systemd --service hft-engine.service
+Restart=always
+RestartSec=10s
+
+# Environment
+Environment="SLACK_WEBHOOK_URL=your-webhook-url-here"
+
+# Security
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

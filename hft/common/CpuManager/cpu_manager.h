@@ -1,10 +1,18 @@
-//
-// Created by neworo2 on 25. 8. 15.
-//
+/*
+* MIT License
+ *
+ * Copyright (c) 2025 NewOro Corporation
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
+ * copyright notice appears in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ */
 
 #pragma once
 
-#include "logger.h"
+#include "../logger.h"
 
 namespace common {
 struct sched_attr;
@@ -56,32 +64,22 @@ class CpuManager {
  private:
   static void trim_newline(std::string& str);
   static pid_t get_tid_by_thread_name(const std::string& target_name);
-  static int setup(std::string& result);
-  static int verify(std::string& result);
-  static int undo(std::string& result);
-  static int part_fix(std::string& result);
-  static int overlap(std::string& result);
-  static int attach(int pid, std::string& result);
-  static int detach(int pid, std::string& result);
   static int sched_setattr_syscall(pid_t tid, const struct sched_attr* attr,
                                    unsigned int flags);
-  static int set_affinity(const AffinityInfo& info);
+  int set_affinity(const AffinityInfo& info);
   int set_cpu_fifo(uint8_t cpu_id, pid_t tid, int prio);
   int set_cpu_rr(uint8_t cpu_id, pid_t tid, int prio);
   int set_cpu_other(uint8_t cpu_id, pid_t tid, int nicev);
   int set_cpu_batch(uint8_t cpu_id, pid_t tid, int nicev);
   int set_cpu_idle(uint8_t cpu_id, pid_t tid, int nicev);
 
-  int set_rt(uint8_t cpu_id, pid_t tid, SchedPolicy policy, int prio);
+  int set_rt(uint8_t cpu_id, pid_t tid, SchedPolicy policy, int priority);
   int set_cfs(uint8_t cpu_id, pid_t tid, SchedPolicy policy, int nicev);
-  static int set_cpu_to_tid(uint8_t cpu_id, pid_t tid, std::string& result);
+  int set_cpu_to_tid(uint8_t cpu_id, pid_t tid);
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-  static int set_chrt(pid_t tid, int value, int sched, std::string& result);
-  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-  static int set_priority(int value, pid_t tid, std::string& result);
-  static int run_commnad(const std::string& command, std::string& result);
+  int set_scheduler(pid_t tid, int priority, int scheduler_policy);
 
-  common::Logger::Producer logger_;
+  Logger::Producer logger_;
   std::string set_cpu_file_path_;
   std::map<uint8_t, CpuInfo> cpu_info_list_;
   std::map<std::string, ThreadInfo> thread_info_list_;

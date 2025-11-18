@@ -180,3 +180,271 @@ TEST(MemoryPool, TwoThreadStressWithMutex) {
   // 구조적 에러 없이 종료되는지만 확인
   SUCCEED();
 }
+
+// =============================================================================
+// Thread Safety Tests - Demonstrating Current MemoryPool Issues
+// =============================================================================
+
+// Test 1: Concurrent allocate/deallocate without mutex (WILL FAIL)
+TEST(MemoryPoolThreadSafety, ConcurrentAllocateDeallocate) {
+  MemoryPool<Tracked> pool(10000);
+  constexpr int kThreads = 4;
+  constexpr int kOpsPerThread = 10000;
+  std::atomic<int> failures{0};
+
+  auto worker = [&]() {
+    for (int i = 0; i < kOpsPerThread; ++i) {
+      auto* ptr = pool.allocate(i);
+      if (ptr == nullptr) {
+        ++failures;
+        continue;
+      }
+      // Use the pointer briefly
+      volatile int x = ptr->id;
+      (void)x;
+
+      if (!pool.deallocate(ptr)) {
+        ++failures;
+      }
+    }
+  };
+
+  std::vector<std::thread> threads;
+  for (int i = 0; i < kThreads; ++i) {
+    threads.emplace_back(worker);
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  std::cout << "Concurrent test: " << failures.load() << " failures detected\n";
+  std::cout << "Pool state: " << pool.free_count() << " free slots\n";
+}
+
+// Test 2: Producer-Consumer pattern (Should be SAFE with current SPSC usage)
+TEST(MemoryPoolThreadSafety, ProducerConsumerSPSC) {
+  MemoryPool<Tracked> pool(1000);
+  constexpr int kMessages = 10000;
+  std::vector<Tracked*> queue;
+  std::mutex queue_mutex;
+  std::atomic<bool> done{false};
+  std::atomic<int> allocated{0};
+  std::atomic<int> deallocated{0};
+
+  // Producer thread (like MDRead)
+  std::thread producer([&]() {
+    for (int i = 0; i < kMessages; ++i) {
+      auto* ptr = pool.allocate(i);
+      if (ptr) {
+        ++allocated;
+        std::lock_guard lock(queue_mutex);
+        queue.push_back(ptr);
+      }
+    }
+    done = true;
+  });
+
+  // Consumer thread (like TradeEngine)
+  std::thread consumer([&]() {
+    while (!done.load() || !queue.empty()) {
+      Tracked* ptr = nullptr;
+      {
+        std::lock_guard lock(queue_mutex);
+        if (!queue.empty()) {
+          ptr = queue.back();
+          queue.pop_back();
+        }
+      }
+
+      if (ptr) {
+        volatile int x = ptr->id;
+        (void)x;
+        if (pool.deallocate(ptr)) {
+          ++deallocated;
+        }
+      } else {
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
+      }
+    }
+  });
+
+  producer.join();
+  consumer.join();
+
+  std::cout << "SPSC test: allocated=" << allocated.load()
+            << ", deallocated=" << deallocated.load() << "\n";
+  EXPECT_EQ(allocated.load(), deallocated.load());
+}
+
+// Test 3: Producer-Consumer with ERROR PATH (WILL SHOW UAF)
+TEST(MemoryPoolThreadSafety, ProducerConsumerWithErrorPath) {
+  MemoryPool<Tracked> pool(1000);
+  constexpr int kMessages = 5000;
+  std::vector<Tracked*> queue;
+  std::mutex queue_mutex;
+  std::atomic<bool> done{false};
+  std::atomic<int> double_free_detected{0};
+  std::atomic<int> allocated{0};
+  std::atomic<int> deallocated{0};
+
+  // Producer thread with error path simulation
+  std::thread producer([&]() {
+    for (int i = 0; i < kMessages; ++i) {
+      auto* ptr = pool.allocate(i);
+      if (ptr) {
+        ++allocated;
+
+        // Simulate error path (10% chance)
+        if (i % 10 == 0) {
+          // ERROR PATH: Deallocate before enqueueing (ownership violation!)
+          if (!pool.deallocate(ptr)) {
+            ++double_free_detected;
+          } else {
+            ++deallocated;
+          }
+          continue; // Don't enqueue
+        }
+
+        std::lock_guard lock(queue_mutex);
+        queue.push_back(ptr);
+      }
+    }
+    done = true;
+  });
+
+  // Consumer thread
+  std::thread consumer([&]() {
+    while (!done.load() || !queue.empty()) {
+      Tracked* ptr = nullptr;
+      {
+        std::lock_guard lock(queue_mutex);
+        if (!queue.empty()) {
+          ptr = queue.back();
+          queue.pop_back();
+        }
+      }
+
+      if (ptr) {
+        // This might deallocate already-freed memory!
+        if (!pool.deallocate(ptr)) {
+          ++double_free_detected;
+        } else {
+          ++deallocated;
+        }
+      } else {
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
+      }
+    }
+  });
+
+  producer.join();
+  consumer.join();
+
+  std::cout << "Error path test: allocated=" << allocated.load()
+            << ", deallocated=" << deallocated.load()
+            << ", double_free_detected=" << double_free_detected.load() << "\n";
+  std::cout << "Pool free count: " << pool.free_count() << "\n";
+}
+
+// Test 4: Concurrent Deallocate (CRITICAL - Will show vector corruption)
+TEST(MemoryPoolThreadSafety, ConcurrentDeallocateSamePointer) {
+  MemoryPool<Tracked> pool(100);
+  std::vector<Tracked*> allocated;
+
+  // Pre-allocate objects
+  for (int i = 0; i < 100; ++i) {
+    allocated.push_back(pool.allocate(i));
+  }
+
+  std::atomic<int> success_count{0};
+  std::atomic<int> failure_count{0};
+
+  // Try to deallocate each pointer from multiple threads simultaneously
+  auto worker = [&](int start, int end) {
+    for (int i = start; i < end; ++i) {
+      // Multiple threads try to free the same pointer
+      if (pool.deallocate(allocated[i])) {
+        ++success_count;
+      } else {
+        ++failure_count;
+      }
+    }
+  };
+
+  constexpr int kThreads = 4;
+  std::vector<std::thread> threads;
+
+  // All threads try to deallocate all pointers (should cause chaos)
+  for (int t = 0; t < kThreads; ++t) {
+    threads.emplace_back(worker, 0, 100);
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  std::cout << "Concurrent deallocate test:\n";
+  std::cout << "  Success: " << success_count.load() << "\n";
+  std::cout << "  Failure: " << failure_count.load() << "\n";
+  std::cout << "  Expected success: 100 (one per object)\n";
+  std::cout << "  Pool free count: " << pool.free_count() << "\n";
+}
+
+// Test 5: Vector Corruption Test (Stress test on free_ vector)
+TEST(MemoryPoolThreadSafety, VectorCorruptionStressTest) {
+  MemoryPool<Tracked> pool(10000);
+  constexpr int kThreads = 8;
+  constexpr int kAllocationsPerThread = 5000;
+
+  std::vector<std::vector<Tracked*>> thread_allocations(kThreads);
+  std::atomic<int> corruption_detected{0};
+
+  // Phase 1: Each thread allocates its own objects
+  {
+    std::vector<std::thread> threads;
+    for (int t = 0; t < kThreads; ++t) {
+      threads.emplace_back([&, t]() {
+        for (int i = 0; i < kAllocationsPerThread; ++i) {
+          auto* ptr = pool.allocate(t * 10000 + i);
+          if (ptr) {
+            thread_allocations[t].push_back(ptr);
+          }
+        }
+      });
+    }
+    for (auto& t : threads) {
+      t.join();
+    }
+  }
+
+  std::cout << "Allocated objects across " << kThreads << " threads\n";
+
+  // Phase 2: All threads deallocate concurrently (NO MUTEX)
+  // This should cause vector corruption in free_ vector
+  {
+    std::vector<std::thread> threads;
+    for (int t = 0; t < kThreads; ++t) {
+      threads.emplace_back([&, t]() {
+        for (auto* ptr : thread_allocations[t]) {
+          if (!pool.deallocate(ptr)) {
+            ++corruption_detected;
+          }
+        }
+      });
+    }
+    for (auto& t : threads) {
+      t.join();
+    }
+  }
+
+  std::cout << "Vector corruption test:\n";
+  std::cout << "  Corruption detected: " << corruption_detected.load() << "\n";
+  std::cout << "  Pool free count: " << pool.free_count() << "\n";
+  std::cout << "  Expected free count: 10000\n";
+
+  // The free count might be wrong due to corruption
+  if (pool.free_count() != 10000) {
+    std::cout << "  WARNING: Free list corrupted! Count mismatch.\n";
+  }
+}

@@ -10,7 +10,7 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "cpu_manager.h"
+#include "hft/common/CpuManager/cpu_manager.h"
 #include "hft/core/NewOroFix44/response_manager.h"
 #include "ini_config.hpp"
 #include "logger.h"

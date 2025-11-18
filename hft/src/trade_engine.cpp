@@ -159,7 +159,7 @@ void TradeEngine::run() {
         continue;
       wait.reset();
       START_MEASURE(MAKE_ORDERBOOK_ALL);
-      for (auto& market_data : message->data) {
+      for (const auto* market_data : message->data) {
         START_MEASURE(MAKE_ORDERBOOK_UNIT);
         ticker_order_book_[market_data->ticker_id]->on_market_data_updated(
             market_data);

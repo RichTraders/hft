@@ -10,6 +10,9 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
+#ifndef ORDER_MANAGER_TPP
+#define ORDER_MANAGER_TPP
+
 #include "order_manager.h"
 #include "ini_config.hpp"
 #include "order_entry.h"
@@ -26,8 +29,10 @@ using common::TickerId;
 using order::LayerBook;
 using order::PendingReplaceInfo;
 
-OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
-                           RiskManager& risk_manager)
+template <typename Strategy>
+OrderManager<Strategy>::OrderManager(common::Logger* logger,
+                                     TradeEngine<Strategy>* trade_engine,
+                                     RiskManager& risk_manager)
     : layer_book_(INI_CONFIG.get("meta", "ticker")),
       trade_engine_(trade_engine),
       risk_manager_(risk_manager),
@@ -41,11 +46,14 @@ OrderManager::OrderManager(common::Logger* logger, TradeEngine* trade_engine,
       tick_converter_(ticker_size_) {
   logger_.info("[Constructor] OrderManager Created");
 }
-OrderManager::~OrderManager() {
+template <typename Strategy>
+OrderManager<Strategy>::~OrderManager() {
   logger_.info("[Destructor] OrderManager Destroy");
 }
 
-void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
+template <typename Strategy>
+void OrderManager<Strategy>::on_order_updated(
+    const ExecutionReport* response) noexcept {
 
   auto& side_book = layer_book_.side_book(response->symbol, response->side);
 
@@ -273,9 +281,11 @@ void OrderManager::on_order_updated(const ExecutionReport* response) noexcept {
   }
 }
 
-void OrderManager::new_order(const TickerId& ticker_id, const Price price,
-                             const Side side, const Qty qty,
-                             const OrderId order_id) noexcept {
+template <typename Strategy>
+void OrderManager<Strategy>::new_order(const TickerId& ticker_id,
+                                       const Price price, const Side side,
+                                       const Qty qty,
+                                       const OrderId order_id) noexcept {
   const RequestCommon new_request{
       .req_type = ReqeustType::kNewSingleOrderData,
       .cl_order_id = order_id,
@@ -291,11 +301,13 @@ void OrderManager::new_order(const TickerId& ticker_id, const Price price,
       std::format("[OrderRequest]Sent new order {}", new_request.toString()));
 }
 
-void OrderManager::modify_order(const TickerId& ticker_id,
-                                const OrderId& cancel_new_order_id,
-                                const OrderId& order_id,
-                                const OrderId& original_order_id, Price price,
-                                Side side, const Qty qty) noexcept {
+template <typename Strategy>
+void OrderManager<Strategy>::modify_order(const TickerId& ticker_id,
+                                          const OrderId& cancel_new_order_id,
+                                          const OrderId& order_id,
+                                          const OrderId& original_order_id,
+                                          Price price, Side side,
+                                          const Qty qty) noexcept {
   const RequestCommon new_request{
       .req_type = ReqeustType::kOrderCancelRequestAndNewOrderSingle,
       .cl_cancel_order_id = cancel_new_order_id,
@@ -313,9 +325,10 @@ void OrderManager::modify_order(const TickerId& ticker_id,
                            new_request.toString()));
 }
 
-void OrderManager::cancel_order(const TickerId& ticker_id,
-                                const OrderId& original_order_id,
-                                const OrderId& order_id) noexcept {
+template <typename Strategy>
+void OrderManager<Strategy>::cancel_order(const TickerId& ticker_id,
+                                          const OrderId& original_order_id,
+                                          const OrderId& order_id) noexcept {
   const RequestCommon cancel_request{
       .req_type = ReqeustType::kOrderCancelRequest,
       .cl_order_id = order_id,
@@ -327,7 +340,9 @@ void OrderManager::cancel_order(const TickerId& ticker_id,
       std::format("[OrderRequest]Sent cancel {}", cancel_request.toString()));
 }
 
-void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
+template <typename Strategy>
+void OrderManager<Strategy>::apply(
+    const std::vector<QuoteIntent>& intents) noexcept {
   START_MEASURE(Trading_OrderManager_apply);
   auto actions = reconciler_.diff(intents, layer_book_, fast_clock_);
 
@@ -434,8 +449,9 @@ void OrderManager::apply(const std::vector<QuoteIntent>& intents) noexcept {
   END_MEASURE(Trading_OrderManager_apply, logger_);
 }
 
-void OrderManager::filter_by_risk(const std::vector<QuoteIntent>& intents,
-                                  order::Actions& acts) {
+template <typename Strategy>
+void OrderManager<Strategy>::filter_by_risk(
+    const std::vector<QuoteIntent>& intents, order::Actions& acts) {
   const auto& ticker = intents.empty() ? std::string{} : intents.front().ticker;
   auto running = reserved_position_;
   auto allow_new = [&](auto& actions) {
@@ -469,9 +485,11 @@ void OrderManager::filter_by_risk(const std::vector<QuoteIntent>& intents,
   allow_repl(acts.repls);
 }
 
-void OrderManager::register_expiry(const TickerId& ticker, Side side,
-                                   uint32_t layer, const OrderId& order_id,
-                                   OMOrderState state) noexcept {
+template <typename Strategy>
+void OrderManager<Strategy>::register_expiry(const TickerId& ticker, Side side,
+                                             uint32_t layer,
+                                             const OrderId& order_id,
+                                             OMOrderState state) noexcept {
   const auto now = fast_clock_.get_timestamp();
   const auto ttl = (state == OMOrderState::kReserved ||
                     state == OMOrderState::kCancelReserved)
@@ -484,7 +502,8 @@ void OrderManager::register_expiry(const TickerId& ticker, Side side,
                             .cl_order_id = order_id});
 }
 
-void OrderManager::sweep_expired() noexcept {
+template <typename Strategy>
+void OrderManager<Strategy>::sweep_expired() noexcept {
   const auto now = fast_clock_.get_timestamp();
 
   while (!expiry_pq_.empty() && expiry_pq_.top().expire_ts <= now) {
@@ -522,8 +541,11 @@ void OrderManager::sweep_expired() noexcept {
   }
 }
 
-OrderId OrderManager::gen_order_id() noexcept {
+template <typename Strategy>
+OrderId OrderManager<Strategy>::gen_order_id() noexcept {
   const auto now = fast_clock_.get_timestamp();
   return OrderId{now};
 }
 }  // namespace trading
+
+#endif  // ORDER_MANAGER_TPP

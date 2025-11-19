@@ -9,17 +9,44 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(-march=native)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g -fno-omit-frame-pointer")
     set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_RELEASE} -g -fno-omit-frame-pointer")
+    # Enable LTO for maximum performance
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif ()
 
 include_directories(
         hft
 )
 add_subdirectory(hft)
-add_executable(HFT main.cpp)
-target_link_libraries(HFT PRIVATE HftLib)
+
+option(ENABLE_TESTS "Build and fetch test dependencies" OFF)
+
+set(STRATEGY_CONFIG_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/strategy_config.hpp.in")
+
+function(add_strategy_target target_name strategy_type strategy_name)
+    set(gen_dir "${CMAKE_CURRENT_BINARY_DIR}/generated/${target_name}")
+    file(MAKE_DIRECTORY "${gen_dir}")
+    set(STRATEGY_TYPE "${strategy_type}")
+    set(STRATEGY_NAME "${strategy_name}")
+    configure_file("${STRATEGY_CONFIG_TEMPLATE}" "${gen_dir}/strategy_config.hpp" @ONLY)
+
+    add_executable(${target_name} main.cpp)
+    target_include_directories(${target_name} PRIVATE "${gen_dir}")
+    target_link_libraries(${target_name} PRIVATE HftLib)
+
+    if (CMAKE_BUILD_TYPE STREQUAL "Release")
+        set_property(TARGET ${target_name} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    endif ()
+endfunction()
+
+add_strategy_target(HFT_maker "trading::MarketMaker" "MarketMaker")
+add_strategy_target(HFT_taker "trading::LiquidTaker" "LiquidTaker")
+# Default target for backward compatibility (uses market maker strategy)
+add_strategy_target(HFT "trading::MarketMaker" "MarketMaker")
 
 add_subdirectory(repository)
-add_subdirectory(test)
+if (ENABLE_TESTS)
+    add_subdirectory(test)
+endif ()
 
 set(RESOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 file(COPY ${RESOURCES_DIR} DESTINATION ${CMAKE_BINARY_DIR})

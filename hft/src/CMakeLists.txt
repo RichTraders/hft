@@ -1,6 +1,8 @@
 file(GLOB_RECURSE LIB_SRC_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/*.tpp
         ${CMAKE_CURRENT_SOURCE_DIR}/strategy/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/strategy/*.tpp
 )
 
 add_library(Src STATIC

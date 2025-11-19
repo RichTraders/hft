@@ -21,11 +21,13 @@
 #include "quote_reconciler.h"
 
 namespace trading {
+template <typename Strategy>
 class TradeEngine;
 
+template <typename Strategy>
 class OrderManager {
  public:
-  OrderManager(common::Logger* logger, TradeEngine* trade_engine,
+  OrderManager(common::Logger* logger, TradeEngine<Strategy>* trade_engine,
                RiskManager& risk_manager);
   ~OrderManager();
   void on_order_updated(const ExecutionReport* response) noexcept;
@@ -58,7 +60,7 @@ class OrderManager {
 
  private:
   order::LayerBook layer_book_;
-  TradeEngine* trade_engine_ = nullptr;
+  TradeEngine<Strategy>* trade_engine_ = nullptr;
   RiskManager& risk_manager_;
   common::Logger::Producer logger_;
   common::FastClock fast_clock_;

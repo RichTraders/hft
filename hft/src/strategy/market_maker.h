@@ -13,28 +13,28 @@
 #ifndef MARKETMAKER_H
 #define MARKETMAKER_H
 #include "base_strategy.hpp"
-#include "strategy_dispatch.hpp"
 
 struct MarketData;
+
 namespace trading {
-class FeatureEngine;
-class MarketOrderBook;
-}  // namespace trading
-namespace trading {
-class MarketMaker : public BaseStrategy {
+class MarketMaker : public BaseStrategy<MarketMaker> {
  public:
-  MarketMaker(OrderManager* order_manager, const FeatureEngine* feature_engine,
+  MarketMaker(OrderManager<MarketMaker>* order_manager,
+              const FeatureEngine<MarketMaker>* feature_engine,
               common::Logger* logger,
               const common::TradeEngineCfgHashMap& ticker_cfg);
-  void on_orderbook_updated(const common::TickerId& ticker, common::Price,
-                            common::Side,
-                            const MarketOrderBook* order_book) noexcept;
+  void on_orderbook_updated(
+      const common::TickerId& ticker, common::Price, common::Side,
+      const MarketOrderBook<MarketMaker>* order_book) noexcept;
 
-  void on_trade_updated(const MarketData*, MarketOrderBook*) noexcept;
+  void on_trade_updated(const MarketData*,
+                        MarketOrderBook<MarketMaker>*) noexcept;
 
   void on_order_updated(const ExecutionReport*) noexcept;
 
  private:
+  static constexpr int kDefaultOBILevel10 = 10;
+  static constexpr int kGap = 5;
   const double variance_denominator_;
   const double position_variance_;
   const double enter_threshold_;
@@ -43,8 +43,6 @@ class MarketMaker : public BaseStrategy {
   std::vector<double> bid_qty_;
   std::vector<double> ask_qty_;
 };
-
-void register_market_maker_strategy();
 }  // namespace trading
 
 #endif  //MARKETMAKER_H

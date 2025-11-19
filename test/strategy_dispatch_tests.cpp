@@ -10,13 +10,13 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "gtest/gtest.h"
-#include "strategy/strategy_dispatch.hpp"
-#include "strategy/strategies.hpp"
-#include "order_manager.h"
 #include "feature_engine.h"
-#include "logger.h"
+#include "gtest/gtest.h"
 #include "ini_config.hpp"
+#include "logger.h"
+#include "order_manager.h"
+#include "strategy/strategies.hpp"
+#include "strategy/strategy_dispatch.hpp"
 
 using namespace trading;
 using namespace common;

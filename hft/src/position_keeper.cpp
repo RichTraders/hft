@@ -11,7 +11,6 @@
  */
 
 #include "position_keeper.h"
-
 #include "order_book.h"
 #include "order_entry.h"
 

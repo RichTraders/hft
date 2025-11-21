@@ -92,29 +92,30 @@ void MarketMaker::on_trade_updated(
     intents.push_back(
         QuoteIntent{.ticker = ticker,
                     .side = Side::kBuy,
-                    .price = best_bid_price - kGap,
+                    .price = best_bid_price - kSafetyMargin,
                     .qty = Qty{round5(signal * position_variance_)}});
 
-    logger_.info(std::format(
+    logger_.debug(std::format(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:buy, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
         "vwap:{}, spread:{}",
-        best_bid_price.value - kGap, round5(signal * position_variance_), delta,
-        obi, signal, mid, vwap, spread));
+        best_bid_price.value - kSafetyMargin,
+        round5(signal * position_variance_), delta, obi, signal, mid, vwap,
+        spread));
   } else if (delta * obi < -enter_threshold_) {
     const auto best_ask_price = order_book->get_bbo()->ask_price;
     intents.push_back(
         QuoteIntent{.ticker = ticker,
                     .side = Side::kSell,
-                    .price = best_ask_price + kGap,
+                    .price = best_ask_price + kSafetyMargin,
                     .qty = Qty{round5(signal * position_variance_)}});
-    logger_.info(std::format(
+    logger_.debug(std::format(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
         "vwap:{}, spread:{}",
-        best_ask_price.value + MarketMaker::kGap,
+        best_ask_price.value + MarketMaker::kSafetyMargin,
         round5(signal * position_variance_), delta, obi, signal, mid, vwap,
         spread));
   }

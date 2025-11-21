@@ -34,7 +34,7 @@ class MarketMaker : public BaseStrategy<MarketMaker> {
 
  private:
   static constexpr int kDefaultOBILevel10 = 10;
-  static constexpr int kGap = 5;
+  static constexpr int kSafetyMargin = 10;
   const double variance_denominator_;
   const double position_variance_;
   const double enter_threshold_;

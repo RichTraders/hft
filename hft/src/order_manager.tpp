@@ -13,9 +13,9 @@
 #ifndef ORDER_MANAGER_TPP
 #define ORDER_MANAGER_TPP
 
-#include "order_manager.h"
 #include "ini_config.hpp"
 #include "order_entry.h"
+#include "order_manager.h"
 #include "performance.h"
 #include "trade_engine.h"
 
@@ -164,8 +164,7 @@ void OrderManager<Strategy>::on_order_updated(
         break;
       }
       auto& slot = side_book.slots[layer];
-      reserved_position_ -=
-          static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
+      reserved_position_ -= common::sideToValue(response->side) * slot.qty;
       slot.qty = response->leaves_qty;
       slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
@@ -216,16 +215,15 @@ void OrderManager<Strategy>::on_order_updated(
 
       auto& slot = side_book.slots[layer];
       slot.state = OMOrderState::kDead;
-      reserved_position_ -=
-          static_cast<double>(common::sideToIndex(response->side)) * slot.qty;
+      reserved_position_ -= common::sideToValue(response->side) * slot.qty;
       LayerBook::unmap_layer(side_book, layer);
       logger_.info(
           std::format("[OrderUpdated] Canceled {}", response->toString()));
       break;
     }
     case OrdStatus::kRejected:
+      [[fallthrough]];
     case OrdStatus::kExpired: {
-      // 우선 듀얼 매핑(새주문)으로 조회
       int layer = -1;
       if (const auto iter =
               side_book.new_id_to_layer.find(response->cl_order_id.value);
@@ -236,10 +234,8 @@ void OrderManager<Strategy>::on_order_updated(
       if (const auto& pend_opt = side_book.pending_repl[layer];
           layer >= 0 && pend_opt.has_value()) {
         const auto& pend = *pend_opt;
-        // delta 롤백
-        reserved_position_ -=
-            static_cast<double>(common::sideToIndex(response->side)) *
-            (pend.new_qty - pend.last_qty);
+        reserved_position_ -= common::sideToValue(response->side) *
+                              (pend.new_qty - pend.last_qty);
         side_book.pending_repl[layer].reset();
         if (const auto iter =
                 side_book.new_id_to_layer.find(response->cl_order_id.value);
@@ -255,10 +251,9 @@ void OrderManager<Strategy>::on_order_updated(
           layer = LayerBook::find_layer_by_ticks(side_book, tick);
         }
         if (layer >= 0) {
-          const auto& slot = side_book.slots[layer];
-          reserved_position_ -=
-              static_cast<double>(common::sideToIndex(response->side)) *
-              slot.qty;
+          auto& slot = side_book.slots[layer];
+          reserved_position_ -= common::sideToValue(response->side) * slot.qty;
+          slot.state = OMOrderState::kDead;
           LayerBook::unmap_layer(side_book, layer);
         } else {
           logger_.error(std::format("[OrderUpdated] {}: layer not found {}",
@@ -378,8 +373,7 @@ void OrderManager<Strategy>::apply(
 
     new_order(ticker, action.price, action.side, action.qty,
               action.cl_order_id);
-    reserved_position_ +=
-        static_cast<double>(common::sideToIndex(action.side)) * action.qty;
+    reserved_position_ += common::sideToValue(action.side) * action.qty;
 
     logger_.info(
         std::format("[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}",
@@ -427,8 +421,7 @@ void OrderManager<Strategy>::apply(
                  action.qty);
 
     reserved_position_ +=
-        static_cast<double>(common::sideToIndex(action.side)) *
-        (action.qty - action.last_qty);
+        common::sideToValue(action.side) * (action.qty - action.last_qty);
     register_expiry(ticker, action.side, action.layer, action.cl_order_id,
                     OMOrderState::kCancelReserved);
   }
@@ -457,8 +450,8 @@ void OrderManager<Strategy>::filter_by_risk(
   auto allow_new = [&](auto& actions) {
     for (auto action = actions.begin(); action != actions.end();) {
       const auto delta = action->qty;
-      if (risk_manager_.checkPreTradeRisk(ticker, action->side, delta,
-                                          running) ==
+      if (risk_manager_.check_pre_trade_risk(ticker, action->side, delta,
+                                             running) ==
           RiskCheckResult::kAllowed) {
         running += delta;
         ++action;
@@ -470,8 +463,8 @@ void OrderManager<Strategy>::filter_by_risk(
   auto allow_repl = [&](auto& actions) {
     for (auto action = actions.begin(); action != actions.end();) {
       const auto delta = action->qty - action->last_qty;
-      if (risk_manager_.checkPreTradeRisk(ticker, action->side, delta,
-                                          running) ==
+      if (risk_manager_.check_pre_trade_risk(ticker, action->side, delta,
+                                             running) ==
           RiskCheckResult::kAllowed) {
         running += delta;
         ++action;

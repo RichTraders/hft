@@ -21,7 +21,7 @@ class MarketMaker : public BaseStrategy<MarketMaker> {
  public:
   MarketMaker(OrderManager<MarketMaker>* order_manager,
               const FeatureEngine<MarketMaker>* feature_engine,
-              common::Logger* logger,
+              const InventoryManager* inventory_manager, common::Logger* logger,
               const common::TradeEngineCfgHashMap& ticker_cfg);
   void on_orderbook_updated(
       const common::TickerId& ticker, common::Price, common::Side,

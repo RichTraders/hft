@@ -29,6 +29,7 @@ template <class Strategy>
 class FeatureEngine;
 template <class Strategy>
 class OrderManager;
+class InventoryManager;
 struct ExecutionReport;
 
 template <class Strategy>
@@ -36,9 +37,11 @@ class BaseStrategy {
  public:
   BaseStrategy(OrderManager<Strategy>* const order_manager,
                const FeatureEngine<Strategy>* const feature_engine,
+               const InventoryManager* const inventory_manager,
                common::Logger* logger)
       : order_manager_(order_manager),
         feature_engine_(feature_engine),
+        inventory_manager_(inventory_manager),
         logger_(logger->make_producer()) {}
 
   ~BaseStrategy() = default;
@@ -46,6 +49,7 @@ class BaseStrategy {
  protected:
   OrderManager<Strategy>* order_manager_;
   const FeatureEngine<Strategy>* feature_engine_;
+  const InventoryManager* inventory_manager_;
   common::Logger::Producer logger_;
 };
 }  // namespace trading

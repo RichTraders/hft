@@ -17,6 +17,7 @@
 
 #include "feature_engine.h"
 #include "ini_config.hpp"
+#include "inventory_manager.h"
 #include "order_entry.h"
 #include "order_gateway.h"
 #include "order_manager.h"
@@ -37,6 +38,7 @@ TradeEngine<Strategy>::TradeEngine(
     const common::TradeEngineCfgHashMap& ticker_cfg)
     requires std::is_constructible_v<Strategy, OrderManager<Strategy>*,
                                      const FeatureEngine<Strategy>*,
+                                     const InventoryManager*,
                                      common::Logger*,
                                      const common::TradeEngineCfgHashMap&>
     : logger_(logger->make_producer()),
@@ -49,9 +51,12 @@ TradeEngine<Strategy>::TradeEngine(
       position_keeper_(std::make_unique<PositionKeeper>(logger)),
       risk_manager_(std::make_unique<RiskManager>(
           logger, position_keeper_.get(), ticker_cfg)),
+      inventory_manager_(std::make_unique<InventoryManager>(
+          logger, position_keeper_.get(), ticker_cfg)),
       order_manager_(
           std::make_unique<OrderManager<Strategy>>(logger, this, *risk_manager_)),
-      strategy_(order_manager_.get(), feature_engine_.get(), logger, ticker_cfg) {
+      strategy_(order_manager_.get(), feature_engine_.get(),
+                inventory_manager_.get(), logger, ticker_cfg) {
   const std::string ticker = INI_CONFIG.get("meta", "ticker");
   auto orderbook = std::make_unique<MarketOrderBook<Strategy>>(ticker, logger);
   response_queue_ = std::make_unique<

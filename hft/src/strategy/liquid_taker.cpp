@@ -15,9 +15,10 @@
 namespace trading {
 LiquidTaker::LiquidTaker(OrderManager<LiquidTaker>* const order_manager,
                          const FeatureEngine<LiquidTaker>* const feature_engine,
+                         const InventoryManager* const inventory_manager,
                          common::Logger* logger,
                          const common::TradeEngineCfgHashMap&)
-    : BaseStrategy(order_manager, feature_engine, logger) {}
+    : BaseStrategy(order_manager, feature_engine, inventory_manager, logger) {}
 
 void LiquidTaker::on_orderbook_updated(
     const common::TickerId&, common::Price, common::Side,

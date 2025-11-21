@@ -27,9 +27,10 @@ inline double round5(double value) {
 namespace trading {
 MarketMaker::MarketMaker(OrderManager<MarketMaker>* const order_manager,
                          const FeatureEngine<MarketMaker>* const feature_engine,
+                         const InventoryManager* const inventory_manager,
                          common::Logger* logger,
                          const common::TradeEngineCfgHashMap&)
-    : BaseStrategy(order_manager, feature_engine, logger),
+    : BaseStrategy(order_manager, feature_engine, inventory_manager, logger),
       variance_denominator_(
           INI_CONFIG.get_double("strategy", "variance_denominator")),
       position_variance_(
@@ -89,34 +90,43 @@ void MarketMaker::on_trade_updated(
 
   if (delta * obi > enter_threshold_) {
     const auto best_bid_price = order_book->get_bbo()->bid_price;
+    const auto bid_adjustment =
+        inventory_manager_->get_quote_adjustment(Side::kBuy, ticker);
+    const auto adjusted_bid_price =
+        best_bid_price.value - kGap + bid_adjustment;
+
     intents.push_back(
         QuoteIntent{.ticker = ticker,
                     .side = Side::kBuy,
-                    .price = best_bid_price - kGap,
+                    .price = common::Price{adjusted_bid_price},
                     .qty = Qty{round5(signal * position_variance_)}});
 
-    logger_.info(std::format(
+    logger_.debug(std::format(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:buy, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
-        "vwap:{}, spread:{}",
-        best_bid_price.value - kGap, round5(signal * position_variance_), delta,
-        obi, signal, mid, vwap, spread));
+        "vwap:{}, spread:{}, inventory_adj:{}",
+        adjusted_bid_price, round5(signal * position_variance_), delta, obi,
+        signal, mid, vwap, spread, bid_adjustment));
   } else if (delta * obi < -enter_threshold_) {
     const auto best_ask_price = order_book->get_bbo()->ask_price;
+    const auto ask_adjustment =
+        inventory_manager_->get_quote_adjustment(Side::kSell, ticker);
+    const auto adjusted_ask_price =
+        best_ask_price.value + kGap + ask_adjustment;
+
     intents.push_back(
         QuoteIntent{.ticker = ticker,
                     .side = Side::kSell,
-                    .price = best_ask_price + kGap,
+                    .price = common::Price{adjusted_ask_price},
                     .qty = Qty{round5(signal * position_variance_)}});
-    logger_.info(std::format(
+    logger_.debug(std::format(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
-        "vwap:{}, spread:{}",
-        best_ask_price.value + MarketMaker::kGap,
-        round5(signal * position_variance_), delta, obi, signal, mid, vwap,
-        spread));
+        "vwap:{}, spread:{}, inventory_adj:{}",
+        adjusted_ask_price, round5(signal * position_variance_), delta, obi,
+        signal, mid, vwap, spread, ask_adjustment));
   }
   if (signal < exit_threshold_) {
     return;

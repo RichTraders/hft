@@ -28,6 +28,7 @@ struct ExecutionReport;
 template <typename Strategy>
 class FeatureEngine;
 class RiskManager;
+class InventoryManager;
 template <class Strategy>
 class OrderManager;
 class ResponseManager;
@@ -52,9 +53,10 @@ class TradeEngine {
       common::MemoryPool<MarketData>* market_data_pool,
       ResponseManager* response_manager,
       const common::TradeEngineCfgHashMap& ticker_cfg)
-    requires std::is_constructible_v<
-        Strategy, OrderManager<Strategy>*, const FeatureEngine<Strategy>*,
-        common::Logger*, const common::TradeEngineCfgHashMap&>;
+    requires std::is_constructible_v<Strategy, OrderManager<Strategy>*,
+                                     const FeatureEngine<Strategy>*,
+                                     const InventoryManager*, common::Logger*,
+                                     const common::TradeEngineCfgHashMap&>;
   ~TradeEngine();
 
   void init_order_gateway(OrderGateway<Strategy>* order_gateway);
@@ -88,6 +90,7 @@ class TradeEngine {
   std::unique_ptr<FeatureEngine<Strategy>> feature_engine_;
   std::unique_ptr<PositionKeeper> position_keeper_;
   std::unique_ptr<RiskManager> risk_manager_;
+  std::unique_ptr<InventoryManager> inventory_manager_;
   std::unique_ptr<OrderManager<Strategy>> order_manager_;
 
   // Direct strategy instance - zero overhead, fully inlinable

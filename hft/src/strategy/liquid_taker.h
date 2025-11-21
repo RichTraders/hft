@@ -27,7 +27,8 @@ class LiquidTaker : public BaseStrategy<LiquidTaker> {
  public:
   LiquidTaker(OrderManager<LiquidTaker>* order_manager,
               const FeatureEngine<LiquidTaker>* feature_engine,
-              common::Logger* logger, const common::TradeEngineCfgHashMap&);
+              const InventoryManager* inventory_manager, common::Logger* logger,
+              const common::TradeEngineCfgHashMap&);
 
   void on_orderbook_updated(const common::TickerId&, common::Price,
                             common::Side,

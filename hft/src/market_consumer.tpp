@@ -10,14 +10,19 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
+#ifndef MARKET_CONSUMER_TPP
+#define MARKET_CONSUMER_TPP
+
 #include "market_consumer.h"
 #include "fix_md_app.h"
 #include "ini_config.hpp"
 #include "trade_engine.h"
 
 namespace trading {
-MarketConsumer::MarketConsumer(
-    common::Logger* logger, TradeEngine* trade_engine,
+
+template<typename Strategy>
+MarketConsumer<Strategy>::MarketConsumer(
+    common::Logger* logger, TradeEngine<Strategy>* trade_engine,
     common::MemoryPool<MarketUpdateData>* market_update_data_pool,
     common::MemoryPool<MarketData>* market_data_pool)
     : market_update_data_pool_(market_update_data_pool),
@@ -50,15 +55,18 @@ MarketConsumer::MarketConsumer(
   logger_.info("[Constructor] MarketConsumer Created");
 }
 
-MarketConsumer::~MarketConsumer() {
-  logger_.info("[Destructor] MarketConsumer Destory");
+template<typename Strategy>
+MarketConsumer<Strategy>::~MarketConsumer() {
+  logger_.info("[Destructor] MarketConsumer Destroy");
 }
 
-void MarketConsumer::stop() {
+template<typename Strategy>
+void MarketConsumer<Strategy>::stop() {
   app_->stop();
 }
 
-void MarketConsumer::on_login(FIX8::Message*) {
+template<typename Strategy>
+void MarketConsumer<Strategy>::on_login(FIX8::Message*) {
   logger_.info("[Login] Market consumer successful");
   const std::string message = app_->create_market_data_subscription_message(
       "DEPTH_STREAM", INI_CONFIG.get("meta", "level"),
@@ -75,7 +83,8 @@ void MarketConsumer::on_login(FIX8::Message*) {
   }
 }
 
-void MarketConsumer::on_snapshot(FIX8::Message* msg) {
+template<typename Strategy>
+void MarketConsumer<Strategy>::on_snapshot(FIX8::Message* msg) {
   logger_.info("Snapshot made");
 
   auto* snapshot_data = market_update_data_pool_->allocate(
@@ -102,7 +111,8 @@ void MarketConsumer::on_snapshot(FIX8::Message* msg) {
   state_ = StreamState::kRunning;
 }
 
-void MarketConsumer::on_subscribe(FIX8::Message* msg) {
+template<typename Strategy>
+void MarketConsumer<Strategy>::on_subscribe(FIX8::Message* msg) {
   auto* data =
       market_update_data_pool_->allocate(app_->create_market_data_message(msg));
 
@@ -144,7 +154,8 @@ void MarketConsumer::on_subscribe(FIX8::Message* msg) {
   }
 }
 
-void MarketConsumer::on_reject(FIX8::Message* msg) {
+template<typename Strategy>
+void MarketConsumer<Strategy>::on_reject(FIX8::Message* msg) {
   const auto rejected_message = app_->create_reject_message(msg);
   logger_.error(std::format("[Message] {}", rejected_message.toString()));
   if (rejected_message.session_reject_reason == "A") {
@@ -152,25 +163,29 @@ void MarketConsumer::on_reject(FIX8::Message* msg) {
   }
 }
 
-void MarketConsumer::on_logout(FIX8::Message*) {
+template<typename Strategy>
+void MarketConsumer<Strategy>::on_logout(FIX8::Message*) {
   logger_.info("[Message] logout");
 }
 
-void MarketConsumer::on_instrument_list(FIX8::Message* msg) {
+template<typename Strategy>
+void MarketConsumer<Strategy>::on_instrument_list(FIX8::Message* msg) {
   const InstrumentInfo instrument_message =
       app_->create_instrument_list_message(msg);
   logger_.info(std::format("[Message] on_instrument_list :{}",
                            instrument_message.toString()));
 }
 
-void MarketConsumer::on_heartbeat(FIX8::Message* msg) {
+template<typename Strategy>
+void MarketConsumer<Strategy>::on_heartbeat(FIX8::Message* msg) {
   auto message = app_->create_heartbeat_message(msg);
   if (UNLIKELY(!app_->send(message))) {
     logger_.error("[Message] failed to send heartbeat");
   }
 }
 
-void MarketConsumer::resubscribe() {
+template<typename Strategy>
+void MarketConsumer<Strategy>::resubscribe() {
   logger_.info("Try resubscribing");
   current_generation_.store(
       generation_.fetch_add(1, std::memory_order_acq_rel) + 1,
@@ -195,3 +210,5 @@ void MarketConsumer::resubscribe() {
 }
 
 }  // namespace trading
+
+#endif  // MARKET_CONSUMER_TPP

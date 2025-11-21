@@ -71,7 +71,7 @@ class RiskManager {
               const common::TradeEngineCfgHashMap& ticker_cfg);
 
   ~RiskManager();
-  [[nodiscard]] auto checkPreTradeRisk(
+  [[nodiscard]] auto check_pre_trade_risk(
       const common::TickerId& ticker_id, const common::Side side,
       const common::Qty qty, const common::Qty reserved_qty) noexcept {
     return ticker_risk_.at(ticker_id).checkPreTradeRisk(side, qty, reserved_qty,

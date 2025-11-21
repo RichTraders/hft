@@ -18,9 +18,8 @@
 #include "order_entry.h"
 #include "order_gateway.h"
 #include "risk_manager.h"
-#include "strategy/strategies.hpp"
-#include "thread.hpp"
 #include "trade_engine.h"
+#include "strategy_config.hpp"
 
 int main() {
   try {
@@ -29,7 +28,6 @@ int main() {
 #else
     INI_CONFIG.load("resources/config.ini");
 #endif
-    trading::register_all_strategies();
 
     std::unique_ptr<common::Logger> logger = std::make_unique<common::Logger>();
     logger->setLevel(logger->string_to_level(INI_CONFIG.get("log", "level")));
@@ -71,18 +69,19 @@ int main() {
         logger.get(), execution_report_pool.get(),
         order_cancel_reject_pool.get(), order_mass_cancel_report_pool.get());
 
-    auto order_gateway = std::make_unique<trading::OrderGateway>(
-        logger.get(), response_manager.get());
+    auto order_gateway =
+        std::make_unique<trading::OrderGateway<SelectedStrategy>>(
+            logger.get(), response_manager.get());
 
-    auto engine = std::make_unique<trading::TradeEngine>(
+    auto engine = std::make_unique<trading::TradeEngine<SelectedStrategy>>(
         logger.get(), market_update_data_pool.get(), market_data_pool.get(),
         response_manager.get(), config_map);
     engine->init_order_gateway(order_gateway.get());
     order_gateway->init_trade_engine(engine.get());
 
-    const trading::MarketConsumer consumer(logger.get(), engine.get(),
-                                           market_update_data_pool.get(),
-                                           market_data_pool.get());
+    const trading::MarketConsumer<SelectedStrategy> consumer(
+        logger.get(), engine.get(), market_update_data_pool.get(),
+        market_data_pool.get());
 
     std::unique_ptr<common::CpuManager> cpu_manager =
         std::make_unique<common::CpuManager>(logger.get());

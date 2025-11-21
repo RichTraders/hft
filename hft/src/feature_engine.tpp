@@ -10,6 +10,8 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
+#ifndef FEATURE_ENGINE_TPP
+#define FEATURE_ENGINE_TPP
 #include "feature_engine.h"
 #include "common/logger.h"
 #include "core/NewOroFix44/market_data.h"
@@ -22,8 +24,9 @@ using common::TickerId;
 constexpr int kLevel10 = 10;
 namespace trading {
 
-void FeatureEngine::on_order_book_updated(const Price price, const Side side,
-                                          MarketOrderBook* book) noexcept {
+template<class Strategy>
+void FeatureEngine<Strategy>::on_order_book_updated(const Price price, const Side side,
+                                          MarketOrderBook<Strategy>* book) noexcept {
   const auto* bbo = book->get_bbo();
   if (LIKELY(bbo->bid_price != common::kPriceInvalid &&
              bbo->ask_price != common::kPriceInvalid)) {
@@ -41,8 +44,9 @@ void FeatureEngine::on_order_book_updated(const Price price, const Side side,
                   common::toString(price), common::toString(side), mkt_price_,
                   agg_trade_qty_ratio_));
 }
-void FeatureEngine::on_trade_updated(const MarketData* market_update,
-                                     MarketOrderBook* book) noexcept {
+template<class Strategy>
+void FeatureEngine<Strategy>::on_trade_updated(const MarketData* market_update,
+                                     MarketOrderBook<Strategy>* book) noexcept {
   const auto* bbo = book->get_bbo();
   if (LIKELY(bbo->bid_price.value != common::kPriceInvalid &&
              bbo->ask_price.value != common::kPriceInvalid)) {
@@ -73,7 +77,8 @@ void FeatureEngine::on_trade_updated(const MarketData* market_update,
                             agg_trade_qty_ratio_));
 }
 
-double FeatureEngine::vwap_from_levels(const std::vector<LevelView>& level) {
+template<class Strategy>
+double FeatureEngine<Strategy>::vwap_from_levels(const std::vector<LevelView>& level) {
   double num = 0.0L;
   double den = 0.0L;
   const auto level_size = level.size();
@@ -84,7 +89,8 @@ double FeatureEngine::vwap_from_levels(const std::vector<LevelView>& level) {
   return den > 0.0 ? (num / den) : common::kPriceInvalid;
 }
 
-double FeatureEngine::orderbook_imbalance_from_levels(
+template<class Strategy>
+double FeatureEngine<Strategy>::orderbook_imbalance_from_levels(
     const std::vector<double>& bid_levels,
     const std::vector<double>& ask_levels) {
   const size_t min_size = std::min(bid_levels.size(), ask_levels.size());
@@ -132,3 +138,5 @@ double FeatureEngine::orderbook_imbalance_from_levels(
   return result;
 }
 }  // namespace trading
+
+#endif // FFEATURE_ENGINE_TPP

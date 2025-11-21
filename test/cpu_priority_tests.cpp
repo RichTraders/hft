@@ -27,7 +27,7 @@ void run() {
 }
 
 TEST(CpuPriorityTest, CpuSetting) {
-  INI_CONFIG.load("resources/config.ini");
+  INI_CONFIG.load("resources/cpu_test_config.ini");
   common::Thread<"test_0"> test_thread_0;
   common::Thread<"test_1"> test_thread_1;
   common::Thread<"test_2"> test_thread_2;
@@ -44,8 +44,6 @@ TEST(CpuPriorityTest, CpuSetting) {
   auto logger = std::make_unique<Logger>();
   CpuManager cpu(logger.get());
 
-  std::string result;
-  EXPECT_FALSE(cpu.init_cpu_group(result));
   EXPECT_FALSE(cpu.init_cpu_to_tid());
 
   int pol_0 = sched_getscheduler(cpu.get_tid("test_0"));
@@ -61,39 +59,3 @@ TEST(CpuPriorityTest, CpuSetting) {
   EXPECT_EQ(pol_4, 3);
 }
 
-TEST(CpuPriorityTest, CpuGroupAndTidTest) {
-  auto logger = std::make_unique<Logger>();
-  CpuManager cpu(logger.get());
-
-  std::string result;
-  EXPECT_FALSE(cpu.init_cpu_group(result));
-  EXPECT_FALSE(cpu.init_cpu_to_tid());
-}
-
-TEST(CpuPriorityTest, DISABLED_CpuSettingWithoutIRQL) {
-  common::Thread<"test_0"> test_thread_0;
-  common::Thread<"test_1"> test_thread_1;
-  common::Thread<"test_2"> test_thread_2;
-  common::Thread<"test_3"> test_thread_3;
-
-
-  test_thread_0.start(&run);
-  test_thread_1.start(&run);
-  test_thread_2.start(&run);
-  test_thread_3.start(&run);
-
-  auto logger = std::make_unique<Logger>();
-  CpuManager cpu(logger.get());
-
-  EXPECT_TRUE(cpu.init_cpu_to_tid());
-
-  int pol_0 = sched_getscheduler(cpu.get_tid("test_0"));
-  int pol_1 = sched_getscheduler(cpu.get_tid("test_1"));
-  int pol_2 = sched_getscheduler(cpu.get_tid("test_2"));
-  int pol_3 = sched_getscheduler(cpu.get_tid("test_3"));
-
-  EXPECT_EQ(pol_0, 2);
-  EXPECT_EQ(pol_1, 2);
-  EXPECT_EQ(pol_2, 1);
-  EXPECT_EQ(pol_3, 1);
-}

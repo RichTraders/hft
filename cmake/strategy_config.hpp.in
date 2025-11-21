@@ -1,0 +1,7 @@
+#pragma once
+
+#include "strategy/market_maker.h"
+#include "strategy/liquid_taker.h"
+
+using SelectedStrategy = @STRATEGY_TYPE@;
+inline constexpr std::string_view kSelectedStrategyName = "@STRATEGY_NAME@";

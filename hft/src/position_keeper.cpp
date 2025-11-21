@@ -11,7 +11,6 @@
  */
 
 #include "position_keeper.h"
-
 #include "order_book.h"
 #include "order_entry.h"
 
@@ -81,7 +80,8 @@ void PositionInfo::add_fill(const ExecutionReport* report,
 
   total_pnl_ = unreal_pnl_ + real_pnl_;
 
-  logger.info(std::format("[Fill] {} {}", toString(), report->toString()));
+  logger.info(std::format("[PositionInfo][Fill] {} {}", toString(),
+                          report->toString()));
 }
 
 void PositionInfo::update_bbo(const BBO* bbo,
@@ -105,7 +105,8 @@ void PositionInfo::update_bbo(const BBO* bbo,
     total_pnl_ = unreal_pnl_ + real_pnl_;
 
     if (total_pnl_ != old_total_pnl)
-      logger.info(std::format("[Updated] {} {}", toString(), bbo_->toString()));
+      logger.info(std::format("[PositionInfo][Updated] {} {}", toString(),
+                              bbo_->toString()));
   }
 }
 

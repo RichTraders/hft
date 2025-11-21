@@ -1,20 +1,20 @@
 /*
  * MIT License
- * 
+ *
  * Copyright (c) 2025 NewOro Corporation
- * 
- * Permission is hereby granted, free of charge, to use, copy, modify, and distribute 
- * this software for any purpose with or without fee, provided that the above 
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
  * copyright notice appears in all copies.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
+#ifndef ORDER_BOOK_TPP
+#define ORDER_BOOK_TPP
+
 #include "order_book.h"
-
 #include "market_data.h"
-#include "trade_engine.h"
-
 using common::MarketUpdateType;
 using common::Price;
 using common::Qty;
@@ -24,12 +24,12 @@ using common::TickerId;
 constexpr int kBucketPoolSize = 1024 * 8;
 
 namespace trading {
-MarketOrder::MarketOrder() = default;
+inline MarketOrder::MarketOrder() = default;
 
-MarketOrder::MarketOrder(const Qty qty_, const bool active_ = false) noexcept
+inline MarketOrder::MarketOrder(const Qty qty_, const bool active_) noexcept
     : qty(qty_), active(active_) {}
 
-auto MarketOrder::toString() const -> std::string {
+inline auto MarketOrder::toString() const -> std::string {
   std::ostringstream stream;
   stream << "[MarketOrder]" << "[" << "qty:" << qty.value << " "
          << "active:" << active << " ";
@@ -37,7 +37,8 @@ auto MarketOrder::toString() const -> std::string {
   return stream.str();
 }
 
-MarketOrderBook::MarketOrderBook(const TickerId& ticker_id,
+template<typename Strategy>
+MarketOrderBook<Strategy>::MarketOrderBook(const TickerId& ticker_id,
                                  common::Logger* logger)
     : ticker_id_(std::move(ticker_id)),
       logger_(logger->make_producer()),
@@ -48,13 +49,15 @@ MarketOrderBook::MarketOrderBook(const TickerId& ticker_id,
   logger_.info("[Constructor] MarketOrderBook Created");
 }
 
-MarketOrderBook::~MarketOrderBook() {
-  logger_.info("[Destructor] MarketOrderBook Destory");
+template<typename Strategy>
+MarketOrderBook<Strategy>::~MarketOrderBook() {
+  logger_.info("[Destructor] MarketOrderBook Destroy");
 
   trade_engine_ = nullptr;
 }
 
-void MarketOrderBook::update_bid(int idx, Qty qty) {
+template<typename Strategy>
+void MarketOrderBook<Strategy>::update_bid(int idx, Qty qty) {
   const int bucket_idx = idx / kBucketSize;
   const int off = idx & (kBucketSize - 1);
 
@@ -88,7 +91,8 @@ void MarketOrderBook::update_bid(int idx, Qty qty) {
   }
 }
 
-void MarketOrderBook::update_ask(const int idx, const Qty qty) {
+template<typename Strategy>
+void MarketOrderBook<Strategy>::update_ask(const int idx, const Qty qty) {
   const int bidx = idx / kBucketSize;
   const int off = idx & (kBucketSize - 1);
 
@@ -122,7 +126,8 @@ void MarketOrderBook::update_ask(const int idx, const Qty qty) {
   }
 }
 
-int MarketOrderBook::best_bid_idx() const noexcept {
+template<typename Strategy>
+int MarketOrderBook<Strategy>::best_bid_idx() const noexcept {
   for (int sw = kSummaryWords - 1; sw >= 0; --sw) {
     const uint64_t word = bidSummary_[sw];
     if (!word)
@@ -145,7 +150,8 @@ int MarketOrderBook::best_bid_idx() const noexcept {
   return -1;
 }
 
-int MarketOrderBook::best_ask_idx() const noexcept {
+template<typename Strategy>
+int MarketOrderBook<Strategy>::best_ask_idx() const noexcept {
   for (int sw = 0; sw < kSummaryWords; ++sw) {
     const uint64_t word = askSummary_[sw];
     if (!word)
@@ -168,17 +174,20 @@ int MarketOrderBook::best_ask_idx() const noexcept {
   return -1;
 }
 
-Price MarketOrderBook::best_bid_price() const noexcept {
+template<typename Strategy>
+Price MarketOrderBook<Strategy>::best_bid_price() const noexcept {
   const int idx = best_bid_idx();
   return (idx >= 0) ? indexToPrice(idx) : Price{common::kPriceInvalid};
 }
 
-Price MarketOrderBook::best_ask_price() const noexcept {
+template<typename Strategy>
+Price MarketOrderBook<Strategy>::best_ask_price() const noexcept {
   const int idx = best_ask_idx();
   return (idx >= 0) ? indexToPrice(idx) : Price{common::kPriceInvalid};
 }
 
-Qty MarketOrderBook::best_bid_qty() const noexcept {
+template<typename Strategy>
+Qty MarketOrderBook<Strategy>::best_bid_qty() const noexcept {
   const int idx = best_bid_idx();
   if (idx < 0)
     return Qty{common::kQtyInvalid};
@@ -188,7 +197,8 @@ Qty MarketOrderBook::best_bid_qty() const noexcept {
   return bucket ? bucket->orders[off].qty : Qty{common::kQtyInvalid};
 }
 
-Qty MarketOrderBook::best_ask_qty() const noexcept {
+template<typename Strategy>
+Qty MarketOrderBook<Strategy>::best_ask_qty() const noexcept {
   const int idx = best_ask_idx();
   if (idx < 0)
     return Qty{common::kQtyInvalid};
@@ -198,7 +208,8 @@ Qty MarketOrderBook::best_ask_qty() const noexcept {
   return bucket ? bucket->orders[off].qty : Qty{common::kQtyInvalid};
 }
 
-void MarketOrderBook::trade_order(const MarketData* market_update,
+template<typename Strategy>
+void MarketOrderBook<Strategy>::trade_order(const MarketData* market_update,
                                   const int idx) {
   const int bidx = idx / kBucketSize;
   const int off = idx & (kBucketSize - 1);
@@ -226,7 +237,8 @@ void MarketOrderBook::trade_order(const MarketData* market_update,
   }
 }
 
-void MarketOrderBook::delete_order(const MarketData* market_update,
+template<typename Strategy>
+void MarketOrderBook<Strategy>::delete_order(const MarketData* market_update,
                                    const int idx) {
   if (market_update->side == Side::kBuy) {
     update_bid(idx, Qty{0.});  // 비활성화
@@ -239,7 +251,8 @@ void MarketOrderBook::delete_order(const MarketData* market_update,
   }
 }
 
-void MarketOrderBook::add_order(const MarketData* market_update, const int idx,
+template<typename Strategy>
+void MarketOrderBook<Strategy>::add_order(const MarketData* market_update, const int idx,
                                 const Qty qty) {
   if (market_update->side == Side::kBuy) {
     update_bid(idx, qty);
@@ -253,7 +266,8 @@ void MarketOrderBook::add_order(const MarketData* market_update, const int idx,
 }
 
 /// Process market data update and update the limit order book.
-auto MarketOrderBook::on_market_data_updated(
+template<typename Strategy>
+auto MarketOrderBook<Strategy>::on_market_data_updated(
     const MarketData* market_update) noexcept -> void {
   if (static_cast<double>(kMaxPriceInt) / kTickMultiplierInt <
           market_update->price.value ||
@@ -317,9 +331,11 @@ auto MarketOrderBook::on_market_data_updated(
                                       this);
 }
 
-void MarketOrderBook::on_trade_update(MarketData*) {}
+template<typename Strategy>
+void MarketOrderBook<Strategy>::on_trade_update(MarketData*) {}
 
-std::string MarketOrderBook::print_active_levels(bool is_bid) const {
+template<typename Strategy>
+std::string MarketOrderBook<Strategy>::print_active_levels(bool is_bid) const {
   std::ostringstream stream;
   const auto& buckets = is_bid ? bidBuckets_ : askBuckets_;
 
@@ -343,7 +359,8 @@ std::string MarketOrderBook::print_active_levels(bool is_bid) const {
   return stream.str();
 }
 
-int MarketOrderBook::next_active_bid(const int start_idx) const noexcept {
+template<typename Strategy>
+int MarketOrderBook<Strategy>::next_active_bid(const int start_idx) const noexcept {
   const auto& summary_bitmap = bidSummary_;
   const auto& buckets = bidBuckets_;
 
@@ -395,7 +412,8 @@ int MarketOrderBook::next_active_bid(const int start_idx) const noexcept {
   return -1;
 }
 
-int MarketOrderBook::next_active_ask(const int start_idx) const noexcept {
+template<typename Strategy>
+int MarketOrderBook<Strategy>::next_active_ask(const int start_idx) const noexcept {
   const auto& summary_bitmap = askSummary_;
   const auto& buckets = askBuckets_;
 
@@ -448,7 +466,8 @@ int MarketOrderBook::next_active_ask(const int start_idx) const noexcept {
   return -1;
 }
 
-std::vector<int> MarketOrderBook::peek_levels(const bool is_bid,
+template<typename Strategy>
+std::vector<int> MarketOrderBook<Strategy>::peek_levels(const bool is_bid,
                                               const int level) const {
   std::vector<int> output;
   int idx = is_bid ? best_bid_idx() : best_ask_idx();
@@ -462,7 +481,8 @@ std::vector<int> MarketOrderBook::peek_levels(const bool is_bid,
 
 // highest=true  => 버킷 내에서 가장 큰(High‑우선) 레벨 오프셋
 // highest=false => 버킷 내에서 가장 작은(Low‑우선) 레벨 오프셋
-int MarketOrderBook::find_in_bucket(const Bucket* bucket,
+template<typename Strategy>
+int MarketOrderBook<Strategy>::find_in_bucket(const Bucket* bucket,
                                     const bool highest) noexcept {
   if (highest) {
     for (int iter = kBucketBitmapWords - 1; iter >= 0; --iter) {
@@ -483,7 +503,8 @@ int MarketOrderBook::find_in_bucket(const Bucket* bucket,
 }
 
 //NOLINTBEGIN(readability-function-cognitive-complexity)
-int MarketOrderBook::peek_levels_with_qty(
+template<typename Strategy>
+int MarketOrderBook<Strategy>::peek_levels_with_qty(
     bool is_bid, int level, std::vector<LevelView>& out) const noexcept {
   out.clear();
   out.reserve(level);
@@ -543,8 +564,9 @@ int MarketOrderBook::peek_levels_with_qty(
   return static_cast<int>(out.size());
 }
 
-int MarketOrderBook::peek_qty(bool is_bid, int level, std::span<double> qty_out,
-                              std::span<int> idx_out = {}) const noexcept {
+template<typename Strategy>
+int MarketOrderBook<Strategy>::peek_qty(bool is_bid, int level, std::span<double> qty_out,
+                              std::span<int> idx_out) const noexcept {
   const auto want = std::min<int>(level, static_cast<int>(qty_out.size()));
   if (want <= 0)
     return -1;
@@ -601,3 +623,5 @@ int MarketOrderBook::peek_qty(bool is_bid, int level, std::span<double> qty_out,
 }
 //NOLINTEND(readability-function-cognitive-complexity)
 }  // namespace trading
+
+#endif  // ORDER_BOOK_TPP

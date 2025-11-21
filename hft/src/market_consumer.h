@@ -29,6 +29,7 @@ class FixMarketDataApp;
 }  // namespace core
 
 namespace trading {
+template <typename Strategy>
 class TradeEngine;
 
 enum class StreamState : uint8_t {
@@ -37,9 +38,10 @@ enum class StreamState : uint8_t {
   kApplyingSnapshot
 };
 
+template <typename Strategy>
 class MarketConsumer {
  public:
-  MarketConsumer(common::Logger* logger, TradeEngine* trade_engine,
+  MarketConsumer(common::Logger* logger, TradeEngine<Strategy>* trade_engine,
                  common::MemoryPool<MarketUpdateData>* market_update_data_pool,
                  common::MemoryPool<MarketData>* market_data_pool);
   ~MarketConsumer();
@@ -57,7 +59,7 @@ class MarketConsumer {
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
   common::Logger::Producer logger_;
-  TradeEngine* trade_engine_;
+  TradeEngine<Strategy>* trade_engine_;
   std::unique_ptr<core::FixMarketDataApp> app_;
   uint64_t update_index_ = 0ULL;
 
@@ -66,5 +68,4 @@ class MarketConsumer {
   StreamState state_{StreamState::kAwaitingSnapshot};
 };
 }  // namespace trading
-
 #endif  //MARKET_CONSUMER_H

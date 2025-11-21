@@ -23,6 +23,7 @@
 struct MarketData;
 
 namespace trading {
+template <typename Strategy>
 class TradeEngine;
 
 struct BBO {
@@ -61,7 +62,7 @@ struct MarketOrder {
   common::Qty qty = common::Qty{.0f};
   bool active = false;
   MarketOrder();
-  MarketOrder(common::Qty qty_, bool active_) noexcept;
+  explicit MarketOrder(common::Qty qty_, bool active_ = false) noexcept;
   [[nodiscard]] auto toString() const -> std::string;
 };
 
@@ -100,6 +101,7 @@ inline const MarketOrder* level_ptr(const Bucket* bucket, int off) noexcept {
   return &bucket->orders[off];
 }
 
+template <typename Strategy>
 class MarketOrderBook final {
  public:
   MarketOrderBook(const common::TickerId& ticker_id, common::Logger* logger);
@@ -108,7 +110,7 @@ class MarketOrderBook final {
 
   auto on_market_data_updated(const MarketData* market_update) noexcept -> void;
 
-  auto set_trade_engine(TradeEngine* trade_engine) {
+  auto set_trade_engine(TradeEngine<Strategy>* trade_engine) {
     trade_engine_ = trade_engine;
   }
 
@@ -140,7 +142,7 @@ class MarketOrderBook final {
 
  private:
   const common::TickerId ticker_id_;
-  TradeEngine* trade_engine_ = nullptr;
+  TradeEngine<Strategy>* trade_engine_ = nullptr;
   common::Logger::Producer logger_;
 
   std::array<Bucket*, kBucketCount> bidBuckets_{};
@@ -180,8 +182,9 @@ class MarketOrderBook final {
   }
 };
 
+template <typename Strategy>
 using MarketOrderBookHashMap =
-    std::map<std::string, std::unique_ptr<MarketOrderBook>>;
+    std::map<std::string, std::unique_ptr<MarketOrderBook<Strategy>>>;
 
 //NOLINTBEGIN
 inline bool push_if_active(const Bucket* bucket, int bidx, int off,

@@ -14,7 +14,13 @@
 #define BASE_STRATEGY_H
 
 #include "logger.h"
-#include "types.h"
+
+#include "feature_engine.tpp"
+#include "market_consumer.tpp"
+#include "order_book.tpp"
+#include "order_gateway.tpp"
+#include "order_manager.tpp"
+#include "trade_engine.tpp"
 
 namespace trading {
 template <class Strategy>
@@ -43,12 +49,5 @@ class BaseStrategy {
   common::Logger::Producer logger_;
 };
 }  // namespace trading
-
-#include "feature_engine.tpp"
-#include "market_consumer.tpp"
-#include "order_book.tpp"
-#include "order_gateway.tpp"
-#include "order_manager.tpp"
-#include "trade_engine.tpp"
 
 #endif  //BASE_STRATEGY_H

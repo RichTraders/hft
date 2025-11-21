@@ -17,16 +17,18 @@
 #include "ini_config.hpp"
 #include "logger.h"
 #include "order_gateway.h"
+#include "strategy_config.hpp"
 #include "trade_engine.h"
 #include "types.h"
-
-#include "strategy/strategies.hpp"
 
 using namespace core;
 using namespace common;
 using namespace trading;
 
-int cl_order_id = 2075;
+using TestTradeEngine = trading::TradeEngine<SelectedStrategy>;
+using TestOrderGateway = trading::OrderGateway<SelectedStrategy>;
+
+constexpr int cl_order_id = 2075;
 
 class OrderGatewayTest : public ::testing::Test  {
 public:
@@ -39,7 +41,6 @@ protected:
     TradeEngineCfgHashMap temp;
     TradeEngineCfg tempcfg;
     temp.emplace(INI_CONFIG.get("meta", "ticker"), tempcfg);
-    register_all_strategies();
     market_update_data_pool_ = std::make_unique<MemoryPool<MarketUpdateData>>(1024);
     market_data_pool_ = std::make_unique<MemoryPool<MarketData>>(1024);
 
@@ -54,9 +55,10 @@ protected:
         logger.get(), execution_report_pool_.get(), order_cancel_reject_pool_.get(),
         order_mass_cancel_report_pool_.get());
 
-    order_gateway_= std::make_unique<trading::OrderGateway>(logger.get(), response_manager_.get());
-    trade_engine_ = std::make_unique<TradeEngine>(logger.get(), market_update_data_pool_.get(),
-                                                 market_data_pool_.get(), response_manager_.get(), temp);
+    order_gateway_= std::make_unique<TestOrderGateway>(logger.get(), response_manager_.get());
+    trade_engine_ = std::make_unique<TestTradeEngine>(
+        logger.get(), market_update_data_pool_.get(), market_data_pool_.get(),
+        response_manager_.get(), temp);
 
     order_gateway_->init_trade_engine(trade_engine_.get());
     trade_engine_->init_order_gateway(order_gateway_.get());
@@ -80,8 +82,8 @@ public:
   static std::unique_ptr<MemoryPool<
         OrderMassCancelReport>> order_mass_cancel_report_pool_;
   static std::unique_ptr<ResponseManager> response_manager_;
-  static std::unique_ptr<TradeEngine> trade_engine_;
-  static std::unique_ptr<OrderGateway> order_gateway_;
+  static std::unique_ptr<TestTradeEngine> trade_engine_;
+  static std::unique_ptr<TestOrderGateway> order_gateway_;
 
 };
 std::unique_ptr<Logger> OrderGatewayTest::logger;
@@ -138,8 +140,8 @@ TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
   auto response_manager = std::make_unique<ResponseManager>(
       logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
       order_mass_cancel_report_pool.get());
-  OrderGateway og(logger.get(), response_manager.get());
-  auto trade_engine = new TradeEngine(logger.get(), pool.get(),
+  TestOrderGateway og(logger.get(), response_manager.get());
+  auto trade_engine = new TestTradeEngine(logger.get(), pool.get(),
                                                pool2.get(), response_manager.get(), temp);
   og.init_trade_engine(trade_engine);
   trade_engine->init_order_gateway(&og);
@@ -172,5 +174,5 @@ std::unique_ptr<MemoryPool<
 std::unique_ptr<MemoryPool<
       OrderMassCancelReport>> OrderGatewayTest::order_mass_cancel_report_pool_;
 std::unique_ptr<ResponseManager> OrderGatewayTest::response_manager_;
-std::unique_ptr<TradeEngine> OrderGatewayTest::trade_engine_;
-std::unique_ptr<OrderGateway> OrderGatewayTest::order_gateway_;
+std::unique_ptr<TestTradeEngine> OrderGatewayTest::trade_engine_;
+std::unique_ptr<TestOrderGateway> OrderGatewayTest::order_gateway_;

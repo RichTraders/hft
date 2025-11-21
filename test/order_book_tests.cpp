@@ -13,25 +13,27 @@
 #include "gtest/gtest.h"
 #include "ini_config.hpp"
 #include "order_book.h"
-#include "strategy/strategies.hpp"
+#include "strategy_config.hpp"
 #include "trade_engine.h"
 
 using namespace trading;
 using namespace common;
+
+using TestTradeEngine = trading::TradeEngine<SelectedStrategy>;
+using TestOrderBook = trading::MarketOrderBook<SelectedStrategy>;
 
 class MarketOrderBookTest : public ::testing::Test {
 public:
   static std::unique_ptr<Logger> logger;
  protected:
 
-  MarketOrderBook* book_;
+  TestOrderBook* book_;
   ResponseManager* response_manager_;
-  TradeEngine* trade_engine_;
+  TestTradeEngine* trade_engine_;
 
   static void SetUpTestSuite() {
     logger = std::make_unique<Logger>();
     INI_CONFIG.load("resources/config.ini");
-    register_all_strategies();
   }
 
   void SetUp() override {
@@ -55,10 +57,10 @@ public:
         logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
         order_mass_cancel_report_pool.get());
 
-    trade_engine_ = new TradeEngine(logger.get(), pool.get(),
-                                                 pool2.get(), response_manager_, temp);
+    trade_engine_ = new TestTradeEngine(logger.get(), pool.get(),
+                                        pool2.get(), response_manager_, temp);
     // trade_engine_ 주입
-    book_ = new MarketOrderBook{INI_CONFIG.get("meta", "ticker"), logger.get()};
+    book_ = new TestOrderBook{INI_CONFIG.get("meta", "ticker"), logger.get()};
     book_->set_trade_engine(trade_engine_);
   }
 

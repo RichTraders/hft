@@ -13,19 +13,21 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <strategy/strategies.hpp>
-
 #include "feature_engine.h"
-
 #include "ini_config.hpp"
 #include "logger.h"
 #include "order_book.h"
+#include "strategy_config.hpp"
 #include "trade_engine.h"
 
 using ::testing::_;
 using ::testing::HasSubstr;
 using namespace common;
 using namespace trading;
+
+using TestTradeEngine = trading::TradeEngine<SelectedStrategy>;
+using TestFeatureEngine = trading::FeatureEngine<SelectedStrategy>;
+using TestOrderBook = trading::MarketOrderBook<SelectedStrategy>;
 
 class FeatureEngineTest : public ::testing::Test {
  public:
@@ -34,7 +36,6 @@ class FeatureEngineTest : public ::testing::Test {
  protected:
   void SetUp() override {
     INI_CONFIG.load("resources/config.ini");
-    register_all_strategies();
     market_pool = new MemoryPool<MarketData>(8);
     market_update_pool = new MemoryPool<MarketUpdateData>(8);
 
@@ -46,8 +47,8 @@ class FeatureEngineTest : public ::testing::Test {
     ticker_cfg =
         new TradeEngineCfgHashMap{{INI_CONFIG.get("meta", "ticker"), cfg}};
 
-    trade_engine = new TradeEngine(&logger, market_update_pool, market_pool,
-                                   nullptr, *ticker_cfg);
+    trade_engine = new TestTradeEngine(&logger, market_update_pool, market_pool,
+                                       nullptr, *ticker_cfg);
     trade_engine->stop();
   }
 
@@ -58,7 +59,7 @@ class FeatureEngineTest : public ::testing::Test {
     delete ticker_cfg;
   }
 
-  TradeEngine* trade_engine;
+  TestTradeEngine* trade_engine;
   MemoryPool<MarketData>* market_pool;
   MemoryPool<MarketUpdateData>* market_update_pool;
   TradeEngineCfgHashMap* ticker_cfg;
@@ -67,10 +68,10 @@ Logger FeatureEngineTest::logger;
 
 TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
 
-  FeatureEngine engine(&logger);
+  TestFeatureEngine engine(&logger);
   std::string symbol = "ETHUSDT";
   // BBO 세팅
-  MarketOrderBook book("ETHUSDT", &logger);
+  TestOrderBook book("ETHUSDT", &logger);
   book.set_trade_engine(trade_engine);
   {
     const Price p = Price{100'000.};
@@ -106,10 +107,10 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
-  FeatureEngine engine(&logger);
+  TestFeatureEngine engine(&logger);
   std::string symbol = "ETHUSDT";
   // BBO 세팅
-  MarketOrderBook book(symbol, &logger);
+  TestOrderBook book(symbol, &logger);
   book.set_trade_engine(trade_engine);
   {
     std::string symbol = "ETHUSDT";
@@ -153,11 +154,11 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdate) {
-  FeatureEngine engine(&logger);
+  TestFeatureEngine engine(&logger);
 
   std::string symbol = "ETHUSDT";
   // BBO 세팅
-  MarketOrderBook book(symbol, &logger);
+  TestOrderBook book(symbol, &logger);
   book.set_trade_engine(trade_engine);
 
   struct T {
@@ -186,10 +187,10 @@ TEST_F(FeatureEngineTest, OnTradeUpdate) {
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction) {
-  FeatureEngine engine(&logger);
+  TestFeatureEngine engine(&logger);
 
   std::string symbol = "ETHUSDT";
-  MarketOrderBook book(symbol, &logger);
+  TestOrderBook book(symbol, &logger);
 
   const size_t W = 64;
   const size_t N = W + 7;
@@ -227,10 +228,10 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction) {
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_MultiWraps) {
-  FeatureEngine engine(&logger);
+  TestFeatureEngine engine(&logger);
 
   std::string symbol = "ETHUSDT";
-  MarketOrderBook book(symbol, &logger);
+  TestOrderBook book(symbol, &logger);
 
   const size_t W = 64;
   const size_t N = 3 * W + 11;

@@ -45,6 +45,12 @@ add_strategy_target(HFT "trading::MarketMaker" "MarketMaker")
 
 add_subdirectory(repository)
 if (ENABLE_TESTS)
+    set(TEST_STRATEGY_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated/tests")
+    file(MAKE_DIRECTORY "${TEST_STRATEGY_INCLUDE_DIR}")
+    set(STRATEGY_TYPE "trading::MarketMaker")
+    set(STRATEGY_NAME "MarketMaker")
+    configure_file("${STRATEGY_CONFIG_TEMPLATE}"
+                   "${TEST_STRATEGY_INCLUDE_DIR}/strategy_config.hpp" @ONLY)
     add_subdirectory(test)
 endif ()
 

@@ -56,7 +56,7 @@ void MarketMaker::on_trade_updated(
       bbo->bid_price.value == common::kPriceInvalid ||
       bbo->ask_price.value == common::kPriceInvalid ||
       bbo->ask_price.value < bbo->bid_price.value) {
-    logger_.debug("Invalid BBO. Skipping quoting.");
+    logger_.trace("Invalid BBO. Skipping quoting.");
     return;
   }
 
@@ -83,7 +83,7 @@ void MarketMaker::on_trade_updated(
   std::vector<QuoteIntent> intents;
   intents.reserve(4);
 
-  logger_.debug(std::format(
+  logger_.trace(std::format(
       "[Updated] delta:{} obi:{} signal:{} mid:{}, vwap:{}, spread:{}", delta,
       obi, signal, mid, vwap, spread));
 
@@ -95,7 +95,7 @@ void MarketMaker::on_trade_updated(
                     .price = best_bid_price - kSafetyMargin,
                     .qty = Qty{round5(signal * position_variance_)}});
 
-    logger_.debug(std::format(
+    logger_.trace(std::format(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:buy, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
@@ -110,7 +110,7 @@ void MarketMaker::on_trade_updated(
                     .side = Side::kSell,
                     .price = best_ask_price + kSafetyMargin,
                     .qty = Qty{round5(signal * position_variance_)}});
-    logger_.debug(std::format(
+    logger_.trace(std::format(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "

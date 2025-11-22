@@ -17,6 +17,7 @@
 #include "fast_clock.h"
 #include "layer_book.h"
 #include "logger.h"
+#include "market_data.h"
 #include "orders.h"
 #include "quote_reconciler.h"
 
@@ -31,6 +32,7 @@ class OrderManager {
                RiskManager& risk_manager);
   ~OrderManager();
   void on_order_updated(const ExecutionReport* response) noexcept;
+  void on_instrument_info(const InstrumentInfo& instrument_info) noexcept;
 
   void new_order(const common::TickerId& ticker_id, common::Price price,
                  common::Side side, common::Qty qty,
@@ -108,6 +110,9 @@ class OrderManager {
 
   void sweep_expired() noexcept;
   [[nodiscard]] common::OrderId gen_order_id() noexcept;
+
+  void dump_all_slots(const std::string& symbol,
+                      const std::string& context) noexcept;
 };
 }  // namespace trading
 

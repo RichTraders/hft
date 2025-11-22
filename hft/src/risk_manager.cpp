@@ -19,14 +19,14 @@ RiskCheckResult RiskInfo::checkPreTradeRisk(
     const common::Side side, const common::Qty qty,
     common::Qty reserved_position, common::Logger::Producer& logger) noexcept {
   if (qty.value > risk_cfg_.max_order_size_.value) {
-    logger.info(std::format("[Risk]Order is too large [Desired:{}][Allow:{}]",
-                            qty.value, risk_cfg_.max_order_size_.value));
+    logger.debug(std::format("[Risk]Order is too large [Desired:{}][Allow:{}]",
+                             qty.value, risk_cfg_.max_order_size_.value));
     return RiskCheckResult::kOrderTooLarge;
   }
   if (position_info_->position_ + reserved_position.value +
           sideToValue(side) * qty.value >
       risk_cfg_.max_position_.value) {
-    logger.info(
+    logger.debug(
         std::format("[Risk]Maximum position allowed has been reached."
                     "[Desired:{}][Current:{}][Working:{}][Allow:{}]",
                     sideToValue(side) * qty.value, position_info_->position_,
@@ -36,7 +36,7 @@ RiskCheckResult RiskInfo::checkPreTradeRisk(
   if (position_info_->position_ + reserved_position.value +
           sideToValue(side) * qty.value <
       risk_cfg_.min_position_.value) {
-    logger.info(
+    logger.debug(
         std::format("[Risk]Minimum position allowed has been reached."
                     "[Desired:{}][Current:{}][Working:{}][Allow:{}]",
                     sideToValue(side) * qty.value, position_info_->position_,
@@ -44,7 +44,7 @@ RiskCheckResult RiskInfo::checkPreTradeRisk(
     return RiskCheckResult::kPositionTooSmall;
   }
   if (position_info_->total_pnl_ < risk_cfg_.max_loss_) {
-    logger.info(
+    logger.debug(
         std::format("[Risk]Maximum PnL allowed has been reached."
                     "[Current:{}][Allow:{}]",
                     position_info_->total_pnl_, risk_cfg_.max_loss_));

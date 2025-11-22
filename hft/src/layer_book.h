@@ -41,15 +41,24 @@ struct PendingReplaceInfo {
   uint64_t new_tick;
   common::OrderId new_cl_order_id;
   common::Qty last_qty;
+  common::OrderId original_cl_order_id;
+  common::Price original_price;
+  uint64_t original_tick;
   PendingReplaceInfo() = default;
   PendingReplaceInfo(const common::Price& new_price, const common::Qty& new_qty,
                      uint64_t new_tick, const common::OrderId& new_cl_order_id,
-                     const common::Qty& last_qty)
+                     const common::Qty& last_qty,
+                     const common::OrderId& original_cl_order_id,
+                     const common::Price& original_price,
+                     uint64_t original_tick)
       : new_price(new_price),
         new_qty(new_qty),
         new_tick(new_tick),
         new_cl_order_id(new_cl_order_id),
-        last_qty(last_qty) {}
+        last_qty(last_qty),
+        original_cl_order_id(original_cl_order_id),
+        original_price(original_price),
+        original_tick(original_tick) {}
 };
 
 struct SideBook {

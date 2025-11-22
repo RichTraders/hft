@@ -80,8 +80,7 @@ void PositionInfo::add_fill(const ExecutionReport* report,
 
   total_pnl_ = unreal_pnl_ + real_pnl_;
 
-  logger.info(std::format("[PositionInfo][Fill] {} {}", toString(),
-                          report->toString()));
+  logger.info(std::format("[PositionInfo][Fill] {}", toString()));
 }
 
 void PositionInfo::update_bbo(const BBO* bbo,

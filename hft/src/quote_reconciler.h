@@ -94,9 +94,18 @@ class VenuePolicy {
         minimum_qty_(INI_CONFIG.get_double("venue", "minimum_order_qty")),
         maximum_qty_(INI_CONFIG.get_double("venue", "maximum_order_qty")),
         minimum_time_gap_(
-            INI_CONFIG.get_double("venue", "minimum_order_time_gap")) {}
+            INI_CONFIG.get_double("venue", "minimum_order_time_gap")),
+        qty_increment_(kQtyDefault) {}
 
   ~VenuePolicy() = default;
+
+  void set_qty_increment(double increment) { qty_increment_ = increment; }
+
+  [[nodiscard]] common::Qty round_qty(common::Qty qty) const noexcept {
+    const double rounded =
+        std::round(qty.value / qty_increment_) * qty_increment_;
+    return common::Qty{rounded};
+  }
 
   void filter_by_venue(const std::string& symbol, Actions& actions,
                        uint64_t current_time, LayerBook& layer_book) {
@@ -154,6 +163,8 @@ class VenuePolicy {
         action.qty.value = minimum_usdt_ / action.price.value;
       }
       action.qty.value = std::min(maximum_qty_, action.qty.value);
+
+      action.qty = round_qty(action.qty);
     }
 
     for (auto& action : actions.repls) {
@@ -166,14 +177,19 @@ class VenuePolicy {
         action.qty.value = minimum_usdt_ / action.price.value;
       }
       action.qty.value = std::min(maximum_qty_, action.qty.value);
+
+      action.qty = round_qty(action.qty);
+      action.last_qty = round_qty(action.last_qty);
     }
   }
 
  private:
+  static constexpr double kQtyDefault = 0.00001;
   const double minimum_usdt_;
   const double minimum_qty_;
   const double maximum_qty_;
   const uint64_t minimum_time_gap_;
+  double qty_increment_;
 };
 
 struct TickConverter {

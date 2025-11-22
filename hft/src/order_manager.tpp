@@ -13,6 +13,8 @@
 #ifndef ORDER_MANAGER_TPP
 #define ORDER_MANAGER_TPP
 
+#include <cmath>
+
 #include "ini_config.hpp"
 #include "order_entry.h"
 #include "order_manager.h"
@@ -100,6 +102,7 @@ void OrderManager<Strategy>::on_order_updated(
         if (auto& pend_opt = side_book.pending_repl[layer];
             pend_opt.has_value()) {
           const auto& pend = *pend_opt;
+
           side_book.layer_ticks[layer] = pend.new_tick;
           new_slot.price = response->price;
           new_slot.qty = response->leaves_qty;
@@ -143,7 +146,6 @@ void OrderManager<Strategy>::on_order_updated(
       if (slot.state == OMOrderState::kDead) {
         LayerBook::unmap_layer(side_book, layer);
       } else {
-        // register again not to expire
         slot.last_used = fast_clock_.get_timestamp();
         register_expiry(response->symbol, response->side, layer,
                         response->cl_order_id, OMOrderState::kLive);
@@ -202,6 +204,7 @@ void OrderManager<Strategy>::on_order_updated(
                                  response->toString()));
         break;
       }
+
       layer = LayerBook::find_layer_by_id(side_book, response->cl_order_id);
       if (layer < 0) {
         const uint64_t tick = tick_converter_.to_ticks(response->price.value);
@@ -214,11 +217,12 @@ void OrderManager<Strategy>::on_order_updated(
       }
 
       auto& slot = side_book.slots[layer];
-      slot.state = OMOrderState::kDead;
       reserved_position_ -= common::sideToValue(response->side) * slot.qty;
+      slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
-      logger_.info(
-          std::format("[OrderUpdated] Canceled {}", response->toString()));
+
+      logger_.info(std::format("[OrderUpdated] Canceled {}",
+                               response->toString()));
       break;
     }
     case OrdStatus::kRejected:
@@ -242,8 +246,23 @@ void OrderManager<Strategy>::on_order_updated(
             iter != side_book.new_id_to_layer.end()) {
           side_book.new_id_to_layer.erase(iter);
         }
-        side_book.slots[layer].state = OMOrderState::kDead;
-        LayerBook::unmap_layer(side_book, layer);
+
+        auto& slot = side_book.slots[layer];
+        slot.state = OMOrderState::kLive;
+        slot.price = pend.original_price;
+        slot.cl_order_id = pend.original_cl_order_id;
+        slot.qty = pend.last_qty;
+        side_book.layer_ticks[layer] = pend.original_tick;
+
+        const auto cancel_id = response->cl_order_id.value - 1;
+        if (const auto iter = side_book.orig_id_to_layer.find(cancel_id);
+            iter != side_book.orig_id_to_layer.end()) {
+          side_book.orig_id_to_layer.erase(iter);
+        }
+
+        logger_.info(std::format("[OrderUpdated] Rejected (replace failed, restored original oid={}, price={:.2f}, qty={:.6f}) {}",
+                                 pend.original_cl_order_id.value, pend.original_price.value,
+                                 pend.last_qty.value, response->toString()));
       } else {
         layer = LayerBook::find_layer_by_id(side_book, response->cl_order_id);
         if (layer < 0) {
@@ -270,10 +289,24 @@ void OrderManager<Strategy>::on_order_updated(
     default: {
       logger_.error(
           std::format("[OrderUpdated] on_order_updated: unknown OrdStatus {}",
-                      trading::toString(response->ord_status)));
+                      toString(response->ord_status)));
       break;
     }
   }
+
+  constexpr double kReservedPositionEpsilon = 1e-8;
+  if (std::abs(reserved_position_.value) < kReservedPositionEpsilon) {
+    reserved_position_.value = 0.0;
+  }
+
+  logger_.debug(
+      std::format("[OrderUpdated]Order Id:{} reserved_position:{:.6f}",
+                  response->cl_order_id.value, reserved_position_.value));
+
+  dump_all_slots(response->symbol,
+                 std::format("After {} oid={}",
+                             toString(response->ord_status),
+                             response->cl_order_id.value));
 }
 
 template <typename Strategy>
@@ -336,9 +369,21 @@ void OrderManager<Strategy>::cancel_order(const TickerId& ticker_id,
 }
 
 template <typename Strategy>
+void OrderManager<Strategy>::on_instrument_info(
+    const InstrumentInfo& instrument_info) noexcept {
+  if (!instrument_info.symbols.empty()) {
+    venue_policy_.set_qty_increment(
+        instrument_info.symbols[0].min_qty_increment);
+    logger_.info(std::format("[OrderManager] Updated qty_increment to {}",
+                             instrument_info.symbols[0].min_qty_increment));
+  }
+}
+
+template <typename Strategy>
 void OrderManager<Strategy>::apply(
     const std::vector<QuoteIntent>& intents) noexcept {
   START_MEASURE(Trading_OrderManager_apply);
+
   auto actions = reconciler_.diff(intents, layer_book_, fast_clock_);
 
   if (intents.empty()) {
@@ -375,10 +420,11 @@ void OrderManager<Strategy>::apply(
               action.cl_order_id);
     reserved_position_ += common::sideToValue(action.side) * action.qty;
 
-    logger_.info(
-        std::format("[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}",
-                    tick, action.layer, common::toString(action.side),
-                    common::toString(action.cl_order_id)));
+    logger_.info(std::format(
+        "[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}, "
+        "reserved_position_={}",
+        tick, action.layer, common::toString(action.side),
+        common::toString(action.cl_order_id), reserved_position_.value));
 
     register_expiry(ticker, action.side, action.layer, action.cl_order_id,
                     OMOrderState::kReserved);
@@ -392,6 +438,9 @@ void OrderManager<Strategy>::apply(
         existing >= 0 && existing != action.layer) {
       continue;
     }
+
+    const auto original_price = slot.price;
+    const auto original_tick = side_book.layer_ticks[action.layer];
 
     side_book.layer_ticks[action.layer] = tick;
     slot.price = action.price;
@@ -409,19 +458,24 @@ void OrderManager<Strategy>::apply(
       } else
         ++iter;
     }
-    side_book.orig_id_to_layer[action.original_cl_order_id.value] =
-        action.layer;
+    const auto cancel_new_order_id = OrderId{action.cl_order_id.value - 1};
+
+    side_book.orig_id_to_layer[cancel_new_order_id.value] = action.layer;
     side_book.new_id_to_layer[action.cl_order_id.value] = action.layer;
     side_book.pending_repl[action.layer] = PendingReplaceInfo{
-        action.price, action.qty, tick, action.cl_order_id, action.last_qty};
-
-    const auto cancel_new_order_id = OrderId{action.cl_order_id.value - 1};
+        action.price, action.qty, tick, action.cl_order_id, action.last_qty,
+        action.original_cl_order_id, original_price, original_tick};
     modify_order(ticker, cancel_new_order_id, action.cl_order_id,
                  action.original_cl_order_id, action.price, action.side,
                  action.qty);
 
     reserved_position_ +=
         common::sideToValue(action.side) * (action.qty - action.last_qty);
+    logger_.info(std::format(
+        "[Apply][REPLACE] tick:{}/ layer={}, side:{}, order_id={}, "
+        "reserved_position_={}",
+        tick, action.layer, common::toString(action.side),
+        common::toString(action.cl_order_id), reserved_position_.value));
     register_expiry(ticker, action.side, action.layer, action.cl_order_id,
                     OMOrderState::kCancelReserved);
   }
@@ -431,12 +485,13 @@ void OrderManager<Strategy>::apply(
     slot.state = OMOrderState::kCancelReserved;
     slot.last_used = fast_clock_.get_timestamp();
     cancel_order(ticker, action.original_cl_order_id, action.cl_order_id);
-    logger_.info(
-        std::format("[OrderManager][CANCEL]  layer={}, side:{}, order_id={}, "
-                    "previous order id :{}",
-                    action.layer, common::toString(action.side),
-                    common::toString(action.cl_order_id),
-                    common::toString(action.original_cl_order_id)));
+    logger_.info(std::format(
+        "[Apply][CANCEL] layer={}, side:{}, order_id={}, "
+        "reserved_position_={}",
+        "previous order id :{}", action.layer, common::toString(action.side),
+        common::toString(action.cl_order_id),
+        common::toString(action.original_cl_order_id),
+        reserved_position_.value));
   }
   sweep_expired();
   END_MEASURE(Trading_OrderManager_apply, logger_);
@@ -453,7 +508,7 @@ void OrderManager<Strategy>::filter_by_risk(
       if (risk_manager_.check_pre_trade_risk(ticker, action->side, delta,
                                              running) ==
           RiskCheckResult::kAllowed) {
-        running += delta;
+        running += common::sideToValue(action->side) * delta.value;
         ++action;
       } else {
         action = actions.erase(action);
@@ -466,7 +521,7 @@ void OrderManager<Strategy>::filter_by_risk(
       if (risk_manager_.check_pre_trade_risk(ticker, action->side, delta,
                                              running) ==
           RiskCheckResult::kAllowed) {
-        running += delta;
+        running += common::sideToValue(action->side) * delta.value;
         ++action;
       } else {
         action = actions.erase(action);
@@ -517,7 +572,8 @@ void OrderManager<Strategy>::sweep_expired() noexcept {
       continue;
     }
 
-    if (slot.state == OMOrderState::kLive) {
+    if (slot.state == OMOrderState::kLive ||
+        slot.state == OMOrderState::kReserved) {
       const auto cancel_id = gen_order_id();
       slot.state = OMOrderState::kCancelReserved;
       slot.last_used = now;
@@ -538,6 +594,35 @@ template <typename Strategy>
 OrderId OrderManager<Strategy>::gen_order_id() noexcept {
   const auto now = fast_clock_.get_timestamp();
   return OrderId{now};
+}
+
+template <typename Strategy>
+void OrderManager<Strategy>::dump_all_slots(const std::string& symbol, const std::string& context) noexcept {
+  logger_.debug(std::format("[SLOT_DUMP] ========== {} ==========", context));
+  logger_.debug(std::format("[SLOT_DUMP] Symbol: {}, Reserved: {:.10f}", symbol, reserved_position_.value));
+
+  for (int side_idx = 0; side_idx < 2; ++side_idx) {
+    const auto side = side_idx == 0 ? common::Side::kBuy : common::Side::kSell;
+    const auto& side_book = layer_book_.side_book(symbol, side);
+
+    logger_.debug(std::format("[SLOT_DUMP] ===== {} Side =====", common::toString(side)));
+
+    for (int layer = 0; layer < kSlotsPerSide; ++layer) {
+      const auto& slot = side_book.slots[layer];
+      const auto tick = side_book.layer_ticks[layer];
+
+      if (slot.state == OMOrderState::kInvalid || slot.state == OMOrderState::kDead) {
+        continue;
+      }
+
+      logger_.debug(std::format(
+        "[SLOT_DUMP]   Layer[{}]: state={}, tick={}, price={:.2f}, qty={:.6f}, oid={}",
+        layer, trading::toString(slot.state), tick,
+        slot.price.value, slot.qty.value, slot.cl_order_id.value));
+    }
+  }
+
+  logger_.info(std::format("[SLOT_DUMP] ========== END {} ==========", context));
 }
 }  // namespace trading
 

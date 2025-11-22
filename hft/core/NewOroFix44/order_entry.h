@@ -14,7 +14,7 @@
 #include "types.h"
 
 namespace trading {
-constexpr int kRequestCommonStringPrecision = 5;
+constexpr int kRequestCommonStringPrecision = 6;
 
 enum class ReqeustType : uint8_t {
   kInvalid = 0,
@@ -338,6 +338,7 @@ struct ExecutionReport {
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
+    stream << std::fixed << std::setprecision(kRequestCommonStringPrecision);
     stream << "ExecutionReport{" << "order_id=" << cl_order_id.value
            << ", symbol=" << symbol
            << ", exec_type=" << trading::toString(exec_type)

@@ -10,9 +10,9 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "market_maker.h"
 #include "feature_engine.h"
 #include "ini_config.hpp"
+#include "momentum_strategy.h"
 #include "order_book.h"
 #include "order_manager.h"
 
@@ -25,8 +25,8 @@ inline double round5(double value) {
 }
 
 namespace trading {
-MarketMaker::MarketMaker(OrderManager<MarketMaker>* const order_manager,
-                         const FeatureEngine<MarketMaker>* const feature_engine,
+ObiVwapMomentumStrategy::ObiVwapMomentumStrategy(OrderManager<ObiVwapMomentumStrategy>* const order_manager,
+                         const FeatureEngine<ObiVwapMomentumStrategy>* const feature_engine,
                          common::Logger* logger,
                          const common::TradeEngineCfgHashMap&)
     : BaseStrategy(order_manager, feature_engine, logger),
@@ -42,13 +42,13 @@ MarketMaker::MarketMaker(OrderManager<MarketMaker>* const order_manager,
       bid_qty_(obi_level_),
       ask_qty_(obi_level_) {}
 
-void MarketMaker::on_orderbook_updated(
+void ObiVwapMomentumStrategy::on_orderbook_updated(
     const common::TickerId&, common::Price, Side,
-    const MarketOrderBook<MarketMaker>*) noexcept {}
+    const MarketOrderBook<ObiVwapMomentumStrategy>*) noexcept {}
 
-void MarketMaker::on_trade_updated(
+void ObiVwapMomentumStrategy::on_trade_updated(
     const MarketData* market_data,
-    MarketOrderBook<MarketMaker>* order_book) noexcept {
+    MarketOrderBook<ObiVwapMomentumStrategy>* order_book) noexcept {
   const auto ticker = market_data->ticker_id;
   const auto* bbo = order_book->get_bbo();
   if (bbo->bid_qty.value == common::kQtyInvalid ||
@@ -56,7 +56,7 @@ void MarketMaker::on_trade_updated(
       bbo->bid_price.value == common::kPriceInvalid ||
       bbo->ask_price.value == common::kPriceInvalid ||
       bbo->ask_price.value < bbo->bid_price.value) {
-    logger_.debug("Invalid BBO. Skipping quoting.");
+    logger_.trace("Invalid BBO. Skipping quoting.");
     return;
   }
 
@@ -67,7 +67,7 @@ void MarketMaker::on_trade_updated(
   const auto spread = feature_engine_->get_spread();
 
   const double obi =
-      FeatureEngine<MarketMaker>::orderbook_imbalance_from_levels(bid_qty_,
+      FeatureEngine<ObiVwapMomentumStrategy>::orderbook_imbalance_from_levels(bid_qty_,
                                                                   ask_qty_);
   const auto mid = (order_book->get_bbo()->bid_price.value +
                     order_book->get_bbo()->ask_price.value) *
@@ -83,7 +83,7 @@ void MarketMaker::on_trade_updated(
   std::vector<QuoteIntent> intents;
   intents.reserve(4);
 
-  logger_.debug(std::format(
+  logger_.trace(std::format(
       "[Updated] delta:{} obi:{} signal:{} mid:{}, vwap:{}, spread:{}", delta,
       obi, signal, mid, vwap, spread));
 
@@ -95,7 +95,7 @@ void MarketMaker::on_trade_updated(
                     .price = best_bid_price - kSafetyMargin,
                     .qty = Qty{round5(signal * position_variance_)}});
 
-    logger_.debug(std::format(
+    logger_.trace(std::format(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:buy, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
@@ -110,12 +110,12 @@ void MarketMaker::on_trade_updated(
                     .side = Side::kSell,
                     .price = best_ask_price + kSafetyMargin,
                     .qty = Qty{round5(signal * position_variance_)}});
-    logger_.debug(std::format(
+    logger_.trace(std::format(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
         "vwap:{}, spread:{}",
-        best_ask_price.value + MarketMaker::kSafetyMargin,
+        best_ask_price.value + ObiVwapMomentumStrategy::kSafetyMargin,
         round5(signal * position_variance_), delta, obi, signal, mid, vwap,
         spread));
   }
@@ -126,6 +126,6 @@ void MarketMaker::on_trade_updated(
   order_manager_->apply(intents);
 }
 
-void MarketMaker::on_order_updated(const ExecutionReport*) noexcept {}
+void ObiVwapMomentumStrategy::on_order_updated(const ExecutionReport*) noexcept {}
 
 }  // namespace trading

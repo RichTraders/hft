@@ -10,31 +10,31 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#ifndef MARKETMAKER_H
-#define MARKETMAKER_H
+#ifndef MOMENTUM_STRATEGY_H
+#define MOMENTUM_STRATEGY_H
 #include "base_strategy.hpp"
 
 struct MarketData;
 
 namespace trading {
-class MarketMaker : public BaseStrategy<MarketMaker> {
+class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
  public:
-  MarketMaker(OrderManager<MarketMaker>* order_manager,
-              const FeatureEngine<MarketMaker>* feature_engine,
+  ObiVwapMomentumStrategy(OrderManager<ObiVwapMomentumStrategy>* order_manager,
+              const FeatureEngine<ObiVwapMomentumStrategy>* feature_engine,
               common::Logger* logger,
               const common::TradeEngineCfgHashMap& ticker_cfg);
   void on_orderbook_updated(
       const common::TickerId& ticker, common::Price, common::Side,
-      const MarketOrderBook<MarketMaker>* order_book) noexcept;
+      const MarketOrderBook<ObiVwapMomentumStrategy>* order_book) noexcept;
 
   void on_trade_updated(const MarketData*,
-                        MarketOrderBook<MarketMaker>*) noexcept;
+                        MarketOrderBook<ObiVwapMomentumStrategy>*) noexcept;
 
   void on_order_updated(const ExecutionReport*) noexcept;
 
  private:
   static constexpr int kDefaultOBILevel10 = 10;
-  static constexpr int kSafetyMargin = 10;
+  static constexpr int kSafetyMargin = 20;
   const double variance_denominator_;
   const double position_variance_;
   const double enter_threshold_;
@@ -45,4 +45,4 @@ class MarketMaker : public BaseStrategy<MarketMaker> {
 };
 }  // namespace trading
 
-#endif  //MARKETMAKER_H
+#endif  //MOMENTUM_STRATEGY_H

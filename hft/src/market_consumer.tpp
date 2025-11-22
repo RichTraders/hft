@@ -174,6 +174,7 @@ void MarketConsumer<Strategy>::on_instrument_list(FIX8::Message* msg) {
       app_->create_instrument_list_message(msg);
   logger_.info(std::format("[Message] on_instrument_list :{}",
                            instrument_message.toString()));
+  trade_engine_->on_instrument_info(instrument_message);
 }
 
 template<typename Strategy>

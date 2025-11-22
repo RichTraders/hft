@@ -114,7 +114,7 @@ void TradeEngine<Strategy>::on_order_updated(const ExecutionReport* report) noex
   order_manager_->on_order_updated(report);
   END_MEASURE(Trading_TradeEngine_on_order_updated, logger_);
 
-  logger_.info(std::format("[OrderResult]{}", report->toString()));
+  //logger_.info(std::format("[OrderResult]{}", report->toString()));
 }
 
 template <typename Strategy>
@@ -203,6 +203,16 @@ void TradeEngine<Strategy>::on_order_mass_cancel_report(
   logger_.info(
       std::format("[OrderResult]Order mass cancel is rejected. error:{}",
                   cancel_report->toString()));
+}
+
+template <typename Strategy>
+void TradeEngine<Strategy>::on_instrument_info(const InstrumentInfo& instrument_info) {
+  if (!instrument_info.symbols.empty()) {
+    qty_increment_ = instrument_info.symbols[0].min_qty_increment;
+    logger_.info(std::format("[TradeEngine] Updated qty_increment to {}", qty_increment_));
+
+    order_manager_->on_instrument_info(instrument_info);
+  }
 }
 }  // namespace trading
 

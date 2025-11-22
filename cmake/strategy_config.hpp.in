@@ -1,6 +1,6 @@
 #pragma once
 
-#include "strategy/market_maker.h"
+#include "strategy/momentum_strategy.h"
 #include "strategy/liquid_taker.h"
 
 using SelectedStrategy = @STRATEGY_TYPE@;

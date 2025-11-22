@@ -1,12 +1,12 @@
 /*
  * MIT License
- * 
+ *
  * Copyright (c) 2025 NewOro Corporation
- * 
- * Permission is hereby granted, free of charge, to use, copy, modify, and distribute 
- * this software for any purpose with or without fee, provided that the above 
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
  * copyright notice appears in all copies.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
@@ -18,8 +18,11 @@
 #include "layer_book.h"
 #include "logger.h"
 #include "market_data.h"
+#include "order_expiry_manager.h"
+#include "order_state_manager.h"
 #include "orders.h"
 #include "quote_reconciler.h"
+#include "reserved_position_tracker.h"
 
 namespace trading {
 template <typename Strategy>
@@ -69,46 +72,16 @@ class OrderManager {
   const double ticker_size_ = 0;
   order::QuoteReconciler reconciler_;
   order::VenuePolicy venue_policy_;
-  common::Qty reserved_position_{0};
-
-  uint64_t ttl_reserved_ns_;
-  uint64_t ttl_live_ns_;
-
   order::TickConverter tick_converter_;
 
-  struct ExpiryKey {
-    uint64_t expire_ts{0};
-    common::TickerId symbol;
-    common::Side side{};
-    uint32_t layer{0};
-    common::OrderId cl_order_id;
-
-    auto operator<=>(const ExpiryKey& key) const noexcept {
-      return expire_ts <=> key.expire_ts;
-    }
-    friend std::ostream& operator<<(std::ostream& stream,
-                                    const ExpiryKey& key) {
-      stream << "expire_ts: " << key.expire_ts << ", symbol: " << key.symbol
-             << ", side: " << common::toString(key.side)
-             << ", layer: " << key.layer
-             << ", cl_order_id: " << key.cl_order_id.value;
-      return stream;
-    }
-  };
-
-  // Manage expiry
-  using MinHeap =
-      std::priority_queue<ExpiryKey, std::vector<ExpiryKey>, std::greater<>>;
-  MinHeap expiry_pq_;
+  // Delegated components for separation of concerns
+  OrderStateManager state_manager_;
+  ReservedPositionTracker position_tracker_;
+  OrderExpiryManager expiry_manager_;
 
   void filter_by_risk(const std::vector<QuoteIntent>& intents,
                       order::Actions& acts);
 
-  void register_expiry(const common::TickerId& ticker, common::Side side,
-                       uint32_t layer, const common::OrderId& order_id,
-                       OMOrderState state) noexcept;
-
-  void sweep_expired() noexcept;
   [[nodiscard]] common::OrderId gen_order_id() noexcept;
 
   void dump_all_slots(const std::string& symbol,

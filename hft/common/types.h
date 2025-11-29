@@ -263,6 +263,16 @@ inline Side charToSide(const char character) noexcept {
   }
 }
 
+inline Side toSide(std::string_view str) noexcept {
+  if (str == "BUY")
+    return Side::kBuy;
+  if (str == "SELL")
+    return Side::kSell;
+  if (str == "TRADE")
+    return Side::kTrade;
+  return Side::kInvalid;
+}
+
 constexpr auto sideToIndex(Side side) noexcept {
   return static_cast<size_t>(side);
 }
@@ -271,8 +281,8 @@ constexpr auto oppIndex(size_t idx) noexcept -> size_t {
   return idx ^ 1U;
 }
 
-constexpr auto sideToValue(Side side) noexcept {
-  const int ret = side == Side::kBuy ? 1 : -1;
+constexpr auto sideToValue(common::Side side) noexcept {
+  const int ret = side == common::Side::kBuy ? 1 : -1;
   return ret;
 }
 

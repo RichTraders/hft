@@ -55,10 +55,9 @@ void FileSink::reopen_fallback() {
   ofs_.flush();
   ofs_.close();
   std::filesystem::rename(filename_ + file_extension_,
-                          filename_ + "_reopen_" +
-                              std::to_string(std::time(nullptr)) +
-                              file_extension_,
-                          error_code);
+      filename_ + "_reopen_" + std::to_string(std::time(nullptr)) +
+          file_extension_,
+      error_code);
   ofs_.open(filename_ + file_extension_);
   ofs_.exceptions(std::ofstream::failbit | std::ofstream::badbit);
   line_cnt_ = 0;
@@ -111,8 +110,9 @@ Logger::Producer Logger::make_producer() {
 
 void Logger::shutdown() {
   bool expected = false;
-  if (!stop_.compare_exchange_strong(expected, true,
-                                     std::memory_order_acq_rel)) {
+  if (!stop_.compare_exchange_strong(expected,
+          true,
+          std::memory_order_acq_rel)) {
     return;
   }
 
@@ -245,13 +245,13 @@ Logger::Producer& Logger::Producer::operator=(Producer&& producer) noexcept {
 }
 
 void Logger::Producer::log(LogLevel lvl, std::string_view text,
-                           std::source_location /*loc*/) {
+    std::source_location /*loc*/) const {
   if (impl_->level->load(std::memory_order_relaxed) > lvl)
     return;
 
   //Allow multiple logger
   thread_local std::unordered_map<const void*,
-                                  std::vector<std::unique_ptr<ProducerToken>>>
+      std::vector<std::unique_ptr<ProducerToken>>>
       tls;
   auto& slots = tls[impl_->logger];
   if (slots.size() <= impl_->sid)

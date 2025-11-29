@@ -16,19 +16,38 @@
 
 struct MarketData;
 
-namespace trading {
-class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
- public:
-  ObiVwapMomentumStrategy(OrderManager<ObiVwapMomentumStrategy>* order_manager,
-              const FeatureEngine<ObiVwapMomentumStrategy>* feature_engine,
-              common::Logger* logger,
-              const common::TradeEngineCfgHashMap& ticker_cfg);
-  void on_orderbook_updated(
-      const common::TickerId& ticker, common::Price, common::Side,
-      const MarketOrderBook<ObiVwapMomentumStrategy>* order_book) noexcept;
+namespace core {
+#ifdef ENABLE_WEBSOCKET
+class WsOrderEntryApp;
+#else
+class FixOrderEntryApp;
+#endif
+}  // namespace core
 
-  void on_trade_updated(const MarketData*,
-                        MarketOrderBook<ObiVwapMomentumStrategy>*) noexcept;
+namespace trading {
+template <typename Strategy, typename App>
+class FeatureEngine;
+template <typename Strategy, typename App>
+class MarketOrderBook;
+
+template <typename App>
+class ObiVwapMomentumStrategyTemplate
+    : public BaseStrategy<ObiVwapMomentumStrategyTemplate<App>, App> {
+ public:
+  using Base = BaseStrategy<ObiVwapMomentumStrategyTemplate<App>, App>;
+  using OrderManagerT = OrderManager<ObiVwapMomentumStrategyTemplate<App>, App>;
+  using FeatureEngineT =
+      FeatureEngine<ObiVwapMomentumStrategyTemplate<App>, App>;
+  using MarketOrderBookT =
+      MarketOrderBook<ObiVwapMomentumStrategyTemplate<App>, App>;
+
+  ObiVwapMomentumStrategyTemplate(OrderManagerT* order_manager,
+      const FeatureEngineT* feature_engine, common::Logger* logger,
+      const common::TradeEngineCfgHashMap& ticker_cfg);
+  void on_orderbook_updated(const common::TickerId& ticker, common::Price,
+      common::Side, const MarketOrderBookT* order_book) noexcept;
+
+  void on_trade_updated(const MarketData*, MarketOrderBookT*) noexcept;
 
   void on_order_updated(const ExecutionReport*) noexcept;
 
@@ -43,6 +62,17 @@ class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
   std::vector<double> bid_qty_;
   std::vector<double> ask_qty_;
 };
+
+#ifdef ENABLE_WEBSOCKET
+using ObiVwapMomentumStrategyWs =
+    ObiVwapMomentumStrategyTemplate<core::WsOrderEntryApp>;
+using ObiVwapMomentumStrategy = ObiVwapMomentumStrategyWs;
+#else
+using ObiVwapMomentumStrategyFix =
+    ObiVwapMomentumStrategyTemplate<core::FixOrderEntryApp>;
+using ObiVwapMomentumStrategy = ObiVwapMomentumStrategyFix;
+#endif
+
 }  // namespace trading
 
 #endif  //MOMENTUM_STRATEGY_H

@@ -13,10 +13,6 @@
 #ifndef ORDER_EXPIRY_MANAGER_H
 #define ORDER_EXPIRY_MANAGER_H
 
-#include <format>
-#include <ostream>
-#include <queue>
-#include <vector>
 #include "orders.h"
 #include "types.h"
 
@@ -36,7 +32,7 @@ class OrderExpiryManager {
     }
 
     friend std::ostream& operator<<(std::ostream& stream,
-                                    const ExpiryKey& key) {
+        const ExpiryKey& key) {
       stream << "expire_ts: " << key.expire_ts << ", symbol: " << key.symbol
              << ", side: " << common::toString(key.side)
              << ", layer: " << key.layer
@@ -51,17 +47,17 @@ class OrderExpiryManager {
   ~OrderExpiryManager() = default;
 
   void register_expiry(const common::TickerId& ticker, common::Side side,
-                       uint32_t layer, const common::OrderId& order_id,
-                       OMOrderState state, uint64_t now_ns) noexcept {
+      uint32_t layer, const common::OrderId& order_id, OMOrderState state,
+      uint64_t now_ns) noexcept {
     const auto ttl = (state == OMOrderState::kReserved ||
-                      state == OMOrderState::kCancelReserved)
+                         state == OMOrderState::kCancelReserved)
                          ? ttl_reserved_ns_
                          : ttl_live_ns_;
     expiry_pq_.push(ExpiryKey{.expire_ts = now_ns + ttl,
-                              .symbol = ticker,
-                              .side = side,
-                              .layer = layer,
-                              .cl_order_id = order_id});
+        .symbol = ticker,
+        .side = side,
+        .layer = layer,
+        .cl_order_id = order_id});
   }
 
   std::vector<ExpiryKey> sweep_expired(uint64_t now_ns) noexcept {

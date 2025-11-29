@@ -1,0 +1,310 @@
+/*
+ * MIT License
+ * 
+ * Copyright (c) 2025 NewOro Corporation
+ * 
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute 
+ * this software for any purpose with or without fee, provided that the above 
+ * copyright notice appears in all copies.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ */
+#include "ws_oe_app.h"
+
+#include "common/authorization.h"
+#include "core/common.h"
+#include "core/signature.h"
+#include "schema/account_position.h"
+
+constexpr int kHttpOK = 200;
+constexpr int kDefaultRecvWindow = 5000;
+
+namespace {
+std::string get_signature_base64(std::string_view timestamp_ms,
+    std::uint32_t recv_window_ms = kDefaultRecvWindow) {
+  EVP_PKEY* private_key =
+      core::Util::load_ed25519(AUTHORIZATION.get_pem_file_path(),
+          AUTHORIZATION.get_private_password().c_str());
+
+  std::vector<std::pair<std::string, std::string>> params;
+  params.emplace_back("apiKey", AUTHORIZATION.get_api_key());
+  params.emplace_back("timestamp", std::string(timestamp_ms));
+  if (recv_window_ms > 0) {
+    params.emplace_back("recvWindow", std::to_string(recv_window_ms));
+  }
+  const std::string payload =
+      core::Util::build_canonical_query(std::move(params));
+
+  auto result = core::Util::sign_and_base64(private_key, payload);
+  core::Util::free_key(private_key);
+  return result;
+}
+}  // namespace
+
+namespace core {
+
+WsOrderEntryApp::WsOrderEntryApp(const std::string& /*sender_comp_id*/,
+    const std::string& /*target_comp_id*/, common::Logger* logger,
+    trading::ResponseManager* response_manager)
+    : logger_(logger->make_producer()),
+      ws_oe_core_(logger, response_manager),
+      host_(AUTHORIZATION.get_oe_ws_address()),
+      path_(AUTHORIZATION.get_oe_ws_path()),
+      port_(AUTHORIZATION.get_oe_ws_port()),
+      use_ssl_(AUTHORIZATION.use_oe_ws_ssl()) {}
+
+WsOrderEntryApp::~WsOrderEntryApp() {
+  stop();
+}
+
+bool WsOrderEntryApp::start() {
+  if (running_.exchange(true)) {
+    return false;
+  }
+  transport_ = std::make_unique<WebSocketTransport<"OERead">>(host_,
+      port_,
+      path_,
+      use_ssl_);
+
+  transport_->register_message_callback(
+      [this](std::string_view payload) { this->handle_payload(payload); });
+  return true;
+}
+
+void WsOrderEntryApp::stop() {
+  if (!running_.exchange(false)) {
+    return;
+  }
+  if (transport_) {
+    transport_->interrupt();
+  }
+  transport_.reset();
+}
+
+bool WsOrderEntryApp::send(const std::string& msg) const {
+  if (!transport_ || msg.empty()) {
+    return false;
+  }
+  logger_.info(
+      std::format("[WsOrderEntryApp] Sending message to server :{}", msg));
+  return transport_->write(msg) >= 0;
+}
+
+void WsOrderEntryApp::register_callback(const MsgType& type,
+    std::function<void(const WireMessage&)> callback) {
+  callbacks_[type] = std::move(callback);
+}
+
+std::string WsOrderEntryApp::create_log_on_message(const std::string& sig_b64,
+    const std::string& timestamp) {
+  return ws_oe_core_.create_log_on_message(sig_b64, timestamp);
+}
+
+std::string WsOrderEntryApp::create_log_out_message() {
+  return ws_oe_core_.create_log_out_message();
+}
+
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
+std::string WsOrderEntryApp::create_heartbeat_message(WireMessage /*message*/) {
+  return ws_oe_core_.create_heartbeat_message();
+}
+
+std::string WsOrderEntryApp::create_order_message(
+    const trading::NewSingleOrderData& order_data) {
+  return ws_oe_core_.create_order_message(order_data);
+}
+
+std::string WsOrderEntryApp::create_cancel_order_message(
+    const trading::OrderCancelRequest& cancel_request) {
+  return ws_oe_core_.create_cancel_order_message(cancel_request);
+}
+
+std::string WsOrderEntryApp::create_cancel_and_reorder_message(
+    const trading::OrderCancelRequestAndNewOrderSingle& cancel_and_re_order) {
+  return ws_oe_core_.create_cancel_and_reorder_message(cancel_and_re_order);
+}
+
+std::string WsOrderEntryApp::create_order_all_cancel(
+    const trading::OrderMassCancelRequest& all_order_cancel) {
+  return ws_oe_core_.create_order_all_cancel(all_order_cancel);
+}
+
+trading::ExecutionReport* WsOrderEntryApp::create_execution_report_message(
+    const WireExecutionReport& msg) {
+  return ws_oe_core_.create_execution_report_message(msg);
+}
+
+trading::OrderCancelReject* WsOrderEntryApp::create_order_cancel_reject_message(
+    const WireCancelReject& msg) {
+  return ws_oe_core_.create_order_cancel_reject_message(msg);
+}
+
+trading::OrderMassCancelReport*
+WsOrderEntryApp::create_order_mass_cancel_report_message(
+    const WireMassCancelReport& msg) {
+  return ws_oe_core_.create_order_mass_cancel_report_message(msg);
+}
+
+trading::OrderReject WsOrderEntryApp::create_reject_message(
+    const WireReject& msg) {
+  return ws_oe_core_.create_reject_message(msg);
+}
+
+WsOrderEntryApp::WireMessage WsOrderEntryApp::decode(
+    const std::string& message) {
+  return ws_oe_core_.decode(message);
+}
+
+void WsOrderEntryApp::create_log_on() const {
+  const auto cur_timestamp = std::to_string(util::get_timestamp_epoch());
+  constexpr int kRecvWindow = 5000;
+  const std::string sig_b64 =
+      ::get_signature_base64(cur_timestamp, kRecvWindow);
+
+  auto log_on_message =
+      ws_oe_core_.create_log_on_message(sig_b64, cur_timestamp);
+  transport_->write(log_on_message);
+}
+void WsOrderEntryApp::handle_payload(std::string_view payload) {
+  if (payload.empty()) {
+    return;
+  }
+  if (payload == "__CONNECTED__") {
+    create_log_on();
+    return;
+  }
+
+  constexpr int kDefaultLogLen = 200;
+  logger_.debug(std::format("Received payload (size: {}): {}...",
+      payload.size(),
+      payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size()))));
+
+  WireMessage message = ws_oe_core_.decode(payload);
+  if (UNLIKELY(std::holds_alternative<std::monostate>(message))) {
+    return;
+  }
+
+  std::visit(
+      [this](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, schema::ExecutionReportResponse>) {
+          handle_execution_report(arg);
+        } else if constexpr (std::is_same_v<T,
+                                 schema::OutboundAccountPositionEnvelope>) {
+          handle_account_updated(arg);
+        } else if constexpr (std::is_same_v<T, schema::BalanceUpdateEnvelope>) {
+          handle_balance_update(arg);
+        } else if constexpr (std::is_same_v<T, schema::SessionLogonResponse>) {
+          handle_session_logon(arg);
+        } else if constexpr (std::is_same_v<T,
+                                 schema::SessionUserSubscriptionResponse>) {
+          handle_user_subscription(arg);
+        } else if constexpr (std::is_same_v<T, schema::ApiResponse>) {
+          handle_api_response(arg);
+        }
+      },
+      message);
+}
+
+void WsOrderEntryApp::dispatch(const std::string& type,
+    const WireMessage& message) {
+  const auto callback = callbacks_.find(type);
+  if (callback == callbacks_.end() || !callback->second) {
+    logger_.warn(
+        std::format("No callback registered for message type {}", type));
+    return;
+  }
+  callback->second(message);
+}
+std::string WsOrderEntryApp::get_signature_base64(const std::string& payload) {
+  EVP_PKEY* private_key = Util::load_ed25519(AUTHORIZATION.get_pem_file_path(),
+      AUTHORIZATION.get_private_password().c_str());
+
+  const std::string signature = Util::sign_and_base64(private_key, payload);
+
+  Util::free_key(private_key);
+  return signature;
+}
+
+void WsOrderEntryApp::handle_execution_report(
+    const schema::ExecutionReportResponse& ptr) {
+  const auto& event = ptr.event;
+  const WireMessage message = ptr;
+
+  if (event.execution_type == "REJECTED") {
+    dispatch("3", message);  // Reject message type
+  } else if (event.execution_type == "CANCELED") {
+    if (!event.reject_reason.empty()) {
+      dispatch("9", message);  // Cancel reject
+    } else {
+      dispatch("8", message);  // Regular execution report (cancel success)
+    }
+  } else {
+    dispatch("8", message);  // Regular execution report
+  }
+}
+
+void WsOrderEntryApp::handle_balance_update(
+    const schema::BalanceUpdateEnvelope& ptr) const {
+  std::ostringstream stream;
+  stream << "BalanceUpdated : " << ptr.event;
+  logger_.debug(stream.str());
+}
+
+void WsOrderEntryApp::handle_account_updated(
+    const schema::OutboundAccountPositionEnvelope& ptr) const {
+  std::ostringstream stream;
+  stream << "AccountUpdated : " << ptr.event;
+  logger_.debug(stream.str());
+}
+
+void WsOrderEntryApp::handle_session_logon(
+    const schema::SessionLogonResponse& ptr) {
+  if (ptr.status == kHttpOK) {
+    logger_.info("[WsOeApp] session.logon successful");
+    // Automatically start user data stream after successful login
+    const std::string user_stream_msg =
+        ws_oe_core_.create_user_data_stream_subscribe();
+    if (UNLIKELY(!user_stream_msg.empty())) {
+      send(user_stream_msg);
+    }
+  } else {
+    if (ptr.error.has_value())
+      logger_.error(
+          std::format("[WsOeApp] session.logon failed: status={}, error={}",
+              ptr.status,
+              ptr.error.value().message));
+  }
+
+  const WireMessage message = ptr;
+  dispatch("A", message);
+}
+
+void WsOrderEntryApp::handle_user_subscription(
+    const schema::SessionUserSubscriptionResponse& ptr) {
+  if (ptr.status != kHttpOK) {
+    logger_.warn(std::format(
+        "[WsOeApp] UserDataStream response failed: id={}, status={}",
+        ptr.id,
+        ptr.status));
+  }
+
+  const WireMessage message = ptr;
+  dispatch("sub", message);
+}
+
+void WsOrderEntryApp::handle_api_response(const schema::ApiResponse& ptr) {
+  if (ptr.status != kHttpOK) {
+    if (ptr.error.has_value())
+      logger_.warn(std::format(
+          "[WsOeApp] API response failed: id={}, status={}, error={}",
+          ptr.id,
+          ptr.status,
+          ptr.error.value().message));
+  }
+
+  const WireMessage message = ptr;
+  dispatch("api", message);
+}
+
+}  // namespace core

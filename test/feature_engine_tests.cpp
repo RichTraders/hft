@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 
 #include "feature_engine.h"
+#include "hft/core/NewOroFix44/fix_oe_app.h"
 #include "ini_config.hpp"
 #include "logger.h"
 #include "order_book.h"
@@ -25,9 +26,12 @@ using ::testing::HasSubstr;
 using namespace common;
 using namespace trading;
 
-using TestTradeEngine = trading::TradeEngine<SelectedStrategy>;
-using TestFeatureEngine = trading::FeatureEngine<SelectedStrategy>;
-using TestOrderBook = trading::MarketOrderBook<SelectedStrategy>;
+using TestTradeEngine =
+    trading::TradeEngine<SelectedStrategy, core::FixOrderEntryApp>;
+using TestFeatureEngine =
+    trading::FeatureEngine<SelectedStrategy, core::FixOrderEntryApp>;
+using TestOrderBook =
+    trading::MarketOrderBook<SelectedStrategy, core::FixOrderEntryApp>;
 
 class FeatureEngineTest : public ::testing::Test {
  public:

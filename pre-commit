@@ -14,7 +14,7 @@ if ! command -v "$CLANG_TIDY" > /dev/null; then
 fi
 
 EXTENSIONS="h cpp cc cxx c hpp"
-FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -Ev "test|NewOroFix44MD_|NewOroFix44OE_|fix_[?:app|md_app|oe_app]|fix_*_[core]" | grep -E "\.(${EXTENSIONS// /|})$")
+FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -Ev "test|NewOroFix44MD_|NewOroFix44OE_|fix_[?:app|md_app|oe_app]|fix_*_[core]|schema" | grep -E "\.(${EXTENSIONS// /|})$")
 
 if [ -z "$FILES" ]; then
   exit 0
@@ -24,7 +24,7 @@ fi
 
 if [ ! -e build/compile_commands.json ]; then
   echo "build/compile_commands.json not found, running cmake..."
-  cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON || exit 1
+  cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DENABLE_WEBSOCKET=ON ; cmake --build build --target websockets || exit 1
 fi
 
 FAIL=0

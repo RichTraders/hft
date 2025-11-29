@@ -11,6 +11,7 @@
  */
 
 #include "gtest/gtest.h"
+#include "hft/core/NewOroFix44/fix_oe_app.h"
 #include "ini_config.hpp"
 #include "logger.h"
 #include "response_manager.h"
@@ -20,7 +21,8 @@
 using namespace trading;
 using namespace common;
 
-using TestTradeEngine = trading::TradeEngine<SelectedStrategy>;
+using TestTradeEngine =
+    trading::TradeEngine<SelectedStrategy, core::FixOrderEntryApp>;
 
 class StrategyIntegrationTest : public ::testing::Test {
  protected:

@@ -13,8 +13,9 @@
 #ifndef ORDER_BOOK_TPP
 #define ORDER_BOOK_TPP
 
-#include "order_book.h"
 #include "market_data.h"
+#include "order_book.h"
+
 using common::MarketUpdateType;
 using common::Price;
 using common::Qty;
@@ -37,9 +38,9 @@ inline auto MarketOrder::toString() const -> std::string {
   return stream.str();
 }
 
-template<typename Strategy>
-MarketOrderBook<Strategy>::MarketOrderBook(const TickerId& ticker_id,
-                                 common::Logger* logger)
+template <typename Strategy, typename App>
+MarketOrderBook<Strategy, App>::MarketOrderBook(const TickerId& ticker_id,
+    common::Logger* logger)
     : ticker_id_(std::move(ticker_id)),
       logger_(logger->make_producer()),
       bid_bucket_pool_(
@@ -49,15 +50,15 @@ MarketOrderBook<Strategy>::MarketOrderBook(const TickerId& ticker_id,
   logger_.info("[Constructor] MarketOrderBook Created");
 }
 
-template<typename Strategy>
-MarketOrderBook<Strategy>::~MarketOrderBook() {
+template <typename Strategy, typename App>
+MarketOrderBook<Strategy, App>::~MarketOrderBook() {
   logger_.info("[Destructor] MarketOrderBook Destroy");
 
   trade_engine_ = nullptr;
 }
 
-template<typename Strategy>
-void MarketOrderBook<Strategy>::update_bid(int idx, Qty qty) {
+template <typename Strategy, typename App>
+void MarketOrderBook<Strategy, App>::update_bid(int idx, Qty qty) {
   const int bucket_idx = idx / kBucketSize;
   const int off = idx & (kBucketSize - 1);
 
@@ -91,8 +92,8 @@ void MarketOrderBook<Strategy>::update_bid(int idx, Qty qty) {
   }
 }
 
-template<typename Strategy>
-void MarketOrderBook<Strategy>::update_ask(const int idx, const Qty qty) {
+template <typename Strategy, typename App>
+void MarketOrderBook<Strategy, App>::update_ask(const int idx, const Qty qty) {
   const int bidx = idx / kBucketSize;
   const int off = idx & (kBucketSize - 1);
 
@@ -126,8 +127,8 @@ void MarketOrderBook<Strategy>::update_ask(const int idx, const Qty qty) {
   }
 }
 
-template<typename Strategy>
-int MarketOrderBook<Strategy>::best_bid_idx() const noexcept {
+template <typename Strategy, typename App>
+int MarketOrderBook<Strategy, App>::best_bid_idx() const noexcept {
   for (int sw = kSummaryWords - 1; sw >= 0; --sw) {
     const uint64_t word = bidSummary_[sw];
     if (!word)
@@ -150,8 +151,8 @@ int MarketOrderBook<Strategy>::best_bid_idx() const noexcept {
   return -1;
 }
 
-template<typename Strategy>
-int MarketOrderBook<Strategy>::best_ask_idx() const noexcept {
+template <typename Strategy, typename App>
+int MarketOrderBook<Strategy, App>::best_ask_idx() const noexcept {
   for (int sw = 0; sw < kSummaryWords; ++sw) {
     const uint64_t word = askSummary_[sw];
     if (!word)
@@ -174,20 +175,20 @@ int MarketOrderBook<Strategy>::best_ask_idx() const noexcept {
   return -1;
 }
 
-template<typename Strategy>
-Price MarketOrderBook<Strategy>::best_bid_price() const noexcept {
+template <typename Strategy, typename App>
+Price MarketOrderBook<Strategy, App>::best_bid_price() const noexcept {
   const int idx = best_bid_idx();
   return (idx >= 0) ? indexToPrice(idx) : Price{common::kPriceInvalid};
 }
 
-template<typename Strategy>
-Price MarketOrderBook<Strategy>::best_ask_price() const noexcept {
+template <typename Strategy, typename App>
+Price MarketOrderBook<Strategy, App>::best_ask_price() const noexcept {
   const int idx = best_ask_idx();
   return (idx >= 0) ? indexToPrice(idx) : Price{common::kPriceInvalid};
 }
 
-template<typename Strategy>
-Qty MarketOrderBook<Strategy>::best_bid_qty() const noexcept {
+template <typename Strategy, typename App>
+Qty MarketOrderBook<Strategy, App>::best_bid_qty() const noexcept {
   const int idx = best_bid_idx();
   if (idx < 0)
     return Qty{common::kQtyInvalid};
@@ -197,8 +198,8 @@ Qty MarketOrderBook<Strategy>::best_bid_qty() const noexcept {
   return bucket ? bucket->orders[off].qty : Qty{common::kQtyInvalid};
 }
 
-template<typename Strategy>
-Qty MarketOrderBook<Strategy>::best_ask_qty() const noexcept {
+template <typename Strategy, typename App>
+Qty MarketOrderBook<Strategy, App>::best_ask_qty() const noexcept {
   const int idx = best_ask_idx();
   if (idx < 0)
     return Qty{common::kQtyInvalid};
@@ -208,9 +209,9 @@ Qty MarketOrderBook<Strategy>::best_ask_qty() const noexcept {
   return bucket ? bucket->orders[off].qty : Qty{common::kQtyInvalid};
 }
 
-template<typename Strategy>
-void MarketOrderBook<Strategy>::trade_order(const MarketData* market_update,
-                                  const int idx) {
+template <typename Strategy, typename App>
+void MarketOrderBook<Strategy, App>::trade_order(
+    const MarketData* market_update, const int idx) {
   const int bidx = idx / kBucketSize;
   const int off = idx & (kBucketSize - 1);
 
@@ -237,9 +238,9 @@ void MarketOrderBook<Strategy>::trade_order(const MarketData* market_update,
   }
 }
 
-template<typename Strategy>
-void MarketOrderBook<Strategy>::delete_order(const MarketData* market_update,
-                                   const int idx) {
+template <typename Strategy, typename App>
+void MarketOrderBook<Strategy, App>::delete_order(
+    const MarketData* market_update, const int idx) {
   if (market_update->side == Side::kBuy) {
     update_bid(idx, Qty{0.});  // 비활성화
     bbo_.bid_price = best_bid_price();
@@ -251,9 +252,9 @@ void MarketOrderBook<Strategy>::delete_order(const MarketData* market_update,
   }
 }
 
-template<typename Strategy>
-void MarketOrderBook<Strategy>::add_order(const MarketData* market_update, const int idx,
-                                const Qty qty) {
+template <typename Strategy, typename App>
+void MarketOrderBook<Strategy, App>::add_order(const MarketData* market_update,
+    const int idx, const Qty qty) {
   if (market_update->side == Side::kBuy) {
     update_bid(idx, qty);
     bbo_.bid_price = best_bid_price();
@@ -266,8 +267,8 @@ void MarketOrderBook<Strategy>::add_order(const MarketData* market_update, const
 }
 
 /// Process market data update and update the limit order book.
-template<typename Strategy>
-auto MarketOrderBook<Strategy>::on_market_data_updated(
+template <typename Strategy, typename App>
+auto MarketOrderBook<Strategy, App>::on_market_data_updated(
     const MarketData* market_update) noexcept -> void {
   if (static_cast<double>(kMaxPriceInt) / kTickMultiplierInt <
           market_update->price.value ||
@@ -313,9 +314,10 @@ auto MarketOrderBook<Strategy>::on_market_data_updated(
       bidSummary_.fill(0);
       askSummary_.fill(0);
       bbo_ = {.bid_price = Price{common::kPriceInvalid},
-              .ask_price = Price{common::kPriceInvalid},
-              .bid_qty = Qty{common::kQtyInvalid},
-              .ask_qty = Qty{common::kQtyInvalid}};
+          .ask_price = Price{common::kPriceInvalid},
+          .bid_qty = Qty{common::kQtyInvalid},
+          .ask_qty = Qty{common::kQtyInvalid}};
+      logger_.info("Cleared all market data.");
       return;
     }
     case MarketUpdateType::kInvalid:
@@ -323,19 +325,22 @@ auto MarketOrderBook<Strategy>::on_market_data_updated(
       break;
   }
 
-  logger_.debug(std::format("[Updated] {} {}", market_update->toString(),
-                            bbo_.toString()));
+  logger_.debug(std::format("[Updated] {} {}",
+      market_update->toString(),
+      bbo_.toString()));
 
   trade_engine_->on_orderbook_updated(market_update->ticker_id,
-                                      market_update->price, market_update->side,
-                                      this);
+      market_update->price,
+      market_update->side,
+      this);
 }
 
-template<typename Strategy>
-void MarketOrderBook<Strategy>::on_trade_update(MarketData*) {}
+template <typename Strategy, typename App>
+void MarketOrderBook<Strategy, App>::on_trade_update(MarketData*) {}
 
-template<typename Strategy>
-std::string MarketOrderBook<Strategy>::print_active_levels(bool is_bid) const {
+template <typename Strategy, typename App>
+std::string MarketOrderBook<Strategy, App>::print_active_levels(
+    bool is_bid) const {
   std::ostringstream stream;
   const auto& buckets = is_bid ? bidBuckets_ : askBuckets_;
 
@@ -359,8 +364,9 @@ std::string MarketOrderBook<Strategy>::print_active_levels(bool is_bid) const {
   return stream.str();
 }
 
-template<typename Strategy>
-int MarketOrderBook<Strategy>::next_active_bid(const int start_idx) const noexcept {
+template <typename Strategy, typename App>
+int MarketOrderBook<Strategy, App>::next_active_bid(
+    const int start_idx) const noexcept {
   const auto& summary_bitmap = bidSummary_;
   const auto& buckets = bidBuckets_;
 
@@ -412,8 +418,9 @@ int MarketOrderBook<Strategy>::next_active_bid(const int start_idx) const noexce
   return -1;
 }
 
-template<typename Strategy>
-int MarketOrderBook<Strategy>::next_active_ask(const int start_idx) const noexcept {
+template <typename Strategy, typename App>
+int MarketOrderBook<Strategy, App>::next_active_ask(
+    const int start_idx) const noexcept {
   const auto& summary_bitmap = askSummary_;
   const auto& buckets = askBuckets_;
 
@@ -443,8 +450,8 @@ int MarketOrderBook<Strategy>::next_active_ask(const int start_idx) const noexce
   const int summary_bit_offset = bucket_index & kWordMask;
   const uint64_t sb_word = summary_bitmap[summary_word_index] &
                            (summary_bit_offset == kWordMask
-                                ? 0ULL
-                                : ~((1ULL << (summary_bit_offset + 1)) - 1));
+                                   ? 0ULL
+                                   : ~((1ULL << (summary_bit_offset + 1)) - 1));
   if (sb_word) {
     const int bit = __builtin_ctzll(sb_word);
     const int next_bucket_index = (summary_word_index << kWordShift) + bit;
@@ -466,9 +473,9 @@ int MarketOrderBook<Strategy>::next_active_ask(const int start_idx) const noexce
   return -1;
 }
 
-template<typename Strategy>
-std::vector<int> MarketOrderBook<Strategy>::peek_levels(const bool is_bid,
-                                              const int level) const {
+template <typename Strategy, typename App>
+std::vector<int> MarketOrderBook<Strategy, App>::peek_levels(const bool is_bid,
+    const int level) const {
   std::vector<int> output;
   int idx = is_bid ? best_bid_idx() : best_ask_idx();
   while (idx >= 0 && output.size() < static_cast<size_t>(level)) {
@@ -481,9 +488,9 @@ std::vector<int> MarketOrderBook<Strategy>::peek_levels(const bool is_bid,
 
 // highest=true  => 버킷 내에서 가장 큰(High‑우선) 레벨 오프셋
 // highest=false => 버킷 내에서 가장 작은(Low‑우선) 레벨 오프셋
-template<typename Strategy>
-int MarketOrderBook<Strategy>::find_in_bucket(const Bucket* bucket,
-                                    const bool highest) noexcept {
+template <typename Strategy, typename App>
+int MarketOrderBook<Strategy, App>::find_in_bucket(const Bucket* bucket,
+    const bool highest) noexcept {
   if (highest) {
     for (int iter = kBucketBitmapWords - 1; iter >= 0; --iter) {
       if (const uint64_t word = bucket->bitmap[iter]) {
@@ -503,9 +510,9 @@ int MarketOrderBook<Strategy>::find_in_bucket(const Bucket* bucket,
 }
 
 //NOLINTBEGIN(readability-function-cognitive-complexity)
-template<typename Strategy>
-int MarketOrderBook<Strategy>::peek_levels_with_qty(
-    bool is_bid, int level, std::vector<LevelView>& out) const noexcept {
+template <typename Strategy, typename App>
+int MarketOrderBook<Strategy, App>::peek_levels_with_qty(bool is_bid, int level,
+    std::vector<LevelView>& out) const noexcept {
   out.clear();
   out.reserve(level);
   if (level <= 0)
@@ -530,10 +537,14 @@ int MarketOrderBook<Strategy>::peek_levels_with_qty(
     const Bucket* bucket = buckets[bucket_idx];
 
     if (!bucket) {
-      bucket_idx = is_bid ? jump_next_bucket_impl<true>(summary, bucket_idx,
-                                                        kWordShift, kWordMask)
-                          : jump_next_bucket_impl<false>(summary, bucket_idx,
-                                                         kWordShift, kWordMask);
+      bucket_idx = is_bid ? jump_next_bucket_impl<true>(summary,
+                                bucket_idx,
+                                kWordShift,
+                                kWordMask)
+                          : jump_next_bucket_impl<false>(summary,
+                                bucket_idx,
+                                kWordShift,
+                                kWordMask);
       if (bucket_idx < 0)
         break;
       off = is_bid ? (kBucketSize - 1) : 0;
@@ -541,21 +552,39 @@ int MarketOrderBook<Strategy>::peek_levels_with_qty(
     }
 
     if (is_bid) {
-      consume_levels_in_bucket<true>(bucket, bucket_idx, off, kWordShift,
-                                     kWordMask, kBucketBitmapWords, kBucketSize,
-                                     price_of, out, level);
+      consume_levels_in_bucket<true>(bucket,
+          bucket_idx,
+          off,
+          kWordShift,
+          kWordMask,
+          kBucketBitmapWords,
+          kBucketSize,
+          price_of,
+          out,
+          level);
     } else {
-      consume_levels_in_bucket<false>(bucket, bucket_idx, off, kWordShift,
-                                      kWordMask, kBucketBitmapWords,
-                                      kBucketSize, price_of, out, level);
+      consume_levels_in_bucket<false>(bucket,
+          bucket_idx,
+          off,
+          kWordShift,
+          kWordMask,
+          kBucketBitmapWords,
+          kBucketSize,
+          price_of,
+          out,
+          level);
     }
     if (static_cast<int>(out.size()) >= level)
       break;
 
-    bucket_idx = is_bid ? jump_next_bucket_impl<true>(summary, bucket_idx,
-                                                      kWordShift, kWordMask)
-                        : jump_next_bucket_impl<false>(summary, bucket_idx,
-                                                       kWordShift, kWordMask);
+    bucket_idx = is_bid ? jump_next_bucket_impl<true>(summary,
+                              bucket_idx,
+                              kWordShift,
+                              kWordMask)
+                        : jump_next_bucket_impl<false>(summary,
+                              bucket_idx,
+                              kWordShift,
+                              kWordMask);
     if (bucket_idx < 0)
       break;
     off = is_bid ? (kBucketSize - 1) : 0;
@@ -564,9 +593,9 @@ int MarketOrderBook<Strategy>::peek_levels_with_qty(
   return static_cast<int>(out.size());
 }
 
-template<typename Strategy>
-int MarketOrderBook<Strategy>::peek_qty(bool is_bid, int level, std::span<double> qty_out,
-                              std::span<int> idx_out) const noexcept {
+template <typename Strategy, typename App>
+int MarketOrderBook<Strategy, App>::peek_qty(bool is_bid, int level,
+    std::span<double> qty_out, std::span<int> idx_out) const noexcept {
   const auto want = std::min<int>(level, static_cast<int>(qty_out.size()));
   if (want <= 0)
     return -1;
@@ -582,22 +611,42 @@ int MarketOrderBook<Strategy>::peek_qty(bool is_bid, int level, std::span<double
       return false;
 
     if (is_bid) {
-      return consume_bucket_side<Side::kBuy>(
-          bucket, bidx, start_off, kWordShift, kWordMask, kBucketSize,
-          kBucketBitmapWords, qty_out, idx_out, filled, want);
+      return consume_bucket_side<Side::kBuy>(bucket,
+          bidx,
+          start_off,
+          kWordShift,
+          kWordMask,
+          kBucketSize,
+          kBucketBitmapWords,
+          qty_out,
+          idx_out,
+          filled,
+          want);
     }
-    return consume_bucket_side<Side::kSell>(
-        bucket, bidx, start_off, kWordShift, kWordMask, kBucketSize,
-        kBucketBitmapWords, qty_out, idx_out, filled, want);
+    return consume_bucket_side<Side::kSell>(bucket,
+        bidx,
+        start_off,
+        kWordShift,
+        kWordMask,
+        kBucketSize,
+        kBucketBitmapWords,
+        qty_out,
+        idx_out,
+        filled,
+        want);
   };
 
   auto jump_next_bucket = [&](int bidx) -> int {
     if (is_bid) {
-      return jump_next_bucket_impl<true /*Bid*/>(summary, bidx, kWordShift,
-                                                 kWordMask);
+      return jump_next_bucket_impl<true /*Bid*/>(summary,
+          bidx,
+          kWordShift,
+          kWordMask);
     }
-    return jump_next_bucket_impl<false /*Ask*/>(summary, bidx, kWordShift,
-                                                kWordMask);
+    return jump_next_bucket_impl<false /*Ask*/>(summary,
+        bidx,
+        kWordShift,
+        kWordMask);
   };
 
   const int idx = is_bid ? best_bid_idx() : best_ask_idx();

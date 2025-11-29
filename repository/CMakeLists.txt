@@ -17,15 +17,16 @@ set(FIX8_SRC
         ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44OE_router.hpp
         ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44OE_classes.hpp
         ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44OE_classes.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/signature.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/ssl_socket.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/fix_md_core.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/fix_oe_core.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/fix_app.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/fix_md_app.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/fix_oe_app.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/response_manager.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/fix_sequence_counter.cpp
+
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/fix_md_core.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/fix_oe_core.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/fix_app.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/fix_md_app.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/fix_oe_app.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/fix_sequence_counter.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/ssl_socket.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/signature.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/response_manager.cpp
 )
 
 add_library(BrokerFix8Schema STATIC ${FIX8_SRC})
@@ -33,6 +34,7 @@ target_precompile_headers(BrokerFix8Schema PUBLIC ${CMAKE_SOURCE_DIR}/include/pc
 target_include_directories(BrokerFix8Schema PUBLIC
         ${CMAKE_SOURCE_DIR}/hft/core
         ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44
+        ${CMAKE_SOURCE_DIR}/hft/core/fix
         /usr/local/include
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/hft
@@ -53,7 +55,17 @@ target_link_libraries(BrokerFix8Schema PUBLIC
         crypto
 )
 
-target_compile_options(BrokerFix8Schema PRIVATE -Wno-missing-field-initializers -Wno-error=unused-parameter)
+target_compile_options(BrokerFix8Schema PUBLIC
+        -Wno-missing-field-initializers
+        -Wno-unused-parameter
+        -Wno-error=unused-parameter
+)
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(BrokerFix8Schema PUBLIC
+            -Wno-return-type-c-linkage
+            -Wno-error=return-type-c-linkage
+    )
+endif()
 ############################################
 
 #common

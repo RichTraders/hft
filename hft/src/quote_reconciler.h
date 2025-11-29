@@ -102,55 +102,35 @@ class VenuePolicy {
   void set_qty_increment(double increment) { qty_increment_ = increment; }
 
   [[nodiscard]] common::Qty round_qty(common::Qty qty) const noexcept {
-    const double rounded =
-        std::round(qty.value / qty_increment_) * qty_increment_;
+    const double steps = qty.value / qty_increment_;
+    const double rounded = std::ceil(steps) * qty_increment_;
     return common::Qty{rounded};
   }
 
   void filter_by_venue(const std::string& symbol, Actions& actions,
-                       uint64_t current_time, LayerBook& layer_book) {
+      uint64_t current_time, LayerBook& layer_book) {
     uint64_t buy_last_used = 0;
     uint64_t sell_last_used = 0;
     std::tie(buy_last_used, sell_last_used) = layer_book.get_last_time(symbol);
 
+    auto erase_side = [](auto& vec, common::Side side) {
+      for (size_t i = 0; i < vec.size();) {
+        if (vec[i].side == side) {
+          vec[i] = std::move(vec.back());
+          vec.pop_back();
+        } else {
+          ++i;
+        }
+      }
+    };
     if (current_time - buy_last_used < minimum_time_gap_) {
-      for (size_t i = 0; i < actions.news.size();) {
-        if (actions.news[i].side == common::Side::kBuy) {
-          actions.news[i] = std::move(actions.news.back());
-          actions.news.pop_back();
-        } else {
-          ++i;
-        }
-      }
-
-      for (size_t i = 0; i < actions.repls.size();) {
-        if (actions.repls[i].side == common::Side::kBuy) {
-          actions.repls[i] = std::move(actions.repls.back());
-          actions.repls.pop_back();
-        } else {
-          ++i;
-        }
-      }
+      erase_side(actions.news, common::Side::kBuy);
+      erase_side(actions.repls, common::Side::kBuy);
     }
 
     if (current_time - sell_last_used < minimum_time_gap_) {
-      for (size_t i = 0; i < actions.news.size();) {
-        if (actions.news[i].side == common::Side::kSell) {
-          actions.news[i] = std::move(actions.news.back());
-          actions.news.pop_back();
-        } else {
-          ++i;
-        }
-      }
-
-      for (size_t i = 0; i < actions.repls.size();) {
-        if (actions.repls[i].side == common::Side::kSell) {
-          actions.repls[i] = std::move(actions.repls.back());
-          actions.repls.pop_back();
-        } else {
-          ++i;
-        }
-      }
+      erase_side(actions.news, common::Side::kSell);
+      erase_side(actions.repls, common::Side::kSell);
     }
 
     for (auto& action : actions.news) {
@@ -229,7 +209,7 @@ class QuoteReconciler {
         tick_converter_(tick_size) {}
 
   Actions diff(const std::vector<QuoteIntent>& intents, LayerBook& layer_book,
-               common::FastClock& clock) const {
+      common::FastClock& clock) const {
     Actions acts;
     if (intents.empty()) {
       // TODO(SoftPull) Implement soft-pull
@@ -281,14 +261,13 @@ class QuoteReconciler {
         if (assign.victim_live_layer) {
           const int vidx = *assign.victim_live_layer;
           const auto& vslot = side_book.slots[vidx];
-          acts.repls.push_back(
-              ActionReplace{.layer = vidx,
-                            .price = *intent.price,
-                            .qty = intent.qty,
-                            .side = side,
-                            .cl_order_id = common::OrderId{now},
-                            .original_cl_order_id = vslot.cl_order_id,
-                            .last_qty = vslot.qty});
+          acts.repls.push_back(ActionReplace{.layer = vidx,
+              .price = *intent.price,
+              .qty = intent.qty,
+              .side = side,
+              .cl_order_id = common::OrderId{now},
+              .original_cl_order_id = vslot.cl_order_id,
+              .last_qty = vslot.qty});
           //did_victim_this_side = true;
           continue;
         }
@@ -296,10 +275,10 @@ class QuoteReconciler {
         if (slot.state == OMOrderState::kInvalid ||
             slot.state == OMOrderState::kDead) {
           acts.news.push_back(ActionNew{.layer = assign.layer,
-                                        .price = *intent.price,
-                                        .qty = intent.qty,
-                                        .side = side,
-                                        .cl_order_id = common::OrderId{now}});
+              .price = *intent.price,
+              .qty = intent.qty,
+              .side = side,
+              .cl_order_id = common::OrderId{now}});
         } else if (slot.state == OMOrderState::kLive) {
           const auto slot_tick = tick_converter_.to_ticks(slot.price.value);
           const auto intent_tick =
@@ -311,14 +290,13 @@ class QuoteReconciler {
           const bool qty_diff = (std::abs(slot.qty.value - intent.qty.value) >=
                                  min_replace_qty_delta_);
           if (price_diff || qty_diff) {
-            acts.repls.push_back(
-                ActionReplace{.layer = assign.layer,
-                              .price = *intent.price,
-                              .qty = intent.qty,
-                              .side = side,
-                              .cl_order_id = common::OrderId{now},
-                              .original_cl_order_id = slot.cl_order_id,
-                              .last_qty = slot.qty});
+            acts.repls.push_back(ActionReplace{.layer = assign.layer,
+                .price = *intent.price,
+                .qty = intent.qty,
+                .side = side,
+                .cl_order_id = common::OrderId{now},
+                .original_cl_order_id = slot.cl_order_id,
+                .last_qty = slot.qty});
           }
         }
       }

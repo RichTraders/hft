@@ -10,6 +10,7 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 #include "../hft/core/NewOroFix44/response_manager.h"
+#include "hft/core/NewOroFix44/fix_oe_app.h"
 #include "gtest/gtest.h"
 #include "ini_config.hpp"
 #include "order_book.h"
@@ -19,8 +20,10 @@
 using namespace trading;
 using namespace common;
 
-using TestTradeEngine = trading::TradeEngine<SelectedStrategy>;
-using TestOrderBook = trading::MarketOrderBook<SelectedStrategy>;
+using TestTradeEngine =
+    trading::TradeEngine<SelectedStrategy, core::FixOrderEntryApp>;
+using TestOrderBook =
+    trading::MarketOrderBook<SelectedStrategy, core::FixOrderEntryApp>;
 
 class MarketOrderBookTest : public ::testing::Test {
 public:

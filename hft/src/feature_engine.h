@@ -13,12 +13,11 @@
 #ifndef FEATURE_ENGIN_H
 #define FEATURE_ENGIN_H
 
+#include "common/types.h"
 #include "order_book.h"
-#include "types.h"
 
-namespace trading {
-template <class Strategy>
-class MarketOrderBook;
+namespace core {
+class FixOrderEntryApp;
 }
 
 struct MarketData;
@@ -27,7 +26,7 @@ namespace common {
 class Logger;
 }
 namespace trading {
-template <class Strategy>
+template <class Strategy, class App = core::FixOrderEntryApp>
 class FeatureEngine {
  public:
   explicit FeatureEngine(common::Logger* logger)
@@ -40,9 +39,9 @@ class FeatureEngine {
 
   ~FeatureEngine() { logger_.info("[Destructor] FeatureEngine Destroy"); }
   auto on_trade_updated(const MarketData* market_update,
-                        MarketOrderBook<Strategy>* book) noexcept -> void;
+      MarketOrderBook<Strategy, App>* book) noexcept -> void;
   auto on_order_book_updated(common::Price price, common::Side side,
-                             MarketOrderBook<Strategy>* book) noexcept -> void;
+      MarketOrderBook<Strategy, App>* book) noexcept -> void;
   static double vwap_from_levels(const std::vector<LevelView>& level);
   static double orderbook_imbalance_from_levels(
       const std::vector<double>& bid_levels,

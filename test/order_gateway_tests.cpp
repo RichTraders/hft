@@ -25,8 +25,9 @@ using namespace core;
 using namespace common;
 using namespace trading;
 
-using TestTradeEngine = trading::TradeEngine<SelectedStrategy>;
-using TestOrderGateway = trading::OrderGateway<SelectedStrategy>;
+using TestTradeEngine =
+    trading::TradeEngine<SelectedStrategy, core::FixOrderEntryApp>;
+using TestOrderGateway = trading::ProtocolOrderGateway<SelectedStrategy>;
 
 constexpr int cl_order_id = 2075;
 

@@ -10,7 +10,8 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#pragma once
+#ifndef COMMON_LOGGER_H
+#define COMMON_LOGGER_H
 
 #include <source_location>
 #include "thread.hpp"
@@ -153,11 +154,15 @@ class LogFormatter {
     std::tm calendar_date;
     gmtime_r(&time, &calendar_date);
 
-    const auto* time_format = std::format_to(
-        out, "[{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:06}Z]",
-        calendar_date.tm_year + k1900, calendar_date.tm_mon + 1,
-        calendar_date.tm_mday, calendar_date.tm_hour, calendar_date.tm_min,
-        calendar_date.tm_sec, nano / k1000);
+    const auto* time_format = std::format_to(out,
+        "[{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:06}Z]",
+        calendar_date.tm_year + k1900,
+        calendar_date.tm_mon + 1,
+        calendar_date.tm_mday,
+        calendar_date.tm_hour,
+        calendar_date.tm_min,
+        calendar_date.tm_sec,
+        nano / k1000);
     len = static_cast<size_t>(time_format - out);
   }
   static constexpr int kTimeDigit = 6;
@@ -196,31 +201,30 @@ class Logger {
     explicit operator bool() const noexcept { return impl_ != nullptr; }
 
     void log(LogLevel lvl, std::string_view text,
-             std::source_location loc = std::source_location::current());
+        std::source_location loc = std::source_location::current()) const;
 
     void info(std::string_view str,
-              std::source_location loc = std::source_location::current()) {
+        std::source_location loc = std::source_location::current()) const {
       log(LogLevel::kInfo, str, loc);
     }
     void debug(std::string_view str,
-               std::source_location loc = std::source_location::current()) {
+        std::source_location loc = std::source_location::current()) const {
       log(LogLevel::kDebug, str, loc);
     }
     void trace(std::string_view str,
-               std::source_location loc = std::source_location::current()) {
-
+        std::source_location loc = std::source_location::current()) const {
       log(LogLevel::kTrace, str, loc);
     }
     void warn(std::string_view str,
-              std::source_location loc = std::source_location::current()) {
+        std::source_location loc = std::source_location::current()) const {
       log(LogLevel::kWarn, str, loc);
     }
     void error(std::string_view str,
-               std::source_location loc = std::source_location::current()) {
+        std::source_location loc = std::source_location::current()) const {
       log(LogLevel::kError, str, loc);
     }
     void fatal(std::string_view str,
-               std::source_location loc = std::source_location::current()) {
+        std::source_location loc = std::source_location::current()) const {
       log(LogLevel::kFatal, str, loc);
     }
 
@@ -246,3 +250,4 @@ class Logger {
 };
 
 }  // namespace common
+#endif

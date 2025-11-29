@@ -13,12 +13,20 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif ()
 
+option(ENABLE_WEBSOCKET "Build WebSocket transport support" ON)
+option(ENABLE_TESTS "Build and fetch test dependencies" OFF)
+
+if(ENABLE_WEBSOCKET)
+    include(${CMAKE_SOURCE_DIR}/cmake/libwebsockets.cmake)
+    include(${CMAKE_SOURCE_DIR}/cmake/glaze.cmake)
+    add_compile_definitions(ENABLE_WEBSOCKET)
+    message("WEBSOCKET enabled")
+endif()
+
 include_directories(
         hft
 )
 add_subdirectory(hft)
-
-option(ENABLE_TESTS "Build and fetch test dependencies" OFF)
 
 set(STRATEGY_CONFIG_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/strategy_config.hpp.in")
 
@@ -40,7 +48,7 @@ endfunction()
 
 add_strategy_target(HFT_maker "trading::ObiVwapMomentumStrategy" "ObiVwapMomentumStrategy")
 add_strategy_target(HFT_taker "trading::LiquidTaker" "LiquidTaker")
-# Default target for backward compatibility (uses market maker strategy)
+# Default target for backward compatibility (uses obi vwap momentum strategy)
 add_strategy_target(HFT "trading::ObiVwapMomentumStrategy" "ObiVwapMomentumStrategy")
 
 add_subdirectory(repository)

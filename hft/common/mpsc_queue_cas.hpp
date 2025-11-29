@@ -12,8 +12,6 @@
 
 #pragma once
 
-#include <immintrin.h>
-
 namespace common {
 
 constexpr int kDefaultChunkSize = 512;
@@ -30,7 +28,7 @@ inline void cpu_relax() noexcept {
 }
 
 template <typename T, size_t ChunkSize = kDefaultChunkSize,
-          size_t CacheLine = kCacheLine>
+    size_t CacheLine = kCacheLine>
 class MPSCSegQueue {
   struct Slot {
     std::atomic<uint8_t> ready{0};
@@ -67,8 +65,10 @@ class MPSCSegQueue {
     RetiredNode* head = retired_head_.load(std::memory_order_relaxed);
     do {
       node->next = head;
-    } while (!retired_head_.compare_exchange_weak(
-        head, node, std::memory_order_release, std::memory_order_relaxed));
+    } while (!retired_head_.compare_exchange_weak(head,
+        node,
+        std::memory_order_release,
+        std::memory_order_relaxed));
     ++retired_count_;
   }
 
@@ -101,8 +101,10 @@ class MPSCSegQueue {
         while (tail->next)
           tail = tail->next;
         tail->next = head;
-      } while (!retired_head_.compare_exchange_weak(
-          head, keep, std::memory_order_release, std::memory_order_relaxed));
+      } while (!retired_head_.compare_exchange_weak(head,
+          keep,
+          std::memory_order_release,
+          std::memory_order_relaxed));
     }
   }
 
@@ -164,7 +166,7 @@ class MPSCSegQueue {
     requires(std::constructible_from<T, U &&> &&
              std::is_nothrow_move_constructible_v<T> &&
              (std::is_nothrow_move_assignable_v<T> ||
-              std::is_trivially_copyable_v<T>))
+                 std::is_trivially_copyable_v<T>))
   void enqueue(U&& input) noexcept(noexcept(T(std::forward<U>(input)))) {
     unsigned spin = 0;
     while (true) {
@@ -190,9 +192,10 @@ class MPSCSegQueue {
       Chunk* next = cur->next.load(std::memory_order_acquire);
       if (!next) {
         auto* new_chunk = new Chunk();
-        if (!cur->next.compare_exchange_strong(next, new_chunk,
-                                               std::memory_order_acq_rel,
-                                               std::memory_order_relaxed)) {
+        if (!cur->next.compare_exchange_strong(next,
+                new_chunk,
+                std::memory_order_acq_rel,
+                std::memory_order_relaxed)) {
           delete new_chunk;
           cpu_relax();
         } else {
@@ -200,8 +203,10 @@ class MPSCSegQueue {
         }
       }
 
-      if (!tail_.compare_exchange_strong(cur, next, std::memory_order_acq_rel,
-                                         std::memory_order_relaxed)) {
+      if (!tail_.compare_exchange_strong(cur,
+              next,
+              std::memory_order_acq_rel,
+              std::memory_order_relaxed)) {
         cpu_relax();
         if (++spin > kMaxSpinCount) {
           spin = 0;

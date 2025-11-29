@@ -13,17 +13,19 @@
 #ifndef ORDERBOOK_H
 #define ORDERBOOK_H
 
-#include <bits/basic_string.h>
-
-#include "logger.h"
+#include "common/logger.h"
+#include "common/memory_pool.hpp"
+#include "common/types.h"
 #include "market_data.h"
-#include "memory_pool.hpp"
-#include "types.h"
+
+namespace core {
+class FixOrderEntryApp;
+}
 
 struct MarketData;
 
 namespace trading {
-template <typename Strategy>
+template <typename Strategy, typename App>
 class TradeEngine;
 
 struct BBO {
@@ -80,8 +82,8 @@ inline int priceToIndex(common::Price price_int) noexcept {
 }
 
 inline common::Price indexToPrice(int index) noexcept {
-  return common::Price{static_cast<double>(kMinPriceInt + index) /
-                       kTickMultiplierInt};
+  return common::Price{
+      static_cast<double>(kMinPriceInt + index) / kTickMultiplierInt};
 }
 
 struct LevelView {
@@ -101,7 +103,7 @@ inline const MarketOrder* level_ptr(const Bucket* bucket, int off) noexcept {
   return &bucket->orders[off];
 }
 
-template <typename Strategy>
+template <typename Strategy, typename App>
 class MarketOrderBook final {
  public:
   MarketOrderBook(const common::TickerId& ticker_id, common::Logger* logger);
@@ -110,7 +112,7 @@ class MarketOrderBook final {
 
   auto on_market_data_updated(const MarketData* market_update) noexcept -> void;
 
-  auto set_trade_engine(TradeEngine<Strategy>* trade_engine) {
+  auto set_trade_engine(TradeEngine<Strategy, App>* trade_engine) {
     trade_engine_ = trade_engine;
   }
 
@@ -118,7 +120,7 @@ class MarketOrderBook final {
   [[nodiscard]] std::string print_active_levels(bool is_bid) const;
 
   [[nodiscard]] int next_active_idx(const bool is_bid,
-                                    const int start_idx) const noexcept {
+      const int start_idx) const noexcept {
     return is_bid ? next_active_bid(start_idx) : next_active_ask(start_idx);
   }
 
@@ -126,11 +128,11 @@ class MarketOrderBook final {
   [[nodiscard]] int next_active_ask(int start_idx) const noexcept;
   [[nodiscard]] std::vector<int> peek_levels(bool is_bid, int level) const;
   [[nodiscard]] static int find_in_bucket(const Bucket* bucket,
-                                          bool highest) noexcept;
-  [[nodiscard]] int peek_levels_with_qty(
-      bool is_bid, int level, std::vector<LevelView>& out) const noexcept;
+      bool highest) noexcept;
+  [[nodiscard]] int peek_levels_with_qty(bool is_bid, int level,
+      std::vector<LevelView>& out) const noexcept;
   [[nodiscard]] int peek_qty(bool is_bid, int level, std::span<double> qty_out,
-                             std::span<int> idx_out) const noexcept;
+      std::span<int> idx_out) const noexcept;
 
   static void on_trade_update(MarketData* market_data);
 
@@ -142,7 +144,7 @@ class MarketOrderBook final {
 
  private:
   const common::TickerId ticker_id_;
-  TradeEngine<Strategy>* trade_engine_ = nullptr;
+  TradeEngine<Strategy, App>* trade_engine_ = nullptr;
   common::Logger::Producer logger_;
 
   std::array<Bucket*, kBucketCount> bidBuckets_{};
@@ -182,14 +184,14 @@ class MarketOrderBook final {
   }
 };
 
-template <typename Strategy>
+template <typename Strategy, typename App>
 using MarketOrderBookHashMap =
-    std::map<std::string, std::unique_ptr<MarketOrderBook<Strategy>>>;
+    std::map<std::string, std::unique_ptr<MarketOrderBook<Strategy, App>>>;
 
 //NOLINTBEGIN
 inline bool push_if_active(const Bucket* bucket, int bidx, int off,
-                           int kBucketSize, std::span<double> qty_out,
-                           std::span<int> idx_out, int& filled, int want) {
+    int kBucketSize, std::span<double> qty_out, std::span<int> idx_out,
+    int& filled, int want) {
   const auto& market_order = bucket->orders[off];
   if (market_order.active && market_order.qty.value > 0.0) {
     qty_out[filled] = market_order.qty.value;
@@ -202,7 +204,7 @@ inline bool push_if_active(const Bucket* bucket, int bidx, int off,
 
 template <bool MsbFirst>
 bool scan_word(uint64_t word, int base_off, int kWordShift, int kWordMask,
-               const std::function<bool(int /*off*/)>& on_bit) {
+    const std::function<bool(int /*off*/)>& on_bit) {
   while (word) {
     int bit;
     if constexpr (MsbFirst) {
@@ -220,7 +222,7 @@ bool scan_word(uint64_t word, int base_off, int kWordShift, int kWordMask,
 
 template <bool MsbFirst>
 bool scan_word(uint64_t word, int base_word_idx, int kWordShift, int kWordMask,
-               const auto& on_off) {
+    const auto& on_off) {
   while (word) {
     int bit =
         MsbFirst ? (kWordMask - __builtin_clzll(word)) : __builtin_ctzll(word);
@@ -245,16 +247,21 @@ uint64_t first_mask(int start_off, int kWordMask) {
 
 template <common::Side S>
 bool consume_first_word(const Bucket* bucket, int bidx, int start_off,
-                        int kWordShift, int kWordMask,
-                        std::span<double> qty_out, std::span<int> idx_out,
-                        int& filled, int want) {
+    int kWordShift, int kWordMask, std::span<double> qty_out,
+    std::span<int> idx_out, int& filled, int want) {
   const int word_idx = start_off >> kWordShift;
   const uint64_t mask = first_mask<S>(start_off, kWordMask);
   const uint64_t word = bucket->bitmap[word_idx] & mask;
 
   auto on_off = [&](int off) {
-    return push_if_active(bucket, bidx, off, kBucketSize, qty_out, idx_out,
-                          filled, want);
+    return push_if_active(bucket,
+        bidx,
+        off,
+        kBucketSize,
+        qty_out,
+        idx_out,
+        filled,
+        want);
   };
 
   if constexpr (S == common::Side::kBuy) {
@@ -266,28 +273,38 @@ bool consume_first_word(const Bucket* bucket, int bidx, int start_off,
 
 template <common::Side S>
 bool consume_following_words(const Bucket* bucket, int bidx, int start_off,
-                             int kWordShift, int kWordMask,
-                             int kBucketBitmapWords, int kBucketSize,
-                             std::span<double> qty_out, std::span<int> idx_out,
-                             int& filled, int want) {
+    int kWordShift, int kWordMask, int kBucketBitmapWords, int kBucketSize,
+    std::span<double> qty_out, std::span<int> idx_out, int& filled, int want) {
   const int word_idx = start_off >> kWordShift;
 
   auto on_off = [&](int off) {
-    return push_if_active(bucket, bidx, off, kBucketSize, qty_out, idx_out,
-                          filled, want);
+    return push_if_active(bucket,
+        bidx,
+        off,
+        kBucketSize,
+        qty_out,
+        idx_out,
+        filled,
+        want);
   };
 
   if constexpr (S == common::Side::kBuy) {
     for (int idx = word_idx - 1; idx >= 0 && filled < want; --idx) {
-      if (scan_word<true>(bucket->bitmap[idx], idx, kWordShift, kWordMask,
-                          on_off))
+      if (scan_word<true>(bucket->bitmap[idx],
+              idx,
+              kWordShift,
+              kWordMask,
+              on_off))
         return true;
     }
   } else {
     for (int idx = word_idx + 1; idx < kBucketBitmapWords && filled < want;
          ++idx) {
-      if (scan_word<false>(bucket->bitmap[idx], idx, kWordShift, kWordMask,
-                           on_off))
+      if (scan_word<false>(bucket->bitmap[idx],
+              idx,
+              kWordShift,
+              kWordMask,
+              on_off))
         return true;
     }
   }
@@ -296,19 +313,33 @@ bool consume_following_words(const Bucket* bucket, int bidx, int start_off,
 
 template <common::Side S>
 bool consume_bucket_side(const Bucket* bucket, int bidx, int start_off,
-                         int kWordShift, int kWordMask, int kBucketSize,
-                         int kBucketBitmapWords, std::span<double> qty_out,
-                         std::span<int> idx_out, int& filled, int want) {
+    int kWordShift, int kWordMask, int kBucketSize, int kBucketBitmapWords,
+    std::span<double> qty_out, std::span<int> idx_out, int& filled, int want) {
   if (!bucket)
     return false;
 
-  if (consume_first_word<S>(bucket, bidx, start_off, kWordShift, kWordMask,
-                            qty_out, idx_out, filled, want)) {
+  if (consume_first_word<S>(bucket,
+          bidx,
+          start_off,
+          kWordShift,
+          kWordMask,
+          qty_out,
+          idx_out,
+          filled,
+          want)) {
     return true;
   }
-  return consume_following_words<S>(bucket, bidx, start_off, kWordShift,
-                                    kWordMask, kBucketBitmapWords, kBucketSize,
-                                    qty_out, idx_out, filled, want);
+  return consume_following_words<S>(bucket,
+      bidx,
+      start_off,
+      kWordShift,
+      kWordMask,
+      kBucketBitmapWords,
+      kBucketSize,
+      qty_out,
+      idx_out,
+      filled,
+      want);
 }
 
 constexpr uint64_t mask_before(int bit) {
@@ -329,7 +360,7 @@ int scan_word_one(uint64_t word, int swi, int kWordShift, int kWordMask) {
 
 template <bool IsBid>
 int jump_next_bucket_impl(std::span<const uint64_t> summary, int start_bidx,
-                          int kWordShift, int kWordMask) {
+    int kWordShift, int kWordMask) {
   const int kSummaryWords = static_cast<int>(summary.size());
   const int swi = (start_bidx >> kWordShift);
   const int sbit = (start_bidx & kWordMask);
@@ -339,8 +370,8 @@ int jump_next_bucket_impl(std::span<const uint64_t> summary, int start_bidx,
       summary[swi] &
       (IsBid ? mask_before(sbit)  // Bid: 낮은 비트 쪽만
              : ((sbit == kWordMask)
-                    ? 0ULL
-                    : mask_after_inclusive(sbit)));  // Ask: 높은 비트 쪽만
+                       ? 0ULL
+                       : mask_after_inclusive(sbit)));  // Ask: 높은 비트 쪽만
 
   if (int idx = scan_word_one<IsBid>(masked, swi, kWordShift, kWordMask);
       idx != -1)
@@ -362,30 +393,34 @@ int jump_next_bucket_impl(std::span<const uint64_t> summary, int start_bidx,
   return -1;
 }
 bool push_level_if_positive(const Bucket* bucket, int bucket_idx, int local_off,
-                            int kBucketSize,
-                            const auto& indexToPrice,  // member 호출자 전달용
-                            std::vector<LevelView>& out, int level) {
+    int kBucketSize,
+    const auto& indexToPrice,  // member 호출자 전달용
+    std::vector<LevelView>& out, int level) {
   const MarketOrder* market_order = level_ptr(bucket, local_off);
   if (market_order->qty.value <= 0.0)
     return false;
   const int global_idx = bucket_idx * kBucketSize + local_off;
-  out.push_back(LevelView{global_idx, market_order->qty.value,
-                          indexToPrice(global_idx).value});
+  out.push_back(LevelView{global_idx,
+      market_order->qty.value,
+      indexToPrice(global_idx).value});
   return static_cast<int>(out.size()) >= level;
 }
 
 template <bool IsBid>
 void consume_levels_in_bucket(const Bucket* bucket, int bucket_idx, int off,
-                              int kWordShift, int kWordMask,
-                              int kBucketBitmapWords, int kBucketSize,
-                              const auto& indexToPrice,
-                              std::vector<LevelView>& out, int level) {
+    int kWordShift, int kWordMask, int kBucketBitmapWords, int kBucketSize,
+    const auto& indexToPrice, std::vector<LevelView>& out, int level) {
   if (!bucket || static_cast<int>(out.size()) >= level)
     return;
 
   auto on_off = [&](int loc_off) {
-    return push_level_if_positive(bucket, bucket_idx, loc_off, kBucketSize,
-                                  indexToPrice, out, level);
+    return push_level_if_positive(bucket,
+        bucket_idx,
+        loc_off,
+        kBucketSize,
+        indexToPrice,
+        out,
+        level);
   };
 
   const int word_index = off >> kWordShift;
@@ -417,17 +452,24 @@ void consume_levels_in_bucket(const Bucket* bucket, int bucket_idx, int off,
 
   if constexpr (IsBid) {
     for (int workd_idx = word_index - 1;
-         workd_idx >= 0 && static_cast<int>(out.size()) < level; --workd_idx) {
-      if (scan_word<true>(bucket->bitmap[workd_idx], workd_idx, kWordShift,
-                          kWordMask, on_off))
+         workd_idx >= 0 && static_cast<int>(out.size()) < level;
+         --workd_idx) {
+      if (scan_word<true>(bucket->bitmap[workd_idx],
+              workd_idx,
+              kWordShift,
+              kWordMask,
+              on_off))
         return;
     }
   } else {
     for (int word_idx = word_index + 1;
          word_idx < kBucketBitmapWords && static_cast<int>(out.size()) < level;
          ++word_idx) {
-      if (scan_word<false>(bucket->bitmap[word_idx], word_idx, kWordShift,
-                           kWordMask, on_off))
+      if (scan_word<false>(bucket->bitmap[word_idx],
+              word_idx,
+              kWordShift,
+              kWordMask,
+              on_off))
         return;
     }
   }

@@ -9,45 +9,46 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
-#pragma once
-
-#include "fix_oe_app.h"
+#ifndef ORDER_GATEWAY_H
+#define ORDER_GATEWAY_H
+#include "fix/fix_oe_app.h"
 #include "logger.h"
 #include "order_entry.h"
 
-namespace FIX8::NewOroFix44OE {
-class ExecutionReport;
-class OrderCancelReject;
-class OrderMassCancelReport;
-}  // namespace FIX8::NewOroFix44OE
-
-namespace FIX8 {  // NOLINT(readability-identifier-naming)
-class Message;
-}
+#ifdef ENABLE_WEBSOCKET
+#include "core/websocket/ws_oe_app.h"
+#endif
 
 namespace trading {
-template <typename Strategy>
+template <typename Strategy, typename App>
 class TradeEngine;
 class ResponseManager;
 
-template <typename Strategy>
+template <typename Strategy, typename OeApp>
+  requires core::OrderEntryAppLike<OeApp>
 class OrderGateway {
  public:
+  using AppType = OeApp;
+  using WireMessage = typename OeApp::WireMessage;
+  using WireExecutionReport = typename OeApp::WireExecutionReport;
+  using WireCancelReject = typename OeApp::WireCancelReject;
+  using WireMassCancelReport = typename OeApp::WireMassCancelReport;
+  using WireReject = typename OeApp::WireReject;
+
   OrderGateway(common::Logger* logger, ResponseManager* response_manager);
   ~OrderGateway();
 
-  void init_trade_engine(TradeEngine<Strategy>* trade_engine);
+  void init_trade_engine(TradeEngine<Strategy, OeApp>* trade_engine);
   void stop() const;
 
-  void on_login(FIX8::Message*);
-  void on_execution_report(FIX8::NewOroFix44OE::ExecutionReport* msg);
-  void on_order_cancel_reject(FIX8::NewOroFix44OE::OrderCancelReject* msg);
-  void on_order_mass_cancel_report(
-      FIX8::NewOroFix44OE::OrderMassCancelReport* msg);
-  void on_rejected(FIX8::NewOroFix44OE::Reject* msg);
-  void on_order_mass_status_response(FIX8::Message* msg);
-  void on_logout(FIX8::Message*);
-  void on_heartbeat(FIX8::Message* msg);
+  void on_login(WireMessage msg);
+  void on_execution_report(WireExecutionReport msg);
+  void on_order_cancel_reject(WireCancelReject msg);
+  void on_order_mass_cancel_report(WireMassCancelReport msg);
+  void on_rejected(WireReject msg);
+  void on_order_mass_status_response(WireMessage msg);
+  void on_logout(WireMessage msg);
+  void on_heartbeat(WireMessage msg);
   void order_request(const RequestCommon& request);
 
  private:
@@ -57,8 +58,18 @@ class OrderGateway {
   void order_mass_cancel_request(const RequestCommon& request);
 
   common::Logger::Producer logger_;
-  TradeEngine<Strategy>* trade_engine_;
+  TradeEngine<Strategy, OeApp>* trade_engine_;
 
-  std::unique_ptr<core::FixOrderEntryApp> app_;
+  std::unique_ptr<OeApp> app_;
 };
+
+#ifdef ENABLE_WEBSOCKET
+template <typename Strategy>
+using ProtocolOrderGateway = OrderGateway<Strategy, core::WsOrderEntryApp>;
+#else
+template <typename Strategy>
+using ProtocolOrderGateway = OrderGateway<Strategy, core::FixOrderEntryApp>;
+#endif
 }  // namespace trading
+
+#endif

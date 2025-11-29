@@ -16,104 +16,137 @@
 #include "order_gateway.h"
 
 namespace trading {
-template <typename Strategy>
+template <typename Strategy, typename OeApp>
 class TradeEngine;
 
-template<typename Strategy>
-OrderGateway<Strategy>::OrderGateway(common::Logger* logger,
-                           ResponseManager* response_manager)
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+OrderGateway<Strategy, OeApp>::OrderGateway(common::Logger* logger,
+    ResponseManager* response_manager)
     : logger_(logger->make_producer()),
-      app_(std::make_unique<core::FixOrderEntryApp>("BMDWATCH", "SPOT", logger,
-                                                    response_manager)) {
-  app_->register_callback(
-      "A", [this](auto&& msg) { on_login(std::forward<decltype(msg)>(msg)); });
-  app_->register_callback("1", [this](auto&& msg) {
-    on_heartbeat(std::forward<decltype(msg)>(msg));
+      app_(std::make_unique<OeApp>("BMDWATCH", "SPOT", logger,
+          response_manager)) {
+  using WireMessage = typename OeApp::WireMessage;
+  auto register_handler = [this](const std::string& type, auto&& fn) {
+    if constexpr (std::is_pointer_v<WireMessage>) {
+      app_->register_callback(type,
+          [handler = std::forward<decltype(fn)>(fn)](
+              WireMessage msg) { handler(msg); });
+    } else {
+      app_->register_callback(type,
+          [handler = std::forward<decltype(fn)>(fn)](
+              const WireMessage& msg) { handler(msg); });
+    }
+  };
+
+  register_handler("A", [this](auto&& msg) { on_login(msg); });
+  register_handler("1", [this](auto&& msg) { on_heartbeat(msg); });
+  register_handler("5", [this](auto&& msg) { on_logout(msg); });
+
+  register_handler("8", [this](auto&& msg) {
+    if constexpr (std::is_pointer_v<WireExecutionReport>) {
+      on_execution_report(reinterpret_cast<WireExecutionReport>(msg));
+    } else {
+      on_execution_report(std::get<WireExecutionReport>(msg));
+    }
   });
-  app_->register_callback("8", [&](FIX8::Message* msg) {
-    on_execution_report(
-        reinterpret_cast<FIX8::NewOroFix44OE::ExecutionReport*>(msg));
+  register_handler("9", [this](auto&& msg) {
+    if constexpr (std::is_pointer_v<WireCancelReject>) {
+      on_order_cancel_reject(reinterpret_cast<WireCancelReject>(msg));
+    } else {
+      on_order_cancel_reject(std::get<WireCancelReject>(msg));
+    }
   });
-  app_->register_callback("9", [&](FIX8::Message* msg) {
-    on_order_cancel_reject(
-        reinterpret_cast<FIX8::NewOroFix44OE::OrderCancelReject*>(msg));
+  register_handler("r", [this](auto&& msg) {
+    if constexpr (std::is_pointer_v<WireMassCancelReport>) {
+      on_order_mass_cancel_report(reinterpret_cast<WireMassCancelReport>(msg));
+    } else {
+      on_order_mass_cancel_report(std::get<WireMassCancelReport>(msg));
+    }
   });
-  app_->register_callback("r", [&](FIX8::Message* msg) {
-    on_order_mass_cancel_report(
-        reinterpret_cast<FIX8::NewOroFix44OE::OrderMassCancelReport*>(msg));
+  register_handler("3", [this](auto&& msg) {
+    if constexpr (std::is_pointer_v<WireReject>) {
+      on_rejected(reinterpret_cast<WireReject>(msg));
+    } else {
+      on_rejected(std::get<WireReject>(msg));
+    }
   });
-  app_->register_callback("3", [&](FIX8::Message* msg) {
-    on_rejected(reinterpret_cast<FIX8::NewOroFix44OE::Reject*>(msg));
-  });
-  app_->register_callback(
-      "5", [this](auto&& msg) { on_logout(std::forward<decltype(msg)>(msg)); });
 
   if (!app_->start()) {
-    logger_.info("Fix Order Entry Start");
+    logger_.info("Order Entry Start");
   }
 
   logger_.info("[Constructor] OrderGateway Created");
 }
 
-template<typename Strategy>
-OrderGateway<Strategy>::~OrderGateway() {
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+OrderGateway<Strategy, OeApp>::~OrderGateway() {
   logger_.info("[Destructor] OrderGateway Destroy");
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::stop() const {
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::stop() const {
   app_->stop();
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::init_trade_engine(TradeEngine<Strategy>* trade_engine) {
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::init_trade_engine(
+    TradeEngine<Strategy, OeApp>* trade_engine) {
   trade_engine_ = trade_engine;
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::on_login(FIX8::Message*) {
-  logger_.info("[Message] login successful");
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::on_login(WireMessage /*msg*/) {
+  logger_.info("[OrderGateway][Message] login successful");
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::on_execution_report(
-    FIX8::NewOroFix44OE::ExecutionReport* msg) {
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::on_execution_report(
+    WireExecutionReport msg) {
   ResponseCommon res;
   res.res_type = ResponseType::kExecutionReport;
   res.execution_report = app_->create_execution_report_message(msg);
 
   if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
-    logger_.error("[Report] failed to send execution_report");
+    logger_.error("[OrderGateway][Message] failed to send execution_report");
   }
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::on_order_cancel_reject(
-    FIX8::NewOroFix44OE::OrderCancelReject* msg) {
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::on_order_cancel_reject(
+    WireCancelReject msg) {
   ResponseCommon res;
   res.res_type = ResponseType::kOrderCancelReject;
   res.order_cancel_reject = app_->create_order_cancel_reject_message(msg);
 
   if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
-    logger_.error("[Reject] failed to send order_cancel_reject");
+    logger_.error("[OrderGateway][Message] failed to send order_cancel_reject");
   }
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::on_order_mass_cancel_report(
-    FIX8::NewOroFix44OE::OrderMassCancelReport* msg) {
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::on_order_mass_cancel_report(
+    WireMassCancelReport msg) {
   ResponseCommon res;
   res.res_type = ResponseType::kOrderMassCancelReport;
   res.order_mass_cancel_report =
       app_->create_order_mass_cancel_report_message(msg);
 
   if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
-    logger_.error("[Report] failed to send order_mass_cancel");
+    logger_.error("[OrderGateway][Message] failed to send order_mass_cancel");
   }
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::on_rejected(FIX8::NewOroFix44OE::Reject* msg) {
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::on_rejected(WireReject msg) {
   const OrderReject reject = app_->create_reject_message(msg);
   logger_.error(reject.toString());
   if (reject.session_reject_reason == "A") {
@@ -121,31 +154,37 @@ void OrderGateway<Strategy>::on_rejected(FIX8::NewOroFix44OE::Reject* msg) {
   }
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::on_order_mass_status_response(FIX8::Message*) {
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::on_order_mass_status_response(
+    WireMessage /*msg*/) {
   logger_.info("on_order_mass_status_response");
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::on_logout(FIX8::Message*) {
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::on_logout(WireMessage /*msg*/) {
   auto message = app_->create_log_out_message();
 
   if (UNLIKELY(!app_->send(message))) {
-    logger_.error("[Message] failed to send logout");
+    logger_.error("[OrderGateway][Message] failed to send logout");
   }
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::on_heartbeat(FIX8::Message* msg) {
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::on_heartbeat(WireMessage msg) {
   auto message = app_->create_heartbeat_message(msg);
 
-  if (UNLIKELY(!app_->send(message))) {
-    logger_.error("[Message] failed to send heartbeat");
+  if (!message.empty() && UNLIKELY(!app_->send(message))) {
+    logger_.error("[OrderGateway][Message] failed to send heartbeat");
   }
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::order_request(const RequestCommon& request) {
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::order_request(
+    const RequestCommon& request) {
   switch (request.req_type) {
     case ReqeustType::kNewSingleOrderData:
       new_single_order_data(request);
@@ -166,10 +205,11 @@ void OrderGateway<Strategy>::order_request(const RequestCommon& request) {
   }
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::new_single_order_data(const RequestCommon& request) {
-  const NewSingleOrderData order_data{
-      .cl_order_id = request.cl_order_id,
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::new_single_order_data(
+    const RequestCommon& request) {
+  const NewSingleOrderData order_data{.cl_order_id = request.cl_order_id,
       .symbol = request.symbol,
       .side = to_common_side(request.side),
       .order_qty = request.order_qty,
@@ -182,15 +222,17 @@ void OrderGateway<Strategy>::new_single_order_data(const RequestCommon& request)
   logger_.info(std::format("[Message]Send order message:{}", msg));
 
   if (UNLIKELY(!app_->send(msg))) {
-    logger_.error(std::format(
-        "[Message] failed to send new_single_order_data [msg:{}]", msg));
+    logger_.error(
+        std::format("[Message] failed to send new_single_order_data [msg:{}]",
+            msg));
   }
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::order_cancel_request(const RequestCommon& request) {
-  const OrderCancelRequest cancel_request{
-      .cl_order_id = request.cl_order_id,
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::order_cancel_request(
+    const RequestCommon& request) {
+  const OrderCancelRequest cancel_request{.cl_order_id = request.cl_order_id,
       .orig_cl_order_id = request.orig_cl_order_id,
       .symbol = request.symbol};
 
@@ -202,8 +244,9 @@ void OrderGateway<Strategy>::order_cancel_request(const RequestCommon& request) 
   }
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::order_cancel_request_and_new_order_single(
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::order_cancel_request_and_new_order_single(
     const RequestCommon& request) {
   const OrderCancelRequestAndNewOrderSingle cancel_and_reorder{
       .order_cancel_request_and_new_order_single_mode = 1,
@@ -228,10 +271,13 @@ void OrderGateway<Strategy>::order_cancel_request_and_new_order_single(
   }
 }
 
-template<typename Strategy>
-void OrderGateway<Strategy>::order_mass_cancel_request(const RequestCommon& request) {
+template <typename Strategy, typename OeApp>
+requires core::OrderEntryAppLike<OeApp>
+void OrderGateway<Strategy, OeApp>::order_mass_cancel_request(
+    const RequestCommon& request) {
   const OrderMassCancelRequest all_cancel_request{
-      .cl_order_id = request.cl_order_id, .symbol = request.symbol};
+      .cl_order_id = request.cl_order_id,
+      .symbol = request.symbol};
 
   const std::string msg = app_->create_order_all_cancel(all_cancel_request);
   logger_.debug(std::format("[Message]Send cancel all orders message:{}", msg));

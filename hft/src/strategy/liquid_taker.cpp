@@ -13,19 +13,29 @@
 #include "liquid_taker.h"
 
 namespace trading {
-LiquidTaker::LiquidTaker(OrderManager<LiquidTaker>* const order_manager,
-                         const FeatureEngine<LiquidTaker>* const feature_engine,
-                         common::Logger* logger,
-                         const common::TradeEngineCfgHashMap&)
-    : BaseStrategy(order_manager, feature_engine, logger) {}
 
-void LiquidTaker::on_orderbook_updated(
-    const common::TickerId&, common::Price, common::Side,
-    const MarketOrderBook<LiquidTaker>*) const noexcept {}
+template <typename App>
+LiquidTakerTemplate<App>::LiquidTakerTemplate(
+    OrderManagerT* const order_manager,
+    const FeatureEngineT* const feature_engine, common::Logger* logger,
+    const common::TradeEngineCfgHashMap&)
+    : Base(order_manager, feature_engine, logger) {}
 
-void LiquidTaker::on_trade_updated(
-    const MarketData*, MarketOrderBook<LiquidTaker>*) const noexcept {}
+template <typename App>
+void LiquidTakerTemplate<App>::on_orderbook_updated(const common::TickerId&,
+    common::Price, common::Side, const MarketOrderBookT*) const noexcept {}
 
-void LiquidTaker::on_order_updated(const ExecutionReport*) noexcept {}
+template <typename App>
+void LiquidTakerTemplate<App>::on_trade_updated(const MarketData*,
+    MarketOrderBookT*) const noexcept {}
+
+template <typename App>
+void LiquidTakerTemplate<App>::on_order_updated(
+    const ExecutionReport*) noexcept {}
+
+template class LiquidTakerTemplate<core::FixOrderEntryApp>;
+#ifdef ENABLE_WEBSOCKET
+template class LiquidTakerTemplate<core::WsOrderEntryApp>;
+#endif
 
 }  // namespace trading

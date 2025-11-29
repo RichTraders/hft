@@ -16,28 +16,47 @@
 
 struct MarketData;
 
+namespace core {
+class FixOrderEntryApp;
+#ifdef ENABLE_WEBSOCKET
+class WsOrderEntryApp;
+#endif
+}  // namespace core
+
 namespace trading {
-template <typename Strategy>
+template <typename Strategy, typename App>
 class FeatureEngine;
-template <typename Strategy>
+template <typename Strategy, typename App>
 class MarketOrderBook;
-}  // namespace trading
-namespace trading {
-class LiquidTaker : public BaseStrategy<LiquidTaker> {
+
+template <typename App>
+class LiquidTakerTemplate : public BaseStrategy<LiquidTakerTemplate<App>, App> {
  public:
-  LiquidTaker(OrderManager<LiquidTaker>* order_manager,
-              const FeatureEngine<LiquidTaker>* feature_engine,
-              common::Logger* logger, const common::TradeEngineCfgHashMap&);
+  using Base = BaseStrategy<LiquidTakerTemplate<App>, App>;
+  using OrderManagerT = OrderManager<LiquidTakerTemplate<App>, App>;
+  using FeatureEngineT = FeatureEngine<LiquidTakerTemplate<App>, App>;
+  using MarketOrderBookT = MarketOrderBook<LiquidTakerTemplate<App>, App>;
+
+  LiquidTakerTemplate(OrderManagerT* order_manager,
+      const FeatureEngineT* feature_engine, common::Logger* logger,
+      const common::TradeEngineCfgHashMap&);
 
   void on_orderbook_updated(const common::TickerId&, common::Price,
-                            common::Side,
-                            const MarketOrderBook<LiquidTaker>*) const noexcept;
+      common::Side, const MarketOrderBookT*) const noexcept;
 
-  void on_trade_updated(const MarketData*,
-                        MarketOrderBook<LiquidTaker>*) const noexcept;
+  void on_trade_updated(const MarketData*, MarketOrderBookT*) const noexcept;
 
   void on_order_updated(const ExecutionReport*) noexcept;
 };
+
+using LiquidTakerFix = LiquidTakerTemplate<core::FixOrderEntryApp>;
+#ifdef ENABLE_WEBSOCKET
+using LiquidTakerWs = LiquidTakerTemplate<core::WsOrderEntryApp>;
+using LiquidTaker = LiquidTakerWs;
+#else
+using LiquidTaker = LiquidTakerFix;
+#endif
+
 }  // namespace trading
 
 #endif  //LIQUID_TAKER_H

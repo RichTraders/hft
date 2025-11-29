@@ -10,10 +10,10 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#ifndef RISKMANAGER_H
-#define RISKMANAGER_H
+#ifndef RISK_MANAGER_H
+#define RISK_MANAGER_H
+#include "common/types.h"
 #include "position_keeper.h"
-#include "types.h"
 
 namespace trading {
 
@@ -50,8 +50,8 @@ struct RiskInfo {
 
   common::RiskCfg risk_cfg_;
 
-  [[nodiscard]] RiskCheckResult checkPreTradeRisk(
-      common::Side side, common::Qty qty, common::Qty reserved_position,
+  [[nodiscard]] RiskCheckResult checkPreTradeRisk(common::Side side,
+      common::Qty qty, common::Qty reserved_position,
       common::Logger::Producer& logger) noexcept;
 
   [[nodiscard]] auto toString() const {
@@ -68,14 +68,16 @@ using TickerRiskInfoHashMap = std::unordered_map<std::string, RiskInfo>;
 class RiskManager {
  public:
   RiskManager(common::Logger* logger, PositionKeeper* position_keeper,
-              const common::TradeEngineCfgHashMap& ticker_cfg);
+      const common::TradeEngineCfgHashMap& ticker_cfg);
 
   ~RiskManager();
-  [[nodiscard]] auto check_pre_trade_risk(
-      const common::TickerId& ticker_id, const common::Side side,
-      const common::Qty qty, const common::Qty reserved_qty) noexcept {
-    return ticker_risk_.at(ticker_id).checkPreTradeRisk(side, qty, reserved_qty,
-                                                        logger_);
+  [[nodiscard]] auto check_pre_trade_risk(const common::TickerId& ticker_id,
+      const common::Side side, const common::Qty qty,
+      const common::Qty reserved_qty) noexcept {
+    return ticker_risk_.at(ticker_id).checkPreTradeRisk(side,
+        qty,
+        reserved_qty,
+        logger_);
   }
 
   RiskManager() = delete;
@@ -94,4 +96,4 @@ class RiskManager {
 };
 }  // namespace trading
 
-#endif  //RISKMANAGER_H
+#endif  //RISK_MANAGER_H

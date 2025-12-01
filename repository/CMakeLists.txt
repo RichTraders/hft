@@ -4,19 +4,19 @@ project(repository)
 
 #core
 set(FIX8_SRC
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44MD_types.hpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44MD_types.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44MD_traits.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44MD_router.hpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44MD_classes.hpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44MD_classes.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44/NewOroFix44MD_types.hpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44/NewOroFix44MD_types.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44/NewOroFix44MD_traits.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44/NewOroFix44MD_router.hpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44/NewOroFix44MD_classes.hpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44/NewOroFix44MD_classes.cpp
 
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44OE_types.hpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44OE_types.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44OE_traits.cpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44OE_router.hpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44OE_classes.hpp
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44/NewOroFix44OE_classes.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44/NewOroFix44OE_types.hpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44/NewOroFix44OE_types.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44/NewOroFix44OE_traits.cpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44/NewOroFix44OE_router.hpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44/NewOroFix44OE_classes.hpp
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44/NewOroFix44OE_classes.cpp
 
         ${CMAKE_SOURCE_DIR}/hft/core/fix/fix_md_core.cpp
         ${CMAKE_SOURCE_DIR}/hft/core/fix/fix_oe_core.cpp

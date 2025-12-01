@@ -16,17 +16,15 @@
 #include "common/logger.h"
 #include "common/memory_pool.hpp"
 #include "core/market_data.h"
-#include "core/websocket/schema/depth_stream.h"
-#include "core/websocket/schema/trade.h"
-#include "schema/response/exchange_info_response.h"
-#include "schema/response/snapshot.h"
+#include "ws_md_decoder.h"
+#include "ws_md_domain_mapper.h"
+#include "ws_md_encoder.h"
+#include "ws_md_wire_message.h"
 
 namespace core {
-
 class WsMdCore {
  public:
-  using WireMessage = std::variant<std::monostate, schema::DepthResponse,
-      schema::TradeEvent, schema::DepthSnapshot, schema::ExchangeInfoResponse>;
+  using WireMessage = WsMdWireMessage;
   using RequestId = std::string;
   using MarketDepthLevel = std::string;
   using SymbolId = std::string;
@@ -35,16 +33,16 @@ class WsMdCore {
 
   [[nodiscard]] std::string create_market_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
-      const SymbolId& symbol, bool subscribe);
+      const SymbolId& symbol, bool subscribe) const;
   [[nodiscard]] std::string create_trade_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
       const SymbolId& symbol) const;
+  [[nodiscard]] std::string request_instrument_list_message(
+      const std::string& symbol) const;
   [[nodiscard]] MarketUpdateData create_market_data_message(
       const WireMessage& msg) const;
   [[nodiscard]] MarketUpdateData create_snapshot_data_message(
       const WireMessage& msg) const;
-  [[nodiscard]] std::string request_instrument_list_message(
-      const std::string& symbol) const;
   [[nodiscard]] InstrumentInfo create_instrument_list_message(
       const WireMessage& msg) const;
   [[nodiscard]] MarketDataReject create_reject_message(
@@ -52,22 +50,11 @@ class WsMdCore {
   [[nodiscard]] WireMessage decode(std::string_view payload) const;
 
  private:
-  MarketUpdateData build_depth_update(const schema::DepthResponse& msg,
-      MarketDataType type) const;
-  MarketUpdateData build_depth_snapshot(const schema::DepthSnapshot& msg,
-      MarketDataType type) const;
-  MarketUpdateData build_trade_update(const schema::TradeEvent& msg) const;
-  MarketData* make_entry(const std::string& symbol, common::Side side,
-      double price, double qty, common::MarketUpdateType update_type) const;
-
-  [[nodiscard]] static std::string extract_symbol(const WireMessage& msg);
-  template <class T>
-  WireMessage decode_or_log(std::string_view payload,
-      std::string_view label) const;
-
   common::Logger::Producer logger_;
+  WsMdDecoder decoder_;
+  WsMdDomainMapper mapper_;
+  WsMdEncoder encoder_;
   common::MemoryPool<MarketData>* market_data_pool_;
-  mutable int request_sequence_{1};
 };
 
 }  // namespace core

@@ -37,21 +37,21 @@ class FixMarketDataApp : public FixApp<FixMarketDataApp, "MDRead", "MDWrite"> {
   ~FixMarketDataApp();
 
   std::string create_log_on_message(const std::string& sig_b64,
-      const std::string& timestamp);
-  std::string create_log_out_message();
-  std::string create_heartbeat_message(WireMessage message);
+      const std::string& timestamp) const;
+  std::string create_log_out_message() const;
+  std::string create_heartbeat_message(WireMessage message) const;
   [[nodiscard]] std::string create_market_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
       const SymbolId& symbol, bool subscribe) const;
   std::string create_trade_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
-      const SymbolId& symbol);
-  MarketUpdateData create_market_data_message(WireMessage msg);
-  MarketUpdateData create_snapshot_data_message(WireMessage msg);
-  std::string request_instrument_list_message(const std::string& symbol = "");
-  InstrumentInfo create_instrument_list_message(WireMessage msg);
-  MarketDataReject create_reject_message(WireMessage msg);
-  WireMessage decode(const std::string& message);
+      const SymbolId& symbol) const;
+  MarketUpdateData create_market_data_message(WireMessage msg) const;
+  MarketUpdateData create_snapshot_data_message(WireMessage msg) const;
+  std::string request_instrument_list_message(const std::string& symbol = "") const;
+  InstrumentInfo create_instrument_list_message(WireMessage msg) const;
+  MarketDataReject create_reject_message(WireMessage msg) const;
+  WireMessage decode(const std::string& message) const;
 
  private:
   std::unique_ptr<FixMdCore> fix_md_core_;

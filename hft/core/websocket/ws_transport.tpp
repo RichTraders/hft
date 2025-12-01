@@ -136,9 +136,8 @@ int WebSocketTransport<ThreadName>::write(const std::string& buffer) const {
 
 template<FixedString ThreadName>
 void WebSocketTransport<ThreadName>::interrupt() {
-  //TODO:implement I'm not sure it can be interrupted
+  // TODO(jb): implement I'm not sure it can be interrupted
   interrupted_.store(true, std::memory_order_release);
-  //read_cv_.notify_all();
 
   if (context_) {
     lws_cancel_service(context_);

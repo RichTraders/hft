@@ -11,12 +11,15 @@
  */
 #ifndef ORDER_GATEWAY_H
 #define ORDER_GATEWAY_H
-#include "fix/fix_oe_app.h"
+
 #include "logger.h"
 #include "order_entry.h"
+#include "protocol_concepts.h"
 
 #ifdef ENABLE_WEBSOCKET
-#include "core/websocket/ws_oe_app.h"
+#include "core/websocket/order_entry/ws_oe_app.h"
+#else
+#include "fix/fix_oe_app.h"
 #endif
 
 namespace trading {

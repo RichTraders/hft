@@ -25,7 +25,7 @@
 namespace core {
 #ifdef ENABLE_WEBSOCKET
 class WsMarketDataApp;
-class WsOrderEntryApp;
+//class WsOrderEntryApp;
 #else
 class FixMarketDataApp;
 class FixOrderEntryApp;

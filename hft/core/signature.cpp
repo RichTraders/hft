@@ -13,7 +13,6 @@
 #include "signature.h"
 #include <openssl/evp.h>
 #include <openssl/pem.h>
-#include <pch.h>
 
 constexpr int kBaseSize = 64;
 
@@ -27,14 +26,14 @@ int password_cb(char* buf, int size, int, void* userdata) {
 }
 
 // NOLINT(bugprone-easily-swappable-parameters,-warnings-as-errors)
-EVP_PKEY* Util::load_ed25519(const std::string& pem, const char* password)
-// PEM → EVP_PKEY*
-{
+EVP_PKEY* Util::load_ed25519(const std::string& pem, const char* password) {
   FILE* file = fopen(pem.data(), "r");
   if (!file)
     throw std::runtime_error("key open fail");
-  EVP_PKEY* private_key = PEM_read_PrivateKey(file, nullptr, password_cb,
-                                              const_cast<char*>(password));
+  EVP_PKEY* private_key = PEM_read_PrivateKey(file,
+      nullptr,
+      password_cb,
+      const_cast<char*>(password));
   fclose(file);
   return private_key;
 }
@@ -52,19 +51,23 @@ EVP_PKEY* Util::load_public_ed25519(const char* pem) {
 
 // TODO(jb): support RSA signature
 std::string Util::sign_and_base64(EVP_PKEY* private_key,
-                                  const std::string& payload) {
+    const std::string& payload) {
   EVP_MD_CTX* ctx = EVP_MD_CTX_new();
   EVP_DigestSignInit(ctx, nullptr, nullptr, nullptr, private_key);
 
   size_t siglen = kBaseSize;
-  EVP_DigestSign(ctx, nullptr, &siglen,
-                 reinterpret_cast<const unsigned char*>(payload.data()),
-                 payload.size());
+  EVP_DigestSign(ctx,
+      nullptr,
+      &siglen,
+      reinterpret_cast<const unsigned char*>(payload.data()),
+      payload.size());
 
   std::vector<unsigned char> sig(siglen);
-  EVP_DigestSign(ctx, sig.data(), &siglen,
-                 reinterpret_cast<const unsigned char*>(payload.data()),
-                 payload.size());
+  EVP_DigestSign(ctx,
+      sig.data(),
+      &siglen,
+      reinterpret_cast<const unsigned char*>(payload.data()),
+      payload.size());
 
   sig.resize(siglen);
   EVP_MD_CTX_free(ctx);
@@ -84,7 +87,7 @@ std::string Util::sign_and_base64(EVP_PKEY* private_key,
 }
 
 int Util::verify(const std::string& payload, const std::string& signature,
-                 EVP_PKEY* public_key) {
+    EVP_PKEY* public_key) {
   std::vector<unsigned char> sig_bin;  // 64 bytes
   {
     BIO* b64 = BIO_new(BIO_f_base64());
@@ -95,16 +98,18 @@ int Util::verify(const std::string& payload, const std::string& signature,
 
     sig_bin.resize(kBaseSize);
     const int read = BIO_read(bio, sig_bin.data(), kBaseSize);
-    sig_bin.resize(read);  // 정상이라면 n == 64
+    sig_bin.resize(read);
     BIO_free_all(bio);
   }
 
   EVP_MD_CTX* ctx = EVP_MD_CTX_new();
   EVP_DigestVerifyInit(ctx, nullptr, nullptr, nullptr, public_key);
 
-  const int verified = EVP_DigestVerify(
-      ctx, sig_bin.data(), sig_bin.size(),  // ← 바이너리 서명
-      reinterpret_cast<const unsigned char*>(payload.data()), payload.size());
+  const int verified = EVP_DigestVerify(ctx,
+      sig_bin.data(),
+      sig_bin.size(),
+      reinterpret_cast<const unsigned char*>(payload.data()),
+      payload.size());
   EVP_MD_CTX_free(ctx);
   return verified;
 }
@@ -116,12 +121,11 @@ std::string Util::build_canonical_query(
   }
 
   std::ranges::sort(params,
-            [](const auto& lhs, const auto& rhs) {
-              return lhs.first < rhs.first;
-            });
+      [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
 
   std::string payload;
-  payload.reserve(params.size() * 32);
+  constexpr int kBufferReservedMultiple = 32;
+  payload.reserve(params.size() * kBufferReservedMultiple);
   for (size_t i = 0; i < params.size(); ++i) {
     payload.append(params[i].first);
     payload.push_back('=');

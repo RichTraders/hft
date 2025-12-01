@@ -21,7 +21,7 @@ struct PlaceOrderParams {
   std::string side;
   std::string type;
 
-  std::int64_t timestamp{};
+  std::uint64_t timestamp{};
 
   std::optional<std::string> api_key;
   std::optional<std::string> signature;

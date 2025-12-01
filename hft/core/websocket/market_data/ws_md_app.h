@@ -13,6 +13,8 @@
 #ifndef WS_MARKET_DATA_APP_H
 #define WS_MARKET_DATA_APP_H
 
+#include <variant>
+
 #include "common/authorization.h"
 #include "common/logger.h"
 #include "common/spsc_queue.h"
@@ -47,15 +49,19 @@ class WsMarketDataApp {
       const std::string& timestamp);
   static std::string create_log_out_message();
   static std::string create_heartbeat_message(const WireMessage& message);
+
   [[nodiscard]] std::string create_market_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
-      const SymbolId& symbol, bool subscribe);
-  std::string create_trade_data_subscription_message(
+      const SymbolId& symbol, bool subscribe) const;
+  [[nodiscard]] std::string create_trade_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
+      const SymbolId& symbol) const;
+  [[nodiscard]] MarketUpdateData create_market_data_message(
+      const WireMessage& msg) const;
+  [[nodiscard]] MarketUpdateData create_snapshot_data_message(
+      const WireMessage& msg) const;
+  [[nodiscard]] std::string create_snapshot_request_message(
       const SymbolId& symbol);
-  MarketUpdateData create_market_data_message(const WireMessage& msg);
-  MarketUpdateData create_snapshot_data_message(const WireMessage& msg);
-  std::string create_snapshot_request_message(const SymbolId& symbol);
   std::string request_instrument_list_message(
       const std::string& symbol = "") const;
   InstrumentInfo create_instrument_list_message(const WireMessage& msg) const;
@@ -63,7 +69,7 @@ class WsMarketDataApp {
 
  private:
   void initialize_stream();
-  void handle_payload(std::string_view payload);
+  void handle_payload(std::string_view payload) const;
   void dispatch(std::string_view type, const WireMessage& message) const;
   void handle_depth_snapshot(schema::DepthSnapshot& response) const;
   void handle_depth_response(schema::DepthResponse& response) const;

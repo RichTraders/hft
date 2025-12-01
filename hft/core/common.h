@@ -13,10 +13,13 @@
 #ifndef COMMON_H
 #define COMMON_H
 namespace util {
+constexpr int kMilliseconds = 1000;
+constexpr int kNanoseconds = 1'000'000;
 inline auto get_timestamp_epoch() {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::system_clock::now().time_since_epoch())
-      .count();
+  timespec time;
+  clock_gettime(CLOCK_REALTIME, &time);
+  return static_cast<std::uint64_t>(time.tv_sec) * kMilliseconds +
+         static_cast<std::uint64_t>(time.tv_nsec) / kNanoseconds;
 }
 }  // namespace util
 #endif  //COMMON_H

@@ -439,9 +439,9 @@ struct ResponseCommon {
 
 struct OrderReject {
   std::string session_reject_reason;
-  int rejected_message_type;
+  int rejected_message_type{-1};
   std::string error_message;
-  int error_code;
+  int error_code{-1};
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
     stream << "OrderReject{"
@@ -454,7 +454,13 @@ struct OrderReject {
 };
 
 struct OrderMessage {
-  enum class Type { kNewOrder, kCancel, kReplace, kExecutionReport, kOrderAck };
+  enum class Type : uint8_t {
+    kNewOrder,
+    kCancel,
+    kReplace,
+    kExecutionReport,
+    kOrderAck
+  };
 
   Type type{Type::kNewOrder};
 

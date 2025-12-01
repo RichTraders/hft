@@ -33,9 +33,10 @@ template <typename App>
 void LiquidTakerTemplate<App>::on_order_updated(
     const ExecutionReport*) noexcept {}
 
-template class LiquidTakerTemplate<core::FixOrderEntryApp>;
 #ifdef ENABLE_WEBSOCKET
 template class LiquidTakerTemplate<core::WsOrderEntryApp>;
+#else
+template class LiquidTakerTemplate<core::FixOrderEntryApp>;
 #endif
 
 }  // namespace trading

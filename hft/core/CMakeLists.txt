@@ -7,6 +7,8 @@ if(ENABLE_WEBSOCKET)
     file(GLOB WEBSOCKET_SRC_FILES
             ${CMAKE_CURRENT_SOURCE_DIR}/websocket/*.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/websocket/*.tpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/websocket/market_data/*.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/websocket/order_entry/*.cpp
     )
     list(APPEND LIB_SRC_FILES ${WEBSOCKET_SRC_FILES})
 else()
@@ -27,14 +29,13 @@ target_include_directories(Core PUBLIC
 )
 target_link_libraries(Core PUBLIC Common)
 if(ENABLE_WEBSOCKET)
+    target_include_directories(Core PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}/websocket
+    )
     target_link_libraries(Core PUBLIC
             websockets
             glaze::glaze
     )
-#    target_include_directories(Core PRIVATE
-#            ${libwebsockets_SOURCE_DIR}/include      # libwebsockets.h
-#            ${libwebsockets_BINARY_DIR}/include      # lws_config.h (generated)
-#    )
 else()
     target_include_directories(Core SYSTEM PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}/NewOroFix44

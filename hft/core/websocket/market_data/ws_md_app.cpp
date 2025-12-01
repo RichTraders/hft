@@ -13,6 +13,7 @@
 #include "ws_md_app.h"
 
 #include "common/ini_config.hpp"
+#include "performance.h"
 
 constexpr int kHttpOK = 200;
 namespace core {
@@ -117,7 +118,7 @@ std::string WsMarketDataApp::create_heartbeat_message(
 
 std::string WsMarketDataApp::create_market_data_subscription_message(
     const RequestId& request_id, const MarketDepthLevel& level,
-    const SymbolId& symbol, const bool subscribe) {
+    const SymbolId& symbol, const bool subscribe) const {
   return ws_md_core_.create_market_data_subscription_message(request_id,
       level,
       symbol,
@@ -126,18 +127,18 @@ std::string WsMarketDataApp::create_market_data_subscription_message(
 
 std::string WsMarketDataApp::create_trade_data_subscription_message(
     const RequestId& request_id, const MarketDepthLevel& level,
-    const SymbolId& symbol) {
+    const SymbolId& symbol) const {
   return ws_md_core_.create_trade_data_subscription_message(request_id,
       level,
       symbol);
 }
 MarketUpdateData WsMarketDataApp::create_market_data_message(
-    const WireMessage& msg) {
+    const WireMessage& msg) const {
   return ws_md_core_.create_market_data_message(msg);
 }
 
 MarketUpdateData WsMarketDataApp::create_snapshot_data_message(
-    const WireMessage& msg) {
+    const WireMessage& msg) const {
   return ws_md_core_.create_snapshot_data_message(msg);
 }
 
@@ -165,7 +166,7 @@ MarketDataReject WsMarketDataApp::create_reject_message(
   return ws_md_core_.create_reject_message(msg);
 }
 
-void WsMarketDataApp::handle_payload(std::string_view payload) {
+void WsMarketDataApp::handle_payload(std::string_view payload) const {
   if (payload.empty()) {
     return;
   }
@@ -180,7 +181,9 @@ void WsMarketDataApp::handle_payload(std::string_view payload) {
       payload.substr(0,
           std::min<size_t>(kMinimumLogPrintSize, payload.size()))));
 
+  START_MEASURE(Convert_Message);
   WireMessage message = ws_md_core_.decode(payload);
+  END_MEASURE(Convert_Message, logger_);
 
   std::visit(
       [this](auto&& arg) {

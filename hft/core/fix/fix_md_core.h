@@ -58,7 +58,6 @@ class FixMdCore {
   MarketDataReject create_reject_message(FIX8::Message* msg);
 
   FIX8::Message* decode(const std::string& message);
-  std::string encode(FIX8::Message* message, int reserve = 0);
 
  private:
   int64_t sequence_{1};

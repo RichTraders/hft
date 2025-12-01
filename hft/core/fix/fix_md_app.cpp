@@ -38,15 +38,15 @@ FixMarketDataApp::~FixMarketDataApp() {
 }
 
 std::string FixMarketDataApp::create_log_on_message(
-    const std::string& sig_b64, const std::string& timestamp) {
+    const std::string& sig_b64, const std::string& timestamp) const {
   return fix_md_core_->create_log_on_message(sig_b64, timestamp);
 }
 
-std::string FixMarketDataApp::create_log_out_message() {
+std::string FixMarketDataApp::create_log_out_message() const {
   return fix_md_core_->create_log_out_message();
 }
 
-std::string FixMarketDataApp::create_heartbeat_message(WireMessage message) {
+std::string FixMarketDataApp::create_heartbeat_message(WireMessage message) const {
   return fix_md_core_->create_heartbeat_message(message);
 }
 
@@ -59,35 +59,35 @@ std::string FixMarketDataApp::create_market_data_subscription_message(
 
 std::string FixMarketDataApp::create_trade_data_subscription_message(
     const RequestId& request_id, const MarketDepthLevel& level,
-    const SymbolId& symbol) {
+    const SymbolId& symbol) const {
   return fix_md_core_->create_trade_data_subscription_message(request_id, level,
     symbol);
 }
 
 MarketUpdateData FixMarketDataApp::create_market_data_message(
-    WireMessage msg) {
+    WireMessage msg) const {
   return fix_md_core_->create_market_data_message(msg);
 }
 
 MarketUpdateData FixMarketDataApp::create_snapshot_data_message(
-    WireMessage msg) {
+    WireMessage msg) const {
   return fix_md_core_->create_snapshot_data_message(msg);
 }
 
-std::string FixMarketDataApp::request_instrument_list_message(const std::string& symbol) {
+std::string FixMarketDataApp::request_instrument_list_message(const std::string& symbol) const {
   return fix_md_core_->create_instrument_list_request_message(symbol);
 }
 
 InstrumentInfo FixMarketDataApp::create_instrument_list_message(
-    WireMessage msg) {
+    WireMessage msg) const {
   return fix_md_core_->create_instrument_list_message(msg);
 }
 
-MarketDataReject FixMarketDataApp::create_reject_message(WireMessage msg) {
+MarketDataReject FixMarketDataApp::create_reject_message(WireMessage msg) const {
   return fix_md_core_->create_reject_message(msg);
 }
 
-FixMarketDataApp::WireMessage FixMarketDataApp::decode(const std::string& message) {
+FixMarketDataApp::WireMessage FixMarketDataApp::decode(const std::string& message) const {
   return fix_md_core_->decode(message);
 }
 } // namespace core

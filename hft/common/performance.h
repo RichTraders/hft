@@ -26,10 +26,10 @@ inline auto rdtsc() noexcept {
 
 #ifdef MEASUREMENT
 #define START_MEASURE(TAG) const auto TAG = common::rdtsc()
-#define END_MEASURE(TAG, log)                                          \
-  do {                                                                 \
-    const auto end = common::rdtsc();                                  \
-    (log)->fatal(std::format("[RDTSC]: {}: {}", #TAG, (end - (TAG)))); \
+#define END_MEASURE(TAG, log)                                         \
+  do {                                                                \
+    const auto end = common::rdtsc();                                 \
+    (log).fatal(std::format("[RDTSC]: {}: {}", #TAG, (end - (TAG)))); \
   } while (false)
 #else
 #define START_MEASURE(TAG) ((void)0)

@@ -14,7 +14,8 @@
 #include "common/authorization.h"
 #include "core/common.h"
 #include "core/signature.h"
-#include "schema/account_position.h"
+#include "performance.h"
+#include "schema/response/account_position.h"
 
 constexpr int kHttpOK = 200;
 constexpr int kDefaultRecvWindow = 5000;
@@ -64,7 +65,8 @@ bool WsOrderEntryApp::start() {
   transport_ = std::make_unique<WebSocketTransport<"OERead">>(host_,
       port_,
       path_,
-      use_ssl_);
+      use_ssl_,
+      true);
 
   transport_->register_message_callback(
       [this](std::string_view payload) { this->handle_payload(payload); });
@@ -96,57 +98,60 @@ void WsOrderEntryApp::register_callback(const MsgType& type,
 }
 
 std::string WsOrderEntryApp::create_log_on_message(const std::string& sig_b64,
-    const std::string& timestamp) {
+    const std::string& timestamp) const {
   return ws_oe_core_.create_log_on_message(sig_b64, timestamp);
 }
 
-std::string WsOrderEntryApp::create_log_out_message() {
+std::string WsOrderEntryApp::create_log_out_message() const {
   return ws_oe_core_.create_log_out_message();
 }
 
-// NOLINTNEXTLINE(performance-unnecessary-value-param)
-std::string WsOrderEntryApp::create_heartbeat_message(WireMessage /*message*/) {
+// NOLINTBEGIN(performance-unnecessary-value-param)
+std::string WsOrderEntryApp::create_heartbeat_message(
+    WireMessage /*message*/) const {
   return ws_oe_core_.create_heartbeat_message();
 }
+// NOLINTEND(performance-unnecessary-value-param)
 
 std::string WsOrderEntryApp::create_order_message(
-    const trading::NewSingleOrderData& order_data) {
+    const trading::NewSingleOrderData& order_data) const {
   return ws_oe_core_.create_order_message(order_data);
 }
 
 std::string WsOrderEntryApp::create_cancel_order_message(
-    const trading::OrderCancelRequest& cancel_request) {
+    const trading::OrderCancelRequest& cancel_request) const {
   return ws_oe_core_.create_cancel_order_message(cancel_request);
 }
 
 std::string WsOrderEntryApp::create_cancel_and_reorder_message(
-    const trading::OrderCancelRequestAndNewOrderSingle& cancel_and_re_order) {
+    const trading::OrderCancelRequestAndNewOrderSingle& cancel_and_re_order)
+    const {
   return ws_oe_core_.create_cancel_and_reorder_message(cancel_and_re_order);
 }
 
 std::string WsOrderEntryApp::create_order_all_cancel(
-    const trading::OrderMassCancelRequest& all_order_cancel) {
+    const trading::OrderMassCancelRequest& all_order_cancel) const {
   return ws_oe_core_.create_order_all_cancel(all_order_cancel);
 }
 
 trading::ExecutionReport* WsOrderEntryApp::create_execution_report_message(
-    const WireExecutionReport& msg) {
+    const WireExecutionReport& msg) const {
   return ws_oe_core_.create_execution_report_message(msg);
 }
 
 trading::OrderCancelReject* WsOrderEntryApp::create_order_cancel_reject_message(
-    const WireCancelReject& msg) {
+    const WireCancelReject& msg) const {
   return ws_oe_core_.create_order_cancel_reject_message(msg);
 }
 
 trading::OrderMassCancelReport*
 WsOrderEntryApp::create_order_mass_cancel_report_message(
-    const WireMassCancelReport& msg) {
+    const WireMassCancelReport& msg) const {
   return ws_oe_core_.create_order_mass_cancel_report_message(msg);
 }
 
 trading::OrderReject WsOrderEntryApp::create_reject_message(
-    const WireReject& msg) {
+    const WireReject& msg) const {
   return ws_oe_core_.create_reject_message(msg);
 }
 
@@ -179,7 +184,10 @@ void WsOrderEntryApp::handle_payload(std::string_view payload) {
       payload.size(),
       payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size()))));
 
+  START_MEASURE(Convert_Message);
   WireMessage message = ws_oe_core_.decode(payload);
+  END_MEASURE(Convert_Message, logger_);
+
   if (UNLIKELY(std::holds_alternative<std::monostate>(message))) {
     return;
   }
@@ -187,19 +195,20 @@ void WsOrderEntryApp::handle_payload(std::string_view payload) {
   std::visit(
       [this](auto&& arg) {
         using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, schema::ExecutionReportResponse>) {
+        if constexpr (std::is_same_v<T, schema::ExecutionReportResponse&>) {
           handle_execution_report(arg);
         } else if constexpr (std::is_same_v<T,
-                                 schema::OutboundAccountPositionEnvelope>) {
+                                 schema::OutboundAccountPositionEnvelope&>) {
           handle_account_updated(arg);
-        } else if constexpr (std::is_same_v<T, schema::BalanceUpdateEnvelope>) {
+        } else if constexpr (std::is_same_v<T,
+                                 schema::BalanceUpdateEnvelope&>) {
           handle_balance_update(arg);
-        } else if constexpr (std::is_same_v<T, schema::SessionLogonResponse>) {
+        } else if constexpr (std::is_same_v<T, schema::SessionLogonResponse&>) {
           handle_session_logon(arg);
         } else if constexpr (std::is_same_v<T,
-                                 schema::SessionUserSubscriptionResponse>) {
+                                 schema::SessionUserSubscriptionResponse&>) {
           handle_user_subscription(arg);
-        } else if constexpr (std::is_same_v<T, schema::ApiResponse>) {
+        } else if constexpr (std::is_same_v<T, schema::ApiResponse&>) {
           handle_api_response(arg);
         }
       },
@@ -207,7 +216,7 @@ void WsOrderEntryApp::handle_payload(std::string_view payload) {
 }
 
 void WsOrderEntryApp::dispatch(const std::string& type,
-    const WireMessage& message) {
+    const WireMessage& message) const {
   const auto callback = callbacks_.find(type);
   if (callback == callbacks_.end() || !callback->second) {
     logger_.warn(
@@ -227,7 +236,7 @@ std::string WsOrderEntryApp::get_signature_base64(const std::string& payload) {
 }
 
 void WsOrderEntryApp::handle_execution_report(
-    const schema::ExecutionReportResponse& ptr) {
+    const schema::ExecutionReportResponse& ptr) const {
   const auto& event = ptr.event;
   const WireMessage message = ptr;
 
@@ -259,7 +268,7 @@ void WsOrderEntryApp::handle_account_updated(
 }
 
 void WsOrderEntryApp::handle_session_logon(
-    const schema::SessionLogonResponse& ptr) {
+    const schema::SessionLogonResponse& ptr) const {
   if (ptr.status == kHttpOK) {
     logger_.info("[WsOeApp] session.logon successful");
     // Automatically start user data stream after successful login

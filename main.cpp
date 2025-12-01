@@ -10,29 +10,9 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "hft/common/cpumanager/cpu_manager.h"
-#include "hft/core/response_manager.h"
-#include "ini_config.hpp"
-#include "logger.h"
-#include "market_consumer.h"
-#include "order_entry.h"
-#include "order_gateway.h"
-#include "risk_manager.h"
+#include "hft_lib.h"
+
 #include "strategy_config.hpp"
-#include "trade_engine.h"
-
-#ifdef ENABLE_WEBSOCKET
-#include "hft/core/websocket/ws_md_app.h"
-#include "hft/core/websocket/ws_oe_app.h"
-using SelectedMarketApp = core::WsMarketDataApp;
-using SelectedOrderApp = core::WsOrderEntryApp;
-#else
-#include "hft/core/fix/fix_md_app.h"
-#include "hft/core/fix/fix_oe_app.h"
-using SelectedMarketApp = core::FixMarketDataApp;
-using SelectedOrderApp = core::FixOrderEntryApp;
-#endif
-
 using SelectedOrderGateway =
     trading::OrderGateway<SelectedStrategy, SelectedOrderApp>;
 using SelectedTradeEngine =

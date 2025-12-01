@@ -13,13 +13,11 @@
 #ifndef WS_ORDER_ENTRY_APP_H
 #define WS_ORDER_ENTRY_APP_H
 
-#include "common/authorization.h"
 #include "common/logger.h"
-#include "common/spsc_queue.h"
 #include "core/order_entry.h"
-#include "core/websocket/schema/execution_report.h"
-#include "schema/account_position.h"
+#include "schema/response/account_position.h"
 #include "schema/response/api_response.h"
+#include "schema/response/execution_report.h"
 #include "ws_oe_core.h"
 #include "ws_transport.h"
 
@@ -51,39 +49,44 @@ class WsOrderEntryApp {
   void register_callback(const MsgType& type,
       std::function<void(const WireMessage&)> callback);
 
-  std::string create_log_on_message(const std::string& sig_b64,
-      const std::string& timestamp);
-  std::string create_log_out_message();
-  std::string create_heartbeat_message(WireMessage message);
-  std::string create_order_message(
-      const trading::NewSingleOrderData& order_data);
-  std::string create_cancel_order_message(
-      const trading::OrderCancelRequest& cancel_request);
-  std::string create_cancel_and_reorder_message(
-      const trading::OrderCancelRequestAndNewOrderSingle& cancel_and_re_order);
-  std::string create_order_all_cancel(
-      const trading::OrderMassCancelRequest& all_order_cancel);
-  trading::ExecutionReport* create_execution_report_message(
-      const WireExecutionReport& msg);
-  trading::OrderCancelReject* create_order_cancel_reject_message(
-      const WireCancelReject& msg);
-  trading::OrderMassCancelReport* create_order_mass_cancel_report_message(
-      const WireMassCancelReport& msg);
-  trading::OrderReject create_reject_message(const WireReject& msg);
+  [[nodiscard]] std::string create_log_on_message(const std::string& sig_b64,
+      const std::string& timestamp) const;
+  [[nodiscard]] std::string create_log_out_message() const;
+  [[nodiscard]] std::string create_heartbeat_message(WireMessage message) const;
+  [[nodiscard]] std::string create_order_message(
+      const trading::NewSingleOrderData& order_data) const;
+  [[nodiscard]] std::string create_cancel_order_message(
+      const trading::OrderCancelRequest& cancel_request) const;
+
+  [[nodiscard]] std::string create_cancel_and_reorder_message(
+      const trading::OrderCancelRequestAndNewOrderSingle& cancel_and_re_order)
+      const;
+  [[nodiscard]] std::string create_order_all_cancel(
+      const trading::OrderMassCancelRequest& all_order_cancel) const;
+
+  [[nodiscard]] trading::ExecutionReport* create_execution_report_message(
+      const WireExecutionReport& msg) const;
+  [[nodiscard]] trading::OrderCancelReject* create_order_cancel_reject_message(
+      const WireCancelReject& msg) const;
+  [[nodiscard]] trading::OrderMassCancelReport*
+  create_order_mass_cancel_report_message(
+      const WireMassCancelReport& msg) const;
+  [[nodiscard]] trading::OrderReject create_reject_message(const WireReject& msg) const;
 
   WireMessage decode(const std::string& message);
 
  private:
   void create_log_on() const;
   void handle_payload(std::string_view payload);
-  void dispatch(const std::string& type, const WireMessage& message);
+  void dispatch(const std::string& type, const WireMessage& message) const;
   static std::string get_signature_base64(const std::string& payload);
 
-  void handle_execution_report(const schema::ExecutionReportResponse& ptr);
+  void handle_execution_report(
+      const schema::ExecutionReportResponse& ptr) const;
   void handle_balance_update(const schema::BalanceUpdateEnvelope& ptr) const;
   void handle_account_updated(
       const schema::OutboundAccountPositionEnvelope& ptr) const;
-  void handle_session_logon(const schema::SessionLogonResponse& ptr);
+  void handle_session_logon(const schema::SessionLogonResponse& ptr) const;
   void handle_user_subscription(
       const schema::SessionUserSubscriptionResponse& ptr);
   void handle_api_response(const schema::ApiResponse& ptr);

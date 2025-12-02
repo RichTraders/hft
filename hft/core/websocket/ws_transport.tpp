@@ -117,7 +117,7 @@ template<FixedString ThreadName>
 int WebSocketTransport<ThreadName>::write(const std::string& buffer) const {
   if (!connected_.load(std::memory_order_acquire) ||
       interrupted_.load(std::memory_order_acquire)) {
-    std::cout << "[WebSocketTransport<ThreadName>::write] write failed. connected:"
+    std::cout << "[WebSocketTransport::write] write failed. connected:"
               << connected_.load() << ", interrupted: " << interrupted_.load()
               << std::endl;
     return -1;

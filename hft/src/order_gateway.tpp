@@ -211,7 +211,7 @@ void OrderGateway<Strategy, OeApp>::new_single_order_data(
     const RequestCommon& request) {
   const NewSingleOrderData order_data{.cl_order_id = request.cl_order_id,
       .symbol = request.symbol,
-      .side = to_common_side(request.side),
+      .side = from_common_side(request.side),
       .order_qty = request.order_qty,
       .ord_type = request.ord_type,
       .price = request.price,
@@ -226,6 +226,8 @@ void OrderGateway<Strategy, OeApp>::new_single_order_data(
         std::format("[Message] failed to send new_single_order_data [msg:{}]",
             msg));
   }
+  else{app_->post_new_order(order_data);
+}
 }
 
 template <typename Strategy, typename OeApp>
@@ -242,19 +244,22 @@ void OrderGateway<Strategy, OeApp>::order_cancel_request(
   if (UNLIKELY(!app_->send(msg))) {
     logger_.error("[Message] failed to send order_cancel_request");
   }
+else {
+  app_->post_cancel_order(cancel_request);
+}
 }
 
 template <typename Strategy, typename OeApp>
 requires core::OrderEntryAppLike<OeApp>
 void OrderGateway<Strategy, OeApp>::order_cancel_request_and_new_order_single(
     const RequestCommon& request) {
-  const OrderCancelRequestAndNewOrderSingle cancel_and_reorder{
+  const OrderCancelAndNewOrderSingle cancel_and_reorder{
       .order_cancel_request_and_new_order_single_mode = 1,
       .cancel_new_order_id = request.cl_cancel_order_id,
       .cl_new_order_id = request.cl_order_id,
       .cl_origin_order_id = request.orig_cl_order_id,
       .symbol = request.symbol,
-      .side = to_common_side(request.side),
+      .side = from_common_side(request.side),
       .order_qty = request.order_qty,
       .ord_type = request.ord_type,
       .price = request.price,
@@ -269,6 +274,9 @@ void OrderGateway<Strategy, OeApp>::order_cancel_request_and_new_order_single(
   if (UNLIKELY(!app_->send(msg))) {
     logger_.error("[Message] failed to create_cancel_and_new_order");
   }
+else {
+  app_->post_cancel_and_reorder(cancel_and_reorder);
+}
 }
 
 template <typename Strategy, typename OeApp>
@@ -285,6 +293,11 @@ void OrderGateway<Strategy, OeApp>::order_mass_cancel_request(
   if (UNLIKELY(!app_->send(msg))) {
     logger_.error("[Message] failed to send order_mass_cancel_request");
   }
+  else {
+    app_->post_mass_cancel_order(all_cancel_request);
+  }
+
+
 }
 
 }  // namespace trading

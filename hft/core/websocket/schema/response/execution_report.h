@@ -19,23 +19,23 @@ struct ExecutionReportData {
   std::string event_type;   // "e"
   std::int64_t event_time;  // "E"
 
-  std::string symbol;           // "s"
+  std::string symbol;             // "s"
   std::uint64_t client_order_id;  // "c"
-  std::string side;             // "S" (BUY / SELL)
-  std::string order_type;       // "o" (LIMIT, MARKET, ...)
-  std::string time_in_force;    // "f" (GTC, IOC, ...)
+  std::string side;               // "S" (BUY / SELL)
+  std::string order_type;         // "o" (LIMIT, MARKET, ...)
+  std::string time_in_force;      // "f" (GTC, IOC, ...)
 
   double order_quantity;    // "q"
   double order_price;       // "p"
   double stop_price;        // "P"
   double iceberg_quantity;  // "F"
 
-  std::int64_t order_list_id;           // "g"
+  std::int64_t order_list_id;            // "g"
   std::string original_client_order_id;  // "C"
 
-  std::string execution_type;  // "x" (NEW, TRADE, CANCELED, ...)
-  std::string order_status;    // "X" (NEW, FILLED, ...)
-  std::string reject_reason;   // "r"
+  std::string execution_type;          // "x" (NEW, TRADE, CANCELED, ...)
+  std::string order_status;            // "X" (NEW, FILLED, ...)
+  std::string reject_reason = "NONE";  // "r"
 
   std::uint64_t order_id;
 
@@ -47,7 +47,7 @@ struct ExecutionReportData {
   std::optional<std::string> commission_asset;  // "N" (nullable)
 
   std::uint64_t transaction_time;    // "T"
-  std::int64_t trade_id;            // "t"
+  std::int64_t trade_id;             // "t"
   std::uint64_t prevented_match_id;  // "v"
   std::uint64_t execution_id;        // "I"
 
@@ -61,8 +61,8 @@ struct ExecutionReportData {
   double last_quote_quantity;        // "Y"
   double quote_order_quantity;       // "Q"
 
-  std::uint64_t working_time;              // "W"
-  std::string self_trade_prevention_mode;  // "V"
+  std::uint64_t working_time;                       // "W"
+  std::string self_trade_prevention_mode = "NONE";  // "V"
 
   // clang-format off
   struct glaze {
@@ -116,7 +116,6 @@ struct ExecutionReportData {
   // clang-format on
 };
 
-
 struct ExecutionReportResponse {
   int subscription_id;
   ExecutionReportData event;
@@ -127,5 +126,5 @@ struct ExecutionReportResponse {
         glz::object("subscriptionId", &T::subscription_id, "event", &T::event);
   };
 };
-}
+}  // namespace schema
 #endif  //EXECUTION_REPORT_H

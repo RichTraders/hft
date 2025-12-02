@@ -48,7 +48,8 @@ WsOrderEntryApp::WsOrderEntryApp(const std::string& /*sender_comp_id*/,
     const std::string& /*target_comp_id*/, common::Logger* logger,
     trading::ResponseManager* response_manager)
     : logger_(logger->make_producer()),
-      ws_oe_core_(logger, response_manager),
+      ws_oe_core_(logger_, response_manager),
+      ws_order_manager_(logger_),
       host_(AUTHORIZATION.get_oe_ws_address()),
       path_(AUTHORIZATION.get_oe_ws_path()),
       port_(AUTHORIZATION.get_oe_ws_port()),
@@ -124,8 +125,7 @@ std::string WsOrderEntryApp::create_cancel_order_message(
 }
 
 std::string WsOrderEntryApp::create_cancel_and_reorder_message(
-    const trading::OrderCancelRequestAndNewOrderSingle& cancel_and_re_order)
-    const {
+    const trading::OrderCancelAndNewOrderSingle& cancel_and_re_order) const {
   return ws_oe_core_.create_cancel_and_reorder_message(cancel_and_re_order);
 }
 
@@ -158,6 +158,49 @@ trading::OrderReject WsOrderEntryApp::create_reject_message(
 WsOrderEntryApp::WireMessage WsOrderEntryApp::decode(
     const std::string& message) {
   return ws_oe_core_.decode(message);
+}
+void WsOrderEntryApp::post_new_order(const trading::NewSingleOrderData& data) {
+  PendingOrderRequest request;
+  request.client_order_id = data.cl_order_id.value;
+  request.symbol = data.symbol;
+  request.side = trading::to_common_side(data.side);
+  request.price = data.price;
+  request.order_qty = data.order_qty;
+  request.ord_type = data.ord_type;
+  request.time_in_force = data.time_in_force;
+  ws_order_manager_.register_pending_request(request);
+}
+
+void WsOrderEntryApp::post_cancel_order(
+    const trading::OrderCancelRequest& data) {
+  PendingOrderRequest request;
+  request.client_order_id = data.cl_order_id.value;
+  request.symbol = data.symbol;
+  // Cancel requests have minimal info - only clientOrderId and symbol matter
+  ws_order_manager_.register_pending_request(request);
+}
+
+void WsOrderEntryApp::post_cancel_and_reorder(
+    const trading::OrderCancelAndNewOrderSingle& data) {
+  // Track the NEW order information (not the cancel part)
+  PendingOrderRequest request;
+  request.client_order_id = data.cl_new_order_id.value;
+  request.symbol = data.symbol;
+  request.side = trading::to_common_side(data.side);
+  request.price = data.price;
+  request.order_qty = data.order_qty;
+  request.ord_type = data.ord_type;
+  request.time_in_force = data.time_in_force;
+  ws_order_manager_.register_pending_request(request);
+}
+
+void WsOrderEntryApp::post_mass_cancel_order(
+    const trading::OrderMassCancelRequest& data) {
+  PendingOrderRequest request;
+  request.client_order_id = data.cl_order_id.value;
+  request.symbol = data.symbol;
+  // Mass cancel has minimal info
+  ws_order_manager_.register_pending_request(request);
 }
 
 void WsOrderEntryApp::create_log_on() const {
@@ -195,21 +238,28 @@ void WsOrderEntryApp::handle_payload(std::string_view payload) {
   std::visit(
       [this](auto&& arg) {
         using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, schema::ExecutionReportResponse&>) {
+        if constexpr (std::is_same_v<T, schema::ExecutionReportResponse>) {
           handle_execution_report(arg);
         } else if constexpr (std::is_same_v<T,
-                                 schema::OutboundAccountPositionEnvelope&>) {
+                                 schema::OutboundAccountPositionEnvelope>) {
           handle_account_updated(arg);
-        } else if constexpr (std::is_same_v<T,
-                                 schema::BalanceUpdateEnvelope&>) {
+        } else if constexpr (std::is_same_v<T, schema::BalanceUpdateEnvelope>) {
           handle_balance_update(arg);
-        } else if constexpr (std::is_same_v<T, schema::SessionLogonResponse&>) {
+        } else if constexpr (std::is_same_v<T, schema::SessionLogonResponse>) {
           handle_session_logon(arg);
         } else if constexpr (std::is_same_v<T,
-                                 schema::SessionUserSubscriptionResponse&>) {
+                                 schema::SessionUserSubscriptionResponse>) {
           handle_user_subscription(arg);
-        } else if constexpr (std::is_same_v<T, schema::ApiResponse&>) {
+        } else if constexpr (std::is_same_v<T, schema::ApiResponse>) {
           handle_api_response(arg);
+        } else if constexpr (std::is_same_v<T,
+                                 schema::CancelAndReorderResponse>) {
+          handle_cancel_and_reorder_response(arg);
+        } else if constexpr (std::is_same_v<T,
+                                 schema::CancelAllOrdersResponse>) {
+          handle_cancel_all_response(arg);
+        } else if constexpr (std::is_same_v<T, schema::PlaceOrderResponse>) {
+          handle_place_order_response(arg);
         }
       },
       message);
@@ -236,14 +286,14 @@ std::string WsOrderEntryApp::get_signature_base64(const std::string& payload) {
 }
 
 void WsOrderEntryApp::handle_execution_report(
-    const schema::ExecutionReportResponse& ptr) const {
+    const schema::ExecutionReportResponse& ptr) {
   const auto& event = ptr.event;
   const WireMessage message = ptr;
 
   if (event.execution_type == "REJECTED") {
     dispatch("3", message);  // Reject message type
   } else if (event.execution_type == "CANCELED") {
-    if (!event.reject_reason.empty()) {
+    if (event.reject_reason != "NONE") {
       dispatch("9", message);  // Cancel reject
     } else {
       dispatch("8", message);  // Regular execution report (cancel success)
@@ -251,6 +301,7 @@ void WsOrderEntryApp::handle_execution_report(
   } else {
     dispatch("8", message);  // Regular execution report
   }
+  ws_order_manager_.remove_pending_request(ptr.event.client_order_id);
 }
 
 void WsOrderEntryApp::handle_balance_update(
@@ -304,16 +355,75 @@ void WsOrderEntryApp::handle_user_subscription(
 
 void WsOrderEntryApp::handle_api_response(const schema::ApiResponse& ptr) {
   if (ptr.status != kHttpOK) {
-    if (ptr.error.has_value())
+    if (ptr.error.has_value()) {
       logger_.warn(std::format(
           "[WsOeApp] API response failed: id={}, status={}, error={}",
           ptr.id,
           ptr.status,
           ptr.error.value().message));
-  }
 
-  const WireMessage message = ptr;
-  dispatch("api", message);
+      const WireMessage message = ptr;
+      dispatch("8", message);
+    }
+  }
+}
+void WsOrderEntryApp::handle_cancel_and_reorder_response(
+    const schema::CancelAndReorderResponse& ptr) {
+  if (ptr.status != kHttpOK && ptr.error.has_value()) {
+    logger_.warn(std::format(
+        "[WsOeApp] CancelAndReorder failed: id={}, status={}, error={}",
+        ptr.id,
+        ptr.status,
+        ptr.error.value().message));
+
+    auto synthetic_report =
+        ws_order_manager_.create_synthetic_execution_report(ptr.id,
+            ptr.error.value().code,
+            ptr.error.value().message);
+    if (synthetic_report.has_value()) {
+      const WireMessage message = synthetic_report.value();
+      dispatch("8", message);
+    }
+  }
 }
 
+void WsOrderEntryApp::handle_cancel_all_response(
+    const schema::CancelAllOrdersResponse& ptr) {
+  if (ptr.status != kHttpOK && ptr.error.has_value()) {
+    logger_.warn(
+        std::format("[WsOeApp] CancelAll failed: id={}, status={}, error={}",
+            ptr.id,
+            ptr.status,
+            ptr.error.value().message));
+
+    auto synthetic_report =
+        ws_order_manager_.create_synthetic_execution_report(ptr.id,
+            ptr.error.value().code,
+            ptr.error.value().message);
+    if (synthetic_report.has_value()) {
+      const WireMessage message = synthetic_report.value();
+      dispatch("8", message);
+    }
+  }
+}
+
+void WsOrderEntryApp::handle_place_order_response(
+    const schema::PlaceOrderResponse& ptr) {
+  if (ptr.status != kHttpOK && ptr.error.has_value()) {
+    logger_.warn(
+        std::format("[WsOeApp] PlaceOrder failed: id={}, status={}, error={}",
+            ptr.id,
+            ptr.status,
+            ptr.error.value().message));
+
+    auto synthetic_report =
+        ws_order_manager_.create_synthetic_execution_report(ptr.id,
+            ptr.error.value().code,
+            ptr.error.value().message);
+    if (synthetic_report.has_value()) {
+      const WireMessage message = synthetic_report.value();
+      dispatch("8", message);
+    }
+  }
+}
 }  // namespace core

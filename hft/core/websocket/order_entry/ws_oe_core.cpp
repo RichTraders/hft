@@ -24,15 +24,13 @@
 #include "schema/request/session.h"
 
 namespace core {
-WsOeCore::WsOeCore(common::Logger* logger,
+WsOeCore::WsOeCore(const common::Logger::Producer& logger,
     trading::ResponseManager* response_manager)
-    : logger_(logger->make_producer()),
+    : logger_(logger),
       mapper_(logger_, response_manager),
       decoder_(logger_),
       encoder_(logger_),
       response_manager_(response_manager) {}
-
-WsOeCore::~WsOeCore() = default;
 
 std::string WsOeCore::create_log_on_message(const std::string& signature,
     const std::string& timestamp) const {
@@ -66,7 +64,7 @@ std::string WsOeCore::create_cancel_order_message(
 }
 
 std::string WsOeCore::create_cancel_and_reorder_message(
-    const trading::OrderCancelRequestAndNewOrderSingle& replace) const {
+    const trading::OrderCancelAndNewOrderSingle& replace) const {
   return encoder_.create_cancel_and_reorder_message(replace);
 }
 

@@ -60,15 +60,15 @@ WsOeDecoder::WireMessage WsOeDecoder::decode(std::string_view payload) const {
   }
 
   if (header.id.starts_with("order")) {
-    if (header.id.starts_with("order_replace")) {
+    if (header.id.starts_with("orderreplace")) {
       return decode_or_log<schema::CancelAndReorderResponse>(payload,
           "[cancelReplace]");
     }
-    if (header.id.starts_with("order_cancelAll")) {
+    if (header.id.starts_with("ordercancelAll")) {
       return decode_or_log<schema::CancelAllOrdersResponse>(payload,
           "[cancelAll]");
     }
-    if (header.id.starts_with("order_cancel")) {
+    if (header.id.starts_with("ordercancel")) {
       return decode_or_log<schema::CancelOrderResponse>(payload,
           "[orderCancel]");
     }

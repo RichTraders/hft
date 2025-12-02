@@ -97,6 +97,7 @@ void MarketConsumer<Strategy, MdApp>::on_login(WireMessage /*msg*/) {
   }
 }
 
+#ifdef ENABLE_WEBSOCKET
 template <typename Strategy, typename MdApp>
 requires core::MarketDataAppLike<MdApp>
 void MarketConsumer<Strategy, MdApp>::erase_buffer_lower_than_snapshot(
@@ -113,6 +114,7 @@ void MarketConsumer<Strategy, MdApp>::erase_buffer_lower_than_snapshot(
     }
   }
 }
+#endif
 template <typename Strategy, typename MdApp>
 requires core::MarketDataAppLike<MdApp>
 void MarketConsumer<Strategy, MdApp>::on_snapshot(WireMessage msg) {
@@ -159,9 +161,9 @@ void MarketConsumer<Strategy, MdApp>::on_snapshot(WireMessage msg) {
   }
 
   const uint64_t snapshot_update_id = snapshot_data->end_idx;
-  static constexpr int kMaxRetries = 3;
 
 #ifdef ENABLE_WEBSOCKET
+  static constexpr int kMaxRetries = 3;
   if (state_ == StreamState::kBuffering) {
     if (snapshot_update_id < first_buffered_update_id_) {
       logger_.warn(

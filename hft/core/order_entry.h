@@ -289,7 +289,7 @@ inline MassCancelResponse mass_cancel_response_from_char(char text) {
   return static_cast<MassCancelResponse>(text);
 }
 
-inline OrderSide to_common_side(common::Side side) noexcept {
+inline OrderSide from_common_side(common::Side side) noexcept {
   switch (side) {
     case common::Side::kBuy:
       return OrderSide::kBuy;
@@ -297,6 +297,17 @@ inline OrderSide to_common_side(common::Side side) noexcept {
       return OrderSide::kSell;
     default:
       return OrderSide::kNone;
+  }
+}
+
+inline common::Side to_common_side(OrderSide side) noexcept {
+  switch (side) {
+    case OrderSide::kBuy:
+      return common::Side::kBuy;
+    case OrderSide::kSell:
+      return common::Side::kSell;
+    default:
+      return common::Side::kInvalid;
   }
 }
 
@@ -338,7 +349,7 @@ struct OrderCancelRequest {
   std::string symbol;
 };
 
-struct OrderCancelRequestAndNewOrderSingle {
+struct OrderCancelAndNewOrderSingle {
   int order_cancel_request_and_new_order_single_mode = 1;
   common::OrderId cancel_new_order_id;
   common::OrderId cl_new_order_id;

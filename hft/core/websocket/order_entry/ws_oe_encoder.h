@@ -33,7 +33,7 @@ class WsOeEncoder {
   [[nodiscard]] std::string create_cancel_order_message(
       const trading::OrderCancelRequest& cancel) const;
   [[nodiscard]] std::string create_cancel_and_reorder_message(
-      const trading::OrderCancelRequestAndNewOrderSingle& replace) const;
+      const trading::OrderCancelAndNewOrderSingle& replace) const;
   [[nodiscard]] std::string create_order_all_cancel(
       const trading::OrderMassCancelRequest& request) const;
 

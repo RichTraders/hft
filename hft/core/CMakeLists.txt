@@ -12,7 +12,7 @@ if(ENABLE_WEBSOCKET)
     )
     list(APPEND LIB_SRC_FILES ${WEBSOCKET_SRC_FILES})
 else()
-    add_subdirectory(NewOroFix44)
+    add_subdirectory(fix/NewOroFix44)
     file(GLOB FIX_SRC_FILES
             ${CMAKE_CURRENT_SOURCE_DIR}/fix/*.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/fix/*.tpp

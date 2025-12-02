@@ -9,8 +9,12 @@
  * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
-#include "../hft/core/NewOroFix44/response_manager.h"
-#include "hft/core/NewOroFix44/fix_oe_app.h"
+#include "core/response_manager.h"
+#ifdef ENABLE_WEBSOCKET
+#include "core/websocket/order_entry/ws_oe_app.h"
+#else
+#include "core/fix/fix_oe_app.h"
+#endif
 #include "gtest/gtest.h"
 #include "ini_config.hpp"
 #include "order_book.h"
@@ -19,11 +23,17 @@
 
 using namespace trading;
 using namespace common;
-
+#ifdef ENABLE_WEBSOCKET
+using TestTradeEngine =
+    trading::TradeEngine<SelectedStrategy, core::WsOrderEntryApp>;
+using TestOrderBook =
+    trading::MarketOrderBook<SelectedStrategy, core::WsOrderEntryApp>;
+#else
 using TestTradeEngine =
     trading::TradeEngine<SelectedStrategy, core::FixOrderEntryApp>;
 using TestOrderBook =
     trading::MarketOrderBook<SelectedStrategy, core::FixOrderEntryApp>;
+#endif
 
 class MarketOrderBookTest : public ::testing::Test {
 public:

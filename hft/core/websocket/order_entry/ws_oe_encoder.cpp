@@ -96,7 +96,7 @@ std::string core::WsOeEncoder::create_user_data_stream_unsubscribe() const {
 std::string core::WsOeEncoder::create_order_message(
     const trading::NewSingleOrderData& order) const {
   schema::OrderPlaceRequest payload;
-  payload.id = "order_place" + std::to_string(order.cl_order_id.value);
+  payload.id = "orderplace_" + std::to_string(order.cl_order_id.value);
 
   payload.params.symbol = order.symbol;
   payload.params.new_client_order_id = std::to_string(order.cl_order_id.value);
@@ -117,7 +117,7 @@ std::string core::WsOeEncoder::create_order_message(
 std::string core::WsOeEncoder::create_cancel_order_message(
     const trading::OrderCancelRequest& cancel) const {
   schema::OrderCancelRequest payload;
-  payload.id = "order_cancel" + std::to_string(cancel.cl_order_id.value);
+  payload.id = "ordercancel_" + std::to_string(cancel.cl_order_id.value);
 
   payload.params.symbol = cancel.symbol;
   payload.params.new_client_order_id = std::to_string(cancel.cl_order_id.value);
@@ -128,9 +128,9 @@ std::string core::WsOeEncoder::create_cancel_order_message(
   return glz::write_json(payload).value_or(std::string{});
 }
 std::string core::WsOeEncoder::create_cancel_and_reorder_message(
-    const trading::OrderCancelRequestAndNewOrderSingle& replace) const {
+    const trading::OrderCancelAndNewOrderSingle& replace) const {
   schema::OrderCancelReplaceRequest payload;
-  payload.id = "order_replace" + std::to_string(replace.cl_new_order_id.value);
+  payload.id = "orderreplace_" + std::to_string(replace.cl_new_order_id.value);
 
   payload.params.symbol = replace.symbol;
   payload.params.side = toString(replace.side);
@@ -158,7 +158,7 @@ std::string core::WsOeEncoder::create_order_all_cancel(
     const trading::OrderMassCancelRequest& request) const {
   schema::OpenOrdersCancelAllRequest payload;
 
-  payload.id = "order_cancelAll" + std::to_string(request.cl_order_id.value);
+  payload.id = "ordercancelAll_" + std::to_string(request.cl_order_id.value);
   payload.params.symbol = request.symbol;
   payload.params.timestamp = util::get_timestamp_epoch();
 

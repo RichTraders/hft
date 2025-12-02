@@ -45,3 +45,5 @@ docs
 
 test/config.json
 .clang-tidy-cache
+
+*.log

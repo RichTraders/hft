@@ -20,7 +20,7 @@ namespace trading {
 class ResponseManager;
 struct NewSingleOrderData;
 struct OrderCancelRequest;
-struct OrderCancelRequestAndNewOrderSingle;
+struct OrderCancelAndNewOrderSingle;
 struct OrderMassCancelRequest;
 }  // namespace trading
 namespace common {
@@ -71,7 +71,6 @@ concept MarketDataCore =
       {
         core.decode(std::declval<std::string>())
       } -> std::same_as<typename Core::WireMessage>;
-      { core.encode(msg, 0) } -> std::convertible_to<std::string>;
     };
 
 template <typename Core>
@@ -83,7 +82,7 @@ concept OrderEntryCore = requires(Core core,
     typename Core::WireReject reject_msg, const std::string& sig,
     const std::string& timestamp, const trading::NewSingleOrderData& new_order,
     const trading::OrderCancelRequest& cancel_request,
-    const trading::OrderCancelRequestAndNewOrderSingle& cancel_replace,
+    const trading::OrderCancelAndNewOrderSingle& cancel_replace,
     const trading::OrderMassCancelRequest& mass_cancel) {
   typename Core::WireMessage;
   typename Core::WireExecutionReport;
@@ -175,7 +174,7 @@ concept OrderEntryAppLike =
         typename T::WireMessage wire_msg,
         const trading::NewSingleOrderData& new_order,
         const trading::OrderCancelRequest& cancel_req,
-        const trading::OrderCancelRequestAndNewOrderSingle& cancel_reorder,
+        const trading::OrderCancelAndNewOrderSingle& cancel_reorder,
         const trading::OrderMassCancelRequest& mass_cancel_req,
         typename T::WireExecutionReport exec_msg,
         typename T::WireCancelReject cancel_reject_msg,
@@ -211,6 +210,10 @@ concept OrderEntryAppLike =
       {
         app.create_reject_message(reject_msg)
       } -> std::same_as<trading::OrderReject>;
+      { app.post_new_order(new_order) } -> std::same_as<void>;
+      { app.post_cancel_order(cancel_req) } -> std::same_as<void>;
+      { app.post_cancel_and_reorder(cancel_reorder) } -> std::same_as<void>;
+      { app.post_mass_cancel_order(mass_cancel_req) } -> std::same_as<void>;
     };
 
 }  // namespace core

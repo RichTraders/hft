@@ -1,6 +1,7 @@
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(cmake/googletest.cmake)
+include(cmake/google-benchmark.cmake)
 
 enable_testing()
 set(TEST_TARGETS "")
@@ -24,6 +25,8 @@ macro(add_unit_test _TEST_NAME)
             gmock
             gmock_main
             cap
+            benchmark::benchmark
+            benchmark::benchmark_main
     )
     target_precompile_headers(${_TEST_NAME}_tests PRIVATE
             ${CMAKE_SOURCE_DIR}/include/pch.h
@@ -94,3 +97,6 @@ add_custom_target(RUN_INTEGRATION_TESTS
 )
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION "${TEST_RUNTIME_DIR}")
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION "${TEST_RUNTIME_DIR}")

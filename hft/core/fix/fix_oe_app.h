@@ -49,7 +49,7 @@ class FixOrderEntryApp : public FixApp<FixOrderEntryApp, "OERead", "OEWrite"> {
   std::string create_cancel_order_message(
       const trading::OrderCancelRequest& cancel_request);
   std::string create_cancel_and_reorder_message(
-      const trading::OrderCancelRequestAndNewOrderSingle& cancel_and_re_order);
+      const trading::OrderCancelAndNewOrderSingle& cancel_and_re_order);
   std::string create_order_all_cancel(
       const trading::OrderMassCancelRequest& all_order_cancel);
   trading::ExecutionReport* create_execution_report_message(
@@ -61,6 +61,11 @@ class FixOrderEntryApp : public FixApp<FixOrderEntryApp, "OERead", "OEWrite"> {
   trading::OrderReject create_reject_message(WireReject msg);
 
   WireMessage decode(const std::string& message);
+
+  void post_new_order(const trading::NewSingleOrderData&);
+  void post_cancel_order(const trading::OrderCancelRequest&);
+  void post_cancel_and_reorder(const trading::OrderCancelAndNewOrderSingle &);
+  void post_mass_cancel_order(const trading::OrderMassCancelRequest&);
 
  private:
   std::unique_ptr<FixOeCore> fix_oe_core_;

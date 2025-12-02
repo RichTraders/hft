@@ -11,12 +11,10 @@
  */
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include "../hft/common/CpuManager/cpu_manager.h"
+#include "common/cpumanager/cpu_manager.h"
 #include "ini_config.hpp"
 #include "logger.h"
 #include "thread.hpp"
-
-#include "../hft/common/CpuManager/cpu_manager.h"
 
 using namespace common;
 

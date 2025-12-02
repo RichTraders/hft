@@ -1,11 +1,13 @@
 include(FetchContent)
 
+set(ABSL_BUILD_TESTING OFF CACHE BOOL "Disable Abseil tests" FORCE)
+set(ABSL_BUILD_TEST_HELPERS OFF CACHE BOOL "Disable Abseil test helpers" FORCE)
+
 FetchContent_Declare(
         abseil
         GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
         GIT_TAG        20250512.1
 )
-set(ABSL_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(abseil)
 
 set(_no_ignored_attr

@@ -14,7 +14,11 @@
 #include <gtest/gtest.h>
 
 #include "feature_engine.h"
-#include "hft/core/NewOroFix44/fix_oe_app.h"
+#ifdef ENABLE_WEBSOCKET
+#include "core/websocket/order_entry/ws_oe_app.h"
+#else
+#include "core/fix/fix_oe_app.h"
+#endif
 #include "ini_config.hpp"
 #include "logger.h"
 #include "order_book.h"
@@ -26,12 +30,21 @@ using ::testing::HasSubstr;
 using namespace common;
 using namespace trading;
 
+#ifdef ENABLE_WEBSOCKET
+using TestTradeEngine =
+    trading::TradeEngine<SelectedStrategy, core::WsOrderEntryApp>;
+using TestFeatureEngine =
+    trading::FeatureEngine<SelectedStrategy, core::WsOrderEntryApp>;
+using TestOrderBook =
+    trading::MarketOrderBook<SelectedStrategy, core::WsOrderEntryApp>;
+#else
 using TestTradeEngine =
     trading::TradeEngine<SelectedStrategy, core::FixOrderEntryApp>;
 using TestFeatureEngine =
     trading::FeatureEngine<SelectedStrategy, core::FixOrderEntryApp>;
 using TestOrderBook =
     trading::MarketOrderBook<SelectedStrategy, core::FixOrderEntryApp>;
+#endif
 
 class FeatureEngineTest : public ::testing::Test {
  public:

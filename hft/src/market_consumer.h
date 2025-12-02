@@ -61,7 +61,6 @@ class MarketConsumer {
   ~MarketConsumer();
   void stop();
   void on_login(WireMessage msg);
-  void erase_buffer_lower_than_snapshot(uint64_t snapshot_update_id);
   void on_snapshot(WireMessage msg);
   void on_subscribe(WireMessage msg);
   void on_reject(WireMessage msg);
@@ -71,6 +70,8 @@ class MarketConsumer {
   void recover_from_gap();
 #ifndef ENABLE_WEBSOCKET
   void resubscribe();
+#else
+  void erase_buffer_lower_than_snapshot(uint64_t snapshot_update_id);
 #endif
 
  private:

@@ -14,7 +14,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 endif ()
 
 option(ENABLE_WEBSOCKET "Build WebSocket transport support" ON)
-option(ENABLE_TESTS "Build and fetch test dependencies" OFF)
+option(ENABLE_TESTS "Build and fetch test dependencies" ON)
 
 if(ENABLE_WEBSOCKET)
     include(${CMAKE_SOURCE_DIR}/cmake/libwebsockets.cmake)

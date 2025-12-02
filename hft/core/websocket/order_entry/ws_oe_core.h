@@ -13,8 +13,6 @@
 #ifndef WS_OE_CORE_H
 #define WS_OE_CORE_H
 
-#include <variant>
-
 #include "common/logger.h"
 #include "core/order_entry.h"
 #include "ws_oe_decoder.h"
@@ -35,8 +33,9 @@ class WsOeCore {
   using WireMassCancelReport = schema::ExecutionReportResponse;
   using WireReject = schema::ApiResponse;
 
-  WsOeCore(common::Logger* logger, trading::ResponseManager* response_manager);
-  ~WsOeCore();
+  WsOeCore(const common::Logger::Producer&,
+      trading::ResponseManager* response_manager);
+  ~WsOeCore() = default;
 
   std::string create_log_on_message(const std::string& signature,
       const std::string& timestamp) const;
@@ -51,7 +50,7 @@ class WsOeCore {
   [[nodiscard]] std::string create_cancel_order_message(
       const trading::OrderCancelRequest& cancel) const;
   [[nodiscard]] std::string create_cancel_and_reorder_message(
-      const trading::OrderCancelRequestAndNewOrderSingle& replace) const;
+      const trading::OrderCancelAndNewOrderSingle& replace) const;
   [[nodiscard]] std::string create_order_all_cancel(
       const trading::OrderMassCancelRequest& request) const;
 
@@ -65,7 +64,7 @@ class WsOeCore {
   [[nodiscard]] WireMessage decode(std::string_view payload) const;
 
  private:
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   WsOeDomainMapper mapper_;
   WsOeDecoder decoder_;
   WsOeEncoder encoder_;

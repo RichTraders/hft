@@ -65,7 +65,7 @@ class FixOeCore {
   std::string create_cancel_order_message(
       const trading::OrderCancelRequest& cancel_request);
   std::string create_cancel_and_reorder_message(
-      const trading::OrderCancelRequestAndNewOrderSingle& cancel_and_re_order);
+      const trading::OrderCancelAndNewOrderSingle& cancel_and_re_order);
   std::string create_order_all_cancel(
       const trading::OrderMassCancelRequest& all_order_cancel);
   trading::ExecutionReport* create_execution_report_message(

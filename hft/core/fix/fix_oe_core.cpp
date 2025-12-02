@@ -159,7 +159,7 @@ std::string FixOeCore::create_cancel_order_message(
 }
 
 std::string FixOeCore::create_cancel_and_reorder_message(
-    const trading::OrderCancelRequestAndNewOrderSingle& cancel_and_re_order) {
+    const trading::OrderCancelAndNewOrderSingle& cancel_and_re_order) {
   OrderCancelRequestAndNewOrderSingle request;
 
   FIX8::MessageBase* header = request.Header();

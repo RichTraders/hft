@@ -11,7 +11,7 @@
  */
 
 #include "gtest/gtest.h"
-#include "hft/core/NewOroFix44/fix_oe_app.h"
+#include "core/fix/fix_oe_app.h"
 #include "ini_config.hpp"
 #include "logger.h"
 #include "response_manager.h"

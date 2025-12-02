@@ -11,11 +11,11 @@
  */
 
 
-#include "fix_md_core.h"
+#include "core/fix/fix_md_core.h"
 #include <fix8/f8includes.hpp>
-#include "NewOroFix44MD_types.hpp"
-#include "NewOroFix44MD_router.hpp"
-#include "NewOroFix44MD_classes.hpp"
+#include "core/fix/NewOroFix44/NewOroFix44MD_types.hpp"
+#include "core/fix/NewOroFix44/NewOroFix44MD_router.hpp"
+#include "core/fix/NewOroFix44/NewOroFix44MD_classes.hpp"
 #include "ini_config.hpp"
 
 #include "gtest/gtest.h"

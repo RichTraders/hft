@@ -19,6 +19,7 @@
 #include "schema/response/api_response.h"
 #include "schema/response/execution_report.h"
 #include "ws_oe_core.h"
+#include "ws_order_manager.h"
 #include "ws_transport.h"
 
 namespace trading {
@@ -57,10 +58,8 @@ class WsOrderEntryApp {
       const trading::NewSingleOrderData& order_data) const;
   [[nodiscard]] std::string create_cancel_order_message(
       const trading::OrderCancelRequest& cancel_request) const;
-
   [[nodiscard]] std::string create_cancel_and_reorder_message(
-      const trading::OrderCancelRequestAndNewOrderSingle& cancel_and_re_order)
-      const;
+      const trading::OrderCancelAndNewOrderSingle& cancel_and_re_order) const;
   [[nodiscard]] std::string create_order_all_cancel(
       const trading::OrderMassCancelRequest& all_order_cancel) const;
 
@@ -71,9 +70,16 @@ class WsOrderEntryApp {
   [[nodiscard]] trading::OrderMassCancelReport*
   create_order_mass_cancel_report_message(
       const WireMassCancelReport& msg) const;
-  [[nodiscard]] trading::OrderReject create_reject_message(const WireReject& msg) const;
+  [[nodiscard]] trading::OrderReject create_reject_message(
+      const WireReject& msg) const;
 
   WireMessage decode(const std::string& message);
+
+  void post_new_order(const trading::NewSingleOrderData& data);
+  void post_cancel_order(const trading::OrderCancelRequest& data);
+  void post_cancel_and_reorder(
+      const trading::OrderCancelAndNewOrderSingle& data);
+  void post_mass_cancel_order(const trading::OrderMassCancelRequest& data);
 
  private:
   void create_log_on() const;
@@ -81,8 +87,7 @@ class WsOrderEntryApp {
   void dispatch(const std::string& type, const WireMessage& message) const;
   static std::string get_signature_base64(const std::string& payload);
 
-  void handle_execution_report(
-      const schema::ExecutionReportResponse& ptr) const;
+  void handle_execution_report(const schema::ExecutionReportResponse& ptr);
   void handle_balance_update(const schema::BalanceUpdateEnvelope& ptr) const;
   void handle_account_updated(
       const schema::OutboundAccountPositionEnvelope& ptr) const;
@@ -90,10 +95,15 @@ class WsOrderEntryApp {
   void handle_user_subscription(
       const schema::SessionUserSubscriptionResponse& ptr);
   void handle_api_response(const schema::ApiResponse& ptr);
+  void handle_cancel_and_reorder_response(
+      const schema::CancelAndReorderResponse& ptr);
+  void handle_cancel_all_response(const schema::CancelAllOrdersResponse& ptr);
+  void handle_place_order_response(const schema::PlaceOrderResponse& ptr);
 
   common::Logger::Producer logger_;
-  core::WsOeCore ws_oe_core_;
-  std::unique_ptr<core::WebSocketTransport<"OERead">> transport_;
+  WsOeCore ws_oe_core_;
+  WsOrderManager ws_order_manager_;
+  std::unique_ptr<WebSocketTransport<"OERead">> transport_;
   std::atomic<bool> running_{false};
 
   std::unordered_map<MsgType, std::function<void(const WireMessage&)>>

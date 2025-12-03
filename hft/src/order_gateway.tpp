@@ -219,12 +219,11 @@ void OrderGateway<Strategy, OeApp>::new_single_order_data(
       .self_trade_prevention_mode = request.self_trade_prevention_mode};
 
   const std::string msg = app_->create_order_message(order_data);
-  logger_.info(std::format("[Message]Send order message:{}", msg));
+  logger_.info("[Message]Send order message:{}", msg);
 
   if (UNLIKELY(!app_->send(msg))) {
-    logger_.error(
-        std::format("[Message] failed to send new_single_order_data [msg:{}]",
-            msg));
+    logger_.error("[Message] failed to send new_single_order_data [msg:{}]",
+            msg);
   }
   else{app_->post_new_order(order_data);
 }
@@ -239,7 +238,7 @@ void OrderGateway<Strategy, OeApp>::order_cancel_request(
       .symbol = request.symbol};
 
   const std::string msg = app_->create_cancel_order_message(cancel_request);
-  logger_.debug(std::format("[Message]Send cancel order message:{}", msg));
+  logger_.debug("[Message]Send cancel order message:{}", msg);
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_.error("[Message] failed to send order_cancel_request");
@@ -268,8 +267,7 @@ void OrderGateway<Strategy, OeApp>::order_cancel_request_and_new_order_single(
 
   const std::string msg =
       app_->create_cancel_and_reorder_message(cancel_and_reorder);
-  logger_.debug(
-      std::format("[Message]Send cancel and reorder message:{}", msg));
+  logger_.debug("[Message]Send cancel and reorder message:{}", msg);
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_.error("[Message] failed to create_cancel_and_new_order");
@@ -288,7 +286,7 @@ void OrderGateway<Strategy, OeApp>::order_mass_cancel_request(
       .symbol = request.symbol};
 
   const std::string msg = app_->create_order_all_cancel(all_cancel_request);
-  logger_.debug(std::format("[Message]Send cancel all orders message:{}", msg));
+  logger_.debug("[Message]Send cancel all orders message:{}", msg);
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_.error("[Message] failed to send order_mass_cancel_request");

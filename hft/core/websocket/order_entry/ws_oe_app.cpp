@@ -88,8 +88,7 @@ bool WsOrderEntryApp::send(const std::string& msg) const {
   if (!transport_ || msg.empty()) {
     return false;
   }
-  logger_.info(
-      std::format("[WsOrderEntryApp] Sending message to server :{}", msg));
+  logger_.info("[WsOrderEntryApp] Sending message to server :{}", msg);
   return transport_->write(msg) >= 0;
 }
 
@@ -223,9 +222,9 @@ void WsOrderEntryApp::handle_payload(std::string_view payload) {
   }
 
   constexpr int kDefaultLogLen = 200;
-  logger_.debug(std::format("Received payload (size: {}): {}...",
+  logger_.debug("Received payload (size: {}): {}...",
       payload.size(),
-      payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size()))));
+      payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size())));
 
   START_MEASURE(Convert_Message);
   WireMessage message = ws_oe_core_.decode(payload);
@@ -269,8 +268,7 @@ void WsOrderEntryApp::dispatch(const std::string& type,
     const WireMessage& message) const {
   const auto callback = callbacks_.find(type);
   if (callback == callbacks_.end() || !callback->second) {
-    logger_.warn(
-        std::format("No callback registered for message type {}", type));
+    logger_.warn("No callback registered for message type {}", type);
     return;
   }
   callback->second(message);
@@ -330,10 +328,9 @@ void WsOrderEntryApp::handle_session_logon(
     }
   } else {
     if (ptr.error.has_value())
-      logger_.error(
-          std::format("[WsOeApp] session.logon failed: status={}, error={}",
-              ptr.status,
-              ptr.error.value().message));
+      logger_.error("[WsOeApp] session.logon failed: status={}, error={}",
+          ptr.status,
+          ptr.error.value().message);
   }
 
   const WireMessage message = ptr;
@@ -343,10 +340,9 @@ void WsOrderEntryApp::handle_session_logon(
 void WsOrderEntryApp::handle_user_subscription(
     const schema::SessionUserSubscriptionResponse& ptr) {
   if (ptr.status != kHttpOK) {
-    logger_.warn(std::format(
-        "[WsOeApp] UserDataStream response failed: id={}, status={}",
+    logger_.warn("[WsOeApp] UserDataStream response failed: id={}, status={}",
         ptr.id,
-        ptr.status));
+        ptr.status);
   }
 
   // No need to notify user session subscription
@@ -357,11 +353,10 @@ void WsOrderEntryApp::handle_user_subscription(
 void WsOrderEntryApp::handle_api_response(const schema::ApiResponse& ptr) {
   if (ptr.status != kHttpOK) {
     if (ptr.error.has_value()) {
-      logger_.warn(std::format(
-          "[WsOeApp] API response failed: id={}, status={}, error={}",
+      logger_.warn("[WsOeApp] API response failed: id={}, status={}, error={}",
           ptr.id,
           ptr.status,
-          ptr.error.value().message));
+          ptr.error.value().message);
 
       const WireMessage message = ptr;
       dispatch("8", message);
@@ -371,11 +366,11 @@ void WsOrderEntryApp::handle_api_response(const schema::ApiResponse& ptr) {
 void WsOrderEntryApp::handle_cancel_and_reorder_response(
     const schema::CancelAndReorderResponse& ptr) {
   if (ptr.status != kHttpOK && ptr.error.has_value()) {
-    logger_.warn(std::format(
+    logger_.warn(
         "[WsOeApp] CancelAndReorder failed: id={}, status={}, error={}",
         ptr.id,
         ptr.status,
-        ptr.error.value().message));
+        ptr.error.value().message);
 
     auto synthetic_report =
         ws_order_manager_.create_synthetic_execution_report(ptr.id,
@@ -391,11 +386,10 @@ void WsOrderEntryApp::handle_cancel_and_reorder_response(
 void WsOrderEntryApp::handle_cancel_all_response(
     const schema::CancelAllOrdersResponse& ptr) {
   if (ptr.status != kHttpOK && ptr.error.has_value()) {
-    logger_.warn(
-        std::format("[WsOeApp] CancelAll failed: id={}, status={}, error={}",
-            ptr.id,
-            ptr.status,
-            ptr.error.value().message));
+    logger_.warn("[WsOeApp] CancelAll failed: id={}, status={}, error={}",
+        ptr.id,
+        ptr.status,
+        ptr.error.value().message);
 
     auto synthetic_report =
         ws_order_manager_.create_synthetic_execution_report(ptr.id,
@@ -411,11 +405,10 @@ void WsOrderEntryApp::handle_cancel_all_response(
 void WsOrderEntryApp::handle_place_order_response(
     const schema::PlaceOrderResponse& ptr) {
   if (ptr.status != kHttpOK && ptr.error.has_value()) {
-    logger_.warn(
-        std::format("[WsOeApp] PlaceOrder failed: id={}, status={}, error={}",
-            ptr.id,
-            ptr.status,
-            ptr.error.value().message));
+    logger_.warn("[WsOeApp] PlaceOrder failed: id={}, status={}, error={}",
+        ptr.id,
+        ptr.status,
+        ptr.error.value().message);
 
     auto synthetic_report =
         ws_order_manager_.create_synthetic_execution_report(ptr.id,

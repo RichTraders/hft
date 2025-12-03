@@ -274,8 +274,7 @@ auto MarketOrderBook<Strategy, App>::on_market_data_updated(
           market_update->price.value ||
       market_update->price.value <
           (static_cast<double>(kMinPriceInt) / kTickMultiplierInt)) {
-    logger_.error(
-        std::format("Price[{}] is invalid", market_update->price.value));
+    logger_.error("Price[{}] is invalid", market_update->price.value);
     return;
   }
 
@@ -325,9 +324,9 @@ auto MarketOrderBook<Strategy, App>::on_market_data_updated(
       break;
   }
 
-  logger_.debug(std::format("[Updated] {} {}",
+  logger_.debug("[Updated] {} {}",
       market_update->toString(),
-      bbo_.toString()));
+      bbo_.toString());
 
   trade_engine_->on_orderbook_updated(market_update->ticker_id,
       market_update->price,

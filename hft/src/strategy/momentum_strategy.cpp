@@ -77,22 +77,23 @@ void ObiVwapMomentumStrategyTemplate<App>::on_trade_updated(
   const double denom = std::max({spread, 0.01});
   const auto delta = (mid - vwap) / denom;
   if (!std::isfinite(spread) || spread <= 0.0) {
-    this->logger_.trace(
-        std::format("Non-positive spread ({}). Using denom={}", spread, denom));
+    this->logger_.trace("Non-positive spread ({}). Using denom={}",
+        spread,
+        denom);
   }
   const auto signal = std::abs(delta * obi);
 
   std::vector<QuoteIntent> intents;
   intents.reserve(4);
 
-  this->logger_.trace(std::format(
+  this->logger_.trace(
       "[Updated] delta:{} obi:{} signal:{} mid:{}, vwap:{}, spread:{}",
       delta,
       obi,
       signal,
       mid,
       vwap,
-      spread));
+      spread);
 
   if (delta * obi > enter_threshold_) {
     const auto best_bid_price = order_book->get_bbo()->bid_price;
@@ -101,7 +102,7 @@ void ObiVwapMomentumStrategyTemplate<App>::on_trade_updated(
         .price = best_bid_price - kSafetyMargin,
         .qty = Qty{round5(signal * position_variance_)}});
 
-    this->logger_.trace(std::format(
+    this->logger_.trace(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:buy, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
@@ -113,14 +114,14 @@ void ObiVwapMomentumStrategyTemplate<App>::on_trade_updated(
         signal,
         mid,
         vwap,
-        spread));
+        spread);
   } else if (delta * obi < -enter_threshold_) {
     const auto best_ask_price = order_book->get_bbo()->ask_price;
     intents.push_back(QuoteIntent{.ticker = ticker,
         .side = Side::kSell,
         .price = best_ask_price + kSafetyMargin,
         .qty = Qty{round5(signal * position_variance_)}});
-    this->logger_.trace(std::format(
+    this->logger_.trace(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
@@ -132,7 +133,7 @@ void ObiVwapMomentumStrategyTemplate<App>::on_trade_updated(
         signal,
         mid,
         vwap,
-        spread));
+        spread);
   }
   if (signal < exit_threshold_) {
     return;

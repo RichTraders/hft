@@ -13,6 +13,7 @@
 #ifndef COMMON_LOGGER_H
 #define COMMON_LOGGER_H
 
+#include <format>
 #include <source_location>
 #include "thread.hpp"
 
@@ -200,6 +201,55 @@ class Logger {
 
     explicit operator bool() const noexcept { return impl_ != nullptr; }
 
+    template <typename... Args>
+    void logf(LogLevel lvl, std::string_view fmt,
+        Args&&... args) const noexcept {
+      if (!is_enabled(lvl))
+        return;
+
+      try {
+        const std::string formatted =
+            std::vformat(fmt, std::make_format_args(args...));
+        log(lvl, formatted);
+      } catch (const std::format_error&) {
+        std::cout << "Parser error\n";
+      } catch (const std::bad_alloc&) {
+        std::cout << "memory allocation error\n";
+      } catch (const std::exception& exception) {
+        std::cout << "exception : " << exception.what() << "\n";
+      }
+    }
+
+    template <typename... Args>
+    void info(std::string_view fmt, Args&&... args) const {
+      logf(LogLevel::kInfo, fmt, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void debug(std::string_view fmt, Args&&... args) const {
+      logf(LogLevel::kDebug, fmt, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void trace(std::string_view fmt, Args&&... args) const {
+      logf(LogLevel::kTrace, fmt, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void warn(std::string_view fmt, Args&&... args) const {
+      logf(LogLevel::kWarn, fmt, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void error(std::string_view fmt, Args&&... args) const {
+      logf(LogLevel::kError, fmt, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void fatal(std::string_view fmt, Args&&... args) const {
+      logf(LogLevel::kFatal, fmt, std::forward<Args>(args)...);
+    }
+
     void log(LogLevel lvl, std::string_view text,
         std::source_location loc = std::source_location::current()) const;
 
@@ -233,6 +283,7 @@ class Logger {
     Impl* impl_{nullptr};
     explicit Producer(Impl* producer) : impl_(producer) {}
     friend class Logger;
+    [[nodiscard]] bool is_enabled(LogLevel lvl) const noexcept;
   };
 
  private:

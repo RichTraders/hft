@@ -18,7 +18,7 @@ WsOeDecoder::WireMessage WsOeDecoder::decode(std::string_view payload) const {
   if (payload.empty()) {
     return WireMessage{};
   }
-  logger_.info(std::format("[WsOeCore]payload :{}", payload));
+  logger_.info("[WsOeCore]payload :{}", payload);
 
   if (payload.find("executionReport") != std::string_view::npos) {
     return decode_or_log<schema::ExecutionReportResponse, "[executionReport]">(
@@ -39,10 +39,10 @@ WsOeDecoder::WireMessage WsOeDecoder::decode(std::string_view payload) const {
           header,
           payload);
   if (error_code != glz::error_code::none) {
-    logger_.error(std::format("Failed to decode payload"));
+    logger_.error("Failed to decode payload");
     return WireMessage{};
   }
-  logger_.debug(std::format("[WsOeCore]header id :{}", header.id));
+  logger_.debug("[WsOeCore]header id :{}", header.id);
 
   if (header.id.starts_with("login_")) {
     return decode_or_log<schema::SessionLogonResponse, "[session.logon]">(
@@ -85,11 +85,11 @@ WsOeDecoder::WireMessage WsOeDecoder::decode_or_log(
   if (!parsed) {
     auto error_msg = glz::format_error(parsed.error(), payload);
     logger_.error(
-        std::format("\x1b[31m Failed to decode {} response: "
-                    "{}. payload:{} \x1b[0m",
-            Label.view(),
-            error_msg,
-            payload));
+        "\x1b[31m Failed to decode {} response: "
+        "{}. payload:{} \x1b[0m",
+        Label.view(),
+        error_msg,
+        payload);
     return WireMessage{};
   }
   return WireMessage{std::in_place_type<T>, std::move(*parsed)};

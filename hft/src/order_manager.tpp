@@ -94,10 +94,9 @@ void OrderManager<Strategy, App>::on_order_updated(
     }
   }
 
-  logger_.debug(
-      std::format("[OrderUpdated]Order Id:{} reserved_position:{:.6f}",
+  logger_.debug("[OrderUpdated]Order Id:{} reserved_position:{:.6f}",
           response->cl_order_id.value,
-          position_tracker_.get_reserved().value));
+          position_tracker_.get_reserved().value);
 
   dump_all_slots(response->symbol,
       std::format("After {} oid={}",
@@ -119,8 +118,7 @@ void OrderManager<Strategy, App>::new_order(const TickerId& ticker_id,
       .time_in_force = TimeInForce::kGoodTillCancel};
   trade_engine_->send_request(new_request);
 
-  logger_.info(
-      std::format("[OrderRequest]Sent new order {}", new_request.toString()));
+  logger_.info("[OrderRequest]Sent new order {}", new_request.toString());
 }
 
 template <typename Strategy, typename App>
@@ -141,8 +139,8 @@ void OrderManager<Strategy, App>::modify_order(const TickerId& ticker_id,
       .time_in_force = TimeInForce::kGoodTillCancel};
   trade_engine_->send_request(new_request);
 
-  logger_.info(std::format("[OrderRequest]Sent modify order {}",
-      new_request.toString()));
+  logger_.info("[OrderRequest]Sent modify order {}",
+      new_request.toString());
 }
 
 template <typename Strategy, typename App>
@@ -155,8 +153,7 @@ void OrderManager<Strategy, App>::cancel_order(const TickerId& ticker_id,
       .symbol = ticker_id};
   trade_engine_->send_request(cancel_request);
 
-  logger_.info(
-      std::format("[OrderRequest]Sent cancel {}", cancel_request.toString()));
+  logger_.info("[OrderRequest]Sent cancel {}", cancel_request.toString());
 }
 
 template <typename Strategy, typename App>
@@ -165,8 +162,8 @@ void OrderManager<Strategy, App>::on_instrument_info(
   if (!instrument_info.symbols.empty()) {
     venue_policy_.set_qty_increment(
         instrument_info.symbols[0].min_qty_increment);
-    logger_.info(std::format("[OrderManager] Updated qty_increment to {}",
-        instrument_info.symbols[0].min_qty_increment));
+    logger_.info("[OrderManager] Updated qty_increment to {}",
+        instrument_info.symbols[0].min_qty_increment);
   }
 }
 
@@ -202,14 +199,13 @@ void OrderManager<Strategy, App>::apply(
 
         cancel_order(key.symbol, slot.cl_order_id, cancel_id);
 
-        logger_.info(
-            std::format("[TTL] Cancel sent (state={}, layer={}, oid={}, "
+        logger_.info("[TTL] Cancel sent (state={}, layer={}, oid={}, "
                         "cancel_id={}, remaining_ns={})",
                 trading::toString(slot.state),
                 key.layer,
                 common::toString(slot.cl_order_id),
                 common::toString(cancel_id),
-                key.expire_ts - now));
+                key.expire_ts - now);
       }
     }
     END_MEASURE(Trading_OrderManager_apply, logger_);
@@ -246,14 +242,13 @@ void OrderManager<Strategy, App>::apply(
         action.cl_order_id);
     position_tracker_.add_reserved(action.side, action.qty);
 
-    logger_.info(
-        std::format("[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}, "
+    logger_.info("[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}, "
                     "reserved_position_={}",
             tick,
             action.layer,
             common::toString(action.side),
             common::toString(action.cl_order_id),
-            position_tracker_.get_reserved().value));
+            position_tracker_.get_reserved().value);
 
     expiry_manager_.register_expiry(ticker,
         action.side,
@@ -313,14 +308,13 @@ void OrderManager<Strategy, App>::apply(
 
     const auto delta_qty = action.qty - action.last_qty;
     position_tracker_.add_reserved(action.side, delta_qty);
-    logger_.info(
-        std::format("[Apply][REPLACE] tick:{}/ layer={}, side:{}, order_id={}, "
+    logger_.info("[Apply][REPLACE] tick:{}/ layer={}, side:{}, order_id={}, "
                     "reserved_position_={}",
             tick,
             action.layer,
             common::toString(action.side),
             common::toString(action.cl_order_id),
-            position_tracker_.get_reserved().value));
+            position_tracker_.get_reserved().value);
     expiry_manager_.register_expiry(ticker,
         action.side,
         action.layer,
@@ -334,15 +328,14 @@ void OrderManager<Strategy, App>::apply(
     slot.state = OMOrderState::kCancelReserved;
     slot.last_used = now;
     cancel_order(ticker, action.original_cl_order_id, action.cl_order_id);
-    logger_.info(
-        std::format("[Apply][CANCEL] layer={}, side:{}, order_id={}, "
+    logger_.info("[Apply][CANCEL] layer={}, side:{}, order_id={}, "
                     "reserved_position_={}",
             "previous order id :{}",
             action.layer,
             common::toString(action.side),
             common::toString(action.cl_order_id),
             common::toString(action.original_cl_order_id),
-            position_tracker_.get_reserved().value));
+            position_tracker_.get_reserved().value);
   }
 
   // Sweep expired orders
@@ -368,14 +361,13 @@ void OrderManager<Strategy, App>::apply(
 
       cancel_order(key.symbol, slot.cl_order_id, cancel_id);
 
-      logger_.info(
-          std::format("[TTL] Cancel sent (state={}, layer={}, oid={}, "
+      logger_.info("[TTL] Cancel sent (state={}, layer={}, oid={}, "
                       "cancel_id={}, remaining_ns={})",
               trading::toString(slot.state),
               key.layer,
               common::toString(slot.cl_order_id),
               common::toString(cancel_id),
-              key.expire_ts - now));
+              key.expire_ts - now);
     }
   }
   END_MEASURE(Trading_OrderManager_apply, logger_);
@@ -428,17 +420,16 @@ OrderId OrderManager<Strategy, App>::gen_order_id() noexcept {
 template <typename Strategy, typename App>
 void OrderManager<Strategy, App>::dump_all_slots(const std::string& symbol,
     std::string_view context) noexcept {
-  logger_.debug(std::format("[SLOT_DUMP] ========== {} ==========", context));
-  logger_.debug(std::format("[SLOT_DUMP] Symbol: {}, Reserved: {:.10f}",
+  logger_.debug("[SLOT_DUMP] ========== {} ==========", context);
+  logger_.debug("[SLOT_DUMP] Symbol: {}, Reserved: {:.10f}",
       symbol,
-      position_tracker_.get_reserved().value));
+      position_tracker_.get_reserved().value);
 
   for (int side_idx = 0; side_idx < 2; ++side_idx) {
     const auto side = side_idx == 0 ? common::Side::kBuy : common::Side::kSell;
     const auto& side_book = layer_book_.side_book(symbol, side);
 
-    logger_.debug(
-        std::format("[SLOT_DUMP] ===== {} Side =====", common::toString(side)));
+    logger_.debug("[SLOT_DUMP] ===== {} Side =====", common::toString(side));
 
     for (int layer = 0; layer < kSlotsPerSide; ++layer) {
       const auto& slot = side_book.slots[layer];
@@ -449,20 +440,18 @@ void OrderManager<Strategy, App>::dump_all_slots(const std::string& symbol,
         continue;
       }
 
-      logger_.debug(
-          std::format("[SLOT_DUMP]   Layer[{}]: state={}, tick={}, "
+      logger_.debug("[SLOT_DUMP]   Layer[{}]: state={}, tick={}, "
                       "price={:.2f}, qty={:.6f}, oid={}",
               layer,
               trading::toString(slot.state),
               tick,
               slot.price.value,
               slot.qty.value,
-              slot.cl_order_id.value));
+              slot.cl_order_id.value);
     }
   }
 
-  logger_.debug(
-      std::format("[SLOT_DUMP] ========== END {} ==========", context));
+  logger_.debug("[SLOT_DUMP] ========== END {} ==========", context);
 }
 }  // namespace trading
 

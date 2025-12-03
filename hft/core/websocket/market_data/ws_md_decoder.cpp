@@ -49,9 +49,9 @@ WsMdDecoder::WireMessage WsMdDecoder::decode(std::string_view payload) const {
     if (error_code != glz::error_code::none) {
       const std::string_view view{payload.data(), payload.size()};
       auto msg = glz::format_error(error_code, view);
-      logger_.error(std::format("Failed to [ExchangeInfo] payload:{}. msg:{}",
+      logger_.error("Failed to [ExchangeInfo] payload:{}. msg:{}",
           payload,
-          msg));
+          msg);
       return WireMessage{};
     }
     return WireMessage{std::in_place_type<schema::ExchangeInfoResponse>,
@@ -59,9 +59,9 @@ WsMdDecoder::WireMessage WsMdDecoder::decode(std::string_view payload) const {
   }
 
   constexpr int kDefaultMinMessageLen = 100;
-  logger_.warn(std::format("Unhandled websocket payload: {}",
+  logger_.warn("Unhandled websocket payload: {}",
       payload.substr(0,
-          std::min<size_t>(payload.size(), kDefaultMinMessageLen))));
+          std::min<size_t>(payload.size(), kDefaultMinMessageLen)));
   return WireMessage{};
 }
 
@@ -72,11 +72,11 @@ WsMdDecoder::WireMessage WsMdDecoder::decode_or_log(std::string_view payload,
   if (UNLIKELY(!parsed)) {
     auto error_msg = glz::format_error(parsed.error(), payload);
     logger_.error(
-        std::format("\x1b[31m Failed to decode {} response: "
-                    "{}. payload:{} \x1b[0m",
-            label,
-            error_msg,
-            payload));
+        "\x1b[31m Failed to decode {} response: "
+        "{}. payload:{} \x1b[0m",
+        label,
+        error_msg,
+        payload);
     return WireMessage{};
   }
   return WireMessage{std::in_place_type<T>, std::move(*parsed)};

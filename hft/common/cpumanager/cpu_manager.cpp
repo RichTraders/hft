@@ -82,14 +82,14 @@ bool CpuManager::init_cpu_to_tid() {
 
     const int tid = get_tid_by_thread_name(thread_name);
     if (tid == 0) {
-      logger_.error(
-          std::format("[CpuManager] Thread '{}' not found", thread_name));
+      logger_.error("[CpuManager] Thread '{}' not found", thread_name);
       return true;
     }
 
     info.second.tid = tid;
-    logger_.info(std::format("[CpuManager] Found thread '{}' with TID {}",
-                             thread_name, tid));
+    logger_.info("[CpuManager] Found thread '{}' with TID {}",
+        thread_name,
+        tid);
 
     const auto& cpu_info = cpu_info_list_.find(cpu_id);
 
@@ -179,7 +179,7 @@ pid_t CpuManager::get_tid_by_thread_name(const std::string& target_name) {
   }
 
   for (const auto& entry :
-       std::filesystem::directory_iterator(task_dir, err_c)) {
+      std::filesystem::directory_iterator(task_dir, err_c)) {
     if (err_c)
       break;
     if (!entry.is_directory())
@@ -198,7 +198,9 @@ pid_t CpuManager::get_tid_by_thread_name(const std::string& target_name) {
       int64_t val = 0;
       constexpr int kFormat = 10;
       auto res = std::from_chars(tid_str.data(),
-                                 tid_str.data() + tid_str.size(), val, kFormat);
+          tid_str.data() + tid_str.size(),
+          val,
+          kFormat);
       if (res.ec == std::errc{}) {
         return static_cast<pid_t>(val);
       }
@@ -208,7 +210,7 @@ pid_t CpuManager::get_tid_by_thread_name(const std::string& target_name) {
 }
 
 int CpuManager::sched_setattr_syscall(pid_t tid, const struct sched_attr* attr,
-                                      unsigned int flags) {
+    unsigned int flags) {
   return static_cast<int>(syscall(SYS_sched_setattr, tid, attr, flags));
 }
 
@@ -219,14 +221,12 @@ int CpuManager::set_affinity(const AffinityInfo& info) {
   CPU_SET(info.cpu_id_, &cpu_info);
 
   if (sched_setaffinity(info.tid_, sizeof(cpu_info), &cpu_info) != 0) {
-    logger_.error(
-        std::format("[CpuManager] sched_setaffinity :{}", strerror(errno)));
+    logger_.error("[CpuManager] sched_setaffinity :{}", strerror(errno));
     return -1;
   }
 
   if (sched_getaffinity(info.tid_, sizeof(cpu_info), &cpu_info) == -1) {
-    logger_.error(
-        std::format("[CpuManager] sched_getaffinity :{}", strerror(errno)));
+    logger_.error("[CpuManager] sched_getaffinity :{}", strerror(errno));
     return -1;
   }
   return 0;
@@ -253,7 +253,7 @@ int CpuManager::set_cpu_idle(const uint8_t cpu_id, pid_t tid, int nicev) {
 }
 
 int CpuManager::set_rt(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
-                       int priority) {
+    int priority) {
   const int pmin = sched_get_priority_min(static_cast<int>(policy));
   const int pmax = sched_get_priority_max(static_cast<int>(policy));
   if (priority < pmin || priority > pmax) {
@@ -274,7 +274,7 @@ int CpuManager::set_rt(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
 }
 
 int CpuManager::set_cfs(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
-                        int nicev) {
+    int nicev) {
   if (set_affinity(AffinityInfo(CpuId(cpu_id), ThreadId(tid))) != 0) {
     return -1;
   }
@@ -290,8 +290,8 @@ int CpuManager::set_cfs(const uint8_t cpu_id, pid_t tid, SchedPolicy policy,
   }
 
   if (setpriority(PRIO_PROCESS, tid, nicev) != 0) {
-    logger_.error(std::format(
-        "[CpuManager] failed to priority to tid. Error:{}", strerror(errno)));
+    logger_.error("[CpuManager] failed to priority to tid. Error:{}",
+        strerror(errno));
     return -1;
   }
 
@@ -303,20 +303,23 @@ int CpuManager::set_cpu_to_tid(uint8_t cpu_id, pid_t tid) {
   CPU_ZERO(&cpu_set);
   CPU_SET(cpu_id, &cpu_set);
   if (sched_setaffinity(tid, sizeof(cpu_set), &cpu_set) != 0) {
-    logger_.error(std::format(
-        "[CpuManager] failed to set cpu({}) to tid({}): {} (errno={})", cpu_id,
-        tid, strerror(errno), errno));
+    logger_.error(
+        "[CpuManager] failed to set cpu({}) to tid({}): {} (errno={})",
+        cpu_id,
+        tid,
+        strerror(errno),
+        errno);
     return -1;
   }
   CPU_ZERO(&cpu_set);
   if (sched_getaffinity(tid, sizeof(cpu_set), &cpu_set) == -1) {
-    logger_.error(
-        std::format("[CpuManager] sched_getaffinity: {} cpu({}) to tid({})",
-                    strerror(errno), cpu_id, tid));
+    logger_.error("[CpuManager] sched_getaffinity: {} cpu({}) to tid({})",
+        strerror(errno),
+        cpu_id,
+        tid);
     return -1;
   }
-  logger_.info(
-      std::format("[CpuManager] tid {} allowed CPU : {} ", tid, cpu_id));
+  logger_.info("[CpuManager] tid {} allowed CPU : {} ", tid, cpu_id);
   return 0;
 }
 
@@ -324,16 +327,18 @@ int CpuManager::set_cpu_to_tid(uint8_t cpu_id, pid_t tid) {
 int CpuManager::set_scheduler(pid_t tid, int priority, int scheduler_policy) {
   const sched_param sched_params{.sched_priority = priority};
   if (sched_setscheduler(tid, scheduler_policy, &sched_params) != 0) {
-    logger_.error(std::format(
+    logger_.error(
         "[CpuManager] failed to set scheduler_policy({}) to tid({}). Error:{}",
-        scheduler_policy, tid, strerror(errno)));
+        scheduler_policy,
+        tid,
+        strerror(errno));
     return -1;
   }
 
   if (sched_getscheduler(tid) < 0) {
-    logger_.error(std::format(
-        "[CpuManager] failed to get scheduler_policy({}) to tid({})",
-        scheduler_policy, tid));
+    logger_.error("[CpuManager] failed to get scheduler_policy({}) to tid({})",
+        scheduler_policy,
+        tid);
     return -1;
   }
   return 0;

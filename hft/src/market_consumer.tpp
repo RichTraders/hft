@@ -145,9 +145,9 @@ void MarketConsumer<Strategy, MdApp>::on_snapshot(WireMessage msg) {
         "[MarketConsumer] Market update data pool exhausted on snapshot");
 #ifdef ENABLE_WEBSOCKET
     // Clear buffered events to free memory
-    logger_.warn(std::format(
+    logger_.warn(
         "[MarketConsumer] Clearing {} buffered events to free memory",
-        buffered_events_.size()));
+        buffered_events_.size());
     for (auto* buffered : buffered_events_) {
       for (auto* market_data : buffered->data)
         market_data_pool_->deallocate(market_data);
@@ -158,9 +158,9 @@ void MarketConsumer<Strategy, MdApp>::on_snapshot(WireMessage msg) {
 
     static constexpr int kMaxRetries = 3;
     if (++retry_count_ >= kMaxRetries) {
-      logger_.error(std::format(
+      logger_.error(
           "[MarketConsumer] Failed to allocate snapshot after {} retries",
-          kMaxRetries));
+          kMaxRetries);
       app_->stop();
       std::exit(1);
     }
@@ -181,17 +181,15 @@ void MarketConsumer<Strategy, MdApp>::on_snapshot(WireMessage msg) {
   static constexpr int kMaxRetries = 3;
   if (state_ == StreamState::kBuffering) {
     if (snapshot_update_id < first_buffered_update_id_) {
-      logger_.warn(
-          std::format("[MarketConsumer][Message]Snapshot too old, refetching "
+      logger_.warn("[MarketConsumer][Message]Snapshot too old, refetching "
                       "snapshot:{}, buffered:{}",
               snapshot_update_id,
-              first_buffered_update_id_));
+              first_buffered_update_id_);
 
       if (++retry_count_ >= kMaxRetries) {
-        logger_.error(
-            std::format("[MarketConsumer][Message]Failed to get valid snapshot "
+        logger_.error("[MarketConsumer][Message]Failed to get valid snapshot "
                         "after {} retries, terminating",
-                kMaxRetries));
+                kMaxRetries);
         app_->stop();
         std::exit(1);
       }
@@ -224,17 +222,16 @@ void MarketConsumer<Strategy, MdApp>::on_snapshot(WireMessage msg) {
       update_index_ = buffered->end_idx;
       on_market_data_fn_(buffered);
     } else {
-      logger_.error(std::format(
+      logger_.error(
           "[MarketConsumer]Buffered event gap detected! Expected {}, got {}",
           update_index_ + 1,
-          buffered->start_idx));
+          buffered->start_idx);
       buffered_events_.clear();
 
       if (++retry_count_ >= kMaxRetries) {
-        logger_.error(
-            std::format("[MarketConsumer][Message]Failed to recover from gap "
+        logger_.error("[MarketConsumer][Message]Failed to recover from gap "
                         "after {} retries, terminating",
-                kMaxRetries));
+                kMaxRetries);
         app_->stop();
         std::exit(1);
       }
@@ -301,10 +298,10 @@ void MarketConsumer<Strategy, MdApp>::on_subscribe(WireMessage msg) {
 
   // Skip gap check for trade events (they don't have sequence numbers)
   if (data->type != kTrade) {
-    logger_.trace(std::format("current update index:{}, data start :{}, data end:{}",
+    logger_.trace("current update index:{}, data start :{}, data end:{}",
         update_index_,
         data->start_idx,
-        data->end_idx));
+        data->end_idx);
     if (data->start_idx != update_index_ + 1 && update_index_ != 0) {
       logger_.error("Gap detected");
       recover_from_gap();
@@ -344,10 +341,10 @@ void MarketConsumer<Strategy, MdApp>::on_subscribe(WireMessage msg) {
                (data->type == kMarket &&
                    data->start_idx != this->update_index_ + 1 &&
                    this->update_index_ != 0ULL))) {
-    logger_.error(std::format(
+    logger_.error(
         "Update index is outdated. current index :{}, new index :{}",
         this->update_index_,
-        data->start_idx));
+        data->start_idx);
 
     resubscribe();
 
@@ -398,8 +395,7 @@ template <typename Strategy, typename MdApp>
   requires core::MarketDataAppLike<MdApp>
 void MarketConsumer<Strategy, MdApp>::on_reject(WireMessage msg) {
   const auto rejected_message = app_->create_reject_message(msg);
-  logger_.error(
-      std::format("[MarketConsumer][Message] {}", rejected_message.toString()));
+  logger_.error("[MarketConsumer][Message] {}", rejected_message.toString());
   if (rejected_message.session_reject_reason == "A") {
     app_->stop();
   }
@@ -416,8 +412,8 @@ template <typename Strategy, typename MdApp>
 void MarketConsumer<Strategy, MdApp>::on_instrument_list(WireMessage msg) {
   const InstrumentInfo instrument_message =
       app_->create_instrument_list_message(msg);
-  logger_.info(std::format("[MarketConsumer][Message] on_instrument_list :{}",
-      instrument_message.toString()));
+  logger_.info("[MarketConsumer][Message] on_instrument_list :{}",
+      instrument_message.toString());
   on_instrument_info_fn_(instrument_message);
 }
 
@@ -430,11 +426,10 @@ void MarketConsumer<Strategy, MdApp>::on_heartbeat(WireMessage msg) {
   }
 }
 
-#ifdef ENABLE_WEBSOCKET
 template <typename Strategy, typename MdApp>
   requires core::MarketDataAppLike<MdApp>
 void MarketConsumer<Strategy, MdApp>::recover_from_gap() {
-
+#ifdef ENABLE_WEBSOCKET
   if (state_ == StreamState::kBuffering) {
     logger_.info(
         "[MarketConsumer]Gap detected, but already snapshot buffering mode.");
@@ -451,6 +446,7 @@ void MarketConsumer<Strategy, MdApp>::recover_from_gap() {
   app_->send(snapshot_req);
 
   logger_.info("Gap detected, resubscribing");
+#else
   current_generation_.fetch_add(1, std::memory_order_acq_rel);
 
   const std::string msg_unsub =
@@ -471,8 +467,8 @@ void MarketConsumer<Strategy, MdApp>::recover_from_gap() {
 
   state_ = StreamState::kAwaitingSnapshot;
   update_index_ = 0ULL;
-}
 #endif
+}
 
 }  // namespace trading
 

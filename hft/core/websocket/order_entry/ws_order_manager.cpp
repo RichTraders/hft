@@ -22,11 +22,11 @@ namespace core {
 
 void WsOrderManager::register_pending_request(
     const PendingOrderRequest& request) {
-  logger_.debug(std::format(
+  logger_.debug(
       "[WsOrderManager] Registered pending request: id={}, symbol={}, side={}",
       request.client_order_id,
       request.symbol,
-      common::toString(request.side)));
+      common::toString(request.side));
 
   pending_requests_[request.client_order_id] = request;
 }
@@ -34,8 +34,8 @@ void WsOrderManager::register_pending_request(
 void WsOrderManager::remove_pending_request(std::uint64_t request_id) {
   const auto pending_request = pending_requests_.find(request_id);
   if (pending_request != pending_requests_.end()) {
-    logger_.debug(std::format("[WsOrderManager] Removed pending request: id={}",
-        request_id));
+    logger_.debug("[WsOrderManager] Removed pending request: id={}",
+        request_id);
     pending_requests_.erase(pending_request);
   }
 }
@@ -45,9 +45,9 @@ WsOrderManager::create_synthetic_execution_report(std::string_view request_id,
     int error_code, std::string_view error_message) {
   const auto client_order_id_opt = extract_client_order_id(request_id);
   if (!client_order_id_opt.has_value()) {
-    logger_.error(std::format(
+    logger_.error(
         "[WsOrderManager] Failed to extract clientOrderId from request_id: {}",
-        request_id));
+        request_id);
     return std::nullopt;
   }
 
@@ -56,10 +56,10 @@ WsOrderManager::create_synthetic_execution_report(std::string_view request_id,
   const auto reqeust = pending_requests_.find(client_order_id);
   if (reqeust == pending_requests_.end()) {
     logger_.warn(
-        std::format("[WsOrderManager] No pending request found for "
-                    "clientOrderId={}, creating "
-                    "minimal ExecutionReport",
-            client_order_id));
+        "[WsOrderManager] No pending request found for "
+        "clientOrderId={}, creating "
+        "minimal ExecutionReport",
+        client_order_id);
   }
 
   schema::ExecutionReportResponse response;
@@ -98,11 +98,11 @@ WsOrderManager::create_synthetic_execution_report(std::string_view request_id,
   }
 
   logger_.info(
-      std::format("[WsOrderManager] Created synthetic ExecutionReport: "
-                  "clientOrderId={}, error_code={}, error={}",
-          client_order_id,
-          error_code,
-          error_message));
+      "[WsOrderManager] Created synthetic ExecutionReport: "
+      "clientOrderId={}, error_code={}, error={}",
+      client_order_id,
+      error_code,
+      error_message);
 
   if (LIKELY(reqeust != pending_requests_.end())) {
     pending_requests_.erase(reqeust);

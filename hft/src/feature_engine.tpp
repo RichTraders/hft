@@ -40,10 +40,9 @@ void FeatureEngine<Strategy, App>::on_order_book_updated(
     auto ask_index = book->peek_levels(false, kLevel10);
   }
 
-  logger_.debug(
-      std::format("[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
+  logger_.debug("[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
                   common::toString(price), common::toString(side), mkt_price_,
-                  agg_trade_qty_ratio_));
+                  agg_trade_qty_ratio_);
 }
 template<class Strategy, typename App>
 void FeatureEngine<Strategy, App>::on_trade_updated(
@@ -74,9 +73,9 @@ void FeatureEngine<Strategy, App>::on_trade_updated(
   }
   vwap_index_++;
 
-  logger_.debug(std::format("[Updated] {} mkt-price:{} agg-trade-ratio:{}",
+  logger_.debug("[Updated] {} mkt-price:{} agg-trade-ratio:{}",
                             market_update->toString(), mkt_price_,
-                            agg_trade_qty_ratio_));
+                            agg_trade_qty_ratio_);
 }
 
 template<class Strategy, typename App>

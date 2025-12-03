@@ -82,8 +82,7 @@ bool WsMarketDataApp::send(const std::string& msg) const {
   if (msg.empty() || !write_transport_) {
     return false;
   }
-  logger_.info(
-      std::format("[WsMarketDataApp] Sending message to api server :{}", msg));
+  logger_.info("[WsMarketDataApp] Sending message to api server :{}", msg);
   return write_transport_->write(msg) >= 0;
 }
 
@@ -91,9 +90,7 @@ bool WsMarketDataApp::send_to_stream(const std::string& msg) const {
   if (msg.empty() || !read_transport_) {
     return false;
   }
-  logger_.info(
-      std::format("[WsMarketDataApp] Sending message to stream server :{}",
-          msg));
+  logger_.info("[WsMarketDataApp] Sending message to stream server :{}", msg);
   return read_transport_->write(msg) >= 0;
 }
 
@@ -179,10 +176,10 @@ void WsMarketDataApp::handle_payload(std::string_view payload) const {
   }
 
   static constexpr int kMinimumLogPrintSize = 200;
-  logger_.debug(std::format("Received payload (size: {}): {}...",
+  logger_.debug("Received payload (size: {}): {}...",
       payload.size(),
       payload.substr(0,
-          std::min<size_t>(kMinimumLogPrintSize, payload.size()))));
+          std::min<size_t>(kMinimumLogPrintSize, payload.size())));
 
   START_MEASURE(Convert_Message);
   WireMessage message = ws_md_core_.decode(payload);
@@ -208,8 +205,7 @@ void WsMarketDataApp::dispatch(std::string_view type,
     const WireMessage& message) const {
   const auto callback = callbacks_.find(std::string(type));
   if (callback == callbacks_.end() || !callback->second) {
-    logger_.warn(
-        std::format("No callback registered for message type {}", type));
+    logger_.warn("No callback registered for message type {}", type);
     return;
   }
   callback->second(message);
@@ -220,8 +216,8 @@ void WsMarketDataApp::handle_depth_snapshot(
   if (LIKELY(response.status == kHttpOK)) {
     dispatch("W", response);
   } else {
-    logger_.warn(std::format("Depth snapshot request failed with status: {}",
-        response.status));
+    logger_.warn("Depth snapshot request failed with status: {}",
+        response.status);
   }
 }
 void WsMarketDataApp::handle_depth_response(

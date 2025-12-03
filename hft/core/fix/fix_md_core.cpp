@@ -91,7 +91,7 @@ MarketData* FixMdCore::allocate_with_retry(
 
   auto* market_data = allocate_fn();
   while (market_data == nullptr) {
-    logger_.info(std::format("{} message queue is full", context));
+    logger_.info("{} message queue is full", context);
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     market_data = allocate_fn();
   }
@@ -440,7 +440,7 @@ MarketDataReject FixMdCore::create_reject_message(WireMessage msg) {
   const auto error_code = msg->get<ErrorCode>();
 
   if (ref_sequence != nullptr)
-    logger_.info(std::format("failed sequence :{}", ref_sequence->get()));
+    logger_.info("failed sequence :{}", ref_sequence->get());
 
   return MarketDataReject{
       .session_reject_reason =

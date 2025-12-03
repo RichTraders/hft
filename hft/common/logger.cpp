@@ -148,6 +148,10 @@ void Logger::dispatch(const LogMessage& msg) const {
     sink->write(msg.text);
 }
 
+bool Logger::Producer::is_enabled(LogLevel lvl) const noexcept {
+  return (impl_->level->load(std::memory_order_relaxed) > lvl);
+}
+
 void Logger::process() const {
   WaitStrategy wait_strategy;
   ConsumerToken consumer_token{impl_->queue};
@@ -246,9 +250,6 @@ Logger::Producer& Logger::Producer::operator=(Producer&& producer) noexcept {
 
 void Logger::Producer::log(LogLevel lvl, std::string_view text,
     std::source_location /*loc*/) const {
-  if (impl_->level->load(std::memory_order_relaxed) > lvl)
-    return;
-
   //Allow multiple logger
   thread_local std::unordered_map<const void*,
       std::vector<std::unique_ptr<ProducerToken>>>

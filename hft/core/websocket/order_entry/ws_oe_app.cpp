@@ -349,8 +349,9 @@ void WsOrderEntryApp::handle_user_subscription(
         ptr.status));
   }
 
-  const WireMessage message = ptr;
-  dispatch("sub", message);
+  // No need to notify user session subscription
+  /*const WireMessage message = ptr;
+  dispatch("sub", message);*/
 }
 
 void WsOrderEntryApp::handle_api_response(const schema::ApiResponse& ptr) {

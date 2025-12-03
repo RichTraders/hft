@@ -67,10 +67,11 @@ class MarketConsumer {
   void on_logout(WireMessage msg);
   void on_instrument_list(WireMessage msg);
   void on_heartbeat(WireMessage msg);
-  void recover_from_gap();
+
 #ifndef ENABLE_WEBSOCKET
   void resubscribe();
 #else
+  void recover_from_gap();
   void erase_buffer_lower_than_snapshot(uint64_t snapshot_update_id);
 #endif
 

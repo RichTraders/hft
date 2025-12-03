@@ -28,9 +28,9 @@ class WsMarketDataApp {
  public:
   using WireMessage = WsMdCore::WireMessage;
   using MsgType = std::string;
-  using RequestId = std::string;
-  using MarketDepthLevel = std::string;
-  using SymbolId = std::string;
+  using RequestId = std::string_view;
+  using MarketDepthLevel = std::string_view;
+  using SymbolId = std::string_view;
 
   WsMarketDataApp(const std::string& sender_comp_id,
       const std::string& target_comp_id, common::Logger* logger,
@@ -55,13 +55,15 @@ class WsMarketDataApp {
       const SymbolId& symbol, bool subscribe) const;
   [[nodiscard]] std::string create_trade_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
-      const SymbolId& symbol) const;
+      const SymbolId& symbol, bool subscribe) const;
+  [[nodiscard]] std::string create_snapshot_data_subscription_message(
+      const SymbolId& symbol, const MarketDepthLevel& level) const;
   [[nodiscard]] MarketUpdateData create_market_data_message(
       const WireMessage& msg) const;
   [[nodiscard]] MarketUpdateData create_snapshot_data_message(
       const WireMessage& msg) const;
   [[nodiscard]] std::string create_snapshot_request_message(
-      const SymbolId& symbol);
+      const SymbolId& symbol, MarketDepthLevel level) const;
   std::string request_instrument_list_message(
       const std::string& symbol = "") const;
   InstrumentInfo create_instrument_list_message(const WireMessage& msg) const;

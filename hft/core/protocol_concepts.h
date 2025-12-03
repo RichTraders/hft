@@ -32,46 +32,39 @@ class MemoryPool;
 namespace core {
 
 template <typename Core>
-concept MarketDataCore =
-    requires(Core core, typename Core::WireMessage msg, const std::string& sig,
-        const std::string& timestamp, const std::string& request_id,
-        const std::string& market_depth, const std::string& symbol) {
-      typename Core::WireMessage;
-      {
-        core.create_log_on_message(sig, timestamp)
-      } -> std::convertible_to<std::string>;
-      { core.create_log_out_message() } -> std::convertible_to<std::string>;
-      {
-        core.create_heartbeat_message(msg)
-      } -> std::convertible_to<std::string>;
-      {
-        core.create_market_data_subscription_message(request_id,
-            market_depth,
-            symbol,
-            true)
-      } -> std::convertible_to<std::string>;
-      {
-        core.create_trade_data_subscription_message(request_id,
-            market_depth,
-            symbol)
-      } -> std::convertible_to<std::string>;
-      {
-        core.create_instrument_list_request_message(symbol)
-      } -> std::convertible_to<std::string>;
-      {
-        core.create_market_data_message(msg)
-      } -> std::same_as<MarketUpdateData>;
-      {
-        core.create_snapshot_data_message(msg)
-      } -> std::same_as<MarketUpdateData>;
-      {
-        core.create_instrument_list_message(msg)
-      } -> std::same_as<InstrumentInfo>;
-      { core.create_reject_message(msg) } -> std::same_as<MarketDataReject>;
-      {
-        core.decode(std::declval<std::string>())
-      } -> std::same_as<typename Core::WireMessage>;
-    };
+concept MarketDataCore = requires(Core core, typename Core::WireMessage msg,
+    const std::string& sig, const std::string& timestamp,
+    const std::string& request_id, const std::string& market_depth,
+    const std::string& symbol, bool subscribe) {
+  typename Core::WireMessage;
+  {
+    core.create_log_on_message(sig, timestamp)
+  } -> std::convertible_to<std::string>;
+  { core.create_log_out_message() } -> std::convertible_to<std::string>;
+  { core.create_heartbeat_message(msg) } -> std::convertible_to<std::string>;
+  {
+    core.create_market_data_subscription_message(request_id,
+        market_depth,
+        symbol,
+        subscribe)
+  } -> std::convertible_to<std::string>;
+  {
+    core.create_trade_data_subscription_message(request_id,
+        market_depth,
+        symbol,
+        subscribe)
+  } -> std::convertible_to<std::string>;
+  {
+    core.create_instrument_list_request_message(symbol)
+  } -> std::convertible_to<std::string>;
+  { core.create_market_data_message(msg) } -> std::same_as<MarketUpdateData>;
+  { core.create_snapshot_data_message(msg) } -> std::same_as<MarketUpdateData>;
+  { core.create_instrument_list_message(msg) } -> std::same_as<InstrumentInfo>;
+  { core.create_reject_message(msg) } -> std::same_as<MarketDataReject>;
+  {
+    core.decode(std::declval<std::string>())
+  } -> std::same_as<typename Core::WireMessage>;
+};
 
 template <typename Core>
 concept OrderEntryCore = requires(Core core,
@@ -131,7 +124,7 @@ concept MarketDataAppLike =
     requires(T app, const std::string& sig_b64, const std::string& timestamp,
         typename T::WireMessage msg, const std::string& request_id,
         const std::string& level, const std::string& symbol,
-        const std::string& symbol_str) {
+        const std::string& symbol_str, bool subscribe) {
       {
         app.create_log_on_message(sig_b64, timestamp)
       } -> std::same_as<std::string>;
@@ -141,10 +134,13 @@ concept MarketDataAppLike =
         app.create_market_data_subscription_message(request_id,
             level,
             symbol,
-            true)
+            subscribe)
       } -> std::same_as<std::string>;
       {
-        app.create_trade_data_subscription_message(request_id, level, symbol)
+        app.create_trade_data_subscription_message(request_id,
+            level,
+            symbol,
+            subscribe)
       } -> std::same_as<std::string>;
       { app.create_market_data_message(msg) } -> std::same_as<MarketUpdateData>;
       {

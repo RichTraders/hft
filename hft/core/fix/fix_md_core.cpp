@@ -154,7 +154,7 @@ std::string FixMdCore::create_log_out_message() {
   return wire;
 }
 
-std::string FixMdCore::create_heartbeat_message(FIX8::Message* message) {
+std::string FixMdCore::create_heartbeat_message(WireMessage message) {
   auto test_req_id = message->get<TestReqID>();
 
   Heartbeat request;
@@ -195,10 +195,9 @@ std::string FixMdCore::create_market_data_subscription_message(
   return wire;
 }
 
-//Does it really need?
 std::string FixMdCore::create_trade_data_subscription_message(
     const RequestId& request_id, const MarketDepthLevel& level,
-    const SymbolId& symbol) {
+    const SymbolId& symbol, bool /*subscribe*/) {
   MarketDataRequest request(false);
   populate_standard_header(request);
 
@@ -240,7 +239,7 @@ std::string FixMdCore::create_instrument_list_request_message(
   return wire;
 }
 
-MarketUpdateData FixMdCore::create_market_data_message(FIX8::Message* msg) {
+MarketUpdateData FixMdCore::create_market_data_message(WireMessage msg) {
   auto* entries = msg->find_group(kEntries);
   const std::vector<MarketData*> data(entries->size());
 
@@ -250,12 +249,12 @@ MarketUpdateData FixMdCore::create_market_data_message(FIX8::Message* msg) {
     return MarketUpdateData(kNone, std::move(data));
 
   if (entry->get<TradeID>()) {
-    return _create_trade_data_message(entries);
+    return create_trade_data_message(entries);
   }
-  return _create_market_data_message(entries);
+  return create_market_data_message(entries);
 }
 
-MarketUpdateData FixMdCore::_create_market_data_message(
+MarketUpdateData FixMdCore::create_market_data_message(
     const FIX8::GroupBase* entries) {
   std::vector<MarketData*> data;
   data.reserve(entries->size());
@@ -313,7 +312,7 @@ MarketUpdateData FixMdCore::_create_market_data_message(
     std::move(data));
 }
 
-MarketUpdateData FixMdCore::_create_trade_data_message(
+MarketUpdateData FixMdCore::create_trade_data_message(
     const FIX8::GroupBase* entries) {
   std::vector<MarketData*> data;
   data.reserve(entries->size());
@@ -359,7 +358,7 @@ MarketUpdateData FixMdCore::_create_trade_data_message(
   return MarketUpdateData(kTrade, std::move(data));
 }
 
-MarketUpdateData FixMdCore::create_snapshot_data_message(FIX8::Message* msg) {
+MarketUpdateData FixMdCore::create_snapshot_data_message(WireMessage msg) {
   const auto* symbol = msg->get<Symbol>();
   auto* entries = msg->find_group(kEntries);
 
@@ -399,7 +398,7 @@ MarketUpdateData FixMdCore::create_snapshot_data_message(FIX8::Message* msg) {
     std::move(data));
 }
 
-InstrumentInfo FixMdCore::create_instrument_list_message(FIX8::Message* msg) {
+InstrumentInfo FixMdCore::create_instrument_list_message(WireMessage msg) {
   InstrumentInfo out{};
   if (!msg) return out;
 
@@ -433,7 +432,7 @@ InstrumentInfo FixMdCore::create_instrument_list_message(FIX8::Message* msg) {
   return out;
 }
 
-MarketDataReject FixMdCore::create_reject_message(FIX8::Message* msg) {
+MarketDataReject FixMdCore::create_reject_message(WireMessage msg) {
   const auto ref_sequence = msg->get<RefSeqNum>();
   const auto msg_type = msg->get<RefMsgType>();
   const auto rejected_type = msg->get<SessionRejectReason>();

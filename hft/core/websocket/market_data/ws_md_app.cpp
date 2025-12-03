@@ -127,11 +127,18 @@ std::string WsMarketDataApp::create_market_data_subscription_message(
 
 std::string WsMarketDataApp::create_trade_data_subscription_message(
     const RequestId& request_id, const MarketDepthLevel& level,
-    const SymbolId& symbol) const {
+    const SymbolId& symbol, bool subscribe) const {
   return ws_md_core_.create_trade_data_subscription_message(request_id,
       level,
-      symbol);
+      symbol,
+      subscribe);
 }
+
+std::string WsMarketDataApp::create_snapshot_data_subscription_message(
+    const SymbolId& symbol, const MarketDepthLevel& level) const {
+  return ws_md_core_.create_snapshot_data_subscription_message(symbol, level);
+}
+
 MarketUpdateData WsMarketDataApp::create_market_data_message(
     const WireMessage& msg) const {
   return ws_md_core_.create_market_data_message(msg);
@@ -143,12 +150,8 @@ MarketUpdateData WsMarketDataApp::create_snapshot_data_message(
 }
 
 std::string WsMarketDataApp::create_snapshot_request_message(
-    const SymbolId& symbol) {
-  const std::string level = INI_CONFIG.get("meta", "level");
-  return ws_md_core_.create_market_data_subscription_message("snapshot",
-      level,
-      symbol,
-      true);
+    const SymbolId& symbol, MarketDepthLevel level) const {
+  return ws_md_core_.create_snapshot_data_subscription_message(symbol, level);
 }
 
 std::string WsMarketDataApp::request_instrument_list_message(

@@ -33,7 +33,7 @@ add_library(BrokerFix8Schema STATIC ${FIX8_SRC})
 target_precompile_headers(BrokerFix8Schema PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
 target_include_directories(BrokerFix8Schema PUBLIC
         ${CMAKE_SOURCE_DIR}/hft/core
-        ${CMAKE_SOURCE_DIR}/hft/core/NewOroFix44
+        ${CMAKE_SOURCE_DIR}/hft/core/fix/NewOroFix44
         ${CMAKE_SOURCE_DIR}/hft/core/fix
         /usr/local/include
         ${CMAKE_SOURCE_DIR}/include

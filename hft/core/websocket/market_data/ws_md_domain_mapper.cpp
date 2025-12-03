@@ -35,21 +35,21 @@ using schema::TradeEvent;
 MarketUpdateData WsMdDomainMapper::to_market_data(
     const WireMessage& msg) const {
   if (const auto* depth = as_depth(msg)) {
-    return build_depth_update(*depth, MarketDataType::kMarket);
+    return build_depth_update(*depth, kMarket);
   }
   if (const auto* trade = as_trade(msg)) {
     return build_trade_update(*trade);
   }
-  return MarketUpdateData{MarketDataType::kNone, {}};
+  return MarketUpdateData{kNone, {}};
 }
 
 MarketUpdateData WsMdDomainMapper::to_snapshot_data(
     const WireMessage& msg) const {
   if (const auto* snapshot = as_depth_snapshot(msg)) {
-    return build_depth_snapshot(*snapshot, MarketDataType::kMarket);
+    return build_depth_snapshot(*snapshot, kMarket);
   }
   logger_.error("Snapshot requested from non-depth wire message");
-  return MarketUpdateData{MarketDataType::kNone, {}};
+  return MarketUpdateData{kNone, {}};
 }
 
 InstrumentInfo WsMdDomainMapper::to_instrument_info(
@@ -241,7 +241,7 @@ MarketUpdateData WsMdDomainMapper::build_trade_update(
     entries.push_back(entry);
   }
 
-  return MarketUpdateData(-1, -1, MarketDataType::kTrade, std::move(entries));
+  return MarketUpdateData(-1, -1, kTrade, std::move(entries));
 }
 
 const DepthResponse* WsMdDomainMapper::as_depth(const WireMessage& msg) const {

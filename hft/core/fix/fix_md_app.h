@@ -45,7 +45,7 @@ class FixMarketDataApp : public FixApp<FixMarketDataApp, "MDRead", "MDWrite"> {
       const SymbolId& symbol, bool subscribe) const;
   std::string create_trade_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
-      const SymbolId& symbol) const;
+      const SymbolId& symbol, bool subscribe) const;
   MarketUpdateData create_market_data_message(WireMessage msg) const;
   MarketUpdateData create_snapshot_data_message(WireMessage msg) const;
   std::string request_instrument_list_message(const std::string& symbol = "") const;

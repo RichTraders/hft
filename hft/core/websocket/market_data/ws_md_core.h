@@ -25,9 +25,9 @@ namespace core {
 class WsMdCore {
  public:
   using WireMessage = WsMdWireMessage;
-  using RequestId = std::string;
-  using MarketDepthLevel = std::string;
-  using SymbolId = std::string;
+  using RequestId = std::string_view;
+  using MarketDepthLevel = std::string_view;
+  using SymbolId = std::string_view;
 
   WsMdCore(common::Logger* logger, common::MemoryPool<MarketData>* pool);
 
@@ -36,7 +36,9 @@ class WsMdCore {
       const SymbolId& symbol, bool subscribe) const;
   [[nodiscard]] std::string create_trade_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
-      const SymbolId& symbol) const;
+      const SymbolId& symbol, bool subscribe) const;
+  [[nodiscard]] std::string create_snapshot_data_subscription_message(
+      const SymbolId& symbol, const MarketDepthLevel& level) const;
   [[nodiscard]] std::string request_instrument_list_message(
       const std::string& symbol) const;
   [[nodiscard]] MarketUpdateData create_market_data_message(

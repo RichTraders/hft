@@ -31,10 +31,15 @@ std::string WsMdCore::create_market_data_subscription_message(
 
 std::string WsMdCore::create_trade_data_subscription_message(
     const RequestId& request_id, const MarketDepthLevel& level,
-    const SymbolId& symbol) const {
+    const SymbolId& symbol, bool subscribe) const {
   return encoder_.create_trade_data_subscription_message(request_id,
       level,
-      symbol);
+      symbol,
+      subscribe);
+}
+std::string WsMdCore::create_snapshot_data_subscription_message(
+    const SymbolId& symbol, const MarketDepthLevel& level) const {
+  return encoder_.create_snapshot_data_subscription_message(level, symbol);
 }
 
 std::string WsMdCore::request_instrument_list_message(

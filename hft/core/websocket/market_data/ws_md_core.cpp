@@ -12,16 +12,13 @@
 
 #include "ws_md_core.h"
 
-#include "schema/request/exchange_info.h"
-
 namespace core {
 
 WsMdCore::WsMdCore(common::Logger* logger, common::MemoryPool<MarketData>* pool)
     : logger_(logger->make_producer()),
       decoder_(logger_),
       mapper_(logger_, pool),
-      encoder_(logger_),
-      market_data_pool_(pool) {}
+      encoder_(logger_) {}
 
 std::string WsMdCore::create_market_data_subscription_message(
     const RequestId& request_id, const MarketDepthLevel& level,

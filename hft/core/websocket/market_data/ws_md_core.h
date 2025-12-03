@@ -54,7 +54,6 @@ class WsMdCore {
   WsMdDecoder decoder_;
   WsMdDomainMapper mapper_;
   WsMdEncoder encoder_;
-  common::MemoryPool<MarketData>* market_data_pool_;
 };
 
 }  // namespace core

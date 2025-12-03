@@ -258,6 +258,18 @@ inline OrdStatus toOrderStatus(std::string_view status) {
   if (status == "CANCELED") {
     return OrdStatus::kCanceled;
   }
+  if (status == "PENDING_CANCELED") {
+    return OrdStatus::kPendingCancel;
+  }
+  if (status == "REJECTED") {
+    return OrdStatus::kRejected;
+  }
+  if (status == "PENDING_NEW") {
+    return OrdStatus::kPendingNew;
+  }
+  if (status == "EXPIRED") {
+    return OrdStatus::kExpired;
+  }
   return OrdStatus::kInvalid;
 }
 

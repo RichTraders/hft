@@ -80,6 +80,82 @@ struct CancelAndReorderResult {
   CancelOrderResult cancel_response;
   PlaceOrderResult new_order_response;
 };
+struct ShortError {
+  int code{};
+  std::string msg;
+
+  struct glaze {
+    using T = ShortError;
+    static constexpr auto value = glz::object(
+      "code", &T::code,
+      "msg", &T::msg
+    );
+  };
+};
+struct CancelSuccess {
+  std::string symbol;
+  std::string orig_client_order_id;
+  long long order_id{};
+  long long order_list_id{};
+  std::string client_order_id;
+  long long transact_time{};
+  std::string price;
+  std::string orig_qty;
+  std::string executed_qty;
+  std::string orig_quote_order_qty;
+  std::string cummulative_quote_qty;
+  std::string status;
+  std::string time_in_force;
+  std::string type;
+  std::string side;
+  std::string self_trade_prevention_mode;
+
+  // clang-format off
+  struct glaze {
+    using T = CancelSuccess;
+    static constexpr auto value = glz::object(
+      "symbol", &T::symbol,
+      "origClientOrderId", &T::orig_client_order_id,
+      "orderId", &T::order_id,
+      "orderListId", &T::order_list_id,
+      "clientOrderId", &T::client_order_id,
+      "transactTime", &T::transact_time,
+      "price", &T::price,
+      "origQty", &T::orig_qty,
+      "executedQty", &T::executed_qty,
+      "origQuoteOrderQty", &T::orig_quote_order_qty,
+      "cummulativeQuoteQty", &T::cummulative_quote_qty,
+      "status", &T::status,
+      "timeInForce", &T::time_in_force,
+      "type", &T::type,
+      "side", &T::side,
+      "selfTradePreventionMode", &T::self_trade_prevention_mode
+    );
+  };
+  // clang-format on
+};
+using CancelResponseVariant =
+    std::variant<std::monostate, ShortError, CancelSuccess>;
+using NewOrderResponseVariant = std::variant<std::monostate, ShortError>;
+struct CancelAndReorderErrorResponse {
+  std::string cancel_result;    // "FAILURE" / "SUCCESS"
+  std::string new_order_result;  // "NOT_ATTEMPTED" / "FAILURE" / "SUCCESS" ...
+
+  CancelResponseVariant cancel_response;
+  NewOrderResponseVariant new_order_response;
+
+  // clang-format off
+  struct glaze {
+    using T = CancelAndReorderErrorResponse;
+    static constexpr auto value = glz::object(
+      "cancelResult", &T::cancel_result,
+      "newOrderResult", &T::new_order_result,
+      "cancelResponse", &T::cancel_response,
+      "newOrderResponse", &T::new_order_response
+    );
+  };
+  // clang-format on
+};
 
 struct CancelAllOrdersEntryOrder {
   std::string symbol;
@@ -141,176 +217,135 @@ struct CancelAllOrdersEntry {
   std::vector<CancelAllOrdersEntryOrderReport> order_reports;
 };
 
-template <typename ResultT>
+template <typename ResultT, typename ErrorDataT = std::string>
 struct WsApiResponse {
   std::string id;
   std::int32_t status{};
-  ResultT result;
-  std::vector<RateLimit> rate_limits;
-  std::optional<ErrorResponse> error;
+  std::optional<ResultT> result;
+  std::optional<std::vector<RateLimit>> rate_limits;
+  std::optional<ErrorResponse<ErrorDataT>> error;
 };
 
-using CancelOrderResponse        = WsApiResponse<CancelOrderResult>;
-using CancelAndReorderResponse   = WsApiResponse<CancelAndReorderResult>;
-using PlaceOrderResponse         = WsApiResponse<PlaceOrderResult>;
-using CancelAllOrdersResponse    = WsApiResponse<std::vector<CancelAllOrdersEntry>>;
-}
+using CancelOrderResponse = WsApiResponse<CancelOrderResult, CancelOrderResult>;
+using CancelAndReorderResponse =
+    WsApiResponse<CancelAndReorderResult, CancelAndReorderErrorResponse>;
+using PlaceOrderResponse = WsApiResponse<PlaceOrderResult, PlaceOrderResult>;
+using CancelAllOrdersResponse =
+    WsApiResponse<std::vector<CancelAllOrdersEntry>, CancelAllOrdersEntry>;
+}  // namespace schema
 
 namespace glz {
 template <>
 struct meta<::schema::OrderFill> {
   using T = ::schema::OrderFill;
-  static constexpr auto value = glz::object(
-      "price", glz::quoted_num<&T::price>,
-      "qty", glz::quoted_num<&T::quantity>,
-      "commission", glz::quoted_num<&T::commission>,
-      "commissionAsset", &T::commission_asset,
+  static constexpr auto value = glz::object("price", glz::quoted_num<&T::price>,
+      "qty", glz::quoted_num<&T::quantity>, "commission",
+      glz::quoted_num<&T::commission>, "commissionAsset", &T::commission_asset,
       "tradeId", &T::trade_id);
 };
 
 template <>
 struct meta<::schema::CancelOrderResult> {
   using T = ::schema::CancelOrderResult;
-  static constexpr auto value = glz::object(
-      "symbol", &T::symbol,
-      "origClientOrderId", &T::original_client_order_id,
-      "orderId", &T::order_id,
-      "orderListId", &T::order_list_id,
-      "clientOrderId", &T::client_order_id,
-      "transactTime", &T::transact_time,
-      "price", glz::quoted_num<&T::price>,
-      "origQty", glz::quoted_num<&T::original_quantity>,
-      "executedQty", glz::quoted_num<&T::executed_quantity>,
-      "origQuoteOrderQty", glz::quoted_num<&T::original_quote_order_quantity>,
-      "cummulativeQuoteQty", glz::quoted_num<&T::cumulative_quote_quantity>,
-      "status", &T::status,
-      "timeInForce", &T::time_in_force,
-      "type", &T::order_type,
-      "side", &T::side,
-      "stopPrice", glz::quoted_num<&T::stop_price>,
-      "trailingDelta", &T::trailing_delta,
-      "trailingTime", &T::trailing_time,
-      "icebergQty", glz::quoted_num<&T::iceberg_quantity>,
-      "strategyId", &T::strategy_id,
-      "strategyType", &T::strategy_type,
-      "selfTradePreventionMode", &T::self_trade_prevention_mode);
+  static constexpr auto value = glz::object("symbol", &T::symbol,
+      "origClientOrderId", &T::original_client_order_id, "orderId",
+      &T::order_id, "orderListId", &T::order_list_id, "clientOrderId",
+      &T::client_order_id, "transactTime", &T::transact_time, "price",
+      glz::quoted_num<&T::price>, "origQty",
+      glz::quoted_num<&T::original_quantity>, "executedQty",
+      glz::quoted_num<&T::executed_quantity>, "origQuoteOrderQty",
+      glz::quoted_num<&T::original_quote_order_quantity>, "cummulativeQuoteQty",
+      glz::quoted_num<&T::cumulative_quote_quantity>, "status", &T::status,
+      "timeInForce", &T::time_in_force, "type", &T::order_type, "side",
+      &T::side, "stopPrice", glz::quoted_num<&T::stop_price>, "trailingDelta",
+      &T::trailing_delta, "trailingTime", &T::trailing_time, "icebergQty",
+      glz::quoted_num<&T::iceberg_quantity>, "strategyId", &T::strategy_id,
+      "strategyType", &T::strategy_type, "selfTradePreventionMode",
+      &T::self_trade_prevention_mode);
 };
 
 // PlaceOrderResult (ACK/RESULT/FULL 공통)
 template <>
 struct meta<::schema::PlaceOrderResult> {
   using T = ::schema::PlaceOrderResult;
-  static constexpr auto value = glz::object(
-      "symbol", &T::symbol,
-      "orderId", &T::order_id,
-      "orderListId", &T::order_list_id,
-      "clientOrderId", &T::client_order_id,
-      "transactTime", &T::transact_time,
+  static constexpr auto value = glz::object("symbol", &T::symbol, "orderId",
+      &T::order_id, "orderListId", &T::order_list_id, "clientOrderId",
+      &T::client_order_id, "transactTime", &T::transact_time,
 
-      "price", glz::quoted_num<&T::price>,
-      "origQty", glz::quoted_num<&T::original_quantity>,
-      "executedQty", glz::quoted_num<&T::executed_quantity>,
-      "origQuoteOrderQty", glz::quoted_num<&T::original_quote_order_quantity>,
-      "cummulativeQuoteQty", glz::quoted_num<&T::cumulative_quote_quantity>,
-      "status", &T::status,
-      "timeInForce", &T::time_in_force,
-      "type", &T::order_type,
-      "side", &T::side,
-      "workingTime", &T::working_time,
-      "selfTradePreventionMode", &T::self_trade_prevention_mode,
-      "fills", &T::fills);
+      "price", glz::quoted_num<&T::price>, "origQty",
+      glz::quoted_num<&T::original_quantity>, "executedQty",
+      glz::quoted_num<&T::executed_quantity>, "origQuoteOrderQty",
+      glz::quoted_num<&T::original_quote_order_quantity>, "cummulativeQuoteQty",
+      glz::quoted_num<&T::cumulative_quote_quantity>, "status", &T::status,
+      "timeInForce", &T::time_in_force, "type", &T::order_type, "side",
+      &T::side, "workingTime", &T::working_time, "selfTradePreventionMode",
+      &T::self_trade_prevention_mode, "fills", &T::fills);
 };
 
 template <>
 struct meta<::schema::CancelAndReorderResult> {
   using T = ::schema::CancelAndReorderResult;
-  static constexpr auto value = glz::object(
-      "cancelResult", &T::cancel_result,
-      "newOrderResult", &T::new_order_result,
-      "cancelResponse", &T::cancel_response,
-      "newOrderResponse", &T::new_order_response);
+  static constexpr auto value = glz::object("cancelResult", &T::cancel_result,
+      "newOrderResult", &T::new_order_result, "cancelResponse",
+      &T::cancel_response, "newOrderResponse", &T::new_order_response);
 };
 
 template <>
 struct meta<::schema::CancelAllOrdersEntryOrder> {
   using T = ::schema::CancelAllOrdersEntryOrder;
-  static constexpr auto value = glz::object(
-      "symbol", &T::symbol,
-      "orderId", &T::order_id,
-      "clientOrderId", &T::client_order_id);
+  static constexpr auto value = glz::object("symbol", &T::symbol, "orderId",
+      &T::order_id, "clientOrderId", &T::client_order_id);
 };
 
 template <>
 struct meta<::schema::CancelAllOrdersEntryOrderReport> {
   using T = ::schema::CancelAllOrdersEntryOrderReport;
-  static constexpr auto value = glz::object(
-      "symbol", &T::symbol,
-      "origClientOrderId", &T::original_client_order_id,
-      "orderId", &T::order_id,
-      "orderListId", &T::order_list_id,
-      "clientOrderId", &T::client_order_id,
-      "transactTime", &T::transact_time,
-      "price", glz::quoted_num<&T::price>,
-      "origQty", glz::quoted_num<&T::original_quantity>,
-      "executedQty", glz::quoted_num<&T::executed_quantity>,
-      "origQuoteOrderQty", glz::quoted_num<&T::original_quote_order_quantity>,
-      "cummulativeQuoteQty", glz::quoted_num<&T::cumulative_quote_quantity>,
-      "status", &T::status,
-      "timeInForce", &T::time_in_force,
-      "type", &T::order_type,
-      "side", &T::side,
-      "stopPrice", glz::quoted_num<&T::stop_price>,
+  static constexpr auto value = glz::object("symbol", &T::symbol,
+      "origClientOrderId", &T::original_client_order_id, "orderId",
+      &T::order_id, "orderListId", &T::order_list_id, "clientOrderId",
+      &T::client_order_id, "transactTime", &T::transact_time, "price",
+      glz::quoted_num<&T::price>, "origQty",
+      glz::quoted_num<&T::original_quantity>, "executedQty",
+      glz::quoted_num<&T::executed_quantity>, "origQuoteOrderQty",
+      glz::quoted_num<&T::original_quote_order_quantity>, "cummulativeQuoteQty",
+      glz::quoted_num<&T::cumulative_quote_quantity>, "status", &T::status,
+      "timeInForce", &T::time_in_force, "type", &T::order_type, "side",
+      &T::side, "stopPrice", glz::quoted_num<&T::stop_price>,
       "selfTradePreventionMode", &T::self_trade_prevention_mode);
 };
 
 template <>
 struct meta<::schema::CancelAllOrdersEntry> {
   using T = ::schema::CancelAllOrdersEntry;
-  static constexpr auto value = glz::object(
-      "symbol", &T::symbol,
-      "origClientOrderId", &T::original_client_order_id,
-      "orderId", &T::order_id,
-      "orderListId", &T::order_list_id,
-      "clientOrderId", &T::client_order_id,
-      "transactTime", &T::transact_time,
-      "price", glz::quoted_num<&T::price>,
-      "origQty", glz::quoted_num<&T::original_quantity>,
-      "executedQty", glz::quoted_num<&T::executed_quantity>,
-      "origQuoteOrderQty",
-      glz::quoted_num<&T::original_quote_order_quantity>,
-      "cummulativeQuoteQty",
-      glz::quoted_num<&T::cumulative_quote_quantity>,
-      "status", &T::status,
-      "timeInForce", &T::time_in_force,
-      "type", &T::order_type,
-      "side", &T::side,
-      "stopPrice", glz::quoted_num<&T::stop_price>,
-      "trailingDelta", &T::trailing_delta,
-      "trailingTime", &T::trailing_time,
-      "icebergQty", glz::quoted_num<&T::iceberg_quantity>,
-      "strategyId", &T::strategy_id,
-      "strategyType", &T::strategy_type,
-      "selfTradePreventionMode", &T::self_trade_prevention_mode,
+  static constexpr auto value = glz::object("symbol", &T::symbol,
+      "origClientOrderId", &T::original_client_order_id, "orderId",
+      &T::order_id, "orderListId", &T::order_list_id, "clientOrderId",
+      &T::client_order_id, "transactTime", &T::transact_time, "price",
+      glz::quoted_num<&T::price>, "origQty",
+      glz::quoted_num<&T::original_quantity>, "executedQty",
+      glz::quoted_num<&T::executed_quantity>, "origQuoteOrderQty",
+      glz::quoted_num<&T::original_quote_order_quantity>, "cummulativeQuoteQty",
+      glz::quoted_num<&T::cumulative_quote_quantity>, "status", &T::status,
+      "timeInForce", &T::time_in_force, "type", &T::order_type, "side",
+      &T::side, "stopPrice", glz::quoted_num<&T::stop_price>, "trailingDelta",
+      &T::trailing_delta, "trailingTime", &T::trailing_time, "icebergQty",
+      glz::quoted_num<&T::iceberg_quantity>, "strategyId", &T::strategy_id,
+      "strategyType", &T::strategy_type, "selfTradePreventionMode",
+      &T::self_trade_prevention_mode,
 
-      "contingencyType", &T::contingency_type,
-      "listStatusType", &T::list_status_type,
-      "listOrderStatus", &T::list_order_status,
-      "listClientOrderId", &T::list_client_order_id,
-      "transactionTime", &T::transaction_time,
-      "orders", &T::orders,
-      "orderReports", &T::order_reports);
+      "contingencyType", &T::contingency_type, "listStatusType",
+      &T::list_status_type, "listOrderStatus", &T::list_order_status,
+      "listClientOrderId", &T::list_client_order_id, "transactionTime",
+      &T::transaction_time, "orders", &T::orders, "orderReports",
+      &T::order_reports);
 };
 
-template <typename ResultT>
-struct meta<::schema::WsApiResponse<ResultT>> {
-  using T = ::schema::WsApiResponse<ResultT>;
-  static constexpr auto value = glz::object(
-      "id", &T::id,
-      "status", &T::status,
-      "result", &T::result,
-      "rateLimits", &T::rate_limits,
-      "error",&T::error);
+template <typename ResultT, typename ErrorDataT>
+struct meta<::schema::WsApiResponse<ResultT, ErrorDataT>> {
+  using T = ::schema::WsApiResponse<ResultT, ErrorDataT>;
+  static constexpr auto value = glz::object("id", &T::id, "status", &T::status,
+      "result", &T::result, "rateLimits", &T::rate_limits, "error", &T::error);
 };
-}
+}  // namespace glz
 // clang-format on
 #endif  //SCHEMA_ORDER_H

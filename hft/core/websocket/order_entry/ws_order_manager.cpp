@@ -73,6 +73,12 @@ WsOrderManager::create_synthetic_execution_report(std::string_view request_id,
   event.order_status = "REJECTED";
   event.reject_reason = error_message.data();
 
+  event.order_price = 0.;
+  event.order_quantity = 0.;
+  event.last_executed_quantity = 0.;
+  event.cumulative_filled_quantity = 0.;
+  event.last_executed_price = 0.;
+
   // Fill in details from pending request if available
   if (LIKELY(reqeust != pending_requests_.end())) {
     const auto& pending = reqeust->second;

@@ -25,10 +25,10 @@ struct ExecutionReportData {
   std::string order_type;         // "o" (LIMIT, MARKET, ...)
   std::string time_in_force;      // "f" (GTC, IOC, ...)
 
-  double order_quantity;    // "q"
-  double order_price;       // "p"
-  double stop_price;        // "P"
-  double iceberg_quantity;  // "F"
+  double order_quantity{0.};    // "q"
+  double order_price{0.};       // "p"
+  double stop_price{0.};        // "P"
+  double iceberg_quantity{0.};  // "F"
 
   std::int64_t order_list_id;            // "g"
   std::string original_client_order_id;  // "C"
@@ -37,19 +37,19 @@ struct ExecutionReportData {
   std::string order_status;            // "X" (NEW, FILLED, ...)
   std::string reject_reason = "NONE";  // "r"
 
-  std::uint64_t order_id;
+  std::int64_t order_id;
 
-  double last_executed_quantity;      // "l"
-  double cumulative_filled_quantity;  // "z"
-  double last_executed_price;         // "L"
+  double last_executed_quantity{0.};      // "l"
+  double cumulative_filled_quantity{0.};  // "z"
+  double last_executed_price{0.};         // "L"
 
-  double commission_amount;                     // "n"
+  double commission_amount{0.};                 // "n"
   std::optional<std::string> commission_asset;  // "N" (nullable)
 
-  std::uint64_t transaction_time;    // "T"
+  std::int64_t transaction_time;    // "T"
   std::int64_t trade_id;             // "t"
-  std::uint64_t prevented_match_id;  // "v"
-  std::uint64_t execution_id;        // "I"
+  std::int64_t prevented_match_id;  // "v"
+  std::int64_t execution_id;        // "I"
 
   bool is_on_book;     // "w"
   bool is_maker_side;  // "m"
@@ -57,9 +57,9 @@ struct ExecutionReportData {
 
   std::uint64_t order_creation_time;  // "O"
 
-  double cumulative_quote_quantity;  // "Z"
-  double last_quote_quantity;        // "Y"
-  double quote_order_quantity;       // "Q"
+  double cumulative_quote_quantity{0.};  // "Z"
+  double last_quote_quantity{0.};        // "Y"
+  double quote_order_quantity{0.};       // "Q"
 
   std::uint64_t working_time;                       // "W"
   std::string self_trade_prevention_mode = "NONE";  // "V"

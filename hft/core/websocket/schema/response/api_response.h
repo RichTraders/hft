@@ -23,6 +23,7 @@ struct RateLimit {
   int limit;
   std::optional<int> count;
 
+  // clang-format off
   struct glaze {
     using T = RateLimit;
     static constexpr auto value = glz::object(
@@ -32,22 +33,25 @@ struct RateLimit {
       "limit", &T::limit,
       "count", &T::count);
   };
+  // clang-format on
 };
 
+template <typename DataT = std::string>
 struct ErrorResponse {
   std::int32_t code;
   std::string message;
+  std::optional<DataT> data;
   struct glaze {
     using T = ErrorResponse;
     static constexpr auto value =
-        glz::object("code", &T::code, "msg", &T::message);
+        glz::object("code", &T::code, "msg", &T::message, "data", &T::data);
   };
 };
 
 struct ApiResponse {
   std::string id;
   int status{0};
-  std::optional<ErrorResponse> error;
+  std::optional<ErrorResponse<>> error;
   std::optional<std::vector<RateLimit>> rate_limits;
 
   // clang-format off

@@ -11,12 +11,10 @@
  */
 
 #include <gtest/gtest.h>
-#include <fstream>
-#include <sstream>
 #include <glaze/glaze.hpp>
+#include "logger.h"
 #include "websocket/order_entry/ws_oe_decoder.h"
 #include "websocket/order_entry/ws_oe_wire_message.h"
-#include "logger.h"
 
 using namespace core;
 using namespace common;
@@ -32,18 +30,22 @@ std::string load_test_data(const std::string& filename) {
     return "";
   }
   return std::string(std::istreambuf_iterator<char>(file),
-                     std::istreambuf_iterator<char>());
+      std::istreambuf_iterator<char>());
 }
 
 // Verify JSON is well-formed
 bool is_valid_json(std::string_view json) {
   // Simple validation: check if it starts with { or [ and ends with } or ]
-  if (json.empty()) return false;
+  if (json.empty())
+    return false;
   auto trimmed = json;
-  while (!trimmed.empty() && std::isspace(trimmed.front())) trimmed.remove_prefix(1);
-  while (!trimmed.empty() && std::isspace(trimmed.back())) trimmed.remove_suffix(1);
+  while (!trimmed.empty() && std::isspace(trimmed.front()))
+    trimmed.remove_prefix(1);
+  while (!trimmed.empty() && std::isspace(trimmed.back()))
+    trimmed.remove_suffix(1);
 
-  if (trimmed.empty()) return false;
+  if (trimmed.empty())
+    return false;
 
   char first = trimmed.front();
   char last = trimmed.back();
@@ -52,16 +54,17 @@ bool is_valid_json(std::string_view json) {
 }
 
 // Variant type checker
-template<typename T, typename VariantT>
+template <typename T, typename VariantT>
 bool holds_type(const VariantT& var) {
   return std::holds_alternative<T>(var);
 }
 
 // Safe variant getter with better error messages
-template<typename T, typename VariantT>
+template <typename T, typename VariantT>
 const T& get_or_fail(const VariantT& var, const std::string& context) {
   if (!std::holds_alternative<T>(var)) {
-    throw std::runtime_error("Variant does not hold expected type in: " + context);
+    throw std::runtime_error(
+        "Variant does not hold expected type in: " + context);
   }
   return std::get<T>(var);
 }
@@ -141,10 +144,12 @@ TEST_F(WsOeDecoderTest, DecodeExecutionReport_NewOrder_CorrectVariantType) {
 
   auto wire_msg = decoder_->decode(json);
 
-  ASSERT_TRUE(test_utils::holds_type<schema::ExecutionReportResponse>(wire_msg));
+  ASSERT_TRUE(
+      test_utils::holds_type<schema::ExecutionReportResponse>(wire_msg));
 
-  const auto& exec_report = test_utils::get_or_fail<schema::ExecutionReportResponse>(
-      wire_msg, "DecodeExecutionReport_NewOrder");
+  const auto& exec_report =
+      test_utils::get_or_fail<schema::ExecutionReportResponse>(wire_msg,
+          "DecodeExecutionReport_NewOrder");
 
   EXPECT_EQ(exec_report.subscription_id, 1);
   EXPECT_EQ(exec_report.event.event_type, "executionReport");
@@ -200,10 +205,12 @@ TEST_F(WsOeDecoderTest, DecodeExecutionReport_TradeExecution_AllFieldsParsed) {
 
   auto wire_msg = decoder_->decode(json);
 
-  ASSERT_TRUE(test_utils::holds_type<schema::ExecutionReportResponse>(wire_msg));
+  ASSERT_TRUE(
+      test_utils::holds_type<schema::ExecutionReportResponse>(wire_msg));
 
-  const auto& exec_report = test_utils::get_or_fail<schema::ExecutionReportResponse>(
-      wire_msg, "DecodeExecutionReport_TradeExecution");
+  const auto& exec_report =
+      test_utils::get_or_fail<schema::ExecutionReportResponse>(wire_msg,
+          "DecodeExecutionReport_TradeExecution");
 
   EXPECT_EQ(exec_report.event.execution_type, "TRADE");
   EXPECT_EQ(exec_report.event.order_status, "FILLED");
@@ -258,16 +265,19 @@ TEST_F(WsOeDecoderTest, DecodeExecutionReport_OrderCanceled_StatusCorrect) {
 
   auto wire_msg = decoder_->decode(json);
 
-  ASSERT_TRUE(test_utils::holds_type<schema::ExecutionReportResponse>(wire_msg));
+  ASSERT_TRUE(
+      test_utils::holds_type<schema::ExecutionReportResponse>(wire_msg));
 
-  const auto& exec_report = test_utils::get_or_fail<schema::ExecutionReportResponse>(
-      wire_msg, "DecodeExecutionReport_OrderCanceled");
+  const auto& exec_report =
+      test_utils::get_or_fail<schema::ExecutionReportResponse>(wire_msg,
+          "DecodeExecutionReport_OrderCanceled");
 
   EXPECT_EQ(exec_report.event.execution_type, "CANCELED");
   EXPECT_EQ(exec_report.event.order_status, "CANCELED");
 }
 
-TEST_F(WsOeDecoderTest, DecodeExecutionReport_NullCommissionAsset_OptionalHandled) {
+TEST_F(WsOeDecoderTest,
+    DecodeExecutionReport_NullCommissionAsset_OptionalHandled) {
   std::string json = R"({
     "subscriptionId": 4,
     "event": {
@@ -311,10 +321,12 @@ TEST_F(WsOeDecoderTest, DecodeExecutionReport_NullCommissionAsset_OptionalHandle
 
   auto wire_msg = decoder_->decode(json);
 
-  ASSERT_TRUE(test_utils::holds_type<schema::ExecutionReportResponse>(wire_msg));
+  ASSERT_TRUE(
+      test_utils::holds_type<schema::ExecutionReportResponse>(wire_msg));
 
-  const auto& exec_report = test_utils::get_or_fail<schema::ExecutionReportResponse>(
-      wire_msg, "DecodeExecutionReport_NullCommissionAsset");
+  const auto& exec_report =
+      test_utils::get_or_fail<schema::ExecutionReportResponse>(wire_msg,
+          "DecodeExecutionReport_NullCommissionAsset");
 
   EXPECT_FALSE(exec_report.event.commission_asset.has_value());
 }
@@ -350,8 +362,9 @@ TEST_F(WsOeDecoderTest, DecodeSessionLogon_Success_AllFieldsPresent) {
 
   ASSERT_TRUE(test_utils::holds_type<schema::SessionLogonResponse>(wire_msg));
 
-  const auto& logon = test_utils::get_or_fail<schema::SessionLogonResponse>(
-      wire_msg, "DecodeSessionLogon_Success");
+  const auto& logon =
+      test_utils::get_or_fail<schema::SessionLogonResponse>(wire_msg,
+          "DecodeSessionLogon_Success");
 
   EXPECT_EQ(logon.id, "login_1699564800000");
   EXPECT_EQ(logon.status, 200);
@@ -383,12 +396,13 @@ TEST_F(WsOeDecoderTest, DecodePlaceOrderResponse_ACK_MinimalFields) {
 
   ASSERT_TRUE(test_utils::holds_type<schema::PlaceOrderResponse>(wire_msg));
 
-  const auto& response = test_utils::get_or_fail<schema::PlaceOrderResponse>(
-      wire_msg, "DecodePlaceOrderResponse_ACK");
+  const auto& response =
+      test_utils::get_or_fail<schema::PlaceOrderResponse>(wire_msg,
+          "DecodePlaceOrderResponse_ACK");
 
   EXPECT_EQ(response.status, 200);
-  EXPECT_EQ(response.result.symbol, "BTCUSDT");
-  EXPECT_EQ(response.result.client_order_id, "1764688108000001");
+  EXPECT_EQ(response.result->symbol, "BTCUSDT");
+  EXPECT_EQ(response.result->client_order_id, "1764688108000001");
 }
 
 TEST_F(WsOeDecoderTest, DecodeCancelOrderResponse_Success_AllFieldsPresent) {
@@ -419,12 +433,13 @@ TEST_F(WsOeDecoderTest, DecodeCancelOrderResponse_Success_AllFieldsPresent) {
 
   ASSERT_TRUE(test_utils::holds_type<schema::CancelOrderResponse>(wire_msg));
 
-  const auto& response = test_utils::get_or_fail<schema::CancelOrderResponse>(
-      wire_msg, "DecodeCancelOrderResponse_Success");
+  const auto& response =
+      test_utils::get_or_fail<schema::CancelOrderResponse>(wire_msg,
+          "DecodeCancelOrderResponse_Success");
 
   EXPECT_EQ(response.status, 200);
-  EXPECT_EQ(response.result.symbol, "ETHUSDT");
-  EXPECT_EQ(response.result.original_client_order_id, "1111111111");
+  EXPECT_EQ(response.result->symbol, "ETHUSDT");
+  EXPECT_EQ(response.result->original_client_order_id, "1111111111");
 }
 
 // ============================================================================
@@ -493,13 +508,12 @@ TEST_F(WsOeDecoderTest, DecodeUserProvidedData_IfAvailable_ParsesCorrectly) {
 }
 
 TEST_F(WsOeDecoderTest, DecodeMultipleUserFiles_AllValid_ParseWithoutErrors) {
-  std::vector<std::string> test_files = {
-      "execution_report_new.json",
+  std::vector<std::string> test_files = {"execution_report_new.json",
       "execution_report_trade.json",
       "execution_report_canceled.json",
       "session_logon_success.json",
-      "placeorder_response_ack.json"
-  };
+      "placeorder_response_ack.json",
+      "cancel_reorder_fail.json"};
 
   int files_tested = 0;
 
@@ -524,4 +538,104 @@ TEST_F(WsOeDecoderTest, DecodeMultipleUserFiles_AllValid_ParseWithoutErrors) {
   if (files_tested == 0) {
     GTEST_SKIP() << "No user-provided test data files available";
   }
+}
+
+// ============================================================================
+// CancelAndReorder Response Tests
+// ============================================================================
+
+TEST_F(WsOeDecoderTest,
+    DecodeCancelAndReorderResponse_PartialFail_ErrorParsedCorrectly) {
+  std::string json = test_utils::load_test_data("cancel_reorder_fail.json");
+
+  if (json.empty()) {
+    GTEST_SKIP() << "cancel_reorder_fail.json not available";
+  }
+
+  EXPECT_TRUE(test_utils::is_valid_json(json));
+
+  auto wire_msg = decoder_->decode(json);
+
+  // Debug: Check what type was actually parsed
+  if (test_utils::holds_type<std::monostate>(wire_msg)) {
+    FAIL() << "Decoded to monostate (parsing failed)";
+  } else if (test_utils::holds_type<schema::ApiResponse>(wire_msg)) {
+    FAIL() << "Decoded to ApiResponse instead of CancelAndReorderResponse";
+  }
+
+  ASSERT_TRUE(
+      test_utils::holds_type<schema::CancelAndReorderResponse>(wire_msg))
+      << "Expected CancelAndReorderResponse variant type";
+
+  const auto& response =
+      test_utils::get_or_fail<schema::CancelAndReorderResponse>(wire_msg,
+          "DecodeCancelAndReorderResponse_PartialFail");
+
+  // Verify response header
+  EXPECT_EQ(response.id, "orderreplace_1764690263119909563");
+  EXPECT_EQ(response.status, 409);
+
+  // Verify error structure exists
+  ASSERT_TRUE(response.error.has_value()) << "Error field should be present";
+  EXPECT_EQ(response.error->code, -2021);
+  EXPECT_EQ(response.error->message, "Order cancel-replace partially failed.");
+
+  // Verify error data structure
+  ASSERT_TRUE(response.error->data.has_value())
+      << "Error data should be present";
+  const auto& error_data = response.error->data.value();
+
+  // Verify cancel and new order results
+  EXPECT_EQ(error_data.cancel_result, "SUCCESS");
+  EXPECT_EQ(error_data.new_order_result, "FAILURE");
+
+  // Verify cancelResponse details
+  const auto& resp = error_data.cancel_response;
+  const auto cancel_resp = std::get<schema::CancelSuccess>(resp);
+  EXPECT_EQ(cancel_resp.symbol, "BTCUSDT");
+  EXPECT_EQ(cancel_resp.orig_client_order_id, "1764690263066988543");
+  EXPECT_EQ(cancel_resp.order_id, 53230736388);
+  EXPECT_EQ(cancel_resp.order_list_id, -1);
+  EXPECT_EQ(cancel_resp.client_order_id, "1764690263119909562");
+  EXPECT_EQ(cancel_resp.transact_time, 1764690263200);
+  EXPECT_EQ(cancel_resp.price, "90636.16000000");
+  EXPECT_EQ(cancel_resp.orig_qty, "0.00006000");
+  EXPECT_EQ(cancel_resp.executed_qty, "0.00000000");
+  EXPECT_EQ(cancel_resp.cummulative_quote_qty, "0.00000000");
+  EXPECT_EQ(cancel_resp.status, "CANCELED");
+  EXPECT_EQ(cancel_resp.time_in_force, "GTC");
+  EXPECT_EQ(cancel_resp.type, "LIMIT");
+  EXPECT_EQ(cancel_resp.side, "BUY");
+  EXPECT_EQ(cancel_resp.self_trade_prevention_mode, "EXPIRE_TAKER");
+}
+
+TEST_F(WsOeDecoderTest, DecodeCancelAndReorderResponse_CancelFailure) {
+  std::string json = test_utils::load_test_data("cancel_reorder_cancel_fail.json");
+
+  if (json.empty()) {
+    GTEST_SKIP() << "cancel_reorder_cancel_fail.json not available";
+  }
+
+  auto wire_msg = decoder_->decode(json);
+
+  ASSERT_TRUE(
+      test_utils::holds_type<schema::CancelAndReorderResponse>(wire_msg));
+
+  const auto& response =
+      test_utils::get_or_fail<schema::CancelAndReorderResponse>(wire_msg,
+          "DecodeCancelAndReorderResponse_CancelFailure");
+
+  ASSERT_TRUE(response.error.has_value());
+  ASSERT_TRUE(response.error->data.has_value());
+
+  const auto& error_data = response.error->data.value();
+  EXPECT_EQ(error_data.cancel_result, "FAILURE");
+  EXPECT_EQ(error_data.new_order_result, "NOT_ATTEMPTED");
+
+  const auto& resp = error_data.cancel_response;
+  const auto cancel_resp = std::get<schema::ShortError>(resp);
+  EXPECT_EQ(cancel_resp.code, -2011) << "cancel response code should be -2011";
+  EXPECT_EQ(cancel_resp.msg, "Unknown order sent.") << "Expected cancel response message : Unknown order sent.";
+
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(error_data.new_order_response));
 }

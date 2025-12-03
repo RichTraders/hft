@@ -21,16 +21,16 @@ WsOeDecoder::WireMessage WsOeDecoder::decode(std::string_view payload) const {
   logger_.info(std::format("[WsOeCore]payload :{}", payload));
 
   if (payload.find("executionReport") != std::string_view::npos) {
-    return decode_or_log<schema::ExecutionReportResponse>(payload,
-        "[executionReport]");
+    return decode_or_log<schema::ExecutionReportResponse, "[executionReport]">(
+        payload);
   }
   if (payload.find("outboundAccountPosition") != std::string_view::npos) {
-    return decode_or_log<schema::OutboundAccountPositionEnvelope>(payload,
-        "[outboundAccountPosition]");
+    return decode_or_log<schema::OutboundAccountPositionEnvelope,
+        "[outboundAccountPosition]">(payload);
   }
   if (payload.find("balanceUpdate") != std::string_view::npos) {
-    return decode_or_log<schema::BalanceUpdateEnvelope>(payload,
-        "[balanceUpdate]");
+    return decode_or_log<schema::BalanceUpdateEnvelope, "[balanceUpdate]">(
+        payload);
   }
 
   schema::WsHeader header{};
@@ -45,49 +45,49 @@ WsOeDecoder::WireMessage WsOeDecoder::decode(std::string_view payload) const {
   logger_.debug(std::format("[WsOeCore]header id :{}", header.id));
 
   if (header.id.starts_with("login_")) {
-    return decode_or_log<schema::SessionLogonResponse>(payload,
-        "[session.logon]");
+    return decode_or_log<schema::SessionLogonResponse, "[session.logon]">(
+        payload);
   }
 
   if (header.id.starts_with("subscribe")) {
-    return decode_or_log<schema::SessionUserSubscriptionResponse>(payload,
-        "[userDataStream.subscribe]");
+    return decode_or_log<schema::SessionUserSubscriptionResponse,
+        "[userDataStream.subscribe]">(payload);
   }
 
   if (header.id.starts_with("unsubscribe")) {
-    return decode_or_log<schema::SessionUserUnsubscriptionResponse>(payload,
-        "[userDataStream.unsubscribe]");
+    return decode_or_log<schema::SessionUserUnsubscriptionResponse,
+        "[userDataStream.unsubscribe]">(payload);
   }
 
   if (header.id.starts_with("order")) {
     if (header.id.starts_with("orderreplace")) {
-      return decode_or_log<schema::CancelAndReorderResponse>(payload,
-          "[cancelReplace]");
+      return decode_or_log<schema::CancelAndReorderResponse, "[cancelReplace]">(
+          payload);
     }
     if (header.id.starts_with("ordercancelAll")) {
-      return decode_or_log<schema::CancelAllOrdersResponse>(payload,
-          "[cancelAll]");
+      return decode_or_log<schema::CancelAllOrdersResponse, "[cancelAll]">(
+          payload);
     }
     if (header.id.starts_with("ordercancel")) {
-      return decode_or_log<schema::CancelOrderResponse>(payload,
-          "[orderCancel]");
+      return decode_or_log<schema::CancelOrderResponse, "[orderCancel]">(
+          payload);
     }
-    return decode_or_log<schema::PlaceOrderResponse>(payload, "[orderPlace]");
+    return decode_or_log<schema::PlaceOrderResponse, "[orderPlace]">(payload);
   }
 
-  return decode_or_log<schema::ApiResponse>(payload, "[API response]");
+  return decode_or_log<schema::ApiResponse, "[API response]">(payload);
 }
 
-template <class T>
-WsOeDecoder::WireMessage WsOeDecoder::decode_or_log(std::string_view payload,
-    std::string_view label) const {
+template <class T, FixedString Label>
+WsOeDecoder::WireMessage WsOeDecoder::decode_or_log(
+    std::string_view payload) const {
   auto parsed = glz::read_json<T>(payload);
   if (!parsed) {
     auto error_msg = glz::format_error(parsed.error(), payload);
     logger_.error(
         std::format("\x1b[31m Failed to decode {} response: "
                     "{}. payload:{} \x1b[0m",
-            label,
+            Label.view(),
             error_msg,
             payload));
     return WireMessage{};

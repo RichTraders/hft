@@ -28,9 +28,8 @@ class WsOeDecoder {
   [[nodiscard]] WireMessage decode(std::string_view payload) const;
 
  private:
-  template <class T>
-  [[nodiscard]] WireMessage decode_or_log(std::string_view payload,
-      std::string_view label) const;
+  template <class T, FixedString Label>
+  [[nodiscard]] WireMessage decode_or_log(std::string_view payload) const;
 
   const common::Logger::Producer& logger_;
 };

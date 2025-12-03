@@ -17,11 +17,6 @@
 #include "api_response.h"
 namespace schema {
 struct SessionUserSubscriptionResponse {
-  std::string id;
-  std::uint32_t status;
-  std::optional<ErrorResponse> error;
-  std::optional<std::vector<RateLimit>> rate_limit;
-
   struct Result {
     std::int32_t subscription_id;
 
@@ -34,6 +29,11 @@ struct SessionUserSubscriptionResponse {
     };
     // clang-format on
   };
+
+  std::string id;
+  std::uint32_t status;
+  std::optional<ErrorResponse<Result>> error;
+  std::optional<std::vector<RateLimit>> rate_limit;
 
   std::optional<Result> result;
 
@@ -82,7 +82,7 @@ struct SessionUserUnsubscriptionResponse {
 struct SessionLogonResponse {
   std::string id;
   int status{0};
-  std::optional<ErrorResponse> error;
+  std::optional<ErrorResponse<>> error;
 
   struct Result {
     std::string api_key;

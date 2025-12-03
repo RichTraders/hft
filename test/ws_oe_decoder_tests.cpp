@@ -511,6 +511,7 @@ TEST_F(WsOeDecoderTest, DecodeMultipleUserFiles_AllValid_ParseWithoutErrors) {
   std::vector<std::string> test_files = {"execution_report_new.json",
       "execution_report_trade.json",
       "execution_report_canceled.json",
+    "execution_report_parsing_error.json",
       "session_logon_success.json",
       "placeorder_response_ack.json",
       "cancel_reorder_fail.json"};

@@ -55,7 +55,7 @@ struct ExecutionReportData {
   bool is_maker_side;  // "m"
   bool ignore_flag;    // "M"
 
-  std::uint64_t order_creation_time;  // "O"
+  std::int64_t order_creation_time;  // "O"
 
   double cumulative_quote_quantity{0.};  // "Z"
   double last_quote_quantity{0.};        // "Y"

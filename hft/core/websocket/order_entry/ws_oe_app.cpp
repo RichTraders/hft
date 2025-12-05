@@ -288,15 +288,14 @@ void WsOrderEntryApp::handle_execution_report(
   const auto& event = ptr.event;
   const WireMessage message = ptr;
 
-  if (event.execution_type == "REJECTED") {
-    dispatch("3", message);  // Reject message type
-  } else if (event.execution_type == "CANCELED") {
+  if (event.execution_type == "CANCELED") {
     if (event.reject_reason != "NONE") {
       dispatch("9", message);  // Cancel reject
     } else {
       dispatch("8", message);  // Regular execution report (cancel success)
     }
   } else {
+    // Handle all execution reports including REJECTED, NEW, TRADE, etc.
     dispatch("8", message);  // Regular execution report
   }
   ws_order_manager_.remove_pending_request(ptr.event.client_order_id);

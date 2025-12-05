@@ -14,17 +14,14 @@
 #define MARKET_CONSUMER_TPP
 
 #include "common/ini_config.hpp"
-#include "fix/fix_md_app.h"
 #include "market_consumer.h"
 #include "trade_engine.h"
 
 namespace trading {
 
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-template <typename OeApp>
-MarketConsumer<Strategy, MdApp>::MarketConsumer(common::Logger* logger,
-    TradeEngine<Strategy, OeApp>* trade_engine,
+template <typename Strategy>
+MarketConsumer<Strategy>::MarketConsumer(common::Logger* logger,
+    TradeEngine<Strategy>* trade_engine,
     common::MemoryPool<MarketUpdateData>* market_update_data_pool,
     common::MemoryPool<MarketData>* market_data_pool)
     : market_update_data_pool_(market_update_data_pool),
@@ -39,7 +36,7 @@ MarketConsumer<Strategy, MdApp>::MarketConsumer(common::Logger* logger,
       app_(std::make_unique<MdApp>("BMDWATCH", "SPOT", logger,
           market_data_pool_)) {
 
-  using WireMessage = typename MdApp::WireMessage;
+  using WireMessage = MdApp::WireMessage;
   auto register_handler = [this](const std::string& type, auto&& fn) {
     if constexpr (std::is_pointer_v<WireMessage>) {
       app_->register_callback(type,
@@ -64,21 +61,18 @@ MarketConsumer<Strategy, MdApp>::MarketConsumer(common::Logger* logger,
   logger_.info("[Constructor] MarketConsumer Created");
 }
 
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-MarketConsumer<Strategy, MdApp>::~MarketConsumer() {
+template <typename Strategy>
+MarketConsumer<Strategy>::~MarketConsumer() {
   logger_.info("[Destructor] MarketConsumer Destroy");
 }
 
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-void MarketConsumer<Strategy, MdApp>::stop() {
+template <typename Strategy>
+void MarketConsumer<Strategy>::stop() {
   app_->stop();
 }
 
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-void MarketConsumer<Strategy, MdApp>::on_login(WireMessage /*msg*/) {
+template <typename Strategy>
+void MarketConsumer<Strategy>::on_login(WireMessage /*msg*/) {
   logger_.info("[MarketConsumer][Login] Market consumer successful");
 #ifdef ENABLE_WEBSOCKET
   if constexpr (std::same_as<MdApp, core::WsMarketDataApp>) {
@@ -114,27 +108,9 @@ void MarketConsumer<Strategy, MdApp>::on_login(WireMessage /*msg*/) {
   }
 }
 
-#ifdef ENABLE_WEBSOCKET
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-void MarketConsumer<Strategy, MdApp>::erase_buffer_lower_than_snapshot(
-    const uint64_t snapshot_update_id) {
-  while (!buffered_events_.empty()) {
-    if (const auto* event = buffered_events_.front();
-        event->end_idx <= snapshot_update_id) {
-      for (const auto* market_data : event->data)
-        market_data_pool_->deallocate(market_data);
-      market_update_data_pool_->deallocate(event);
-      buffered_events_.pop_front();
-    } else {
-      break;
-    }
-  }
-}
-#endif
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-void MarketConsumer<Strategy, MdApp>::on_snapshot(WireMessage msg) {
+// erase_buffer_lower_than_snapshot implementation moved to MarketConsumerRecoveryMixin
+template <typename Strategy>
+void MarketConsumer<Strategy>::on_snapshot(WireMessage msg) {
   logger_.info("[MarketConsumer]Snapshot making start");
 
   auto* snapshot_data = market_update_data_pool_->allocate(
@@ -145,8 +121,7 @@ void MarketConsumer<Strategy, MdApp>::on_snapshot(WireMessage msg) {
         "[MarketConsumer] Market update data pool exhausted on snapshot");
 #ifdef ENABLE_WEBSOCKET
     // Clear buffered events to free memory
-    logger_.warn(
-        "[MarketConsumer] Clearing {} buffered events to free memory",
+    logger_.warn("[MarketConsumer] Clearing {} buffered events to free memory",
         buffered_events_.size());
     for (auto* buffered : buffered_events_) {
       for (auto* market_data : buffered->data)
@@ -181,15 +156,17 @@ void MarketConsumer<Strategy, MdApp>::on_snapshot(WireMessage msg) {
   static constexpr int kMaxRetries = 3;
   if (state_ == StreamState::kBuffering) {
     if (snapshot_update_id < first_buffered_update_id_) {
-      logger_.warn("[MarketConsumer][Message]Snapshot too old, refetching "
-                      "snapshot:{}, buffered:{}",
-              snapshot_update_id,
-              first_buffered_update_id_);
+      logger_.warn(
+          "[MarketConsumer][Message]Snapshot too old, refetching "
+          "snapshot:{}, buffered:{}",
+          snapshot_update_id,
+          first_buffered_update_id_);
 
       if (++retry_count_ >= kMaxRetries) {
-        logger_.error("[MarketConsumer][Message]Failed to get valid snapshot "
-                        "after {} retries, terminating",
-                kMaxRetries);
+        logger_.error(
+            "[MarketConsumer][Message]Failed to get valid snapshot "
+            "after {} retries, terminating",
+            kMaxRetries);
         app_->stop();
         std::exit(1);
       }
@@ -229,9 +206,10 @@ void MarketConsumer<Strategy, MdApp>::on_snapshot(WireMessage msg) {
       buffered_events_.clear();
 
       if (++retry_count_ >= kMaxRetries) {
-        logger_.error("[MarketConsumer][Message]Failed to recover from gap "
-                        "after {} retries, terminating",
-                kMaxRetries);
+        logger_.error(
+            "[MarketConsumer][Message]Failed to recover from gap "
+            "after {} retries, terminating",
+            kMaxRetries);
         app_->stop();
         std::exit(1);
       }
@@ -260,9 +238,8 @@ void MarketConsumer<Strategy, MdApp>::on_snapshot(WireMessage msg) {
 }
 
 #ifdef ENABLE_WEBSOCKET
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-void MarketConsumer<Strategy, MdApp>::on_subscribe(WireMessage msg) {
+template <typename Strategy>
+void MarketConsumer<Strategy>::on_subscribe(WireMessage msg) {
   auto* data =
       market_update_data_pool_->allocate(app_->create_market_data_message(msg));
 
@@ -298,7 +275,7 @@ void MarketConsumer<Strategy, MdApp>::on_subscribe(WireMessage msg) {
 
   // Skip gap check for trade events (they don't have sequence numbers)
   if (data->type != kTrade) {
-    logger_.trace("current update index:{}, data start :{}, data end:{}",
+    logger_.info("current update index:{}, data start :{}, data end:{}",
         update_index_,
         data->start_idx,
         data->end_idx);
@@ -316,9 +293,8 @@ void MarketConsumer<Strategy, MdApp>::on_subscribe(WireMessage msg) {
   on_market_data_fn_(data);
 }
 #else
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-void MarketConsumer<Strategy, MdApp>::on_subscribe(WireMessage msg) {
+template <typename Strategy>
+void MarketConsumer<Strategy>::on_subscribe(WireMessage msg) {
   auto* data =
       market_update_data_pool_->allocate(app_->create_market_data_message(msg));
 
@@ -341,8 +317,7 @@ void MarketConsumer<Strategy, MdApp>::on_subscribe(WireMessage msg) {
                (data->type == kMarket &&
                    data->start_idx != this->update_index_ + 1 &&
                    this->update_index_ != 0ULL))) {
-    logger_.error(
-        "Update index is outdated. current index :{}, new index :{}",
+    logger_.error("Update index is outdated. current index :{}, new index :{}",
         this->update_index_,
         data->start_idx);
 
@@ -360,40 +335,12 @@ void MarketConsumer<Strategy, MdApp>::on_subscribe(WireMessage msg) {
     logger_.error("[Message] failed to send subscribe");
   }
 }
-
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-void MarketConsumer<Strategy, MdApp>::resubscribe() {
-  logger_.info("Try resubscribing");
-  current_generation_.store(
-      generation_.fetch_add(1, std::memory_order_acq_rel) + 1,
-      std::memory_order_release);
-
-  const std::string msg_unsub =
-      app_->create_market_data_subscription_message("DEPTH_STREAM",
-          INI_CONFIG.get("meta", "level"),
-          INI_CONFIG.get("meta", "ticker"),
-          /*subscribe=*/false);
-  app_->send(msg_unsub);
-
-  std::this_thread::sleep_for(std::chrono::seconds(5));
-
-  const std::string msg_sub =
-      app_->create_market_data_subscription_message("DEPTH_STREAM",
-          INI_CONFIG.get("meta", "level"),
-          INI_CONFIG.get("meta", "ticker"),
-          /*subscribe=*/true);
-  app_->send(msg_sub);
-
-  ++generation_;
-  state_ = StreamState::kAwaitingSnapshot;
-  update_index_ = 0ULL;
-}
 #endif
 
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-void MarketConsumer<Strategy, MdApp>::on_reject(WireMessage msg) {
+// resubscribe implementation moved to MarketConsumerRecoveryMixin
+
+template <typename Strategy>
+void MarketConsumer<Strategy>::on_reject(WireMessage msg) const {
   const auto rejected_message = app_->create_reject_message(msg);
   logger_.error("[MarketConsumer][Message] {}", rejected_message.toString());
   if (rejected_message.session_reject_reason == "A") {
@@ -401,15 +348,13 @@ void MarketConsumer<Strategy, MdApp>::on_reject(WireMessage msg) {
   }
 }
 
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-void MarketConsumer<Strategy, MdApp>::on_logout(WireMessage /*msg*/) {
+template <typename Strategy>
+void MarketConsumer<Strategy>::on_logout(WireMessage /*msg*/) const {
   logger_.info("[MarketConsumer][Message] logout");
 }
 
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-void MarketConsumer<Strategy, MdApp>::on_instrument_list(WireMessage msg) {
+template <typename Strategy>
+void MarketConsumer<Strategy>::on_instrument_list(WireMessage msg) const {
   const InstrumentInfo instrument_message =
       app_->create_instrument_list_message(msg);
   logger_.info("[MarketConsumer][Message] on_instrument_list :{}",
@@ -417,58 +362,15 @@ void MarketConsumer<Strategy, MdApp>::on_instrument_list(WireMessage msg) {
   on_instrument_info_fn_(instrument_message);
 }
 
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-void MarketConsumer<Strategy, MdApp>::on_heartbeat(WireMessage msg) {
+template <typename Strategy>
+void MarketConsumer<Strategy>::on_heartbeat(WireMessage msg) const {
   auto message = app_->create_heartbeat_message(msg);
   if (UNLIKELY(!app_->send(message))) {
     logger_.error("[MarketConsumer][Message] failed to send heartbeat");
   }
 }
 
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-void MarketConsumer<Strategy, MdApp>::recover_from_gap() {
-#ifdef ENABLE_WEBSOCKET
-  if (state_ == StreamState::kBuffering) {
-    logger_.info(
-        "[MarketConsumer]Gap detected, but already snapshot buffering mode.");
-    return;
-  }
-  logger_.info("[MarketConsumer]Gap detected, entering buffering mode");
-  state_ = StreamState::kBuffering;
-  buffered_events_.clear();
-  first_buffered_update_id_ = 0;
-
-  const std::string snapshot_req =
-      app_->create_snapshot_request_message(INI_CONFIG.get("meta", "ticker"),
-          INI_CONFIG.get("meta", "level"));
-  app_->send(snapshot_req);
-
-  logger_.info("Gap detected, resubscribing");
-#else
-  current_generation_.fetch_add(1, std::memory_order_acq_rel);
-
-  const std::string msg_unsub =
-      app_->create_market_data_subscription_message("DEPTH_STREAM",
-          INI_CONFIG.get("meta", "level"),
-          INI_CONFIG.get("meta", "ticker"),
-          false);
-  app_->send(msg_unsub);
-
-  std::this_thread::sleep_for(std::chrono::seconds(5));
-
-  const std::string msg_sub =
-      app_->create_market_data_subscription_message("DEPTH_STREAM",
-          INI_CONFIG.get("meta", "level"),
-          INI_CONFIG.get("meta", "ticker"),
-          true);
-  app_->send(msg_sub);
-
-  state_ = StreamState::kAwaitingSnapshot;
-  update_index_ = 0ULL;
-#endif
-}
+// recover_from_gap implementation moved to MarketConsumerRecoveryMixin
 
 }  // namespace trading
 

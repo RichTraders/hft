@@ -73,7 +73,7 @@ class WsMdDecoderTest : public ::testing::Test {
     logger_->setLevel(LogLevel::kDebug);
     logger_->clearSink();
     producer_ = std::make_unique<Logger::Producer>(logger_->make_producer());
-    decoder_ = std::make_unique<WsMdDecoder>(*producer_);
+    decoder_ = std::make_unique<WsMdDecoder<JsonDecoderPolicy>>(*producer_);
   }
 
   static void TearDownTestSuite() {
@@ -84,21 +84,21 @@ class WsMdDecoderTest : public ::testing::Test {
   }
   static std::unique_ptr<Logger> logger_;
   static std::unique_ptr<Logger::Producer> producer_;
-  static std::unique_ptr<WsMdDecoder> decoder_;
+  static std::unique_ptr<WsMdDecoder<JsonDecoderPolicy>> decoder_;
 };
 std::unique_ptr<Logger> WsMdDecoderTest::logger_;
 std::unique_ptr<Logger::Producer> WsMdDecoderTest::producer_;
-std::unique_ptr<WsMdDecoder> WsMdDecoderTest::decoder_;
+std::unique_ptr<WsMdDecoder<JsonDecoderPolicy>> WsMdDecoderTest::decoder_;
 
 // ============================================================================
 // DepthResponse Tests
 // ============================================================================
 
 TEST_F(WsMdDecoderTest, DecodeDepthUpdate_RealData_ParsesCorrectly) {
-  std::string json = test_utils::load_test_data("dpeth.json");
+  std::string json = test_utils::load_test_data("depth.json");
 
   if (json.empty()) {
-    GTEST_SKIP() << "dpeth.json not available";
+    GTEST_SKIP() << "depth.json not available";
   }
 
   EXPECT_TRUE(test_utils::is_valid_json(json));
@@ -376,7 +376,7 @@ TEST_F(WsMdDecoderTest, Decode_UnknownStream_ReturnsMonostate) {
 
 TEST_F(WsMdDecoderTest, DecodeMultipleFiles_AllValid_ParseWithoutErrors) {
   std::vector<std::string> test_files = {
-      "dpeth.json",
+      "depth.json",
       "trade.json"
   };
 

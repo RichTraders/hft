@@ -41,7 +41,7 @@ std::string PositionInfo::toString() const {
 }
 
 void PositionInfo::add_fill(const ExecutionReport* report,
-    common::Logger::Producer& logger) noexcept {
+    const common::Logger::Producer& logger) noexcept {
   const auto old_position = position_;
   const auto idx = sideToIndex(report->side);
   const auto opp_side_index = oppIndex(idx);
@@ -84,7 +84,7 @@ void PositionInfo::add_fill(const ExecutionReport* report,
 }
 
 void PositionInfo::update_bbo(const BBO* bbo,
-    common::Logger::Producer& logger) noexcept {
+    const common::Logger::Producer& logger) noexcept {
   bbo_ = bbo;
 
   if (position_ != 0 && bbo->bid_price != common::kPriceInvalid &&

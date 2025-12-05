@@ -9,13 +9,7 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
-#include <fix8/f8includes.hpp>
 #include "core/response_manager.h"
-#ifdef ENABLE_WEBSOCKET
-#include "core/websocket/order_entry/ws_oe_app.h"
-#else
-#include "core/fix/fix_oe_app.h"
-#endif
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -30,14 +24,8 @@ using namespace core;
 using namespace common;
 using namespace trading;
 
-#ifdef ENABLE_WEBSOCKET
-using TestTradeEngine =
-    trading::TradeEngine<SelectedStrategy, core::WsOrderEntryApp>;
-#else
-using TestTradeEngine =
-    trading::TradeEngine<SelectedStrategy, core::FixOrderEntryApp>;
-#endif
-using TestOrderGateway = trading::ProtocolOrderGateway<SelectedStrategy>;
+using TestTradeEngine = TradeEngine<SelectedStrategy>;
+using TestOrderGateway = OrderGateway<SelectedStrategy>;
 
 constexpr int cl_order_id = 2075;
 

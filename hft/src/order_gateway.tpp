@@ -16,12 +16,11 @@
 #include "order_gateway.h"
 
 namespace trading {
-template <typename Strategy, typename OeApp>
+template <typename Strategy>
 class TradeEngine;
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-OrderGateway<Strategy, OeApp>::OrderGateway(common::Logger* logger,
+template <typename Strategy>
+OrderGateway<Strategy>::OrderGateway(common::Logger* logger,
     ResponseManager* response_manager)
     : logger_(logger->make_producer()),
       app_(std::make_unique<OeApp>("BMDWATCH", "SPOT", logger,
@@ -79,34 +78,29 @@ OrderGateway<Strategy, OeApp>::OrderGateway(common::Logger* logger,
   logger_.info("[Constructor] OrderGateway Created");
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-OrderGateway<Strategy, OeApp>::~OrderGateway() {
+template <typename Strategy>
+OrderGateway<Strategy>::~OrderGateway() {
   logger_.info("[Destructor] OrderGateway Destroy");
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::stop() const {
+template <typename Strategy>
+void OrderGateway<Strategy>::stop() const {
   app_->stop();
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::init_trade_engine(
-    TradeEngine<Strategy, OeApp>* trade_engine) {
+template <typename Strategy>
+void OrderGateway<Strategy>::init_trade_engine(
+    TradeEngine<Strategy>* trade_engine) {
   trade_engine_ = trade_engine;
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::on_login(WireMessage /*msg*/) {
+template <typename Strategy>
+void OrderGateway<Strategy>::on_login(WireMessage /*msg*/) {
   logger_.info("[OrderGateway][Message] login successful");
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::on_execution_report(
+template <typename Strategy>
+void OrderGateway<Strategy>::on_execution_report(
     WireExecutionReport msg) {
   ResponseCommon res;
   res.res_type = ResponseType::kExecutionReport;
@@ -117,9 +111,8 @@ void OrderGateway<Strategy, OeApp>::on_execution_report(
   }
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::on_order_cancel_reject(
+template <typename Strategy>
+void OrderGateway<Strategy>::on_order_cancel_reject(
     WireCancelReject msg) {
   ResponseCommon res;
   res.res_type = ResponseType::kOrderCancelReject;
@@ -130,9 +123,8 @@ void OrderGateway<Strategy, OeApp>::on_order_cancel_reject(
   }
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::on_order_mass_cancel_report(
+template <typename Strategy>
+void OrderGateway<Strategy>::on_order_mass_cancel_report(
     WireMassCancelReport msg) {
   ResponseCommon res;
   res.res_type = ResponseType::kOrderMassCancelReport;
@@ -144,9 +136,8 @@ void OrderGateway<Strategy, OeApp>::on_order_mass_cancel_report(
   }
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::on_rejected(WireReject msg) {
+template <typename Strategy>
+void OrderGateway<Strategy>::on_rejected(WireReject msg) {
   const OrderReject reject = app_->create_reject_message(msg);
   logger_.error(reject.toString());
   if (reject.session_reject_reason == "A") {
@@ -154,16 +145,14 @@ void OrderGateway<Strategy, OeApp>::on_rejected(WireReject msg) {
   }
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::on_order_mass_status_response(
+template <typename Strategy>
+void OrderGateway<Strategy>::on_order_mass_status_response(
     WireMessage /*msg*/) {
   logger_.info("on_order_mass_status_response");
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::on_logout(WireMessage /*msg*/) {
+template <typename Strategy>
+void OrderGateway<Strategy>::on_logout(WireMessage /*msg*/) {
   auto message = app_->create_log_out_message();
 
   if (UNLIKELY(!app_->send(message))) {
@@ -171,9 +160,8 @@ void OrderGateway<Strategy, OeApp>::on_logout(WireMessage /*msg*/) {
   }
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::on_heartbeat(WireMessage msg) {
+template <typename Strategy>
+void OrderGateway<Strategy>::on_heartbeat(WireMessage msg) {
   auto message = app_->create_heartbeat_message(msg);
 
   if (!message.empty() && UNLIKELY(!app_->send(message))) {
@@ -181,9 +169,8 @@ void OrderGateway<Strategy, OeApp>::on_heartbeat(WireMessage msg) {
   }
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::order_request(
+template <typename Strategy>
+void OrderGateway<Strategy>::order_request(
     const RequestCommon& request) {
   switch (request.req_type) {
     case ReqeustType::kNewSingleOrderData:
@@ -205,9 +192,8 @@ void OrderGateway<Strategy, OeApp>::order_request(
   }
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::new_single_order_data(
+template <typename Strategy>
+void OrderGateway<Strategy>::new_single_order_data(
     const RequestCommon& request) {
   const NewSingleOrderData order_data{.cl_order_id = request.cl_order_id,
       .symbol = request.symbol,
@@ -229,9 +215,8 @@ void OrderGateway<Strategy, OeApp>::new_single_order_data(
 }
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::order_cancel_request(
+template <typename Strategy>
+void OrderGateway<Strategy>::order_cancel_request(
     const RequestCommon& request) {
   const OrderCancelRequest cancel_request{.cl_order_id = request.cl_order_id,
       .orig_cl_order_id = request.orig_cl_order_id,
@@ -248,9 +233,8 @@ else {
 }
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::order_cancel_request_and_new_order_single(
+template <typename Strategy>
+void OrderGateway<Strategy>::order_cancel_request_and_new_order_single(
     const RequestCommon& request) {
   const OrderCancelAndNewOrderSingle cancel_and_reorder{
       .order_cancel_request_and_new_order_single_mode = 1,
@@ -277,9 +261,8 @@ else {
 }
 }
 
-template <typename Strategy, typename OeApp>
-requires core::OrderEntryAppLike<OeApp>
-void OrderGateway<Strategy, OeApp>::order_mass_cancel_request(
+template <typename Strategy>
+void OrderGateway<Strategy>::order_mass_cancel_request(
     const RequestCommon& request) {
   const OrderMassCancelRequest all_cancel_request{
       .cl_order_id = request.cl_order_id,

@@ -52,7 +52,7 @@ struct RiskInfo {
 
   [[nodiscard]] RiskCheckResult checkPreTradeRisk(common::Side side,
       common::Qty qty, common::Qty reserved_position,
-      common::Logger::Producer& logger) noexcept;
+      const common::Logger::Producer& logger) noexcept;
 
   [[nodiscard]] auto toString() const {
     std::ostringstream stream;
@@ -67,7 +67,8 @@ using TickerRiskInfoHashMap = std::unordered_map<std::string, RiskInfo>;
 
 class RiskManager {
  public:
-  RiskManager(common::Logger* logger, PositionKeeper* position_keeper,
+  RiskManager(const common::Logger::Producer& logger,
+      PositionKeeper* position_keeper,
       const common::TradeEngineCfgHashMap& ticker_cfg);
 
   ~RiskManager();
@@ -91,7 +92,7 @@ class RiskManager {
   RiskManager& operator=(const RiskManager&&) = delete;
 
  private:
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   TickerRiskInfoHashMap ticker_risk_;
 };
 }  // namespace trading

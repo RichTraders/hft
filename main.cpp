@@ -13,12 +13,9 @@
 #include "hft_lib.h"
 
 #include "strategy_config.hpp"
-using SelectedOrderGateway =
-    trading::OrderGateway<SelectedStrategy, SelectedOrderApp>;
-using SelectedTradeEngine =
-    trading::TradeEngine<SelectedStrategy, SelectedOrderApp>;
-using SelectedMarketConsumer =
-    trading::MarketConsumer<SelectedStrategy, SelectedMarketApp>;
+using SelectedOrderGateway = trading::OrderGateway<SelectedStrategy>;
+using SelectedTradeEngine = trading::TradeEngine<SelectedStrategy>;
+using SelectedMarketConsumer = trading::MarketConsumer<SelectedStrategy>;
 
 int main() {
   try {

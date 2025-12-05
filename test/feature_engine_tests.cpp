@@ -14,11 +14,6 @@
 #include <gtest/gtest.h>
 
 #include "feature_engine.h"
-#ifdef ENABLE_WEBSOCKET
-#include "core/websocket/order_entry/ws_oe_app.h"
-#else
-#include "core/fix/fix_oe_app.h"
-#endif
 #include "ini_config.hpp"
 #include "logger.h"
 #include "order_book.h"
@@ -30,21 +25,9 @@ using ::testing::HasSubstr;
 using namespace common;
 using namespace trading;
 
-#ifdef ENABLE_WEBSOCKET
-using TestTradeEngine =
-    trading::TradeEngine<SelectedStrategy, core::WsOrderEntryApp>;
-using TestFeatureEngine =
-    trading::FeatureEngine<SelectedStrategy, core::WsOrderEntryApp>;
-using TestOrderBook =
-    trading::MarketOrderBook<SelectedStrategy, core::WsOrderEntryApp>;
-#else
-using TestTradeEngine =
-    trading::TradeEngine<SelectedStrategy, core::FixOrderEntryApp>;
-using TestFeatureEngine =
-    trading::FeatureEngine<SelectedStrategy, core::FixOrderEntryApp>;
-using TestOrderBook =
-    trading::MarketOrderBook<SelectedStrategy, core::FixOrderEntryApp>;
-#endif
+using TestTradeEngine = TradeEngine<SelectedStrategy>;
+using TestFeatureEngine = FeatureEngine<SelectedStrategy>;
+using TestOrderBook = MarketOrderBook<SelectedStrategy>;
 
 class FeatureEngineTest : public ::testing::Test {
  public:
@@ -64,8 +47,11 @@ class FeatureEngineTest : public ::testing::Test {
     ticker_cfg =
         new TradeEngineCfgHashMap{{INI_CONFIG.get("meta", "ticker"), cfg}};
 
-    trade_engine = new TestTradeEngine(&logger, market_update_pool, market_pool,
-                                       nullptr, *ticker_cfg);
+    trade_engine = new TestTradeEngine(&logger,
+        market_update_pool,
+        market_pool,
+        nullptr,
+        *ticker_cfg);
     trade_engine->stop();
   }
 
@@ -84,32 +70,32 @@ class FeatureEngineTest : public ::testing::Test {
 Logger FeatureEngineTest::logger;
 
 TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
-
-  TestFeatureEngine engine(&logger);
+  auto producer = logger.make_producer();
+  TestFeatureEngine engine(producer);
   std::string symbol = "ETHUSDT";
   // BBO 세팅
-  TestOrderBook book("ETHUSDT", &logger);
+  TestOrderBook book("ETHUSDT", producer);
   book.set_trade_engine(trade_engine);
   {
     const Price p = Price{100'000.};
     const Qty q{20.0};
     const MarketData md{MarketUpdateType::kAdd,
-                        OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kBuy,
-                        p,
-                        q};
+        OrderId{kOrderIdInvalid},
+        symbol,
+        Side::kBuy,
+        p,
+        q};
     book.on_market_data_updated(&md);
   }
   {
     const Price p = Price{200'000.};
     const Qty q{80.0};
     const MarketData md{MarketUpdateType::kAdd,
-                        OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kSell,
-                        p,
-                        q};
+        OrderId{kOrderIdInvalid},
+        symbol,
+        Side::kSell,
+        p,
+        q};
     book.on_market_data_updated(&md);
   }
 
@@ -124,21 +110,22 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
-  TestFeatureEngine engine(&logger);
+  auto producer = logger.make_producer();
+  TestFeatureEngine engine(producer);
   std::string symbol = "ETHUSDT";
   // BBO 세팅
-  TestOrderBook book(symbol, &logger);
+  TestOrderBook book(symbol, producer);
   book.set_trade_engine(trade_engine);
   {
     std::string symbol = "ETHUSDT";
     const Price p = Price{100'000.};
     const Qty q{20.0};
     const MarketData md{MarketUpdateType::kAdd,
-                        OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kBuy,
-                        p,
-                        q};
+        OrderId{kOrderIdInvalid},
+        symbol,
+        Side::kBuy,
+        p,
+        q};
     book.on_market_data_updated(&md);
   }
   {
@@ -146,21 +133,21 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
     const Price p = Price{200'000.};
     const Qty q{80.0};
     const MarketData md{MarketUpdateType::kAdd,
-                        OrderId{kOrderIdInvalid},
-                        symbol,
-                        Side::kSell,
-                        p,
-                        q};
+        OrderId{kOrderIdInvalid},
+        symbol,
+        Side::kSell,
+        p,
+        q};
     book.on_market_data_updated(&md);
   }
 
   symbol = "ETHUSDT";
   const MarketData md{MarketUpdateType::kTrade,
-                      OrderId{kOrderIdInvalid},
-                      symbol,
-                      Side::kBuy,
-                      Price{200'000},
-                      Qty{10.0}};
+      OrderId{kOrderIdInvalid},
+      symbol,
+      Side::kBuy,
+      Price{200'000},
+      Qty{10.0}};
   book.on_market_data_updated(&md);
 
   double expected_ratio = md.qty.value / book.get_bbo()->ask_qty.value;
@@ -171,11 +158,12 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdate) {
-  TestFeatureEngine engine(&logger);
+  auto producer = logger.make_producer();
+  TestFeatureEngine engine(producer);
 
   std::string symbol = "ETHUSDT";
   // BBO 세팅
-  TestOrderBook book(symbol, &logger);
+  TestOrderBook book(symbol, producer);
   book.set_trade_engine(trade_engine);
 
   struct T {
@@ -193,8 +181,12 @@ TEST_F(FeatureEngineTest, OnTradeUpdate) {
   double sum_pq = 0.0, sum_q = 0.0;
   for (auto& t : ticks) {
     std::string symbol = "ETHUSDT";
-    MarketData md(common::MarketUpdateType::kTrade, common::OrderId{0L}, symbol,
-                  t.s, t.p, t.q);
+    MarketData md(common::MarketUpdateType::kTrade,
+        common::OrderId{0L},
+        symbol,
+        t.s,
+        t.p,
+        t.q);
     engine.on_trade_updated(&md, &book);
     sum_pq += t.p.value * t.q.value;
     sum_q += t.q.value;
@@ -204,10 +196,11 @@ TEST_F(FeatureEngineTest, OnTradeUpdate) {
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction) {
-  TestFeatureEngine engine(&logger);
+  auto producer = logger.make_producer();
+  TestFeatureEngine engine(producer);
 
   std::string symbol = "ETHUSDT";
-  TestOrderBook book(symbol, &logger);
+  TestOrderBook book(symbol, producer);
 
   const size_t W = 64;
   const size_t N = W + 7;
@@ -219,8 +212,12 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction) {
     const double qty = 1.0 + static_cast<double>(i % 5);
     std::string symbol = "ETHUSDT";
 
-    MarketData md(common::MarketUpdateType::kTrade, common::OrderId{0}, symbol,
-                  common::Side::kTrade, Price{px}, Qty{qty});
+    MarketData md(common::MarketUpdateType::kTrade,
+        common::OrderId{0},
+        symbol,
+        common::Side::kTrade,
+        Price{px},
+        Qty{qty});
 
     engine.on_trade_updated(&md, &book);
 
@@ -245,10 +242,11 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction) {
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_MultiWraps) {
-  TestFeatureEngine engine(&logger);
+  auto producer = logger.make_producer();
+  TestFeatureEngine engine(producer);
 
   std::string symbol = "ETHUSDT";
-  TestOrderBook book(symbol, &logger);
+  TestOrderBook book(symbol, producer);
 
   const size_t W = 64;
   const size_t N = 3 * W + 11;
@@ -261,8 +259,12 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_MultiWraps) {
     const double qty = (i % 7 == 0) ? 10.0 : (1.0 + static_cast<double>(i % 3));
     std::string symbol = "ETHUSDT";
 
-    MarketData md(common::MarketUpdateType::kTrade, common::OrderId{42}, symbol,
-                  common::Side::kTrade, Price{px}, Qty{qty});
+    MarketData md(common::MarketUpdateType::kTrade,
+        common::OrderId{42},
+        symbol,
+        common::Side::kTrade,
+        Price{px},
+        Qty{qty});
 
     engine.on_trade_updated(&md, &book);
 

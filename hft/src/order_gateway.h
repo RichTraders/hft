@@ -14,23 +14,17 @@
 
 #include "logger.h"
 #include "order_entry.h"
-#include "protocol_concepts.h"
-
-#ifdef ENABLE_WEBSOCKET
-#include "core/websocket/order_entry/ws_oe_app.h"
-#else
-#include "fix/fix_oe_app.h"
-#endif
+#include "protocol_impl.h"
 
 namespace trading {
-template <typename Strategy, typename App>
+template <typename Strategy>
 class TradeEngine;
 class ResponseManager;
 
-template <typename Strategy, typename OeApp>
-  requires core::OrderEntryAppLike<OeApp>
+template <typename Strategy>
 class OrderGateway {
  public:
+  using OeApp = protocol_impl::OrderEntryApp;
   using AppType = OeApp;
   using WireMessage = typename OeApp::WireMessage;
   using WireExecutionReport = typename OeApp::WireExecutionReport;
@@ -41,7 +35,7 @@ class OrderGateway {
   OrderGateway(common::Logger* logger, ResponseManager* response_manager);
   ~OrderGateway();
 
-  void init_trade_engine(TradeEngine<Strategy, OeApp>* trade_engine);
+  void init_trade_engine(TradeEngine<Strategy>* trade_engine);
   void stop() const;
 
   void on_login(WireMessage msg);
@@ -61,18 +55,10 @@ class OrderGateway {
   void order_mass_cancel_request(const RequestCommon& request);
 
   common::Logger::Producer logger_;
-  TradeEngine<Strategy, OeApp>* trade_engine_;
+  TradeEngine<Strategy>* trade_engine_;
 
   std::unique_ptr<OeApp> app_;
 };
-
-#ifdef ENABLE_WEBSOCKET
-template <typename Strategy>
-using ProtocolOrderGateway = OrderGateway<Strategy, core::WsOrderEntryApp>;
-#else
-template <typename Strategy>
-using ProtocolOrderGateway = OrderGateway<Strategy, core::FixOrderEntryApp>;
-#endif
 }  // namespace trading
 
 #endif

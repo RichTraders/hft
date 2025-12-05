@@ -10,11 +10,6 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 #include "core/response_manager.h"
-#ifdef ENABLE_WEBSOCKET
-#include "core/websocket/order_entry/ws_oe_app.h"
-#else
-#include "core/fix/fix_oe_app.h"
-#endif
 #include "gtest/gtest.h"
 #include "ini_config.hpp"
 #include "order_book.h"
@@ -23,21 +18,15 @@
 
 using namespace trading;
 using namespace common;
-#ifdef ENABLE_WEBSOCKET
 using TestTradeEngine =
-    trading::TradeEngine<SelectedStrategy, core::WsOrderEntryApp>;
+    trading::TradeEngine<SelectedStrategy>;
 using TestOrderBook =
-    trading::MarketOrderBook<SelectedStrategy, core::WsOrderEntryApp>;
-#else
-using TestTradeEngine =
-    trading::TradeEngine<SelectedStrategy, core::FixOrderEntryApp>;
-using TestOrderBook =
-    trading::MarketOrderBook<SelectedStrategy, core::FixOrderEntryApp>;
-#endif
+    trading::MarketOrderBook<SelectedStrategy>;
 
 class MarketOrderBookTest : public ::testing::Test {
 public:
   static std::unique_ptr<Logger> logger;
+  static std::unique_ptr<Logger::Producer> producer;
  protected:
 
   TestOrderBook* book_;
@@ -46,6 +35,7 @@ public:
 
   static void SetUpTestSuite() {
     logger = std::make_unique<Logger>();
+    producer = std::make_unique<Logger::Producer>(logger->make_producer());
     INI_CONFIG.load("resources/config.ini");
   }
 
@@ -73,7 +63,7 @@ public:
     trade_engine_ = new TestTradeEngine(logger.get(), pool.get(),
                                         pool2.get(), response_manager_, temp);
     // trade_engine_ 주입
-    book_ = new TestOrderBook{INI_CONFIG.get("meta", "ticker"), logger.get()};
+    book_ = new TestOrderBook{INI_CONFIG.get("meta", "ticker"), *producer};
     book_->set_trade_engine(trade_engine_);
   }
 
@@ -89,6 +79,7 @@ public:
   }
 };
 std::unique_ptr<Logger> MarketOrderBookTest::logger;
+std::unique_ptr<Logger::Producer> MarketOrderBookTest::producer;
 
 TEST_F(MarketOrderBookTest, ClearResetsOrderBookAndUpdatesBBO) {
   TickerId symbol = INI_CONFIG.get("meta", "ticker");

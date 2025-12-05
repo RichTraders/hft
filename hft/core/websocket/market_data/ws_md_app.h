@@ -13,20 +13,23 @@
 #ifndef WS_MARKET_DATA_APP_H
 #define WS_MARKET_DATA_APP_H
 
-#include <variant>
-
-#include "common/authorization.h"
 #include "common/logger.h"
 #include "common/spsc_queue.h"
 #include "core/market_data.h"
+#include "decoder_policy.h"
 #include "ws_md_core.h"
 #include "ws_transport.h"
 
 namespace core {
+#ifdef ENABLE_SBE_DECODER
+using WsMdCoreImpl = WsMdCore<SbeDecoderPolicy>;
+#else
+using WsMdCoreImpl = WsMdCore<JsonDecoderPolicy>;
+#endif
 
 class WsMarketDataApp {
  public:
-  using WireMessage = WsMdCore::WireMessage;
+  using WireMessage = WsMdCoreImpl::WireMessage;
   using MsgType = std::string;
   using RequestId = std::string_view;
   using MarketDepthLevel = std::string_view;
@@ -71,18 +74,36 @@ class WsMarketDataApp {
 
  private:
   void initialize_stream();
-  void handle_payload(std::string_view payload) const;
+  void handle_stream_payload(std::string_view payload) const;
+  void handle_api_payload(std::string_view payload) const;
   void dispatch(std::string_view type, const WireMessage& message) const;
-  void handle_depth_snapshot(schema::DepthSnapshot& response) const;
-  void handle_depth_response(schema::DepthResponse& response) const;
-  void handle_trade_event(schema::TradeEvent& response) const;
-  void handle_exchange_info_response(
-      schema::ExchangeInfoResponse& response) const;
+
+  // JSON message handlers
+  void handle_depth_snapshot(const schema::DepthSnapshot& snapshot,
+      const WireMessage& wire_msg) const;
+  void handle_depth_response(const schema::DepthResponse& response,
+      const WireMessage& wire_msg) const;
+  void handle_trade_event(const schema::TradeEvent& trade,
+      const WireMessage& wire_msg) const;
+
+  // SBE message handlers
+  void handle_depth_snapshot(const schema::sbe::SbeDepthSnapshot& snapshot,
+      const WireMessage& wire_msg) const;
+  void handle_depth_response(const schema::sbe::SbeDepthResponse& response,
+      const WireMessage& wire_msg) const;
+  void handle_trade_event(const schema::sbe::SbeTradeEvent& trade,
+      const WireMessage& wire_msg) const;
+  void handle_best_bid_ask(const schema::sbe::SbeBestBidAsk& bba,
+      const WireMessage& wire_msg) const;
+
+  void handle_exchange_info_response(const schema::ExchangeInfoResponse& info,
+      const WireMessage& wire_msg) const;
 
   common::Logger::Producer logger_;
-  core::WsMdCore ws_md_core_;
-  std::unique_ptr<core::WebSocketTransport<"MDRead">> read_transport_;
-  std::unique_ptr<core::WebSocketTransport<"MDWrite">> write_transport_;
+  WsMdCoreImpl stream_core_;
+  WsMdCore<JsonDecoderPolicy> api_core_;
+  std::unique_ptr<WebSocketTransport<"MDRead">> stream_transport_;
+  std::unique_ptr<WebSocketTransport<"MDWrite">> api_transport_;
 
   std::atomic<bool> running_{false};
   std::atomic<bool> snapshot_received_{false};

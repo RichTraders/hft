@@ -15,9 +15,9 @@
 
 #include "common/logger.h"
 #include "core/order_entry.h"
-#include "schema/response/account_position.h"
-#include "schema/response/api_response.h"
-#include "schema/response/execution_report.h"
+#include "websocket/schema/response/account_position.h"
+#include "websocket/schema/response/api_response.h"
+#include "websocket/schema/response/execution_report.h"
 #include "ws_oe_core.h"
 #include "ws_order_manager.h"
 #include "ws_transport.h"

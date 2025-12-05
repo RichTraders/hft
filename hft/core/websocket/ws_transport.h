@@ -25,7 +25,8 @@ class WebSocketTransport {
   using MessageCallback = std::function<void(std::string_view)>;
 
   WebSocketTransport(std::string host, int port, std::string path = "/",
-      bool use_ssl = true, bool notify_connected = false);
+      bool use_ssl = true, bool notify_connected = false,
+      std::string_view api_key = "");
   ~WebSocketTransport();
 
   WebSocketTransport(const WebSocketTransport&) = delete;
@@ -51,6 +52,7 @@ class WebSocketTransport {
   int port_;
   bool use_ssl_;
   bool notify_connected_;
+  const std::string api_key_;
 
   lws_context* context_{nullptr};
   lws* wsi_{nullptr};

@@ -12,9 +12,6 @@
 
 #include <gtest/gtest.h>
 
-#include <fstream>
-#include <glaze/glaze.hpp>
-
 #include "logger.h"
 #include "websocket/order_entry/ws_order_manager.h"
 #include "websocket/schema/response/order.h"

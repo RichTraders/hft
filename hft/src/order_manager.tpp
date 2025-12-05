@@ -17,7 +17,7 @@
 #include "order_entry.h"
 #include "order_manager.h"
 #include "performance.h"
-#include "trade_engine.h"
+#include "orders.h"
 
 namespace trading {
 using common::OrderId;
@@ -29,37 +29,35 @@ using common::TickerId;
 using order::LayerBook;
 using order::PendingReplaceInfo;
 
-template <typename Strategy, typename App>
-OrderManager<Strategy, App>::OrderManager(common::Logger* logger,
-    TradeEngine<Strategy, App>* trade_engine, RiskManager& risk_manager)
+template <typename Strategy>
+OrderManager<Strategy>::OrderManager(const common::Logger::Producer& logger,
+    TradeEngine<Strategy>* trade_engine, RiskManager& risk_manager)
     : layer_book_(INI_CONFIG.get("meta", "ticker")),
       trade_engine_(trade_engine),
       risk_manager_(risk_manager),
-      logger_(logger->make_producer()),
+      logger_(logger),
       fast_clock_(INI_CONFIG.get_double("cpu_info", "clock"),
           INI_CONFIG.get_int("cpu_info", "interval")),
       ticker_size_(INI_CONFIG.get_double("meta", "ticker_size")),
       reconciler_(ticker_size_),
       tick_converter_(ticker_size_),
       state_manager_(logger_, tick_converter_),
-      position_tracker_(),
       expiry_manager_(INI_CONFIG.get_double("orders", "ttl_reserved_ns"),
           INI_CONFIG.get_double("orders", "ttl_live_ns")) {
   logger_.info("[Constructor] OrderManager Created");
 }
-template <typename Strategy, typename App>
-OrderManager<Strategy, App>::~OrderManager() {
+template <typename Strategy>
+OrderManager<Strategy>::~OrderManager() {
   logger_.info("[Destructor] OrderManager Destroy");
 }
 
-template <typename Strategy, typename App>
-void OrderManager<Strategy, App>::on_order_updated(
+template <typename Strategy>
+void OrderManager<Strategy>::on_order_updated(
     const ExecutionReport* response) noexcept {
 
   auto& side_book = layer_book_.side_book(response->symbol, response->side);
   const auto now = fast_clock_.get_timestamp();
 
-  // Delegate state transition logic to OrderStateManager
   state_manager_.handle_execution_report(response,
       side_book,
       position_tracker_,
@@ -104,8 +102,8 @@ void OrderManager<Strategy, App>::on_order_updated(
           response->cl_order_id.value));
 }
 
-template <typename Strategy, typename App>
-void OrderManager<Strategy, App>::new_order(const TickerId& ticker_id,
+template <typename Strategy>
+void OrderManager<Strategy>::new_order(const TickerId& ticker_id,
     const Price price, const Side side, const Qty qty,
     const OrderId order_id) noexcept {
   const RequestCommon new_request{.req_type = ReqeustType::kNewSingleOrderData,
@@ -121,8 +119,8 @@ void OrderManager<Strategy, App>::new_order(const TickerId& ticker_id,
   logger_.info("[OrderRequest]Sent new order {}", new_request.toString());
 }
 
-template <typename Strategy, typename App>
-void OrderManager<Strategy, App>::modify_order(const TickerId& ticker_id,
+template <typename Strategy>
+void OrderManager<Strategy>::modify_order(const TickerId& ticker_id,
     const OrderId& cancel_new_order_id, const OrderId& order_id,
     const OrderId& original_order_id, Price price, Side side,
     const Qty qty) noexcept {
@@ -143,8 +141,8 @@ void OrderManager<Strategy, App>::modify_order(const TickerId& ticker_id,
       new_request.toString());
 }
 
-template <typename Strategy, typename App>
-void OrderManager<Strategy, App>::cancel_order(const TickerId& ticker_id,
+template <typename Strategy>
+void OrderManager<Strategy>::cancel_order(const TickerId& ticker_id,
     const OrderId& original_order_id, const OrderId& order_id) noexcept {
   const RequestCommon cancel_request{
       .req_type = ReqeustType::kOrderCancelRequest,
@@ -156,8 +154,8 @@ void OrderManager<Strategy, App>::cancel_order(const TickerId& ticker_id,
   logger_.info("[OrderRequest]Sent cancel {}", cancel_request.toString());
 }
 
-template <typename Strategy, typename App>
-void OrderManager<Strategy, App>::on_instrument_info(
+template <typename Strategy>
+void OrderManager<Strategy>::on_instrument_info(
     const InstrumentInfo& instrument_info) noexcept {
   if (!instrument_info.symbols.empty()) {
     venue_policy_.set_qty_increment(
@@ -167,8 +165,8 @@ void OrderManager<Strategy, App>::on_instrument_info(
   }
 }
 
-template <typename Strategy, typename App>
-void OrderManager<Strategy, App>::apply(
+template <typename Strategy>
+void OrderManager<Strategy>::apply(
     const std::vector<QuoteIntent>& intents) noexcept {
   START_MEASURE(Trading_OrderManager_apply);
 
@@ -373,8 +371,8 @@ void OrderManager<Strategy, App>::apply(
   END_MEASURE(Trading_OrderManager_apply, logger_);
 }
 
-template <typename Strategy, typename App>
-void OrderManager<Strategy, App>::filter_by_risk(
+template <typename Strategy>
+void OrderManager<Strategy>::filter_by_risk(
     const std::vector<QuoteIntent>& intents, order::Actions& acts) {
   const auto& ticker = intents.empty() ? std::string{} : intents.front().ticker;
   auto running = position_tracker_.get_reserved();
@@ -411,14 +409,14 @@ void OrderManager<Strategy, App>::filter_by_risk(
   allow_repl(acts.repls);
 }
 
-template <typename Strategy, typename App>
-OrderId OrderManager<Strategy, App>::gen_order_id() noexcept {
+template <typename Strategy>
+OrderId OrderManager<Strategy>::gen_order_id() noexcept {
   const auto now = fast_clock_.get_timestamp();
   return OrderId{now};
 }
 
-template <typename Strategy, typename App>
-void OrderManager<Strategy, App>::dump_all_slots(const std::string& symbol,
+template <typename Strategy>
+void OrderManager<Strategy>::dump_all_slots(const std::string& symbol,
     std::string_view context) noexcept {
   logger_.debug("[SLOT_DUMP] ========== {} ==========", context);
   logger_.debug("[SLOT_DUMP] Symbol: {}, Reserved: {:.10f}",

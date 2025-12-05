@@ -212,11 +212,11 @@ class Logger {
             std::vformat(fmt, std::make_format_args(args...));
         log(lvl, formatted);
       } catch (const std::format_error&) {
-        std::cout << "Parser error\n";
+        std::cout << "[Critical]Parser error\n";
       } catch (const std::bad_alloc&) {
-        std::cout << "memory allocation error\n";
+        std::cout << "[Critical]memory allocation error\n";
       } catch (const std::exception& exception) {
-        std::cout << "exception : " << exception.what() << "\n";
+        std::cout << "[Critical]exception : " << exception.what() << "\n";
       }
     }
 

@@ -16,46 +16,27 @@
 #include "logger.h"
 #include "market_data.h"
 #include "memory_pool.hpp"
-#include "protocol_concepts.h"
-
-#ifdef ENABLE_WEBSOCKET
-
-#endif
-
-namespace core {
-#ifdef ENABLE_WEBSOCKET
-class WsMarketDataApp;
-//class WsOrderEntryApp;
-#else
-class FixMarketDataApp;
-class FixOrderEntryApp;
-template <typename Derived, FixedString ReadThreadName,
-    FixedString WriteThreadName>
-class FixApp;
-#endif
-}  // namespace core
+#include "protocol_impl.h"
+#include "stream_state.h"
 
 namespace trading {
-template <typename Strategy, typename App>
+template <typename Strategy>
 class TradeEngine;
 
-enum class StreamState : uint8_t {
-  kRunning,
-  kAwaitingSnapshot,
-  kApplyingSnapshot,
-  kBuffering,
-};
+template <typename Derived>
+class MarketConsumerRecoveryMixin;
 
-template <typename Strategy, typename MdApp>
-  requires core::MarketDataAppLike<MdApp>
-class MarketConsumer {
+template <typename Strategy>
+class MarketConsumer
+    : public MarketConsumerRecoveryMixin<MarketConsumer<Strategy>> {
+  friend class MarketConsumerRecoveryMixin<MarketConsumer>;
+
  public:
+  using MdApp = protocol_impl::MarketDataApp;
   using AppType = MdApp;
-  using WireMessage = typename MdApp::WireMessage;
+  using WireMessage = MdApp::WireMessage;
 
-  template <typename OeApp>
-  MarketConsumer(common::Logger* logger,
-      TradeEngine<Strategy, OeApp>* trade_engine,
+  MarketConsumer(common::Logger* logger, TradeEngine<Strategy>* trade_engine,
       common::MemoryPool<MarketUpdateData>* market_update_data_pool,
       common::MemoryPool<MarketData>* market_data_pool);
   ~MarketConsumer();
@@ -63,17 +44,17 @@ class MarketConsumer {
   void on_login(WireMessage msg);
   void on_snapshot(WireMessage msg);
   void on_subscribe(WireMessage msg);
-  void on_reject(WireMessage msg);
-  void on_logout(WireMessage msg);
-  void on_instrument_list(WireMessage msg);
-  void on_heartbeat(WireMessage msg);
+  void on_reject(WireMessage msg) const;
+  void on_logout(WireMessage msg) const;
+  void on_instrument_list(WireMessage msg) const;
+  void on_heartbeat(WireMessage msg) const;
 
-#ifndef ENABLE_WEBSOCKET
-  void resubscribe();
-#else
-  void recover_from_gap();
-  void erase_buffer_lower_than_snapshot(uint64_t snapshot_update_id);
-#endif
+  // Recovery methods (implementation in CRTP base)
+  void recover_from_gap() { this->recover_from_gap_impl(); }
+  void erase_buffer_lower_than_snapshot(uint64_t snapshot_update_id) {
+    this->erase_buffer_lower_than_snapshot_impl(snapshot_update_id);
+  }
+  void resubscribe() { this->resubscribe_impl(); }
 
  private:
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
@@ -94,5 +75,9 @@ class MarketConsumer {
   std::atomic<uint64_t> current_generation_{0};
 #endif
 };
+
 }  // namespace trading
+
+#include "market_consumer_recovery.hpp"
+
 #endif  //MARKET_CONSUMER_H

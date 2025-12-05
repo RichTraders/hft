@@ -24,19 +24,15 @@
 #include "quote_reconciler.h"
 #include "reserved_position_tracker.h"
 
-namespace core {
-class FixOrderEntryApp;
-}
-
 namespace trading {
-template <typename Strategy, typename App>
+template <typename Strategy>
 class TradeEngine;
 
-template <typename Strategy, typename App>
+template <typename Strategy>
 class OrderManager {
  public:
-  OrderManager(common::Logger* logger, TradeEngine<Strategy, App>* trade_engine,
-      RiskManager& risk_manager);
+  OrderManager(const common::Logger::Producer& logger,
+      TradeEngine<Strategy>* trade_engine, RiskManager& risk_manager);
   ~OrderManager();
   void on_order_updated(const ExecutionReport* response) noexcept;
   void on_instrument_info(const InstrumentInfo& instrument_info) noexcept;
@@ -67,9 +63,9 @@ class OrderManager {
 
  private:
   order::LayerBook layer_book_;
-  TradeEngine<Strategy, App>* trade_engine_ = nullptr;
+  TradeEngine<Strategy>* trade_engine_ = nullptr;
   RiskManager& risk_manager_;
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   common::FastClock fast_clock_;
   const double ticker_size_ = 0;
   order::QuoteReconciler reconciler_;

@@ -26,10 +26,10 @@ inline double round5(double value) {
 
 namespace trading {
 
-template <typename App>
-ObiVwapMomentumStrategyTemplate<App>::ObiVwapMomentumStrategyTemplate(
+ObiVwapMomentumStrategy::ObiVwapMomentumStrategy(
     OrderManagerT* const order_manager,
-    const FeatureEngineT* const feature_engine, common::Logger* logger,
+    const FeatureEngineT* const feature_engine,
+    const common::Logger::Producer& logger,
     const common::TradeEngineCfgHashMap&)
     : Base(order_manager, feature_engine, logger),
       variance_denominator_(
@@ -44,14 +44,11 @@ ObiVwapMomentumStrategyTemplate<App>::ObiVwapMomentumStrategyTemplate(
       bid_qty_(obi_level_),
       ask_qty_(obi_level_) {}
 
-template <typename App>
-void ObiVwapMomentumStrategyTemplate<App>::on_orderbook_updated(
-    const common::TickerId&, common::Price, Side,
-    const MarketOrderBookT*) noexcept {}
+void ObiVwapMomentumStrategy::on_orderbook_updated(const common::TickerId&,
+    common::Price, Side, const MarketOrderBookT*) noexcept {}
 
-template <typename App>
-void ObiVwapMomentumStrategyTemplate<App>::on_trade_updated(
-    const MarketData* market_data, MarketOrderBookT* order_book) noexcept {
+void ObiVwapMomentumStrategy::on_trade_updated(const MarketData* market_data,
+    MarketOrderBookT* order_book) noexcept {
   const auto ticker = market_data->ticker_id;
   const auto* bbo = order_book->get_bbo();
   if (bbo->bid_qty.value == common::kQtyInvalid ||
@@ -142,14 +139,7 @@ void ObiVwapMomentumStrategyTemplate<App>::on_trade_updated(
   this->order_manager_->apply(intents);
 }
 
-template <typename App>
-void ObiVwapMomentumStrategyTemplate<App>::on_order_updated(
+void ObiVwapMomentumStrategy::on_order_updated(
     const ExecutionReport*) noexcept {}
-
-#ifdef ENABLE_WEBSOCKET
-template class ObiVwapMomentumStrategyTemplate<core::WsOrderEntryApp>;
-#else
-template class ObiVwapMomentumStrategyTemplate<core::FixOrderEntryApp>;
-#endif
 
 }  // namespace trading

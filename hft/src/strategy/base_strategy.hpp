@@ -22,40 +22,31 @@
 #include "order_manager.tpp"
 #include "trade_engine.tpp"
 
-namespace core {
-#ifdef ENABLE_WEBSOCKET
-class WsOrderEntryApp;
-#else
-class FixOrderEntryApp;
-#endif
-}  // namespace core
-
 namespace trading {
-template <class Strategy, typename App>
+template <class Strategy>
 class MarketOrderBook;
-template <class Strategy, typename App>
+template <class Strategy>
 class FeatureEngine;
-template <class Strategy, typename App>
+template <class Strategy>
 class OrderManager;
 struct ExecutionReport;
 
-template <class Strategy, typename App>
-  requires core::OrderEntryAppLike<App>
+template <class Strategy>
 class BaseStrategy {
  public:
-  BaseStrategy(OrderManager<Strategy, App>* const order_manager,
-      const FeatureEngine<Strategy, App>* const feature_engine,
-      common::Logger* logger)
+  BaseStrategy(OrderManager<Strategy>* const order_manager,
+      const FeatureEngine<Strategy>* const feature_engine,
+      const common::Logger::Producer& logger)
       : order_manager_(order_manager),
         feature_engine_(feature_engine),
-        logger_(logger->make_producer()) {}
+        logger_(logger) {}
 
   ~BaseStrategy() = default;
 
  protected:
-  OrderManager<Strategy, App>* order_manager_;
-  const FeatureEngine<Strategy, App>* feature_engine_;
-  common::Logger::Producer logger_;
+  OrderManager<Strategy>* order_manager_;
+  const FeatureEngine<Strategy>* feature_engine_;
+  const common::Logger::Producer& logger_;
 };
 }  // namespace trading
 

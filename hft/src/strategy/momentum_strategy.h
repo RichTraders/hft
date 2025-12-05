@@ -15,34 +15,22 @@
 #include "base_strategy.hpp"
 
 struct MarketData;
-
-namespace core {
-#ifdef ENABLE_WEBSOCKET
-class WsOrderEntryApp;
-#else
-class FixOrderEntryApp;
-#endif
-}  // namespace core
-
 namespace trading {
-template <typename Strategy, typename App>
+template <typename Strategy>
 class FeatureEngine;
-template <typename Strategy, typename App>
+template <typename Strategy>
 class MarketOrderBook;
 
-template <typename App>
-class ObiVwapMomentumStrategyTemplate
-    : public BaseStrategy<ObiVwapMomentumStrategyTemplate<App>, App> {
+class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
  public:
-  using Base = BaseStrategy<ObiVwapMomentumStrategyTemplate<App>, App>;
-  using OrderManagerT = OrderManager<ObiVwapMomentumStrategyTemplate<App>, App>;
-  using FeatureEngineT =
-      FeatureEngine<ObiVwapMomentumStrategyTemplate<App>, App>;
-  using MarketOrderBookT =
-      MarketOrderBook<ObiVwapMomentumStrategyTemplate<App>, App>;
+  using Base = BaseStrategy;
+  using OrderManagerT = OrderManager<ObiVwapMomentumStrategy>;
+  using FeatureEngineT = FeatureEngine<ObiVwapMomentumStrategy>;
+  using MarketOrderBookT = MarketOrderBook<ObiVwapMomentumStrategy>;
 
-  ObiVwapMomentumStrategyTemplate(OrderManagerT* order_manager,
-      const FeatureEngineT* feature_engine, common::Logger* logger,
+  ObiVwapMomentumStrategy(OrderManagerT* order_manager,
+      const FeatureEngineT* feature_engine,
+      const common::Logger::Producer& logger,
       const common::TradeEngineCfgHashMap& ticker_cfg);
   void on_orderbook_updated(const common::TickerId& ticker, common::Price,
       common::Side, const MarketOrderBookT* order_book) noexcept;
@@ -62,16 +50,6 @@ class ObiVwapMomentumStrategyTemplate
   std::vector<double> bid_qty_;
   std::vector<double> ask_qty_;
 };
-
-#ifdef ENABLE_WEBSOCKET
-using ObiVwapMomentumStrategyWs =
-    ObiVwapMomentumStrategyTemplate<core::WsOrderEntryApp>;
-using ObiVwapMomentumStrategy = ObiVwapMomentumStrategyWs;
-#else
-using ObiVwapMomentumStrategyFix =
-    ObiVwapMomentumStrategyTemplate<core::FixOrderEntryApp>;
-using ObiVwapMomentumStrategy = ObiVwapMomentumStrategyFix;
-#endif
 
 }  // namespace trading
 

@@ -14,7 +14,6 @@
 #define OM_ORDER_H
 
 #include "absl/container/flat_hash_map.h"
-#include "common/ini_config.hpp"
 #include "common/types.h"
 
 namespace trading {

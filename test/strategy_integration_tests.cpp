@@ -11,7 +11,11 @@
  */
 
 #include "gtest/gtest.h"
+#ifdef ENABLE_WEBSOCKET
+#include "core/websocket/order_entry/ws_oe_app.h"
+#else
 #include "core/fix/fix_oe_app.h"
+#endif
 #include "ini_config.hpp"
 #include "logger.h"
 #include "response_manager.h"
@@ -22,7 +26,7 @@ using namespace trading;
 using namespace common;
 
 using TestTradeEngine =
-    trading::TradeEngine<SelectedStrategy, core::FixOrderEntryApp>;
+    trading::TradeEngine<SelectedStrategy>;
 
 class StrategyIntegrationTest : public ::testing::Test {
  protected:

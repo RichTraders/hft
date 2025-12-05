@@ -16,29 +16,22 @@
 
 struct MarketData;
 
-namespace core {
-class FixOrderEntryApp;
-#ifdef ENABLE_WEBSOCKET
-class WsOrderEntryApp;
-#endif
-}  // namespace core
-
 namespace trading {
-template <typename Strategy, typename App>
+template <typename Strategy>
 class FeatureEngine;
-template <typename Strategy, typename App>
+template <typename Strategy>
 class MarketOrderBook;
 
-template <typename App>
-class LiquidTakerTemplate : public BaseStrategy<LiquidTakerTemplate<App>, App> {
+class LiquidTaker : public BaseStrategy<LiquidTaker> {
  public:
-  using Base = BaseStrategy<LiquidTakerTemplate<App>, App>;
-  using OrderManagerT = OrderManager<LiquidTakerTemplate<App>, App>;
-  using FeatureEngineT = FeatureEngine<LiquidTakerTemplate<App>, App>;
-  using MarketOrderBookT = MarketOrderBook<LiquidTakerTemplate<App>, App>;
+  using Base = BaseStrategy<LiquidTaker>;
+  using OrderManagerT = OrderManager<LiquidTaker>;
+  using FeatureEngineT = FeatureEngine<LiquidTaker>;
+  using MarketOrderBookT = MarketOrderBook<LiquidTaker>;
 
-  LiquidTakerTemplate(OrderManagerT* order_manager,
-      const FeatureEngineT* feature_engine, common::Logger* logger,
+  LiquidTaker(OrderManagerT* order_manager,
+      const FeatureEngineT* feature_engine,
+      const common::Logger::Producer& logger,
       const common::TradeEngineCfgHashMap&);
 
   void on_orderbook_updated(const common::TickerId&, common::Price,
@@ -48,15 +41,6 @@ class LiquidTakerTemplate : public BaseStrategy<LiquidTakerTemplate<App>, App> {
 
   void on_order_updated(const ExecutionReport*) noexcept;
 };
-
-using LiquidTakerFix = LiquidTakerTemplate<core::FixOrderEntryApp>;
-#ifdef ENABLE_WEBSOCKET
-using LiquidTakerWs = LiquidTakerTemplate<core::WsOrderEntryApp>;
-using LiquidTaker = LiquidTakerWs;
-#else
-using LiquidTaker = LiquidTakerFix;
-#endif
-
 }  // namespace trading
 
 #endif  //LIQUID_TAKER_H

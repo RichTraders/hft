@@ -14,29 +14,18 @@
 
 namespace trading {
 
-template <typename App>
-LiquidTakerTemplate<App>::LiquidTakerTemplate(
-    OrderManagerT* const order_manager,
-    const FeatureEngineT* const feature_engine, common::Logger* logger,
+LiquidTaker::LiquidTaker(OrderManagerT* const order_manager,
+    const FeatureEngineT* const feature_engine,
+    const common::Logger::Producer& logger,
     const common::TradeEngineCfgHashMap&)
     : Base(order_manager, feature_engine, logger) {}
 
-template <typename App>
-void LiquidTakerTemplate<App>::on_orderbook_updated(const common::TickerId&,
-    common::Price, common::Side, const MarketOrderBookT*) const noexcept {}
+void LiquidTaker::on_orderbook_updated(const common::TickerId&, common::Price,
+    common::Side, const MarketOrderBookT*) const noexcept {}
 
-template <typename App>
-void LiquidTakerTemplate<App>::on_trade_updated(const MarketData*,
+void LiquidTaker::on_trade_updated(const MarketData*,
     MarketOrderBookT*) const noexcept {}
 
-template <typename App>
-void LiquidTakerTemplate<App>::on_order_updated(
-    const ExecutionReport*) noexcept {}
-
-#ifdef ENABLE_WEBSOCKET
-template class LiquidTakerTemplate<core::WsOrderEntryApp>;
-#else
-template class LiquidTakerTemplate<core::FixOrderEntryApp>;
-#endif
+void LiquidTaker::on_order_updated(const ExecutionReport*) noexcept {}
 
 }  // namespace trading

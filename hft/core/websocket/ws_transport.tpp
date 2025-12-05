@@ -21,7 +21,7 @@ namespace {
 constexpr int kServiceIntervalMs = 50;
 constexpr std::string_view kConnectedSignalString = "__CONNECTED__";
 
-template<FixedString ThreadName>
+template <FixedString ThreadName>
 struct Protocols {
   explicit Protocols()
       : entries{lws_protocols{"fix-websocket",
@@ -33,18 +33,20 @@ struct Protocols {
                     0},
             lws_protocols{nullptr, nullptr, 0, 0, 0, nullptr, 0}} {}
 
-  std::array<lws_protocols,2> entries;
+  std::array<lws_protocols, 2> entries;
 };
 
 }  // namespace
-template<FixedString ThreadName>
+template <FixedString ThreadName>
 WebSocketTransport<ThreadName>::WebSocketTransport(std::string host, int port,
-    std::string path, bool use_ssl, bool notify_connected)
+    std::string path, bool use_ssl, bool notify_connected,
+    std::string_view api_key)
     : host_(std::move(host)),
       path_(std::move(path)),
       port_(port),
       use_ssl_(use_ssl),
       notify_connected_(notify_connected),
+      api_key_(std::string(api_key.data())),
       queue_(std::make_unique<common::SPSCQueue<std::string, kQueueSize>>()) {
 
   static Protocols<ThreadName> protocols;
@@ -91,7 +93,7 @@ WebSocketTransport<ThreadName>::WebSocketTransport(std::string host, int port,
   std::cout << "WebSocketTransport Created\n";
 }
 
-template<FixedString ThreadName>
+template <FixedString ThreadName>
 WebSocketTransport<ThreadName>::~WebSocketTransport() {
   interrupt();
 
@@ -108,12 +110,13 @@ WebSocketTransport<ThreadName>::~WebSocketTransport() {
   }
 }
 
-template<FixedString ThreadName>
-void WebSocketTransport<ThreadName>::register_message_callback(MessageCallback callback) {
+template <FixedString ThreadName>
+void WebSocketTransport<ThreadName>::register_message_callback(
+    MessageCallback callback) {
   message_callback_ = std::move(callback);
 }
 
-template<FixedString ThreadName>
+template <FixedString ThreadName>
 int WebSocketTransport<ThreadName>::write(const std::string& buffer) const {
   if (!connected_.load(std::memory_order_acquire) ||
       interrupted_.load(std::memory_order_acquire)) {
@@ -127,14 +130,14 @@ int WebSocketTransport<ThreadName>::write(const std::string& buffer) const {
   std::memcpy(payload.data() + LWS_PRE, buffer.data(), buffer.size());
   queue_->enqueue(std::move(payload));
 
-  if (context_) {
+  if (LIKELY(context_)) {
     lws_cancel_service(context_);
   }
 
   return static_cast<int>(buffer.size());
 }
 
-template<FixedString ThreadName>
+template <FixedString ThreadName>
 void WebSocketTransport<ThreadName>::interrupt() {
   // TODO(jb): implement I'm not sure it can be interrupted
   interrupted_.store(true, std::memory_order_release);
@@ -144,7 +147,7 @@ void WebSocketTransport<ThreadName>::interrupt() {
   }
 }
 
-template<FixedString ThreadName>
+template <FixedString ThreadName>
 int WebSocketTransport<ThreadName>::callback(struct lws* wsi,
     enum lws_callback_reasons reason, void* /*user*/, void* data, size_t len) {
   auto* transport =
@@ -155,16 +158,36 @@ int WebSocketTransport<ThreadName>::callback(struct lws* wsi,
   return transport->handle_callback(wsi, reason, data, len);
 }
 
-template<FixedString ThreadName>
+template <FixedString ThreadName>
 int WebSocketTransport<ThreadName>::handle_callback(struct lws* wsi,
     enum lws_callback_reasons reason, void* data, size_t len) {
   switch (reason) {
-    case LWS_CALLBACK_CLIENT_ESTABLISHED:
+    case LWS_CALLBACK_CLIENT_ESTABLISHED: {
       connected_.store(true, std::memory_order_release);
       wsi_ = wsi;
       if (notify_connected_)
         message_callback_(kConnectedSignalString);
       break;
+    }
+    case LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER: {
+      unsigned char** p_data = static_cast<unsigned char**>(data);
+      unsigned char* end = (*p_data) + len;
+
+      if (api_key_.empty())
+        break;
+      const unsigned char* token =
+          reinterpret_cast<const unsigned char*>(api_key_.data());
+
+      if (lws_add_http_header_by_name(wsi,
+              reinterpret_cast<const unsigned char*>("X-MBX-APIKEY:"),
+              token,
+              api_key_.size(),
+              p_data,
+              end)) {
+        return -1;
+      }
+      break;
+    }
 
     case LWS_CALLBACK_CLIENT_RECEIVE: {
       if (data && len > 0) {
@@ -200,20 +223,30 @@ int WebSocketTransport<ThreadName>::handle_callback(struct lws* wsi,
       }
       break;
     }
-    case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
+    case LWS_CALLBACK_EVENT_WAIT_CANCELLED: {
       if (LIKELY(wsi_) && !queue_->empty()) {
         lws_callback_on_writable(wsi_);
       }
       break;
+    }
 
-    case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
+    case LWS_CALLBACK_CLIENT_CONNECTION_ERROR: {
+      std::string msg;
+
+      if (data && len) {
+        msg.assign(static_cast<const char*>(data), len);
+      } else {
+        msg = "unknown error";
+      }
+
+      std::cerr << "[WS] CLIENT_CONNECTION_ERROR: " << msg << "\n";
+    }
     case LWS_CALLBACK_CLIENT_CLOSED:
-    case LWS_CALLBACK_CLOSED:
+    case LWS_CALLBACK_CLOSED: {
       connected_.store(false, std::memory_order_release);
       interrupted_.store(true, std::memory_order_release);
-
       break;
-
+    }
     default:
       break;
   }
@@ -221,7 +254,7 @@ int WebSocketTransport<ThreadName>::handle_callback(struct lws* wsi,
   return 0;
 }
 
-template<FixedString ThreadName>
+template <FixedString ThreadName>
 void WebSocketTransport<ThreadName>::service_loop() {
   while (running_.load(std::memory_order_acquire)) {
     if (context_) {

@@ -16,45 +16,83 @@
 #include "common/logger.h"
 #include "common/memory_pool.hpp"
 #include "core/market_data.h"
+#include "decoder_policy.h"
 #include "ws_md_decoder.h"
 #include "ws_md_domain_mapper.h"
 #include "ws_md_encoder.h"
-#include "ws_md_wire_message.h"
 
 namespace core {
+template <DecoderPolicy Policy>
 class WsMdCore {
  public:
-  using WireMessage = WsMdWireMessage;
+  using PolicyType = Policy;
+  using WireMessage = typename Policy::WireMessage;
   using RequestId = std::string_view;
   using MarketDepthLevel = std::string_view;
   using SymbolId = std::string_view;
 
-  WsMdCore(common::Logger* logger, common::MemoryPool<MarketData>* pool);
+  WsMdCore(common::Logger* logger, common::MemoryPool<MarketData>* pool)
+      : logger_(logger->make_producer()),
+        decoder_(logger_),
+        mapper_(logger_, pool),
+        encoder_(logger_) {}
 
   [[nodiscard]] std::string create_market_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
-      const SymbolId& symbol, bool subscribe) const;
+      const SymbolId& symbol, bool subscribe) const {
+    return encoder_.create_market_data_subscription_message(request_id,
+        level,
+        symbol,
+        subscribe);
+  }
+
   [[nodiscard]] std::string create_trade_data_subscription_message(
       const RequestId& request_id, const MarketDepthLevel& level,
-      const SymbolId& symbol, bool subscribe) const;
+      const SymbolId& symbol, bool subscribe) const {
+    return encoder_.create_trade_data_subscription_message(request_id,
+        level,
+        symbol,
+        subscribe);
+  }
+
   [[nodiscard]] std::string create_snapshot_data_subscription_message(
-      const SymbolId& symbol, const MarketDepthLevel& level) const;
+      const SymbolId& symbol, const MarketDepthLevel& level) const {
+    return encoder_.create_snapshot_data_subscription_message(level, symbol);
+  }
+
   [[nodiscard]] std::string request_instrument_list_message(
-      const std::string& symbol) const;
+      const std::string& symbol) const {
+    return encoder_.request_instrument_list_message(symbol);
+  }
+
   [[nodiscard]] MarketUpdateData create_market_data_message(
-      const WireMessage& msg) const;
+      const WireMessage& msg) const {
+    return mapper_.to_market_data(msg);
+  }
+
   [[nodiscard]] MarketUpdateData create_snapshot_data_message(
-      const WireMessage& msg) const;
+      const WireMessage& msg) const {
+    return mapper_.to_snapshot_data(msg);
+  }
+
   [[nodiscard]] InstrumentInfo create_instrument_list_message(
-      const WireMessage& msg) const;
+      const WireMessage& msg) const {
+    return mapper_.to_instrument_info(msg);
+  }
+
   [[nodiscard]] MarketDataReject create_reject_message(
-      const WireMessage& msg) const;
-  [[nodiscard]] WireMessage decode(std::string_view payload) const;
+      const WireMessage& msg) const {
+    return mapper_.to_reject(msg);
+  }
+
+  [[nodiscard]] WireMessage decode(std::string_view payload) const {
+    return decoder_.decode(payload);
+  }
 
  private:
   common::Logger::Producer logger_;
-  WsMdDecoder decoder_;
-  WsMdDomainMapper mapper_;
+  WsMdDecoder<Policy> decoder_;
+  WsMdDomainMapper<Policy> mapper_;
   WsMdEncoder encoder_;
 };
 

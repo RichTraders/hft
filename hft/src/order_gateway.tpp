@@ -80,7 +80,7 @@ OrderGateway<Strategy>::OrderGateway(common::Logger* logger,
 
 template <typename Strategy>
 OrderGateway<Strategy>::~OrderGateway() {
-  logger_.info("[Destructor] OrderGateway Destroy");
+  std::cout << "[Destructor] OrderGateway Destroy\n";
 }
 
 template <typename Strategy>

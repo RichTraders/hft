@@ -12,12 +12,21 @@
 
 #include "hft_lib.h"
 
+#include <csignal>
 #include "strategy_config.hpp"
+
 using SelectedOrderGateway = trading::OrderGateway<SelectedStrategy>;
 using SelectedTradeEngine = trading::TradeEngine<SelectedStrategy>;
 using SelectedMarketConsumer = trading::MarketConsumer<SelectedStrategy>;
 
+void block_all_signals(sigset_t& set) {
+  sigfillset(&set);
+  pthread_sigmask(SIG_BLOCK, &set, nullptr);
+}
 int main() {
+  sigset_t set;
+  block_all_signals(set);
+
   try {
 #ifdef TEST_NET
     INI_CONFIG.load("resources/test_config.ini");
@@ -77,15 +86,14 @@ int main() {
     engine->init_order_gateway(order_gateway.get());
     order_gateway->init_trade_engine(engine.get());
 
-    const SelectedMarketConsumer consumer(logger.get(),
+    const auto consumer = std::make_unique<SelectedMarketConsumer>(logger.get(),
         engine.get(),
         market_update_data_pool.get(),
         market_data_pool.get());
 
-    std::unique_ptr<common::CpuManager> cpu_manager =
-        std::make_unique<common::CpuManager>(logger.get());
+    const auto cpu_manager = std::make_unique<common::CpuManager>(logger.get());
 
-    auto log = logger->make_producer();
+    const auto log = logger->make_producer();
     std::string cpu_init_result;
     if (cpu_manager->init_cpu_group(cpu_init_result)) {
       log.info(std::format("don't init cpu group: {}", cpu_init_result));
@@ -95,9 +103,19 @@ int main() {
       log.info("don't init cpu to tid");
     }
 
-    constexpr int kSleepCount = 10;
-    while (true)
-      sleep(kSleepCount);  // TODO(neworo2):
+    int sig;
+    while (true) {
+      sigwait(&set, &sig);
+
+      if (sig == SIGINT || sig == SIGTERM) {
+        std::cout << "\n[Main] Signal received\n";
+        order_gateway->stop();
+        consumer->stop();
+        engine->stop();
+        logger->shutdown();
+        break;
+      }
+    }
   } catch (std::exception& e) {
     std::cerr << e.what() << "\n";
   }

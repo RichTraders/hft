@@ -86,7 +86,7 @@ class TradeEngine {
       response_queue_;
   MarketOrderBookHashMap<Strategy> ticker_order_book_;
 
-  bool running_{true};
+  std::atomic<bool> running_{true};
   std::unique_ptr<FeatureEngine<Strategy>> feature_engine_;
   std::unique_ptr<PositionKeeper> position_keeper_;
   std::unique_ptr<RiskManager> risk_manager_;

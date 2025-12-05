@@ -63,7 +63,7 @@ MarketConsumer<Strategy>::MarketConsumer(common::Logger* logger,
 
 template <typename Strategy>
 MarketConsumer<Strategy>::~MarketConsumer() {
-  logger_.info("[Destructor] MarketConsumer Destroy");
+  std::cout << "[Destructor] MarketConsumer Destroy\n";
 }
 
 template <typename Strategy>
@@ -275,7 +275,7 @@ void MarketConsumer<Strategy>::on_subscribe(WireMessage msg) {
 
   // Skip gap check for trade events (they don't have sequence numbers)
   if (data->type != kTrade) {
-    logger_.info("current update index:{}, data start :{}, data end:{}",
+    logger_.debug("current update index:{}, data start :{}, data end:{}",
         update_index_,
         data->start_idx,
         data->end_idx);

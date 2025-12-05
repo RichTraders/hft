@@ -194,9 +194,9 @@ void WsMarketDataApp::handle_stream_payload(std::string_view payload) const {
       payload.substr(0,
           std::min<size_t>(kMinimumLogPrintSize, payload.size())));
 
-  START_MEASURE(Convert_Message);
+  START_MEASURE(Convert_Message_Stream);
   WireMessage wire_msg = stream_core_.decode(payload);
-  END_MEASURE(Convert_Message, logger_);
+  END_MEASURE(Convert_Message_Stream, logger_);
 
   std::visit(
       [this, &wire_msg](const auto& arg) {
@@ -230,9 +230,9 @@ void WsMarketDataApp::handle_api_payload(std::string_view payload) const {
       payload.substr(0,
           std::min<size_t>(kMinimumLogPrintSize, payload.size())));
 
-  START_MEASURE(Convert_Message);
+  START_MEASURE(Convert_Message_API);
   auto api_wire_msg = api_core_.decode(payload);
-  END_MEASURE(Convert_Message, logger_);
+  END_MEASURE(Convert_Message_API, logger_);
 
   std::visit(
       [this](const auto& arg) {

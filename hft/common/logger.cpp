@@ -149,7 +149,7 @@ void Logger::dispatch(const LogMessage& msg) const {
 }
 
 bool Logger::Producer::is_enabled(LogLevel lvl) const noexcept {
-  return (impl_->level->load(std::memory_order_relaxed) < lvl);
+  return (impl_->level->load(std::memory_order_relaxed) <= lvl);
 }
 
 void Logger::process() const {

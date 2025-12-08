@@ -240,6 +240,7 @@ int WebSocketTransport<ThreadName>::handle_callback(struct lws* wsi,
       }
 
       std::cerr << "[WS] CLIENT_CONNECTION_ERROR: " << msg << "\n";
+      [[fallthrough]];
     }
     case LWS_CALLBACK_CLIENT_CLOSED:
     case LWS_CALLBACK_CLOSED: {

@@ -41,7 +41,7 @@ class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
 
  private:
   static constexpr int kDefaultOBILevel10 = 10;
-  static constexpr int kSafetyMargin = 20;
+  static constexpr int kSafetyMargin = 5;
   const double variance_denominator_;
   const double position_variance_;
   const double enter_threshold_;

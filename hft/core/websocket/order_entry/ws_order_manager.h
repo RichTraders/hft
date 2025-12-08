@@ -49,14 +49,22 @@ class WsOrderManager {
   create_synthetic_execution_report(std::string_view request_id, int error_code,
       std::string_view error_message);
 
- private:
+  // Cancel-and-reorder pair tracking
+  void register_cancel_and_reorder_pair(std::uint64_t new_order_id,
+      std::uint64_t original_order_id);
+  [[nodiscard]] std::optional<std::uint64_t> get_original_order_id(
+      std::uint64_t new_order_id) const;
+  void remove_cancel_and_reorder_pair(std::uint64_t new_order_id);
+
   static std::optional<uint64_t> extract_client_order_id(
       std::string_view request_id);
 
+ private:
   const common::Logger::Producer& logger_;
 
-  // Pending requests map: request_id → order info
+  // Cancel-and-reorder pair tracking
   absl::flat_hash_map<std::uint64_t, PendingOrderRequest> pending_requests_;
+  absl::flat_hash_map<std::uint64_t, std::uint64_t> cancel_reorder_pairs_;
 };
 
 }  // namespace core

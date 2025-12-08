@@ -299,6 +299,7 @@ void WsOrderEntryApp::handle_execution_report(
     dispatch("8", message);  // Regular execution report
   }
   ws_order_manager_.remove_pending_request(ptr.event.client_order_id);
+  ws_order_manager_.remove_cancel_and_reorder_pair(ptr.event.client_order_id);
 }
 
 void WsOrderEntryApp::handle_balance_update(
@@ -365,20 +366,85 @@ void WsOrderEntryApp::handle_api_response(const schema::ApiResponse& ptr) {
 void WsOrderEntryApp::handle_cancel_and_reorder_response(
     const schema::CancelAndReorderResponse& ptr) {
   if (ptr.status != kHttpOK && ptr.error.has_value()) {
+    const auto& error = ptr.error.value();
     logger_.warn(
         "[WsOeApp] CancelAndReorder failed: id={}, status={}, error={}",
         ptr.id,
         ptr.status,
-        ptr.error.value().message);
+        error.message);
 
-    auto synthetic_report =
-        ws_order_manager_.create_synthetic_execution_report(ptr.id,
-            ptr.error.value().code,
-            ptr.error.value().message);
-    if (synthetic_report.has_value()) {
-      const WireMessage message = synthetic_report.value();
-      dispatch("8", message);
+    if (!error.data.has_value()) {
+      return;
+      // logger_.warn("[WsOeApp] No error data available for cancel_and_reorder");
+      // // Fallback: create single synthetic report
+      // auto synthetic_report =
+      //     ws_order_manager_.create_synthetic_execution_report(ptr.id,
+      //         error.code,
+      //         error.message);
+      // if (synthetic_report.has_value()) {
+      //   dispatch("8", synthetic_report.value());
+      // }
     }
+
+    const auto& error_data = error.data.value();
+
+    const auto new_order_id_opt =
+        WsOrderManager::extract_client_order_id(ptr.id);
+    if (!new_order_id_opt.has_value()) {
+      logger_.error("[WsOeApp] Failed to extract client_order_id from {}",
+          ptr.id);
+      return;
+    }
+    std::uint64_t new_order_id = new_order_id_opt.value();
+
+    const auto original_order_id_opt =
+        ws_order_manager_.get_original_order_id(new_order_id);
+    if (!original_order_id_opt.has_value()) {
+      logger_.warn(
+          "[WsOeApp] No cancel_and_reorder pair found for new_order_id={}",
+          new_order_id);
+      auto synthetic_report =
+          ws_order_manager_.create_synthetic_execution_report(ptr.id,
+              error.code,
+              error.message);
+      if (synthetic_report.has_value()) {
+        dispatch("8", synthetic_report.value());
+      }
+      return;
+    }
+    const auto original_order_id = original_order_id_opt.value();
+
+    // Handle NEW order based on new_order_result
+    if (error_data.new_order_result != "SUCCESS") {
+      logger_.info("[WsOeApp] New order {}, creating synthetic report",
+          error_data.new_order_result);
+      auto new_order_report =
+          ws_order_manager_.create_synthetic_execution_report(ptr.id,
+              error.code,
+              error.message);
+      if (new_order_report.has_value()) {
+        dispatch("8", new_order_report.value());
+      }
+    }
+
+    if (error_data.cancel_result == "FAILURE" &&
+        error_data.new_order_result != "SUCCESS") {
+      logger_.info("[WsOeApp] Cancel FAILURE, creating synthetic report");
+      const auto orig_request_id =
+          "ordercancel_" + std::to_string(original_order_id);
+      auto cancel_report =
+          ws_order_manager_.create_synthetic_execution_report(orig_request_id,
+              error.code,
+              error.message);
+      if (cancel_report.has_value()) {
+        dispatch("8", cancel_report.value());
+      }
+    } else if (error_data.cancel_result == "SUCCESS") {
+      logger_.info("[WsOeApp] Cancel SUCCESS (no synthetic report needed)");
+    }
+    ws_order_manager_.remove_pending_request(new_order_id);
+    ws_order_manager_.remove_pending_request(original_order_id);
+    ws_order_manager_.remove_cancel_and_reorder_pair(new_order_id);
   }
 }
 

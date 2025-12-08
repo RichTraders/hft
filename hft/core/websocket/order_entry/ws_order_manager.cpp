@@ -44,7 +44,7 @@ std::optional<schema::ExecutionReportResponse>
 WsOrderManager::create_synthetic_execution_report(std::string_view request_id,
     int error_code, std::string_view error_message) {
   const auto client_order_id_opt = extract_client_order_id(request_id);
-  if (!client_order_id_opt.has_value()) {
+  if (UNLIKELY(!client_order_id_opt.has_value())) {
     logger_.error(
         "[WsOrderManager] Failed to extract clientOrderId from request_id: {}",
         request_id);
@@ -53,13 +53,14 @@ WsOrderManager::create_synthetic_execution_report(std::string_view request_id,
 
   uint64_t client_order_id = client_order_id_opt.value();
 
-  const auto reqeust = pending_requests_.find(client_order_id);
-  if (reqeust == pending_requests_.end()) {
+  const auto request = pending_requests_.find(client_order_id);
+  if (request == pending_requests_.end()) {
     logger_.warn(
         "[WsOrderManager] No pending request found for "
         "clientOrderId={}, creating "
         "minimal ExecutionReport",
         client_order_id);
+    return std::nullopt;
   }
 
   schema::ExecutionReportResponse response;
@@ -79,9 +80,8 @@ WsOrderManager::create_synthetic_execution_report(std::string_view request_id,
   event.cumulative_filled_quantity = 0.;
   event.last_executed_price = 0.;
 
-  // Fill in details from pending request if available
-  if (LIKELY(reqeust != pending_requests_.end())) {
-    const auto& pending = reqeust->second;
+  if (LIKELY(request != pending_requests_.end())) {
+    const auto& pending = request->second;
     event.symbol = pending.symbol;
     event.side = common::toString(pending.side);
     event.order_type = trading::toString(pending.ord_type);
@@ -104,8 +104,8 @@ WsOrderManager::create_synthetic_execution_report(std::string_view request_id,
       error_code,
       error_message);
 
-  if (LIKELY(reqeust != pending_requests_.end())) {
-    pending_requests_.erase(reqeust);
+  if (request != pending_requests_.end()) {
+    pending_requests_.erase(request);
   }
 
   return response;
@@ -141,6 +141,36 @@ std::optional<uint64_t> WsOrderManager::extract_client_order_id(
   }
 
   return std::nullopt;
+}
+
+void WsOrderManager::register_cancel_and_reorder_pair(
+    std::uint64_t new_order_id, std::uint64_t original_order_id) {
+  cancel_reorder_pairs_[new_order_id] = original_order_id;
+  logger_.debug(
+      "[WsOrderManager] Registered cancel_and_reorder pair: "
+      "new_order_id={}, original_order_id={}",
+      new_order_id,
+      original_order_id);
+}
+
+std::optional<std::uint64_t> WsOrderManager::get_original_order_id(
+    std::uint64_t new_order_id) const {
+  auto cancel_reorder_pair = cancel_reorder_pairs_.find(new_order_id);
+  if (cancel_reorder_pair != cancel_reorder_pairs_.end()) {
+    return cancel_reorder_pair->second;
+  }
+  return std::nullopt;
+}
+
+void WsOrderManager::remove_cancel_and_reorder_pair(
+    std::uint64_t new_order_id) {
+  auto cancel_reorder_pair = cancel_reorder_pairs_.find(new_order_id);
+  if (cancel_reorder_pair != cancel_reorder_pairs_.end()) {
+    logger_.debug(
+        "[WsOrderManager] Removed cancel_and_reorder pair: new_order_id={}",
+        new_order_id);
+    cancel_reorder_pairs_.erase(cancel_reorder_pair);
+  }
 }
 
 }  // namespace core

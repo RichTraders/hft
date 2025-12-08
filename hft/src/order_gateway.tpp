@@ -22,19 +22,25 @@ class TradeEngine;
 template <typename Strategy>
 OrderGateway<Strategy>::OrderGateway(common::Logger* logger,
     ResponseManager* response_manager)
-    : logger_(logger->make_producer()),
-      app_(std::make_unique<OeApp>("BMDWATCH", "SPOT", logger,
-          response_manager)) {
+  : logger_(logger->make_producer()),
+    app_(std::make_unique<OeApp>("BMDWATCH",
+        "SPOT",
+        logger,
+        response_manager)) {
   using WireMessage = typename OeApp::WireMessage;
   auto register_handler = [this](const std::string& type, auto&& fn) {
     if constexpr (std::is_pointer_v<WireMessage>) {
       app_->register_callback(type,
           [handler = std::forward<decltype(fn)>(fn)](
-              WireMessage msg) { handler(msg); });
+          WireMessage msg) {
+            handler(msg);
+          });
     } else {
       app_->register_callback(type,
           [handler = std::forward<decltype(fn)>(fn)](
-              const WireMessage& msg) { handler(msg); });
+          const WireMessage& msg) {
+            handler(msg);
+          });
     }
   };
 
@@ -42,34 +48,39 @@ OrderGateway<Strategy>::OrderGateway(common::Logger* logger,
   register_handler("1", [this](auto&& msg) { on_heartbeat(msg); });
   register_handler("5", [this](auto&& msg) { on_logout(msg); });
 
-  register_handler("8", [this](auto&& msg) {
-    if constexpr (std::is_pointer_v<WireExecutionReport>) {
-      on_execution_report(reinterpret_cast<WireExecutionReport>(msg));
-    } else {
-      on_execution_report(std::get<WireExecutionReport>(msg));
-    }
-  });
-  register_handler("9", [this](auto&& msg) {
-    if constexpr (std::is_pointer_v<WireCancelReject>) {
-      on_order_cancel_reject(reinterpret_cast<WireCancelReject>(msg));
-    } else {
-      on_order_cancel_reject(std::get<WireCancelReject>(msg));
-    }
-  });
-  register_handler("r", [this](auto&& msg) {
-    if constexpr (std::is_pointer_v<WireMassCancelReport>) {
-      on_order_mass_cancel_report(reinterpret_cast<WireMassCancelReport>(msg));
-    } else {
-      on_order_mass_cancel_report(std::get<WireMassCancelReport>(msg));
-    }
-  });
-  register_handler("3", [this](auto&& msg) {
-    if constexpr (std::is_pointer_v<WireReject>) {
-      on_rejected(reinterpret_cast<WireReject>(msg));
-    } else {
-      on_rejected(std::get<WireReject>(msg));
-    }
-  });
+  register_handler("8",
+      [this](auto&& msg) {
+        if constexpr (std::is_pointer_v<WireExecutionReport>) {
+          on_execution_report(reinterpret_cast<WireExecutionReport>(msg));
+        } else {
+          on_execution_report(std::get<WireExecutionReport>(msg));
+        }
+      });
+  register_handler("9",
+      [this](auto&& msg) {
+        if constexpr (std::is_pointer_v<WireCancelReject>) {
+          on_order_cancel_reject(reinterpret_cast<WireCancelReject>(msg));
+        } else {
+          on_order_cancel_reject(std::get<WireCancelReject>(msg));
+        }
+      });
+  register_handler("r",
+      [this](auto&& msg) {
+        if constexpr (std::is_pointer_v<WireMassCancelReport>) {
+          on_order_mass_cancel_report(
+              reinterpret_cast<WireMassCancelReport>(msg));
+        } else {
+          on_order_mass_cancel_report(std::get<WireMassCancelReport>(msg));
+        }
+      });
+  register_handler("3",
+      [this](auto&& msg) {
+        if constexpr (std::is_pointer_v<WireReject>) {
+          on_rejected(reinterpret_cast<WireReject>(msg));
+        } else {
+          on_rejected(std::get<WireReject>(msg));
+        }
+      });
 
   if (!app_->start()) {
     logger_.info("Order Entry Start");
@@ -196,41 +207,42 @@ template <typename Strategy>
 void OrderGateway<Strategy>::new_single_order_data(
     const RequestCommon& request) {
   const NewSingleOrderData order_data{.cl_order_id = request.cl_order_id,
-      .symbol = request.symbol,
-      .side = from_common_side(request.side),
-      .order_qty = request.order_qty,
-      .ord_type = request.ord_type,
-      .price = request.price,
-      .time_in_force = request.time_in_force,
-      .self_trade_prevention_mode = request.self_trade_prevention_mode};
+                                      .symbol = request.symbol,
+                                      .side = from_common_side(request.side),
+                                      .order_qty = request.order_qty,
+                                      .ord_type = request.ord_type,
+                                      .price = request.price,
+                                      .time_in_force = request.time_in_force,
+                                      .self_trade_prevention_mode = request.
+                                      self_trade_prevention_mode};
 
   const std::string msg = app_->create_order_message(order_data);
   logger_.info("[Message]Send order message:{}", msg);
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_.error("[Message] failed to send new_single_order_data [msg:{}]",
-            msg);
+        msg);
+  } else {
+    app_->post_new_order(order_data);
   }
-  else{app_->post_new_order(order_data);
-}
 }
 
 template <typename Strategy>
 void OrderGateway<Strategy>::order_cancel_request(
     const RequestCommon& request) {
   const OrderCancelRequest cancel_request{.cl_order_id = request.cl_order_id,
-      .orig_cl_order_id = request.orig_cl_order_id,
-      .symbol = request.symbol};
+                                          .orig_cl_order_id = request.
+                                          orig_cl_order_id,
+                                          .symbol = request.symbol};
 
   const std::string msg = app_->create_cancel_order_message(cancel_request);
   logger_.debug("[Message]Send cancel order message:{}", msg);
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_.error("[Message] failed to send order_cancel_request");
+  } else {
+    app_->post_cancel_order(cancel_request);
   }
-else {
-  app_->post_cancel_order(cancel_request);
-}
 }
 
 template <typename Strategy>
@@ -255,10 +267,9 @@ void OrderGateway<Strategy>::order_cancel_request_and_new_order_single(
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_.error("[Message] failed to create_cancel_and_new_order");
+  } else {
+    app_->post_cancel_and_reorder(cancel_and_reorder);
   }
-else {
-  app_->post_cancel_and_reorder(cancel_and_reorder);
-}
 }
 
 template <typename Strategy>
@@ -273,14 +284,12 @@ void OrderGateway<Strategy>::order_mass_cancel_request(
 
   if (UNLIKELY(!app_->send(msg))) {
     logger_.error("[Message] failed to send order_mass_cancel_request");
-  }
-  else {
+  } else {
     app_->post_mass_cancel_order(all_cancel_request);
   }
 
-
 }
 
-}  // namespace trading
+} // namespace trading
 
 #endif  // ORDER_GATEWAY_TPP

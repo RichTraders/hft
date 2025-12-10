@@ -68,10 +68,13 @@ class TradeEngine {
   void on_order_updated(const ExecutionReport* report) noexcept;
   bool enqueue_response(const ResponseCommon& response);
   void send_request(const RequestCommon& request);
+  void on_instrument_info(const InstrumentInfo& instrument_info);
+  [[nodiscard]] double get_qty_increment() const { return qty_increment_; }
 
  private:
   static constexpr int kMarketDataBatchLimit = 128;
   static constexpr int kResponseBatchLimit = 64;
+  static constexpr double kQtyDefault = 0.00001;
   common::Logger::Producer logger_;
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
@@ -90,8 +93,9 @@ class TradeEngine {
   std::unique_ptr<RiskManager> risk_manager_;
   std::unique_ptr<OrderManager<Strategy>> order_manager_;
 
-  // Direct strategy instance - zero overhead, fully inlinable
   Strategy strategy_;
+
+  double qty_increment_{kQtyDefault};
 
   void run();
   void on_order_cancel_reject(const OrderCancelReject*);

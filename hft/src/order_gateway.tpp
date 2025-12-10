@@ -10,12 +10,17 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
+#ifndef ORDER_GATEWAY_TPP
+#define ORDER_GATEWAY_TPP
+
 #include "order_gateway.h"
-#include "trade_engine.h"
 
 namespace trading {
+template <typename Strategy>
+class TradeEngine;
 
-OrderGateway::OrderGateway(common::Logger* logger,
+template<typename Strategy>
+OrderGateway<Strategy>::OrderGateway(common::Logger* logger,
                            ResponseManager* response_manager)
     : logger_(logger->make_producer()),
       app_(std::make_unique<core::FixOrderEntryApp>("BMDWATCH", "SPOT", logger,
@@ -50,23 +55,28 @@ OrderGateway::OrderGateway(common::Logger* logger,
   logger_.info("[Constructor] OrderGateway Created");
 }
 
-OrderGateway::~OrderGateway() {
+template<typename Strategy>
+OrderGateway<Strategy>::~OrderGateway() {
   logger_.info("[Destructor] OrderGateway Destroy");
 }
 
-void OrderGateway::stop() const {
+template<typename Strategy>
+void OrderGateway<Strategy>::stop() const {
   app_->stop();
 }
 
-void OrderGateway::init_trade_engine(TradeEngine* trade_engine) {
+template<typename Strategy>
+void OrderGateway<Strategy>::init_trade_engine(TradeEngine<Strategy>* trade_engine) {
   trade_engine_ = trade_engine;
 }
 
-void OrderGateway::on_login(FIX8::Message*) {
+template<typename Strategy>
+void OrderGateway<Strategy>::on_login(FIX8::Message*) {
   logger_.info("[Message] login successful");
 }
 
-void OrderGateway::on_execution_report(
+template<typename Strategy>
+void OrderGateway<Strategy>::on_execution_report(
     FIX8::NewOroFix44OE::ExecutionReport* msg) {
   ResponseCommon res;
   res.res_type = ResponseType::kExecutionReport;
@@ -77,7 +87,8 @@ void OrderGateway::on_execution_report(
   }
 }
 
-void OrderGateway::on_order_cancel_reject(
+template<typename Strategy>
+void OrderGateway<Strategy>::on_order_cancel_reject(
     FIX8::NewOroFix44OE::OrderCancelReject* msg) {
   ResponseCommon res;
   res.res_type = ResponseType::kOrderCancelReject;
@@ -88,7 +99,8 @@ void OrderGateway::on_order_cancel_reject(
   }
 }
 
-void OrderGateway::on_order_mass_cancel_report(
+template<typename Strategy>
+void OrderGateway<Strategy>::on_order_mass_cancel_report(
     FIX8::NewOroFix44OE::OrderMassCancelReport* msg) {
   ResponseCommon res;
   res.res_type = ResponseType::kOrderMassCancelReport;
@@ -100,7 +112,8 @@ void OrderGateway::on_order_mass_cancel_report(
   }
 }
 
-void OrderGateway::on_rejected(FIX8::NewOroFix44OE::Reject* msg) {
+template<typename Strategy>
+void OrderGateway<Strategy>::on_rejected(FIX8::NewOroFix44OE::Reject* msg) {
   const OrderReject reject = app_->create_reject_message(msg);
   logger_.error(reject.toString());
   if (reject.session_reject_reason == "A") {
@@ -108,11 +121,13 @@ void OrderGateway::on_rejected(FIX8::NewOroFix44OE::Reject* msg) {
   }
 }
 
-void OrderGateway::on_order_mass_status_response(FIX8::Message*) {
+template<typename Strategy>
+void OrderGateway<Strategy>::on_order_mass_status_response(FIX8::Message*) {
   logger_.info("on_order_mass_status_response");
 }
 
-void OrderGateway::on_logout(FIX8::Message*) {
+template<typename Strategy>
+void OrderGateway<Strategy>::on_logout(FIX8::Message*) {
   auto message = app_->create_log_out_message();
 
   if (UNLIKELY(!app_->send(message))) {
@@ -120,7 +135,8 @@ void OrderGateway::on_logout(FIX8::Message*) {
   }
 }
 
-void OrderGateway::on_heartbeat(FIX8::Message* msg) {
+template<typename Strategy>
+void OrderGateway<Strategy>::on_heartbeat(FIX8::Message* msg) {
   auto message = app_->create_heartbeat_message(msg);
 
   if (UNLIKELY(!app_->send(message))) {
@@ -128,7 +144,8 @@ void OrderGateway::on_heartbeat(FIX8::Message* msg) {
   }
 }
 
-void OrderGateway::order_request(const RequestCommon& request) {
+template<typename Strategy>
+void OrderGateway<Strategy>::order_request(const RequestCommon& request) {
   switch (request.req_type) {
     case ReqeustType::kNewSingleOrderData:
       new_single_order_data(request);
@@ -149,7 +166,8 @@ void OrderGateway::order_request(const RequestCommon& request) {
   }
 }
 
-void OrderGateway::new_single_order_data(const RequestCommon& request) {
+template<typename Strategy>
+void OrderGateway<Strategy>::new_single_order_data(const RequestCommon& request) {
   const NewSingleOrderData order_data{
       .cl_order_id = request.cl_order_id,
       .symbol = request.symbol,
@@ -169,7 +187,8 @@ void OrderGateway::new_single_order_data(const RequestCommon& request) {
   }
 }
 
-void OrderGateway::order_cancel_request(const RequestCommon& request) {
+template<typename Strategy>
+void OrderGateway<Strategy>::order_cancel_request(const RequestCommon& request) {
   const OrderCancelRequest cancel_request{
       .cl_order_id = request.cl_order_id,
       .orig_cl_order_id = request.orig_cl_order_id,
@@ -183,7 +202,8 @@ void OrderGateway::order_cancel_request(const RequestCommon& request) {
   }
 }
 
-void OrderGateway::order_cancel_request_and_new_order_single(
+template<typename Strategy>
+void OrderGateway<Strategy>::order_cancel_request_and_new_order_single(
     const RequestCommon& request) {
   const OrderCancelRequestAndNewOrderSingle cancel_and_reorder{
       .order_cancel_request_and_new_order_single_mode = 1,
@@ -208,7 +228,8 @@ void OrderGateway::order_cancel_request_and_new_order_single(
   }
 }
 
-void OrderGateway::order_mass_cancel_request(const RequestCommon& request) {
+template<typename Strategy>
+void OrderGateway<Strategy>::order_mass_cancel_request(const RequestCommon& request) {
   const OrderMassCancelRequest all_cancel_request{
       .cl_order_id = request.cl_order_id, .symbol = request.symbol};
 
@@ -221,3 +242,5 @@ void OrderGateway::order_mass_cancel_request(const RequestCommon& request) {
 }
 
 }  // namespace trading
+
+#endif  // ORDER_GATEWAY_TPP

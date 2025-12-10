@@ -11,7 +11,6 @@
  */
 
 #include "market_maker.h"
-
 #include "feature_engine.h"
 #include "ini_config.hpp"
 #include "order_book.h"
@@ -19,8 +18,6 @@
 
 using common::Qty;
 using common::Side;
-constexpr int kLevel10 = 10;
-constexpr int kGap = 5;
 inline double round5(double value) {
   constexpr double kFactor = 100000.0;
   constexpr double kInvFactor = 1.0 / kFactor;
@@ -28,8 +25,8 @@ inline double round5(double value) {
 }
 
 namespace trading {
-MarketMaker::MarketMaker(OrderManager* const order_manager,
-                         const FeatureEngine* const feature_engine,
+MarketMaker::MarketMaker(OrderManager<MarketMaker>* const order_manager,
+                         const FeatureEngine<MarketMaker>* const feature_engine,
                          common::Logger* logger,
                          const common::TradeEngineCfgHashMap&)
     : BaseStrategy(order_manager, feature_engine, logger),
@@ -40,15 +37,18 @@ MarketMaker::MarketMaker(OrderManager* const order_manager,
           variance_denominator_),
       enter_threshold_(INI_CONFIG.get_double("strategy", "enter_threshold")),
       exit_threshold_(INI_CONFIG.get_double("strategy", "exit_threshold")),
-      obi_level_(INI_CONFIG.get_int("strategy", "obi_level", kLevel10)),
+      obi_level_(
+          INI_CONFIG.get_int("strategy", "obi_level", kDefaultOBILevel10)),
       bid_qty_(obi_level_),
       ask_qty_(obi_level_) {}
 
-void MarketMaker::on_orderbook_updated(const common::TickerId&, common::Price,
-                                       Side, const MarketOrderBook*) noexcept {}
+void MarketMaker::on_orderbook_updated(
+    const common::TickerId&, common::Price, Side,
+    const MarketOrderBook<MarketMaker>*) noexcept {}
 
-void MarketMaker::on_trade_updated(const MarketData* market_data,
-                                   MarketOrderBook* order_book) noexcept {
+void MarketMaker::on_trade_updated(
+    const MarketData* market_data,
+    MarketOrderBook<MarketMaker>* order_book) noexcept {
   const auto ticker = market_data->ticker_id;
   const auto* bbo = order_book->get_bbo();
   if (bbo->bid_qty.value == common::kQtyInvalid ||
@@ -67,7 +67,8 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
   const auto spread = feature_engine_->get_spread();
 
   const double obi =
-      FeatureEngine::orderbook_imbalance_from_levels(bid_qty_, ask_qty_);
+      FeatureEngine<MarketMaker>::orderbook_imbalance_from_levels(bid_qty_,
+                                                                  ask_qty_);
   const auto mid = (order_book->get_bbo()->bid_price.value +
                     order_book->get_bbo()->ask_price.value) *
                    0.5;
@@ -91,30 +92,32 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
     intents.push_back(
         QuoteIntent{.ticker = ticker,
                     .side = Side::kBuy,
-                    .price = best_bid_price - kGap,
+                    .price = best_bid_price - kSafetyMargin,
                     .qty = Qty{round5(signal * position_variance_)}});
 
-    logger_.info(std::format(
+    logger_.debug(std::format(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:buy, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
         "vwap:{}, spread:{}",
-        best_bid_price.value - kGap, round5(signal * position_variance_), delta,
-        obi, signal, mid, vwap, spread));
+        best_bid_price.value - kSafetyMargin,
+        round5(signal * position_variance_), delta, obi, signal, mid, vwap,
+        spread));
   } else if (delta * obi < -enter_threshold_) {
     const auto best_ask_price = order_book->get_bbo()->ask_price;
     intents.push_back(
         QuoteIntent{.ticker = ticker,
                     .side = Side::kSell,
-                    .price = best_ask_price + kGap,
+                    .price = best_ask_price + kSafetyMargin,
                     .qty = Qty{round5(signal * position_variance_)}});
-    logger_.info(std::format(
+    logger_.debug(std::format(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
         "vwap:{}, spread:{}",
-        best_ask_price.value + kGap, round5(signal * position_variance_), delta,
-        obi, signal, mid, vwap, spread));
+        best_ask_price.value + MarketMaker::kSafetyMargin,
+        round5(signal * position_variance_), delta, obi, signal, mid, vwap,
+        spread));
   }
   if (signal < exit_threshold_) {
     return;
@@ -125,7 +128,4 @@ void MarketMaker::on_trade_updated(const MarketData* market_data,
 
 void MarketMaker::on_order_updated(const ExecutionReport*) noexcept {}
 
-void register_market_maker_strategy() {
-  const static Registrar<MarketMaker> kReg("maker");
-}
 }  // namespace trading

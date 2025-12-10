@@ -16,10 +16,6 @@
 #include "logger.h"
 #include "types.h"
 
-namespace common {
-class Logger;
-}
-
 namespace trading {
 struct BBO;
 struct ExecutionReport;
@@ -48,7 +44,7 @@ class PositionKeeper {
         ticker_position_{{INI_CONFIG.get("meta", "ticker"), PositionInfo{}}} {
     logger_.info("[Constructor] PositionKeeper Created");
   }
-  ~PositionKeeper() { logger_.info("[Destructor] PositionKeeper Destory"); }
+  ~PositionKeeper() { logger_.info("[Destructor] PositionKeeper Destroy"); }
 
   void add_fill(const ExecutionReport* report) noexcept;
 

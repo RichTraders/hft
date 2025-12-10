@@ -26,15 +26,17 @@ class Message;
 }
 
 namespace trading {
+template <typename Strategy>
 class TradeEngine;
 class ResponseManager;
 
+template <typename Strategy>
 class OrderGateway {
  public:
   OrderGateway(common::Logger* logger, ResponseManager* response_manager);
   ~OrderGateway();
 
-  void init_trade_engine(TradeEngine* trade_engine);
+  void init_trade_engine(TradeEngine<Strategy>* trade_engine);
   void stop() const;
 
   void on_login(FIX8::Message*);
@@ -55,7 +57,7 @@ class OrderGateway {
   void order_mass_cancel_request(const RequestCommon& request);
 
   common::Logger::Producer logger_;
-  TradeEngine* trade_engine_;
+  TradeEngine<Strategy>* trade_engine_;
 
   std::unique_ptr<core::FixOrderEntryApp> app_;
 };

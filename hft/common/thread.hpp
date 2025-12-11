@@ -19,6 +19,10 @@
 #pragma once
 
 #include "global.h"
+#ifdef __APPLE__
+#include <mach/mach.h>
+#include <mach/thread_policy.h>
+#endif
 
 namespace common {
 template <typename F, typename... Args>
@@ -111,8 +115,11 @@ class Thread {
   int set_thread_name(const std::string& name) {
     if (tid_ == 0)
       return -1;
-
+#ifdef __APPLE__
+    return pthread_setname_np(name.c_str());
+#else
     return pthread_setname_np(tid_, name.c_str());
+#endif
   }
 
   [[nodiscard]] std::string get_thread_name() const {
@@ -127,6 +134,7 @@ class Thread {
   }
 
   [[nodiscard]] int get_cpu_id() const {
+#ifdef __linux__
     int cpu_id = -1;
     cpu_set_t cpuset;
 
@@ -143,6 +151,25 @@ class Thread {
     }
 
     return cpu_id;
+#else
+    return -1;
+#endif
+  }
+
+  int set_affinity(int cpu_id) {
+    if (tid_ == 0) return -1;
+#ifdef __linux__
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(cpu_id, &cpuset);
+    return pthread_setaffinity_np(tid_, sizeof(cpu_set_t), &cpuset);
+#elif __APPLE__
+    thread_affinity_policy_data_t policy = { cpu_id };
+    thread_port_t mach_thread = pthread_mach_thread_np(tid_);
+    return thread_policy_set(mach_thread, THREAD_AFFINITY_POLICY, (thread_policy_t)&policy, THREAD_AFFINITY_POLICY_COUNT);
+#else
+    return 0; // Not supported
+#endif
   }
 
   [[nodiscard]] pthread_t get_thread_id() const { return tid_; }

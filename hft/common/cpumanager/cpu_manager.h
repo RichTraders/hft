@@ -12,10 +12,25 @@
 
 #pragma once
 
+#include <sys/types.h>
 #include "../logger.h"
 
+#if defined(__linux__)
+#include <sched.h>
+#endif
+
 namespace common {
+
+#if defined(__linux__)
+using ThreadId = pid_t;
+#else
+using ThreadId = int;
+#endif
+
+#if defined(__linux__)
 struct sched_attr;
+#endif
+
 struct CpuInfo {
   bool use_irq;
   uint8_t type;
@@ -24,21 +39,17 @@ struct CpuInfo {
 struct ThreadInfo {
   uint8_t cpu_id;
   int value;
-  int tid;
+  ThreadId tid;
 };
 
 struct CpuId {
   uint8_t value;
 };
 
-struct ThreadId {
-  pid_t value;
-};
-
 struct AffinityInfo {
-  AffinityInfo(CpuId cpu, ThreadId tid) : cpu_id_(cpu.value), tid_(tid.value) {}
+  AffinityInfo(CpuId cpu, ThreadId tid) : cpu_id_(cpu.value), tid_(tid) {}
   uint8_t cpu_id_;
-  pid_t tid_;
+  ThreadId tid_;
 };
 
 enum class SchedPolicy : uint8_t {
@@ -63,21 +74,23 @@ class CpuManager {
 
  private:
   static void trim_newline(std::string& str);
-  static pid_t get_tid_by_thread_name(const std::string& target_name);
-  static int sched_setattr_syscall(pid_t tid, const struct sched_attr* attr,
-                                   unsigned int flags);
-  int set_affinity(const AffinityInfo& info);
-  int set_cpu_fifo(uint8_t cpu_id, pid_t tid, int prio);
-  int set_cpu_rr(uint8_t cpu_id, pid_t tid, int prio);
-  int set_cpu_other(uint8_t cpu_id, pid_t tid, int nicev);
-  int set_cpu_batch(uint8_t cpu_id, pid_t tid, int nicev);
-  int set_cpu_idle(uint8_t cpu_id, pid_t tid, int nicev);
 
-  int set_rt(uint8_t cpu_id, pid_t tid, SchedPolicy policy, int priority);
-  int set_cfs(uint8_t cpu_id, pid_t tid, SchedPolicy policy, int nicev);
-  int set_cpu_to_tid(uint8_t cpu_id, pid_t tid);
-  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-  int set_scheduler(pid_t tid, int priority, int scheduler_policy);
+  ThreadId get_tid_by_thread_name(const std::string& target_name);
+#if defined(__linux__)
+  static int sched_setattr_syscall(ThreadId tid, const struct sched_attr* attr,
+                                   unsigned int flags);
+#endif
+  int set_affinity(const AffinityInfo& info);
+  int set_cpu_fifo(uint8_t cpu_id, ThreadId tid, int prio);
+  int set_cpu_rr(uint8_t cpu_id, ThreadId tid, int prio);
+  int set_cpu_other(uint8_t cpu_id, ThreadId tid, int nicev);
+  int set_cpu_batch(uint8_t cpu_id, ThreadId tid, int nicev);
+  int set_cpu_idle(uint8_t cpu_id, ThreadId tid, int nicev);
+
+  int set_rt(uint8_t cpu_id, ThreadId tid, SchedPolicy policy, int priority);
+  int set_cfs(uint8_t cpu_id, ThreadId tid, SchedPolicy policy, int nicev);
+  int set_cpu_to_tid(uint8_t cpu_id, ThreadId tid);
+  int set_scheduler(ThreadId tid, int priority, int scheduler_policy);
 
   Logger::Producer logger_;
   std::string set_cpu_file_path_;

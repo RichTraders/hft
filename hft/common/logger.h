@@ -144,9 +144,8 @@ class LogFormatter {
   }
 
   static void format_iso8601_utc(char* out, size_t& len, uint64_t ts_ns) {
-    const auto time_p = std::chrono::time_point<std::chrono::system_clock>(
-        std::chrono::nanoseconds(ts_ns));
-    const auto sec = time_point_cast<std::chrono::seconds>(time_p);
+    auto time_p = std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>(std::chrono::nanoseconds(ts_ns));
+    const auto sec = std::chrono::time_point_cast<std::chrono::seconds>(time_p);
     const auto nano =
         std::chrono::duration_cast<std::chrono::nanoseconds>(time_p - sec)
             .count();

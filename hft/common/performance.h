@@ -13,14 +13,24 @@
 #ifndef PERFORMANCE_H
 #define PERFORMANCE_H
 
+#if defined(__APPLE__)
+#include <mach/mach_time.h>
+#endif
+
 namespace common {
 constexpr unsigned int kShift = 32;
 
 inline auto rdtsc() noexcept {
+#if defined(__x86_64__) || defined(_M_X64)
   unsigned int lower_bit;
   unsigned int high_bit;
   __asm__ __volatile__("rdtsc" : "=a"(lower_bit), "=d"(high_bit));
   return (static_cast<uint64_t>(high_bit) << kShift) | lower_bit;
+#elif defined(__APPLE__)
+  return mach_absolute_time();
+#else
+  return 0;
+#endif
 }
 }  // namespace common
 

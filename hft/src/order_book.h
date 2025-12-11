@@ -13,6 +13,7 @@
 #ifndef ORDERBOOK_H
 #define ORDERBOOK_H
 
+#include <span>
 #include "common/logger.h"
 #include "common/memory_pool.hpp"
 #include "common/types.h"

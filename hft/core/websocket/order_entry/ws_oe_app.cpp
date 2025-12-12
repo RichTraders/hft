@@ -15,7 +15,7 @@
 #include "core/common.h"
 #include "core/signature.h"
 #include "performance.h"
-#include "schema/response/account_position.h"
+#include "schema/spot/response/account_position.h"
 
 constexpr int kHttpOK = 200;
 constexpr int kDefaultRecvWindow = 5000;
@@ -50,10 +50,10 @@ WsOrderEntryApp::WsOrderEntryApp(const std::string& /*sender_comp_id*/,
     : logger_(logger->make_producer()),
       ws_oe_core_(logger_, response_manager),
       ws_order_manager_(logger_),
-      host_(AUTHORIZATION.get_oe_ws_address()),
-      path_(AUTHORIZATION.get_oe_ws_path()),
-      port_(AUTHORIZATION.get_oe_ws_port()),
-      use_ssl_(AUTHORIZATION.use_oe_ws_ssl()) {}
+      host_(std::string(WsOeCoreImpl::ExchangeTraits::get_api_host())),
+      path_(std::string(WsOeCoreImpl::ExchangeTraits::get_api_endpoint_path())),
+      port_(WsOeCoreImpl::ExchangeTraits::get_api_port()),
+      use_ssl_(WsOeCoreImpl::ExchangeTraits::use_ssl()) {}
 
 WsOrderEntryApp::~WsOrderEntryApp() {
   stop();
@@ -63,6 +63,22 @@ bool WsOrderEntryApp::start() {
   if (running_.exchange(true)) {
     return false;
   }
+
+  if constexpr (WsOeCoreImpl::ExchangeTraits::requires_listen_key()) {
+    listen_key_manager_ =
+        std::make_unique<WsOeCoreImpl::ExchangeTraits::ListenKeyManager>(
+            logger_);
+
+    if (!listen_key_manager_->acquire_listen_key()) {
+      logger_.error("[WsOeApp] Failed to acquire listen key");
+      running_ = false;
+      return false;
+    }
+
+    listen_key_manager_->start_keepalive();
+    logger_.info("[WsOeApp] Listen key acquired and keepalive started");
+  }
+
   transport_ = std::make_unique<WebSocketTransport<"OERead">>(host_,
       port_,
       path_,
@@ -78,6 +94,15 @@ void WsOrderEntryApp::stop() {
   if (!running_.exchange(false)) {
     return;
   }
+
+  if constexpr (WsOeCoreImpl::ExchangeTraits::requires_listen_key()) {
+    if (listen_key_manager_) {
+      listen_key_manager_->stop_keepalive();
+      listen_key_manager_->release_listen_key();
+      listen_key_manager_.reset();
+    }
+  }
+
   if (transport_) {
     transport_->interrupt();
   }
@@ -203,14 +228,19 @@ void WsOrderEntryApp::post_mass_cancel_order(
 }
 
 void WsOrderEntryApp::create_log_on() const {
-  const auto cur_timestamp = std::to_string(util::get_timestamp_epoch());
-  constexpr int kRecvWindow = 5000;
-  const std::string sig_b64 =
-      ::get_signature_base64(cur_timestamp, kRecvWindow);
-
-  auto log_on_message =
-      ws_oe_core_.create_log_on_message(sig_b64, cur_timestamp);
-  transport_->write(log_on_message);
+  if constexpr (WsOeCoreImpl::ExchangeTraits::requires_signature_logon()) {
+    const auto cur_timestamp = std::to_string(util::get_timestamp_epoch());
+    constexpr int kRecvWindow = 5000;
+    const std::string sig_b64 =
+        ::get_signature_base64(cur_timestamp, kRecvWindow);
+    auto log_on_message =
+        ws_oe_core_.create_log_on_message(sig_b64, cur_timestamp);
+    transport_->write(log_on_message);
+  } else {
+    const std::string& api_key = AUTHORIZATION.get_api_key();
+    auto log_on_message = ws_oe_core_.create_log_on_message(api_key, "");
+    transport_->write(log_on_message);
+  }
 }
 void WsOrderEntryApp::handle_payload(std::string_view payload) {
   if (payload.empty()) {
@@ -235,8 +265,10 @@ void WsOrderEntryApp::handle_payload(std::string_view payload) {
   }
 
   std::visit(
-      [this](auto&& arg) {
+      [this, &message](auto&& arg) {
         using T = std::decay_t<decltype(arg)>;
+
+        // Handle messages requiring special logic
         if constexpr (std::is_same_v<T, schema::ExecutionReportResponse>) {
           handle_execution_report(arg);
         } else if constexpr (std::is_same_v<T,
@@ -249,8 +281,6 @@ void WsOrderEntryApp::handle_payload(std::string_view payload) {
         } else if constexpr (std::is_same_v<T,
                                  schema::SessionUserSubscriptionResponse>) {
           handle_user_subscription(arg);
-        } else if constexpr (std::is_same_v<T, schema::ApiResponse>) {
-          handle_api_response(arg);
         } else if constexpr (std::is_same_v<T,
                                  schema::CancelAndReorderResponse>) {
           handle_cancel_and_reorder_response(arg);
@@ -259,6 +289,15 @@ void WsOrderEntryApp::handle_payload(std::string_view payload) {
           handle_cancel_all_response(arg);
         } else if constexpr (std::is_same_v<T, schema::PlaceOrderResponse>) {
           handle_place_order_response(arg);
+        } else if constexpr (std::is_same_v<T, schema::ApiResponse>) {
+          handle_api_response(arg);
+        }
+        // For all other simple messages, use DispatchRouter
+        else {
+          if (const auto type = WsOeCoreImpl::ExchangeTraits::DispatchRouter::
+                  get_dispatch_type(arg)) {
+            dispatch(std::string(*type), message);
+          }
         }
       },
       message);

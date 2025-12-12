@@ -16,7 +16,7 @@
 
 #include "common/types.h"
 #include "response_manager.h"
-#include "schema/response/execution_report.h"
+#include "schema/spot/response/execution_report.h"
 
 namespace core {
 

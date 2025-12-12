@@ -16,8 +16,8 @@
 #include "absl/container/flat_hash_map.h"
 #include "common/logger.h"
 #include "core/order_entry.h"
-#include "schema/response/execution_report.h"
-#include "schema/response/order.h"
+#include "schema/spot/response/execution_report.h"
+#include "schema/spot/response/order.h"
 
 namespace trading {
 class ResponseManager;

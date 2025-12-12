@@ -15,9 +15,6 @@
 
 #include "common/logger.h"
 #include "core/order_entry.h"
-#include "ws_oe_decoder.h"
-#include "ws_oe_encoder.h"
-#include "ws_oe_mapper.h"
 
 namespace trading {
 class ResponseManager;
@@ -25,16 +22,25 @@ class ResponseManager;
 
 namespace core {
 
+template <typename Traits, typename DecoderType>
 class WsOeCore {
  public:
-  using WireMessage = WsOeWireMessage;
-  using WireExecutionReport = schema::ExecutionReportResponse;
-  using WireCancelReject = schema::ExecutionReportResponse;
-  using WireMassCancelReport = schema::ExecutionReportResponse;
-  using WireReject = schema::ApiResponse;
+  using ExchangeTraits = Traits;
+  using Decoder = DecoderType;
+  using WireMessage = typename ExchangeTraits::WireMessage;
+  using WireExecutionReport = typename ExchangeTraits::ExecutionReportResponse;
+  using WireCancelReject = typename ExchangeTraits::ExecutionReportResponse;
+  using WireMassCancelReport = typename ExchangeTraits::ExecutionReportResponse;
+  using WireReject = typename ExchangeTraits::ApiResponse;
 
-  WsOeCore(const common::Logger::Producer&,
-      trading::ResponseManager* response_manager);
+  WsOeCore(const common::Logger::Producer& logger,
+      trading::ResponseManager* response_manager)
+      : logger_(logger),
+        mapper_(logger_, response_manager),
+        decoder_(logger_),
+        encoder_(logger_),
+        response_manager_(response_manager) {}
+
   ~WsOeCore() = default;
 
   std::string create_log_on_message(const std::string& signature,
@@ -65,13 +71,15 @@ class WsOeCore {
 
  private:
   const common::Logger::Producer& logger_;
-  WsOeDomainMapper mapper_;
-  WsOeDecoder decoder_;
-  WsOeEncoder encoder_;
+  typename ExchangeTraits::Mapper mapper_;
+  Decoder decoder_;
+  typename ExchangeTraits::Encoder encoder_;
   trading::ResponseManager* response_manager_;
   mutable uint64_t request_sequence_{0};
 };
 
 }  // namespace core
+
+#include "ws_oe_core.tpp"
 
 #endif

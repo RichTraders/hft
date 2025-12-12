@@ -14,7 +14,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 endif ()
 
 option(ENABLE_WEBSOCKET "Build WebSocket transport support" ON)
-option(ENABLE_SBE_DECODER "Use SBE decoder for WebSocket market data" ON)
+option(ENABLE_SBE_DECODER "Use SBE decoder for WebSocket market data" OFF)
+option(ENABLE_SBE_DECODER_ORDER_ENTRY "Use SBE decoder for WebSocket order entry" OFF)
+option(USE_FUTURES_API "Use Binance Futures API instead of Spot API" OFF)
 option(ENABLE_TESTS "Build and fetch test dependencies" ON)
 
 if (ENABLE_WEBSOCKET)
@@ -34,6 +36,13 @@ else ()
     message(STATUS "JSON decoder enabled for WebSocket market data (default)")
 endif ()
 
+if (USE_FUTURES_API)
+    add_compile_definitions(USE_FUTURES_API)
+    message(STATUS "Using Binance Futures API")
+else ()
+    message(STATUS "Using Binance Spot API (default)")
+endif ()
+
 include_directories(
         hft
 )
@@ -51,11 +60,9 @@ function(add_strategy_target target_name strategy_type strategy_name)
     add_executable(${target_name} main.cpp)
     target_include_directories(${target_name} PRIVATE "${gen_dir}")
     if (ENABLE_WEBSOCKET)
-        message("Hftlib uses websocket")
         target_link_libraries(${target_name} PRIVATE HftLib_ws)
         target_compile_definitions(${target_name} PRIVATE ENABLE_WEBSOCKET)
     else ()
-        message("Hftlib uses fix")
         target_link_libraries(${target_name} PRIVATE HftLib_fix)
     endif ()
 

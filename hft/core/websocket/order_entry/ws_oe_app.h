@@ -15,12 +15,17 @@
 
 #include "common/logger.h"
 #include "core/order_entry.h"
-#include "websocket/schema/response/account_position.h"
-#include "websocket/schema/response/api_response.h"
-#include "websocket/schema/response/execution_report.h"
 #include "ws_oe_core.h"
 #include "ws_order_manager.h"
 #include "ws_transport.h"
+
+#ifdef USE_FUTURES_API
+#include "exchanges/binance/futures/binance_futures_oe_traits.h"
+#include "futures_ws_oe_decoder.h"
+#else
+#include "exchanges/binance/spot/binance_spot_oe_traits.h"
+#include "spot_ws_oe_decoder.h"
+#endif
 
 namespace trading {
 class ResponseManager;
@@ -28,13 +33,27 @@ class ResponseManager;
 
 namespace core {
 
+#ifdef ENABLE_SBE_DECODER_ORDER_ENTRY
+#ifdef USE_FUTURES_API
+static_assert(false, "SBE not supported for Futures Order Entry");
+#else
+static_assert(false, "SBE not supported for Spot Order Entry");
+#endif
+#else
+#ifdef USE_FUTURES_API
+using WsOeCoreImpl = WsOeCore<BinanceFuturesOeTraits, FuturesWsOeDecoder>;
+#else
+using WsOeCoreImpl = WsOeCore<BinanceSpotOeTraits, SpotWsOeDecoder>;
+#endif
+#endif
+
 class WsOrderEntryApp {
  public:
-  using WireMessage = WsOeCore::WireMessage;
-  using WireExecutionReport = WsOeCore::WireExecutionReport;
-  using WireCancelReject = WsOeCore::WireCancelReject;
-  using WireMassCancelReport = WsOeCore::WireMassCancelReport;
-  using WireReject = WsOeCore::WireReject;
+  using WireMessage = WsOeCoreImpl::WireMessage;
+  using WireExecutionReport = WsOeCoreImpl::WireExecutionReport;
+  using WireCancelReject = WsOeCoreImpl::WireCancelReject;
+  using WireMassCancelReport = WsOeCoreImpl::WireMassCancelReport;
+  using WireReject = WsOeCoreImpl::WireReject;
   using MsgType = std::string;
 
   WsOrderEntryApp(const std::string& sender_comp_id,
@@ -101,7 +120,7 @@ class WsOrderEntryApp {
   void handle_place_order_response(const schema::PlaceOrderResponse& ptr);
 
   common::Logger::Producer logger_;
-  WsOeCore ws_oe_core_;
+  WsOeCoreImpl ws_oe_core_;
   WsOrderManager ws_order_manager_;
   std::unique_ptr<WebSocketTransport<"OERead">> transport_;
   std::atomic<bool> running_{false};
@@ -113,6 +132,9 @@ class WsOrderEntryApp {
   const std::string path_;
   const int port_;
   const bool use_ssl_;
+
+  std::unique_ptr<WsOeCoreImpl::ExchangeTraits::ListenKeyManager>
+      listen_key_manager_;
 };
 
 }  // namespace core

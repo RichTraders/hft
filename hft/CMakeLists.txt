@@ -18,7 +18,9 @@ target_link_libraries(HftLib_ws PUBLIC
         Core_ws
         Src_ws
 )
-target_compile_definitions(HftLib_ws PRIVATE ENABLE_WEBSOCKET)
+target_compile_definitions(HftLib_ws PRIVATE
+    ENABLE_WEBSOCKET
+)
 
 add_library(HftLib_fix STATIC
         hft_lib.cpp

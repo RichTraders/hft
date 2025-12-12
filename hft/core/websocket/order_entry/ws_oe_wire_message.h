@@ -13,11 +13,11 @@
 #ifndef WS_OE_WIRE_MESSAGE_H
 #define WS_OE_WIRE_MESSAGE_H
 
-#include "schema/response/account_position.h"
-#include "schema/response/api_response.h"
-#include "schema/response/execution_report.h"
-#include "schema/response/order.h"
-#include "schema/response/session_response.h"
+#include "schema/spot/response/account_position.h"
+#include "schema/spot/response/api_response.h"
+#include "schema/spot/response/execution_report.h"
+#include "schema/spot/response/order.h"
+#include "schema/spot/response/session_response.h"
 
 using WsOeWireMessage = std::variant<std::monostate,
     schema::ExecutionReportResponse, schema::SessionLogonResponse,

@@ -72,40 +72,16 @@ void MarketConsumer<Strategy>::stop() {
 }
 
 template <typename Strategy>
-void MarketConsumer<Strategy>::on_login(WireMessage /*msg*/) {
-  logger_.info("[MarketConsumer][Login] Market consumer successful");
+void MarketConsumer<Strategy>::on_login(WireMessage msg) {
 #ifdef ENABLE_WEBSOCKET
-  if constexpr (std::same_as<MdApp, core::WsMarketDataApp>) {
-    const std::string message =
-        app_->create_snapshot_request_message(INI_CONFIG.get("meta", "ticker"),
-            INI_CONFIG.get("meta", "level"));
-
-    if (UNLIKELY(!app_->send(message))) {
-      logger_.error("[MarketConsumer][Message] failed to send login");
-    }
-    state_ = StreamState::kBuffering;
-    buffered_events_.clear();
-    first_buffered_update_id_ = 0;
-  }
+  ProtocolPolicy::handle_login(*app_, msg, state_, buffered_events_,
+      first_buffered_update_id_, logger_);
 #else
-  if constexpr (std::same_as<MdApp, core::FixMarketDataApp>) {
-    const std::string message =
-        app_->create_market_data_subscription_message("DEPTH_STREAM",
-            INI_CONFIG.get("meta", "level"),
-            INI_CONFIG.get("meta", "ticker"),
-            true);
-
-    if (UNLIKELY(!app_->send(message))) {
-      logger_.error("[MarketConsumer][Message] failed to send login");
-    }
-  }
+  std::deque<MarketUpdateData*> dummy_buffered;
+  uint64_t dummy_first_buffered = 0;
+  ProtocolPolicy::handle_login(*app_, msg, state_, dummy_buffered,
+      dummy_first_buffered, logger_);
 #endif
-
-  const std::string instrument_message =
-      app_->request_instrument_list_message(INI_CONFIG.get("meta", "ticker"));
-  if (UNLIKELY(!app_->send(instrument_message))) {
-    logger_.error("[MarketConsumer][Message] failed to send instrument list");
-  }
 }
 
 // erase_buffer_lower_than_snapshot implementation moved to MarketConsumerRecoveryMixin
@@ -237,105 +213,22 @@ void MarketConsumer<Strategy>::on_snapshot(WireMessage msg) {
   logger_.info("[MarketConsumer]Snapshot Done");
 }
 
+template <typename Strategy>
+void MarketConsumer<Strategy>::on_subscribe(WireMessage msg) {
 #ifdef ENABLE_WEBSOCKET
-template <typename Strategy>
-void MarketConsumer<Strategy>::on_subscribe(WireMessage msg) {
-  auto* data =
-      market_update_data_pool_->allocate(app_->create_market_data_message(msg));
-
-  if (state_ == StreamState::kBuffering) {
-    if (data->type == kTrade) {
-      for (auto* md : data->data)
-        market_data_pool_->deallocate(md);
-      market_update_data_pool_->deallocate(data);
-      return;
-    }
-
-    if (first_buffered_update_id_ == 0) {
-      first_buffered_update_id_ = data->start_idx;
-    }
-
-    // Limit buffer size to prevent memory exhaustion
-    static constexpr size_t kMaxBufferedEvents = 1000;
-    if (buffered_events_.size() >= kMaxBufferedEvents) {
-      const auto* oldest = buffered_events_.front();
-      for (const auto* market_data : oldest->data)
-        market_data_pool_->deallocate(market_data);
-      market_update_data_pool_->deallocate(oldest);
-      buffered_events_.pop_front();
-
-      if (!buffered_events_.empty()) {
-        first_buffered_update_id_ = buffered_events_.front()->start_idx;
-      }
-    }
-
-    buffered_events_.push_back(data);
-    return;
-  }
-
-  // Skip gap check for trade events (they don't have sequence numbers)
-  if (data->type != kTrade) {
-    logger_.debug("current update index:{}, data start :{}, data end:{}",
-        update_index_,
-        data->start_idx,
-        data->end_idx);
-    if (data->start_idx != update_index_ + 1 && update_index_ != 0) {
-      logger_.error("Gap detected");
-      recover_from_gap();
-      for (auto* md : data->data)
-        market_data_pool_->deallocate(md);
-      market_update_data_pool_->deallocate(data);
-      return;
-    }
-    update_index_ = data->end_idx;
-  }
-
-  on_market_data_fn_(data);
-}
+  ProtocolPolicy::handle_subscribe(*app_, msg, state_, buffered_events_,
+      first_buffered_update_id_, update_index_, on_market_data_fn_,
+      market_update_data_pool_, market_data_pool_, logger_,
+      [this]() { recover_from_gap(); });
 #else
-template <typename Strategy>
-void MarketConsumer<Strategy>::on_subscribe(WireMessage msg) {
-  auto* data =
-      market_update_data_pool_->allocate(app_->create_market_data_message(msg));
-
-  if (UNLIKELY(data == nullptr)) {
-    logger_.error(
-        "[Error] Failed to allocate market data message, but log is here");
-#ifdef NDEBUG
-    app_->stop();
-    exit(1);
+  std::deque<MarketUpdateData*> dummy_buffered;
+  uint64_t dummy_first_buffered = 0;
+  ProtocolPolicy::handle_subscribe(*app_, msg, state_, dummy_buffered,
+      dummy_first_buffered, update_index_, on_market_data_fn_,
+      market_update_data_pool_, market_data_pool_, logger_,
+      [this]() { resubscribe(); });
 #endif
-    return;
-  }
-
-  if (UNLIKELY(state_ == StreamState::kAwaitingSnapshot)) {
-    logger_.info("Waiting for making snapshot");
-    return;
-  }
-
-  if (UNLIKELY((data->type == kNone) ||
-               (data->type == kMarket &&
-                   data->start_idx != this->update_index_ + 1 &&
-                   this->update_index_ != 0ULL))) {
-    logger_.error("Update index is outdated. current index :{}, new index :{}",
-        this->update_index_,
-        data->start_idx);
-
-    resubscribe();
-
-    for (const auto& market_data : data->data) {
-      market_data_pool_->deallocate(market_data);
-    }
-    market_update_data_pool_->deallocate(data);
-    return;
-  }
-
-  this->update_index_ = data->end_idx;
-  if (UNLIKELY(!on_market_data_fn_(data))) {
-    logger_.error("[Message] failed to send subscribe");
-  }
 }
-#endif
 
 // resubscribe implementation moved to MarketConsumerRecoveryMixin
 

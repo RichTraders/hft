@@ -16,17 +16,16 @@
 #include "common/logger.h"
 #include "common/memory_pool.hpp"
 #include "core/market_data.h"
-#include "decoder_policy.h"
-#include "ws_md_decoder.h"
 #include "ws_md_domain_mapper.h"
-#include "ws_md_encoder.h"
+#include "ws_md_encoder.hpp"
 
 namespace core {
-template <DecoderPolicy Policy>
+template <ExchangeTraits Exchange, template <typename> class DecoderTemplate>
 class WsMdCore {
  public:
-  using PolicyType = Policy;
-  using WireMessage = typename Policy::WireMessage;
+  using ExchangeTraits = Exchange;
+  using Decoder = DecoderTemplate<Exchange>;
+  using WireMessage = typename Decoder::WireMessage;
   using RequestId = std::string_view;
   using MarketDepthLevel = std::string_view;
   using SymbolId = std::string_view;
@@ -91,9 +90,9 @@ class WsMdCore {
 
  private:
   common::Logger::Producer logger_;
-  WsMdDecoder<Policy> decoder_;
-  WsMdDomainMapper<Policy> mapper_;
-  WsMdEncoder encoder_;
+  Decoder decoder_;
+  WsMdDomainMapper<Exchange, Decoder> mapper_;
+  WsMdEncoder<Exchange> encoder_;
 };
 
 }  // namespace core

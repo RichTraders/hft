@@ -13,6 +13,7 @@
 #define ORDER_GATEWAY_H
 
 #include "logger.h"
+#include "message_adapter_policy.h"
 #include "order_entry.h"
 #include "protocol_impl.h"
 
@@ -26,6 +27,7 @@ class OrderGateway {
  public:
   using OeApp = protocol_impl::OrderEntryApp;
   using AppType = OeApp;
+  using MessagePolicy = typename MessagePolicySelector<OeApp>::type;
   using WireMessage = typename OeApp::WireMessage;
   using WireExecutionReport = typename OeApp::WireExecutionReport;
   using WireCancelReject = typename OeApp::WireCancelReject;
@@ -53,6 +55,13 @@ class OrderGateway {
   void order_cancel_request(const RequestCommon& request);
   void order_cancel_request_and_new_order_single(const RequestCommon& request);
   void order_mass_cancel_request(const RequestCommon& request);
+
+  // Callback registration helpers
+  template <typename Handler>
+  void register_simple_callback(const std::string& type, Handler&& handler);
+
+  template <typename TargetType, typename Handler>
+  void register_typed_callback(const std::string& type, Handler&& handler);
 
   common::Logger::Producer logger_;
   TradeEngine<Strategy>* trade_engine_;

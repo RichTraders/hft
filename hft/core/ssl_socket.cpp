@@ -13,7 +13,6 @@
 #include <netdb.h>
 #include <netinet/tcp.h>
 #include <openssl/ssl.h>
-#include <pch.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -31,8 +30,9 @@ SSLSocket::SSLSocket(const std::string& host, int port) {
   sockfd_ = socket(AF_INET, SOCK_STREAM, 0);
   int flag = 1;
   setsockopt(sockfd_, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(int));
-  int const ret = connect(sockfd_, reinterpret_cast<sockaddr*>(&serv_addr),
-                          sizeof(serv_addr));
+  int const ret = connect(sockfd_,
+      reinterpret_cast<sockaddr*>(&serv_addr),
+      sizeof(serv_addr));
   if (ret < 0) {
     throw std::runtime_error("socket connection failed");
   }

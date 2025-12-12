@@ -13,10 +13,8 @@
 #include "ws_md_app.h"
 
 #include "authorization.h"
-#include "common/ini_config.hpp"
 #include "performance.h"
 
-constexpr int kHttpOK = 200;
 namespace core {
 
 WsMarketDataApp::WsMarketDataApp(const std::string& /*sender_comp_id*/,
@@ -25,21 +23,21 @@ WsMarketDataApp::WsMarketDataApp(const std::string& /*sender_comp_id*/,
     : logger_(logger->make_producer()),
       stream_core_(logger, market_data_pool),
       api_core_(logger, market_data_pool),
-      host_(AUTHORIZATION.get_md_ws_address()),
-      path_(AUTHORIZATION.get_md_ws_path()),
-      port_(AUTHORIZATION.get_md_ws_port()),
-      use_ssl_(AUTHORIZATION.use_md_ws_ssl()),
-      write_host_(AUTHORIZATION.get_md_ws_write_address()),
-      write_path_(AUTHORIZATION.get_md_ws_write_path()),
-      write_port_(AUTHORIZATION.get_md_ws_write_port()),
-      write_use_ssl_(AUTHORIZATION.use_md_ws_write_ssl()) {}
+      host_(WsMdCoreImpl::ExchangeTraits::get_stream_host()),
+      path_(WsMdCoreImpl::ExchangeTraits::get_stream_endpoint_path()),
+      port_(WsMdCoreImpl::ExchangeTraits::get_stream_port()),
+      use_ssl_(WsMdCoreImpl::ExchangeTraits::use_ssl()),
+      api_host_(WsMdCoreApiImpl::ExchangeTraits::get_api_host()),
+      api_path_(WsMdCoreApiImpl::ExchangeTraits::get_api_endpoint_path()),
+      api_port_(WsMdCoreApiImpl::ExchangeTraits::get_api_port()),
+      api_use_ssl_(WsMdCoreApiImpl::ExchangeTraits::use_ssl()) {}
 
 WsMarketDataApp::~WsMarketDataApp() {
   stop();
 }
 
 void WsMarketDataApp::initialize_stream() {
-  if constexpr (WsMdCoreImpl::PolicyType::requires_api_key()) {
+  if constexpr (WsMdCoreImpl::Decoder::requires_api_key()) {
     stream_transport_ = std::make_unique<WebSocketTransport<"MDRead">>(host_,
         port_,
         path_,
@@ -62,10 +60,10 @@ bool WsMarketDataApp::start() {
   if (running_.exchange(true)) {
     return false;
   }
-  api_transport_ = std::make_unique<WebSocketTransport<"MDWrite">>(write_host_,
-      write_port_,
-      write_path_,
-      write_use_ssl_,
+  api_transport_ = std::make_unique<WebSocketTransport<"MDWrite">>(api_host_,
+      api_port_,
+      api_path_,
+      api_use_ssl_,
       true);
 
   api_transport_->register_message_callback(
@@ -195,21 +193,15 @@ void WsMarketDataApp::handle_stream_payload(std::string_view payload) const {
           std::min<size_t>(kMinimumLogPrintSize, payload.size())));
 
   START_MEASURE(Convert_Message_Stream);
-  WireMessage wire_msg = stream_core_.decode(payload);
+  const auto wire_msg = stream_core_.decode(payload);
   END_MEASURE(Convert_Message_Stream, logger_);
 
   std::visit(
       [this, &wire_msg](const auto& arg) {
-        using T = std::decay_t<decltype(arg)>;
-
-        if constexpr (std::is_same_v<T, schema::sbe::SbeDepthSnapshot>) {
-          handle_depth_snapshot(arg, wire_msg);
-        } else if constexpr (std::is_same_v<T, schema::sbe::SbeDepthResponse>) {
-          handle_depth_response(arg, wire_msg);
-        } else if constexpr (std::is_same_v<T, schema::sbe::SbeTradeEvent>) {
-          handle_trade_event(arg, wire_msg);
-        } else if constexpr (std::is_same_v<T, schema::sbe::SbeBestBidAsk>) {
-          handle_best_bid_ask(arg, wire_msg);
+        if (const auto type =
+                WsMdCoreImpl::ExchangeTraits::DispatchRouter::get_dispatch_type(
+                    arg)) {
+          dispatch(*type, wire_msg);
         }
       },
       wire_msg);
@@ -235,16 +227,10 @@ void WsMarketDataApp::handle_api_payload(std::string_view payload) const {
   END_MEASURE(Convert_Message_API, logger_);
 
   std::visit(
-      [this](const auto& arg) {
-        using T = std::decay_t<decltype(arg)>;
-
-        if constexpr (std::is_same_v<T, std::monostate>) {
-        } else if constexpr (std::is_same_v<T, schema::DepthSnapshot>) {
-          const auto& wire_msg = arg;
-          handle_depth_snapshot(arg, wire_msg);
-        } else if constexpr (std::is_same_v<T, schema::ExchangeInfoResponse>) {
-          const auto& wire_msg = arg;
-          handle_exchange_info_response(arg, wire_msg);
+      [this, &api_wire_msg](const auto& arg) {
+        if (const auto type = WsMdCoreApiImpl::ExchangeTraits::DispatchRouter::
+                get_dispatch_type(arg)) {
+          dispatch(*type, api_wire_msg);
         }
       },
       api_wire_msg);
@@ -260,53 +246,4 @@ void WsMarketDataApp::dispatch(std::string_view type,
   callback->second(message);
 }
 
-void WsMarketDataApp::handle_depth_snapshot(
-    const schema::DepthSnapshot& snapshot, const WireMessage& wire_msg) const {
-  if (LIKELY(snapshot.status == kHttpOK)) {
-    dispatch("W", wire_msg);
-  } else {
-    logger_.warn("Depth snapshot request failed with status: {}",
-        snapshot.status);
-  }
-}
-
-void WsMarketDataApp::handle_depth_response(
-    const schema::DepthResponse& /*response*/,
-    const WireMessage& wire_msg) const {
-  dispatch("X", wire_msg);
-}
-
-void WsMarketDataApp::handle_trade_event(const schema::TradeEvent& /*trade*/,
-    const WireMessage& wire_msg) const {
-  dispatch("X", wire_msg);
-}
-void WsMarketDataApp::handle_depth_snapshot(
-    const schema::sbe::SbeDepthSnapshot& /*snapshot*/,
-    const WireMessage& wire_msg) const {
-  dispatch("W", wire_msg);
-}
-
-void WsMarketDataApp::handle_depth_response(
-    const schema::sbe::SbeDepthResponse& /*response*/,
-    const WireMessage& wire_msg) const {
-  dispatch("X", wire_msg);
-}
-
-void WsMarketDataApp::handle_trade_event(
-    const schema::sbe::SbeTradeEvent& /*trade*/,
-    const WireMessage& wire_msg) const {
-  dispatch("X", wire_msg);
-}
-
-void WsMarketDataApp::handle_best_bid_ask(
-    const schema::sbe::SbeBestBidAsk& /*bba*/,
-    const WireMessage& wire_msg) const {
-  dispatch("X", wire_msg);
-}
-
-void WsMarketDataApp::handle_exchange_info_response(
-    const schema::ExchangeInfoResponse& /*info*/,
-    const WireMessage& wire_msg) const {
-  dispatch("y", wire_msg);
-}
 }  // namespace core

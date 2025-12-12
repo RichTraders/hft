@@ -20,6 +20,26 @@ template <typename Strategy>
 class TradeEngine;
 
 template <typename Strategy>
+template <typename Handler>
+void OrderGateway<Strategy>::register_simple_callback(const std::string& type,
+    Handler&& handler) {
+  app_->register_callback(type,
+      [func = std::forward<Handler>(handler)](auto&& msg) {
+        func(MessagePolicy::adapt(msg));
+      });
+}
+
+template <typename Strategy>
+template <typename TargetType, typename Handler>
+void OrderGateway<Strategy>::register_typed_callback(const std::string& type,
+    Handler&& handler) {
+  app_->register_callback(type,
+      [func = std::forward<Handler>(handler)](auto&& msg) {
+        func(MessagePolicy::extract<TargetType>(msg));
+      });
+}
+
+template <typename Strategy>
 OrderGateway<Strategy>::OrderGateway(common::Logger* logger,
     ResponseManager* response_manager)
   : logger_(logger->make_producer()),
@@ -27,60 +47,22 @@ OrderGateway<Strategy>::OrderGateway(common::Logger* logger,
         "SPOT",
         logger,
         response_manager)) {
-  using WireMessage = typename OeApp::WireMessage;
-  auto register_handler = [this](const std::string& type, auto&& fn) {
-    if constexpr (std::is_pointer_v<WireMessage>) {
-      app_->register_callback(type,
-          [handler = std::forward<decltype(fn)>(fn)](
-          WireMessage msg) {
-            handler(msg);
-          });
-    } else {
-      app_->register_callback(type,
-          [handler = std::forward<decltype(fn)>(fn)](
-          const WireMessage& msg) {
-            handler(msg);
-          });
-    }
-  };
 
-  register_handler("A", [this](auto&& msg) { on_login(msg); });
-  register_handler("1", [this](auto&& msg) { on_heartbeat(msg); });
-  register_handler("5", [this](auto&& msg) { on_logout(msg); });
+  register_simple_callback("A", [this](auto msg) { on_login(msg); });
+  register_simple_callback("1", [this](auto msg) { on_heartbeat(msg); });
+  register_simple_callback("5", [this](auto msg) { on_logout(msg); });
 
-  register_handler("8",
-      [this](auto&& msg) {
-        if constexpr (std::is_pointer_v<WireExecutionReport>) {
-          on_execution_report(reinterpret_cast<WireExecutionReport>(msg));
-        } else {
-          on_execution_report(std::get<WireExecutionReport>(msg));
-        }
-      });
-  register_handler("9",
-      [this](auto&& msg) {
-        if constexpr (std::is_pointer_v<WireCancelReject>) {
-          on_order_cancel_reject(reinterpret_cast<WireCancelReject>(msg));
-        } else {
-          on_order_cancel_reject(std::get<WireCancelReject>(msg));
-        }
-      });
-  register_handler("r",
-      [this](auto&& msg) {
-        if constexpr (std::is_pointer_v<WireMassCancelReport>) {
-          on_order_mass_cancel_report(
-              reinterpret_cast<WireMassCancelReport>(msg));
-        } else {
-          on_order_mass_cancel_report(std::get<WireMassCancelReport>(msg));
-        }
-      });
-  register_handler("3",
-      [this](auto&& msg) {
-        if constexpr (std::is_pointer_v<WireReject>) {
-          on_rejected(reinterpret_cast<WireReject>(msg));
-        } else {
-          on_rejected(std::get<WireReject>(msg));
-        }
-      });
+  register_typed_callback<WireExecutionReport>("8",
+      [this](auto msg) { on_execution_report(msg); });
+
+  register_typed_callback<WireCancelReject>("9",
+      [this](auto msg) { on_order_cancel_reject(msg); });
+
+  register_typed_callback<WireMassCancelReport>("r",
+      [this](auto msg) { on_order_mass_cancel_report(msg); });
+
+  register_typed_callback<WireReject>("3",
+      [this](auto msg) { on_rejected(msg); });
 
   if (!app_->start()) {
     logger_.info("Order Entry Start");

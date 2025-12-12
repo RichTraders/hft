@@ -15,6 +15,7 @@
 
 #include "logger.h"
 #include "market_data.h"
+#include "market_data_protocol_policy.h"
 #include "memory_pool.hpp"
 #include "protocol_impl.h"
 #include "stream_state.h"
@@ -34,6 +35,7 @@ class MarketConsumer
  public:
   using MdApp = protocol_impl::MarketDataApp;
   using AppType = MdApp;
+  using ProtocolPolicy = typename MarketDataProtocolPolicySelector<MdApp>::type;
   using WireMessage = MdApp::WireMessage;
 
   MarketConsumer(common::Logger* logger, TradeEngine<Strategy>* trade_engine,

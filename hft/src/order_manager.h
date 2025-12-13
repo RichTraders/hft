@@ -31,25 +31,23 @@ class TradeEngine;
 template <typename Strategy>
 class OrderManager {
  public:
-  OrderManager(common::Logger* logger, TradeEngine<Strategy>* trade_engine,
-               RiskManager& risk_manager);
+  OrderManager(const common::Logger::Producer& logger,
+      TradeEngine<Strategy>* trade_engine, RiskManager& risk_manager);
   ~OrderManager();
   void on_order_updated(const ExecutionReport* response) noexcept;
   void on_instrument_info(const InstrumentInfo& instrument_info) noexcept;
 
   void new_order(const common::TickerId& ticker_id, common::Price price,
-                 common::Side side, common::Qty qty,
-                 common::OrderId order_id) noexcept;
+      common::Side side, common::Qty qty, common::OrderId order_id) noexcept;
   void modify_order(const common::TickerId& ticker_id,
-                    const common::OrderId& order_id,
-                    const common::OrderId& cancel_new_order_id,
-                    const common::OrderId& original_order_id,
-                    common::Price price, common::Side side,
-                    common::Qty qty) noexcept;
+      const common::OrderId& order_id,
+      const common::OrderId& cancel_new_order_id,
+      const common::OrderId& original_order_id, common::Price price,
+      common::Side side, common::Qty qty) noexcept;
 
   void cancel_order(const common::TickerId& ticker_id,
-                    const common::OrderId& original_order_id,
-                    const common::OrderId& order_id) noexcept;
+      const common::OrderId& original_order_id,
+      const common::OrderId& order_id) noexcept;
 
   void apply(const std::vector<QuoteIntent>& intents) noexcept;
 
@@ -67,7 +65,7 @@ class OrderManager {
   order::LayerBook layer_book_;
   TradeEngine<Strategy>* trade_engine_ = nullptr;
   RiskManager& risk_manager_;
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   common::FastClock fast_clock_;
   const double ticker_size_ = 0;
   order::QuoteReconciler reconciler_;
@@ -80,12 +78,12 @@ class OrderManager {
   OrderExpiryManager expiry_manager_;
 
   void filter_by_risk(const std::vector<QuoteIntent>& intents,
-                      order::Actions& acts);
+      order::Actions& acts);
 
   [[nodiscard]] common::OrderId gen_order_id() noexcept;
 
   void dump_all_slots(const std::string& symbol,
-                      const std::string& context) noexcept;
+      std::string_view context) noexcept;
 };
 }  // namespace trading
 

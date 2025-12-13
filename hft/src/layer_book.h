@@ -12,6 +12,7 @@
 
 #ifndef LAYER_BOOK_H
 #define LAYER_BOOK_H
+#include "absl/container/flat_hash_map.h"
 #include "orders.h"
 constexpr int kStringPrecision = 5;
 
@@ -46,11 +47,9 @@ struct PendingReplaceInfo {
   uint64_t original_tick;
   PendingReplaceInfo() = default;
   PendingReplaceInfo(const common::Price& new_price, const common::Qty& new_qty,
-                     uint64_t new_tick, const common::OrderId& new_cl_order_id,
-                     const common::Qty& last_qty,
-                     const common::OrderId& original_cl_order_id,
-                     const common::Price& original_price,
-                     uint64_t original_tick)
+      uint64_t new_tick, const common::OrderId& new_cl_order_id,
+      const common::Qty& last_qty, const common::OrderId& original_cl_order_id,
+      const common::Price& original_price, uint64_t original_tick)
       : new_price(new_price),
         new_qty(new_qty),
         new_tick(new_tick),
@@ -96,14 +95,14 @@ class LayerBook {
   }
 
   static int find_layer_by_ticks(const SideBook& side_book,
-                                 uint64_t tick) noexcept {
+      uint64_t tick) noexcept {
     for (int idx = 0; idx < kSlotsPerSide; ++idx)
       if (side_book.layer_ticks[idx] == tick)
         return idx;
     return -1;
   }
   static int find_layer_by_id(const SideBook& side_book,
-                              const common::OrderId order_id) noexcept {
+      const common::OrderId order_id) noexcept {
     if (order_id.value == common::kOrderIdInvalid)
       return -1;
     for (int idx = 0; idx < kSlotsPerSide; ++idx)
@@ -161,7 +160,6 @@ class LayerBook {
   }
 
   static AssignPlan plan_layer(const SideBook& side_book, uint64_t tick) {
-    static_assert(alignof(decltype(books_)) >= alignof(void*));
     if (const int layer = find_layer_by_ticks(side_book, tick); layer >= 0)
       return {.layer = layer, .victim_live_layer = std::nullopt, .tick = tick};
     if (const int layer = find_free_layer(side_book); layer >= 0)

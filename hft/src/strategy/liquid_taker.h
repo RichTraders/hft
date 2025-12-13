@@ -21,20 +21,23 @@ template <typename Strategy>
 class FeatureEngine;
 template <typename Strategy>
 class MarketOrderBook;
-}  // namespace trading
-namespace trading {
+
 class LiquidTaker : public BaseStrategy<LiquidTaker> {
  public:
-  LiquidTaker(OrderManager<LiquidTaker>* order_manager,
-              const FeatureEngine<LiquidTaker>* feature_engine,
-              common::Logger* logger, const common::TradeEngineCfgHashMap&);
+  using Base = BaseStrategy<LiquidTaker>;
+  using OrderManagerT = OrderManager<LiquidTaker>;
+  using FeatureEngineT = FeatureEngine<LiquidTaker>;
+  using MarketOrderBookT = MarketOrderBook<LiquidTaker>;
+
+  LiquidTaker(OrderManagerT* order_manager,
+      const FeatureEngineT* feature_engine,
+      const common::Logger::Producer& logger,
+      const common::TradeEngineCfgHashMap&);
 
   void on_orderbook_updated(const common::TickerId&, common::Price,
-                            common::Side,
-                            const MarketOrderBook<LiquidTaker>*) const noexcept;
+      common::Side, const MarketOrderBookT*) const noexcept;
 
-  void on_trade_updated(const MarketData*,
-                        MarketOrderBook<LiquidTaker>*) const noexcept;
+  void on_trade_updated(const MarketData*, MarketOrderBookT*) const noexcept;
 
   void on_order_updated(const ExecutionReport*) noexcept;
 };

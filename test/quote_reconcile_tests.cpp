@@ -11,6 +11,7 @@
  */
 #include <gtest/gtest.h>
 #include "quote_reconciler.h"
+#include "common/ini_config.hpp"
 
 using trading::kSlotsPerSide;
 using trading::kTicksInvalid;

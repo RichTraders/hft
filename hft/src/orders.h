@@ -13,8 +13,8 @@
 #ifndef OM_ORDER_H
 #define OM_ORDER_H
 
-#include "ini_config.hpp"
-#include "types.h"
+#include "absl/container/flat_hash_map.h"
+#include "common/types.h"
 
 namespace trading {
 enum class OMOrderState : int8_t {
@@ -52,8 +52,8 @@ struct Order {
   Order() = default;
 
   Order(common::TickerId ticker_id, const common::OrderId order,
-        const common::Side side, const common::Price price,
-        const common::Qty qty, const OMOrderState state)
+      const common::Side side, const common::Price price, const common::Qty qty,
+      const OMOrderState state)
       : ticker_id(std::move(ticker_id)),
         order_id(order),
         side(side),
@@ -89,9 +89,8 @@ struct QuoteIntent {
 };
 
 constexpr int kSlotsPerSide = 8;
-using OMOrderSideHashMap =
-    std::array<std::array<Order, kSlotsPerSide>,
-               common::sideToIndex(common::Side::kTrade)>;
+using OMOrderSideHashMap = std::array<std::array<Order, kSlotsPerSide>,
+    common::sideToIndex(common::Side::kTrade)>;
 
 using OMOrderTickerSideHashMap =
     absl::flat_hash_map<std::string, OMOrderSideHashMap>;

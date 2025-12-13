@@ -263,6 +263,16 @@ inline Side charToSide(const char character) noexcept {
   }
 }
 
+inline Side toSide(std::string_view str) noexcept {
+  if (str == "BUY")
+    return Side::kBuy;
+  if (str == "SELL")
+    return Side::kSell;
+  if (str == "TRADE")
+    return Side::kTrade;
+  return Side::kInvalid;
+}
+
 constexpr auto sideToIndex(Side side) noexcept {
   return static_cast<size_t>(side);
 }
@@ -271,8 +281,8 @@ constexpr auto oppIndex(size_t idx) noexcept -> size_t {
   return idx ^ 1U;
 }
 
-constexpr auto sideToValue(Side side) noexcept {
-  const int ret = side == Side::kBuy ? 1 : -1;
+constexpr auto sideToValue(common::Side side) noexcept {
+  const int ret = side == common::Side::kBuy ? 1 : -1;
   return ret;
 }
 
@@ -351,5 +361,18 @@ struct TradeEngineCfg {
 };
 
 using TradeEngineCfgHashMap = std::unordered_map<std::string, TradeEngineCfg>;
+
+template <typename T>
+std::string to_fixed(T data, int precision) {
+  static constexpr size_t kPrecisionBufferSize = 8;
+  std::array<char, kPrecisionBufferSize> buffer;
+  std::snprintf(buffer.data(),
+      sizeof(buffer),
+      "%.*f",
+      precision,
+      static_cast<double>(data));
+  return std::string(buffer.data());
+}
+
 }  // namespace common
 #endif  //TYPES_H

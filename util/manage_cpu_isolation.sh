@@ -157,8 +157,8 @@ set_slice_cpus() {
         return 0
     fi
 
-    echo "$cpus" > "$cpuset_file" || {
-        log "ERROR: Failed to set CPUs for $slice"
+    systemctl set-property "$slice" AllowedCPUs="$cpus" || {
+        log "ERROR: Failed to set CPUs for $slice via systemctl"
         return 1
     }
 
@@ -169,11 +169,20 @@ set_slice_cpus() {
 do_start() {
     log "Starting CPU isolation for HFT service"
 
+    local iso_cpus
+    iso_cpus=$(get_iso_cpus)
+
     local remaining_cpus
     remaining_cpus=$(calculate_remaining_cpus)
 
-    log "iso.slice CPUs: $(get_iso_cpus)"
+    log "iso.slice CPUs: $iso_cpus"
     log "Other slices CPUs: $remaining_cpus"
+
+    # Set iso.slice to use only isolated CPUs
+    # This overrides any previous runtime settings from stop
+    systemctl set-property iso.slice AllowedCPUs="$iso_cpus" || {
+        log "WARNING: Failed to set iso.slice AllowedCPUs"
+    }
 
     for slice in "${SLICES[@]}"; do
         set_slice_cpus "$slice" "$remaining_cpus"
@@ -190,6 +199,12 @@ do_stop() {
     local all_cpus="0-$((total_cpus - 1))"
 
     log "Restoring all slices to: $all_cpus"
+
+    # Restore iso.slice AllowedCPUs using systemctl
+    # This ensures the restriction is removed from cgroup
+    systemctl set-property iso.slice AllowedCPUs="$all_cpus" || {
+        log "WARNING: Failed to restore iso.slice AllowedCPUs"
+    }
 
     for slice in "${SLICES[@]}"; do
         set_slice_cpus "$slice" "$all_cpus"

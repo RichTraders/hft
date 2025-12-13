@@ -15,26 +15,33 @@
 #include "base_strategy.hpp"
 
 struct MarketData;
-
 namespace trading {
+template <typename Strategy>
+class FeatureEngine;
+template <typename Strategy>
+class MarketOrderBook;
+
 class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
  public:
-  ObiVwapMomentumStrategy(OrderManager<ObiVwapMomentumStrategy>* order_manager,
-              const FeatureEngine<ObiVwapMomentumStrategy>* feature_engine,
-              common::Logger* logger,
-              const common::TradeEngineCfgHashMap& ticker_cfg);
-  void on_orderbook_updated(
-      const common::TickerId& ticker, common::Price, common::Side,
-      const MarketOrderBook<ObiVwapMomentumStrategy>* order_book) noexcept;
+  using Base = BaseStrategy;
+  using OrderManagerT = OrderManager<ObiVwapMomentumStrategy>;
+  using FeatureEngineT = FeatureEngine<ObiVwapMomentumStrategy>;
+  using MarketOrderBookT = MarketOrderBook<ObiVwapMomentumStrategy>;
 
-  void on_trade_updated(const MarketData*,
-                        MarketOrderBook<ObiVwapMomentumStrategy>*) noexcept;
+  ObiVwapMomentumStrategy(OrderManagerT* order_manager,
+      const FeatureEngineT* feature_engine,
+      const common::Logger::Producer& logger,
+      const common::TradeEngineCfgHashMap& ticker_cfg);
+  void on_orderbook_updated(const common::TickerId& ticker, common::Price,
+      common::Side, const MarketOrderBookT* order_book) noexcept;
+
+  void on_trade_updated(const MarketData*, MarketOrderBookT*) noexcept;
 
   void on_order_updated(const ExecutionReport*) noexcept;
 
  private:
   static constexpr int kDefaultOBILevel10 = 10;
-  static constexpr int kSafetyMargin = 20;
+  static constexpr int kSafetyMargin = 5;
   const double variance_denominator_;
   const double position_variance_;
   const double enter_threshold_;
@@ -43,6 +50,7 @@ class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
   std::vector<double> bid_qty_;
   std::vector<double> ask_qty_;
 };
+
 }  // namespace trading
 
 #endif  //MOMENTUM_STRATEGY_H

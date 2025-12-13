@@ -514,3 +514,12 @@ journalctl -u hft-engine.service -n 50 --no-pager
 # cgroup information
 cat /proc/$(systemctl show -p MainPID hft-engine.service | cut -d= -f2)/cgroup
 ```
+
+If cpus do not work after stop cpu isolation, try cpu hotplug
+
+```bash
+#In this case, hotplug for cpu 1 to 4.
+for i in {1..4}; do echo 0 | sudo tee /sys/devices/system/cpu/cpu$i/online; done
+sleep 1
+for i in {1..4}; do echo 1 | sudo tee /sys/devices/system/cpu/cpu$i/online; done
+```

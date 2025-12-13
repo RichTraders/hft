@@ -10,8 +10,10 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#pragma once
+#ifndef COMMON_LOGGER_H
+#define COMMON_LOGGER_H
 
+#include <format>
 #include <source_location>
 #include "thread.hpp"
 
@@ -142,9 +144,8 @@ class LogFormatter {
   }
 
   static void format_iso8601_utc(char* out, size_t& len, uint64_t ts_ns) {
-    const auto time_p = std::chrono::time_point<std::chrono::system_clock>(
-        std::chrono::nanoseconds(ts_ns));
-    const auto sec = time_point_cast<std::chrono::seconds>(time_p);
+    auto time_p = std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>(std::chrono::nanoseconds(ts_ns));
+    const auto sec = std::chrono::time_point_cast<std::chrono::seconds>(time_p);
     const auto nano =
         std::chrono::duration_cast<std::chrono::nanoseconds>(time_p - sec)
             .count();
@@ -153,11 +154,15 @@ class LogFormatter {
     std::tm calendar_date;
     gmtime_r(&time, &calendar_date);
 
-    const auto* time_format = std::format_to(
-        out, "[{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:06}Z]",
-        calendar_date.tm_year + k1900, calendar_date.tm_mon + 1,
-        calendar_date.tm_mday, calendar_date.tm_hour, calendar_date.tm_min,
-        calendar_date.tm_sec, nano / k1000);
+    const auto* time_format = std::format_to(out,
+        "[{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:06}Z]",
+        calendar_date.tm_year + k1900,
+        calendar_date.tm_mon + 1,
+        calendar_date.tm_mday,
+        calendar_date.tm_hour,
+        calendar_date.tm_min,
+        calendar_date.tm_sec,
+        nano / k1000);
     len = static_cast<size_t>(time_format - out);
   }
   static constexpr int kTimeDigit = 6;
@@ -195,32 +200,80 @@ class Logger {
 
     explicit operator bool() const noexcept { return impl_ != nullptr; }
 
+    template <typename... Args>
+    void logf(LogLevel lvl, std::string_view fmt,
+        Args&&... args) const noexcept {
+      if (!is_enabled(lvl))
+        return;
+
+      try {
+        const std::string formatted =
+            std::vformat(fmt, std::make_format_args(args...));
+        log(lvl, formatted);
+      } catch (const std::format_error&) {
+        std::cout << "[Critical]Parser error\n";
+      } catch (const std::bad_alloc&) {
+        std::cout << "[Critical]memory allocation error\n";
+      } catch (const std::exception& exception) {
+        std::cout << "[Critical]exception : " << exception.what() << "\n";
+      }
+    }
+
+    template <typename... Args>
+    void info(std::string_view fmt, Args&&... args) const {
+      logf(LogLevel::kInfo, fmt, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void debug(std::string_view fmt, Args&&... args) const {
+      logf(LogLevel::kDebug, fmt, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void trace(std::string_view fmt, Args&&... args) const {
+      logf(LogLevel::kTrace, fmt, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void warn(std::string_view fmt, Args&&... args) const {
+      logf(LogLevel::kWarn, fmt, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void error(std::string_view fmt, Args&&... args) const {
+      logf(LogLevel::kError, fmt, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    void fatal(std::string_view fmt, Args&&... args) const {
+      logf(LogLevel::kFatal, fmt, std::forward<Args>(args)...);
+    }
+
     void log(LogLevel lvl, std::string_view text,
-             std::source_location loc = std::source_location::current());
+        std::source_location loc = std::source_location::current()) const;
 
     void info(std::string_view str,
-              std::source_location loc = std::source_location::current()) {
+        std::source_location loc = std::source_location::current()) const {
       log(LogLevel::kInfo, str, loc);
     }
     void debug(std::string_view str,
-               std::source_location loc = std::source_location::current()) {
+        std::source_location loc = std::source_location::current()) const {
       log(LogLevel::kDebug, str, loc);
     }
     void trace(std::string_view str,
-               std::source_location loc = std::source_location::current()) {
-
+        std::source_location loc = std::source_location::current()) const {
       log(LogLevel::kTrace, str, loc);
     }
     void warn(std::string_view str,
-              std::source_location loc = std::source_location::current()) {
+        std::source_location loc = std::source_location::current()) const {
       log(LogLevel::kWarn, str, loc);
     }
     void error(std::string_view str,
-               std::source_location loc = std::source_location::current()) {
+        std::source_location loc = std::source_location::current()) const {
       log(LogLevel::kError, str, loc);
     }
     void fatal(std::string_view str,
-               std::source_location loc = std::source_location::current()) {
+        std::source_location loc = std::source_location::current()) const {
       log(LogLevel::kFatal, str, loc);
     }
 
@@ -229,6 +282,7 @@ class Logger {
     Impl* impl_{nullptr};
     explicit Producer(Impl* producer) : impl_(producer) {}
     friend class Logger;
+    [[nodiscard]] bool is_enabled(LogLevel lvl) const noexcept;
   };
 
  private:
@@ -246,3 +300,4 @@ class Logger {
 };
 
 }  // namespace common
+#endif

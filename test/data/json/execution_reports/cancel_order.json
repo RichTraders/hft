@@ -1,0 +1,10 @@
+{
+  "id": "ordercancel_1764653295771388051",
+  "method": "order.cancel",
+  "params": {
+    "symbol": "BTCUSDT",
+    "origClientOrderId": "1764653289516328921",
+    "newClientOrderId": "1764653295771388051",
+    "timestamp": 1764653296717
+  }
+}

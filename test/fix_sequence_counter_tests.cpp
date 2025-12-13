@@ -9,7 +9,7 @@
  * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
-#include "fix_sequence_counter.h"
+#include "core/fix/fix_sequence_counter.h"
 #include "gtest/gtest.h"
 using namespace core;
 TEST(FixCounterTest, CheckFirstCome) {

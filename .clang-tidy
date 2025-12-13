@@ -46,7 +46,8 @@ Checks: >
   -readability-braces-around-statements,
   -readability-redundant-declaration,
   -bugprone-easily-swappable-parameters,
-  -readability-function-cognitive-complexity
+  -readability-function-cognitive-complexity,
+  -readability-convert-member-functions-to-static
 
 # Turn all the warnings from the checks above into errors.
 WarningsAsErrors: "*"

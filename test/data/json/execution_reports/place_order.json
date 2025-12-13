@@ -1,0 +1,15 @@
+{
+  "id": "orderplace_1764653289516328921",
+  "method": "order.place",
+  "params": {
+    "symbol": "BTCUSDT",
+    "side": "BUY",
+    "type": "LIMIT",
+    "timeInForce": "GTC",
+    "price": "86923.64",
+    "quantity": "0.00006",
+    "selfTradePreventionMode": "EXPIRE_TAKER",
+    "newClientOrderId": "1764653289516328921",
+    "timestamp": 1764653290450
+  }
+}

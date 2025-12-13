@@ -1,0 +1,34 @@
+{
+  "id": "orderreplace_1764690263119909563",
+  "status": 409,
+  "error": {
+    "code": -2021,
+    "msg": "Order cancel-replace partially failed.",
+    "data": {
+      "cancelResult": "SUCCESS",
+      "newOrderResult": "FAILURE",
+      "cancelResponse": {
+        "symbol": "BTCUSDT",
+        "origClientOrderId": "1764690263066988543",
+        "orderId": 53230736388,
+        "orderListId": -1,
+        "clientOrderId": "1764690263119909562",
+        "transactTime": 1764690263200,
+        "price": "90636.16000000",
+        "origQty": "0.00006000",
+        "executedQty": "0.00000000",
+        "origQuoteOrderQty": "0.00000000",
+        "cummulativeQuoteQty": "0.00000000",
+        "status": "CANCELED",
+        "timeInForce": "GTC",
+        "type": "LIMIT",
+        "side": "BUY",
+        "selfTradePreventionMode": "EXPIRE_TAKER"
+      },
+      "newOrderResponse": {
+        "code": -2010,
+        "msg": "Account has insufficient balance for requested action."
+      }
+    }
+  }
+}

@@ -31,27 +31,29 @@ class PositionKeeperTest : public ::testing::Test {
     INI_CONFIG.load("resources/config.ini");
     logger = new Logger();
   }
-  void SetUp() override { keeper = new PositionKeeper(logger); }
+  void SetUp() override {
+    producer = logger->make_producer();
+    keeper = new PositionKeeper(producer);
+  }
   void TearDown() override {
     if (keeper)
       delete keeper;
   }
 
-  static void TearDownTestSuite() {
-    delete logger;
-  }
+  static void TearDownTestSuite() { delete logger; }
+  Logger::Producer producer;
   PositionKeeper* keeper;
 };
 Logger* PositionKeeperTest::logger;
 
 TEST_F(PositionKeeperTest, AddFillIncreasesPosition) {
   ExecutionReport report{.cl_order_id = OrderId{1},
-                         .symbol = INI_CONFIG.get("meta", "ticker"),
-                         .ord_status = OrdStatus::kFilled,
-                         .cum_qty = Qty{1.0},
-                         .last_qty = Qty{1.0},
-                         .price = Price{100000.0},
-                         .side = Side::kBuy};
+      .symbol = INI_CONFIG.get("meta", "ticker"),
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{1.0},
+      .last_qty = Qty{1.0},
+      .price = Price{100000.0},
+      .side = Side::kBuy};
 
   keeper->add_fill(&report);
 
@@ -68,12 +70,12 @@ TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
 
   // 1. Long 2 BTC @ 100
   ExecutionReport buy1{.cl_order_id = OrderId{1},
-                       .symbol = INI_CONFIG.get("meta", "ticker"),
-                       .ord_status = OrdStatus::kFilled,
-                       .cum_qty = Qty{2},
-                       .last_qty = Qty{2},
-                       .price = Price{100},
-                       .side = Side::kBuy
+      .symbol = INI_CONFIG.get("meta", "ticker"),
+      .ord_status = OrdStatus::kFilled,
+      .cum_qty = Qty{2},
+      .last_qty = Qty{2},
+      .price = Price{100},
+      .side = Side::kBuy
 
   };
   pos.add_fill(&buy1, log);

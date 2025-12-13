@@ -13,13 +13,8 @@
 #ifndef FEATURE_ENGIN_H
 #define FEATURE_ENGIN_H
 
+#include "common/types.h"
 #include "order_book.h"
-#include "types.h"
-
-namespace trading {
-template <class Strategy>
-class MarketOrderBook;
-}
 
 struct MarketData;
 
@@ -30,8 +25,8 @@ namespace trading {
 template <class Strategy>
 class FeatureEngine {
  public:
-  explicit FeatureEngine(common::Logger* logger)
-      : logger_(logger->make_producer()),
+  explicit FeatureEngine(const common::Logger::Producer& logger)
+      : logger_(logger),
         vwap_size_(INI_CONFIG.get_int("strategy", "vwap_size", kVwapSize)),
         vwap_qty_(vwap_size_),
         vwap_price_(vwap_size_) {
@@ -40,9 +35,9 @@ class FeatureEngine {
 
   ~FeatureEngine() { logger_.info("[Destructor] FeatureEngine Destroy"); }
   auto on_trade_updated(const MarketData* market_update,
-                        MarketOrderBook<Strategy>* book) noexcept -> void;
+      MarketOrderBook<Strategy>* book) noexcept -> void;
   auto on_order_book_updated(common::Price price, common::Side side,
-                             MarketOrderBook<Strategy>* book) noexcept -> void;
+      MarketOrderBook<Strategy>* book) noexcept -> void;
   static double vwap_from_levels(const std::vector<LevelView>& level);
   static double orderbook_imbalance_from_levels(
       const std::vector<double>& bid_levels,
@@ -68,7 +63,7 @@ class FeatureEngine {
 
  private:
   constexpr static int kVwapSize = 64;
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   double mkt_price_ = common::kPriceInvalid;
   double agg_trade_qty_ratio_ = common::kQtyInvalid;
   double spread_ = common::kPriceInvalid;

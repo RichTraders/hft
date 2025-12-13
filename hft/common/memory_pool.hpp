@@ -10,12 +10,8 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#pragma once
-
-// #include <atomic>
-// #include <cstddef>
-// #include <cstdint>
-// #include <limits>
+#ifndef COMMON_MEMORY_POOL_H
+#define COMMON_MEMORY_POOL_H
 
 namespace common {
 template <typename T>
@@ -50,14 +46,15 @@ class MemoryPool {
 
       const std::uint64_t new_raw = pack(new_head);
 
-      if (free_head_.compare_exchange_weak(old_raw, new_raw,
-                                           std::memory_order_acq_rel,
-                                           std::memory_order_acquire)) {
+      if (free_head_.compare_exchange_weak(old_raw,
+              new_raw,
+              std::memory_order_acq_rel,
+              std::memory_order_acquire)) {
 
         Bin& bin = store_[old_idx];
 
         T* pointer = std::construct_at(reinterpret_cast<T*>(bin.storage.data()),
-                                       std::forward<Args>(args)...);
+            std::forward<Args>(args)...);
         bin.alive.store(true, std::memory_order::release);
         return pointer;
       }
@@ -66,7 +63,7 @@ class MemoryPool {
 
   bool deallocate(const T* elem) noexcept {
     static_assert(std::is_nothrow_destructible_v<T>,
-                  "T must be nothrow-destructible");
+        "T must be nothrow-destructible");
     if (elem == nullptr)
       return false;
 
@@ -88,9 +85,10 @@ class MemoryPool {
 
     // Atomic check-and-clear alive flag
     bool expected = true;
-    if (!bin.alive.compare_exchange_strong(expected, false,
-                                           std::memory_order_acq_rel,
-                                           std::memory_order_acquire)) {
+    if (!bin.alive.compare_exchange_strong(expected,
+            false,
+            std::memory_order_acq_rel,
+            std::memory_order_acquire)) {
       return false;
     }
 
@@ -108,9 +106,10 @@ class MemoryPool {
 
       const std::uint64_t new_raw = pack(new_head);
 
-      if (free_head_.compare_exchange_weak(old_raw, new_raw,
-                                           std::memory_order_acq_rel,
-                                           std::memory_order_acquire)) {
+      if (free_head_.compare_exchange_weak(old_raw,
+              new_raw,
+              std::memory_order_acq_rel,
+              std::memory_order_acquire)) {
         return true;
       }
     }
@@ -168,9 +167,9 @@ class MemoryPool {
   }
 
   static_assert(sizeof(StackHead) == kAligned8Bytes,
-                "StackHead must be 8 bytes");
+      "StackHead must be 8 bytes");
   static_assert(alignof(StackHead) == kAligned8Bytes,
-                "StackHead must be 8-byte aligned");
+      "StackHead must be 8-byte aligned");
 
   struct Bin {
     alignas(T) std::array<std::byte, sizeof(T)> storage;
@@ -187,3 +186,5 @@ class MemoryPool {
 };
 
 }  // namespace common
+
+#endif

@@ -1,0 +1,12 @@
+{
+  "id": "login_1764652791868",
+  "status": 200,
+  "result": {
+    "apiKey": "apikeyasdfasdfasdf",
+    "authorizedSince": 1764652791868,
+    "connectedSince": 1764652791850,
+    "returnRateLimits": false,
+    "serverTime": 1764652791893,
+    "userDataStream": false
+  }
+}

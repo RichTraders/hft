@@ -244,9 +244,10 @@ TEST_F(LoggerTest, FileLogRotateTest) {
 
   std::vector<std::string> line_list;
   line_list.push_back("FileLogTest rotate Test");
+  sleep(5);
   line_list.push_back("Application rotate shutting down333");
 
-  logger->addSink(std::make_unique<FileSink>("file_log_rotate_test_final", 32));
+  logger->addSink(std::make_unique<FileSink>("file_log_rotate_test_final", 24));
 
   auto log = logger->make_producer();
 

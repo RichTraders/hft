@@ -14,9 +14,9 @@
 #define BROKER_H
 
 #include "common/logger.h"
-#include "core/NewOroFix44/fix_md_app.h"
-#include "fix_sequence_counter.h"
-#include "memory_pool.hpp"
+#include "common/memory_pool.hpp"
+#include "core/fix/fix_md_app.h"
+#include "core/fix/fix_sequence_counter.h"
 
 class Broker {
  public:
@@ -39,11 +39,11 @@ class Broker {
   bool subscribed_ = false;
 #endif
 
-  void on_login(FIX8::Message*);
-  void on_market_request_reject(FIX8::Message*);
-  void on_heartbeat(FIX8::Message*);
+  void on_login(FIX8::Message*) const;
+  void on_market_request_reject(FIX8::Message*) const;
+  void on_heartbeat(FIX8::Message*) const;
   void on_subscribe(const std::string& str_msg, FIX8::Message* msg,
-                    const std::string& event_type);
+      const std::string& event_type);
 };
 
 #endif  //BROKER_H

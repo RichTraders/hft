@@ -15,7 +15,7 @@
 #include <glaze/glaze.hpp>
 namespace schema {
 namespace futures {
-struct DepthData {
+struct DepthResponse {
   std::string event_type;
   std::uint64_t timestamp;
   std::uint64_t transaction_time;
@@ -29,7 +29,7 @@ struct DepthData {
 
   // clang-format off
   struct glaze {
-    using T = DepthData;
+    using T = DepthResponse;
     static constexpr auto value =
       glz::object(
         "e", &T::event_type,

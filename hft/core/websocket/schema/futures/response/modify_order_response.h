@@ -13,7 +13,7 @@
 #ifndef MODIFY_ORDER_RESPONSE_H
 #define MODIFY_ORDER_RESPONSE_H
 #include <glaze/glaze.hpp>
-#include "futures/api_response.h"
+#include "api_response.h"
 namespace schema {
 namespace futures {
 struct ModifyOrderResult {
@@ -86,15 +86,16 @@ struct ModifyOrderResult {
   // clang-format on
 };
 
-struct CancelAndReorderResponse {
+struct ModifyOrderResponse {
   std::string id;
   int status{};
-  ModifyOrderResult result;
-  std::vector<RateLimit> rate_limits;
+  std::optional<ModifyOrderResult> result;
+  std::optional<ErrorResponse<>> error;
+  std::optional<std::vector<RateLimit>> rate_limits;
 
   // clang-format off
     struct glaze {
-        using T = CancelAndReorderResponse;
+        using T = ModifyOrderResponse;
         static constexpr auto value = glz::object(
             "id",           &T::id,
             "status",       &T::status,

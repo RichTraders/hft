@@ -125,6 +125,8 @@ int WebSocketTransport<ThreadName>::write(const std::string& buffer) const {
               << std::endl;
     return -1;
   }
+  std::cout << "[WebSocketTransport][" << ThreadName << "]: write:" << buffer
+            << "\n";
 
   std::string payload(LWS_PRE + buffer.size(), '\0');
   std::memcpy(payload.data() + LWS_PRE, buffer.data(), buffer.size());
@@ -239,13 +241,25 @@ int WebSocketTransport<ThreadName>::handle_callback(struct lws* wsi,
         msg = "unknown error";
       }
 
-      std::cerr << "[WS] CLIENT_CONNECTION_ERROR: " << msg << "\n";
+      std::cerr << "[WS][" << ThreadName << "] CLIENT_CONNECTION_ERROR: " << msg
+                << "\n";
       [[fallthrough]];
     }
     case LWS_CALLBACK_CLIENT_CLOSED:
     case LWS_CALLBACK_CLOSED: {
       connected_.store(false, std::memory_order_release);
       interrupted_.store(true, std::memory_order_release);
+
+      std::string msg;
+
+      if (data && len) {
+        msg.assign(static_cast<const char*>(data), len);
+      } else {
+        msg = "unknown error";
+      }
+
+      std::cerr << "[WS][" << ThreadName
+                << "] CLIENT_CONNECTION_CLOSED: " << msg << "\n";
       break;
     }
     default:

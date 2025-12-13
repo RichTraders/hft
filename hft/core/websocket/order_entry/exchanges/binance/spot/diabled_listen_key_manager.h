@@ -10,8 +10,8 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#ifndef HFT_DIABLED_LISTEN_KEY_MANAGER_H
-#define HFT_DIABLED_LISTEN_KEY_MANAGER_H
+#ifndef DIABLED_LISTEN_KEY_MANAGER_H
+#define DIABLED_LISTEN_KEY_MANAGER_H
 #include <common/logger.h>
 
 struct DisabledListenKeyManager {
@@ -27,4 +27,4 @@ struct DisabledListenKeyManager {
   void start_keepalive() const {}
 };
 
-#endif  //HFT_DIABLED_LISTEN_KEY_MANAGER_H
+#endif  //DIABLED_LISTEN_KEY_MANAGER_H

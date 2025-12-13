@@ -13,8 +13,11 @@
 #include <gtest/gtest.h>
 #include <glaze/glaze.hpp>
 #include "logger.h"
-#include "websocket/order_entry/ws_oe_decoder.h"
-#include "websocket/order_entry/ws_oe_wire_message.h"
+#include "websocket/order_entry/spot_ws_oe_decoder.h"
+#include "websocket/schema/spot/response/order.h"
+#include "websocket/schema/spot/response/execution_report.h"
+#include "websocket/schema/spot/response/session_response.h"
+#include "websocket/schema/spot/response/api_response.h"
 
 using namespace core;
 using namespace common;
@@ -23,7 +26,7 @@ namespace test_utils {
 
 // Load test data from file
 std::string load_test_data(const std::string& filename) {
-  std::string path = "data/execution_reports/" + filename;
+  std::string path = "data/json/execution_reports/" + filename;
   std::ifstream file(path);
   if (!file.is_open()) {
     // Return empty string if file doesn't exist (user hasn't provided data yet)
@@ -78,7 +81,7 @@ class WsOeDecoderTest : public ::testing::Test {
     logger_->setLevel(LogLevel::kDebug);
     logger_->clearSink();
     producer_ = std::make_unique<Logger::Producer>(logger_->make_producer());
-    decoder_ = std::make_unique<WsOeDecoder>(*producer_);
+    decoder_ = std::make_unique<SpotWsOeDecoder>(*producer_);
   }
 
   static void TearDownTestSuite() {
@@ -89,11 +92,11 @@ class WsOeDecoderTest : public ::testing::Test {
   }
   static std::unique_ptr<Logger> logger_;
   static std::unique_ptr<Logger::Producer> producer_;
-  static std::unique_ptr<WsOeDecoder> decoder_;
+  static std::unique_ptr<SpotWsOeDecoder> decoder_;
 };
 std::unique_ptr<Logger> WsOeDecoderTest::logger_;
 std::unique_ptr<Logger::Producer> WsOeDecoderTest::producer_;
-std::unique_ptr<WsOeDecoder> WsOeDecoderTest::decoder_;
+std::unique_ptr<SpotWsOeDecoder> WsOeDecoderTest::decoder_;
 
 // ============================================================================
 // ExecutionReportResponse Tests

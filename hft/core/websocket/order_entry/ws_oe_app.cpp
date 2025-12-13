@@ -17,7 +17,6 @@
 #include "performance.h"
 #include "schema/spot/response/account_position.h"
 
-constexpr int kHttpOK = 200;
 constexpr int kDefaultRecvWindow = 5000;
 
 namespace {
@@ -50,6 +49,7 @@ WsOrderEntryApp::WsOrderEntryApp(const std::string& /*sender_comp_id*/,
     : logger_(logger->make_producer()),
       ws_oe_core_(logger_, response_manager),
       ws_order_manager_(logger_),
+      dispatch_context_(&logger_, &ws_order_manager_, this),
       host_(std::string(WsOeCoreImpl::ExchangeTraits::get_api_host())),
       path_(std::string(WsOeCoreImpl::ExchangeTraits::get_api_endpoint_path())),
       port_(WsOeCoreImpl::ExchangeTraits::get_api_port()),
@@ -64,29 +64,14 @@ bool WsOrderEntryApp::start() {
     return false;
   }
 
-  if constexpr (WsOeCoreImpl::ExchangeTraits::requires_listen_key()) {
-    listen_key_manager_ =
-        std::make_unique<WsOeCoreImpl::ExchangeTraits::ListenKeyManager>(
-            logger_);
-
-    if (!listen_key_manager_->acquire_listen_key()) {
-      logger_.error("[WsOeApp] Failed to acquire listen key");
-      running_ = false;
-      return false;
-    }
-
-    listen_key_manager_->start_keepalive();
-    logger_.info("[WsOeApp] Listen key acquired and keepalive started");
-  }
-
-  transport_ = std::make_unique<WebSocketTransport<"OERead">>(host_,
+  api_transport_ = std::make_unique<WebSocketTransport<"OEApi">>(host_,
       port_,
       path_,
       use_ssl_,
       true);
 
-  transport_->register_message_callback(
-      [this](std::string_view payload) { this->handle_payload(payload); });
+  api_transport_->register_message_callback(
+      [this](std::string_view payload) { this->handle_api_payload(payload); });
   return true;
 }
 
@@ -95,26 +80,20 @@ void WsOrderEntryApp::stop() {
     return;
   }
 
-  if constexpr (WsOeCoreImpl::ExchangeTraits::requires_listen_key()) {
-    if (listen_key_manager_) {
-      listen_key_manager_->stop_keepalive();
-      listen_key_manager_->release_listen_key();
-      listen_key_manager_.reset();
-    }
-  }
+  stop_stream_transport_impl(stream_transport_);
 
-  if (transport_) {
-    transport_->interrupt();
+  if (api_transport_) {
+    api_transport_->interrupt();
   }
-  transport_.reset();
+  api_transport_.reset();
 }
 
 bool WsOrderEntryApp::send(const std::string& msg) const {
-  if (!transport_ || msg.empty()) {
+  if (!api_transport_ || msg.empty()) {
     return false;
   }
   logger_.info("[WsOrderEntryApp] Sending message to server :{}", msg);
-  return transport_->write(msg) >= 0;
+  return api_transport_->write(msg) >= 0;
 }
 
 void WsOrderEntryApp::register_callback(const MsgType& type,
@@ -235,14 +214,19 @@ void WsOrderEntryApp::create_log_on() const {
         ::get_signature_base64(cur_timestamp, kRecvWindow);
     auto log_on_message =
         ws_oe_core_.create_log_on_message(sig_b64, cur_timestamp);
-    transport_->write(log_on_message);
+    api_transport_->write(log_on_message);
   } else {
-    const std::string& api_key = AUTHORIZATION.get_api_key();
-    auto log_on_message = ws_oe_core_.create_log_on_message(api_key, "");
-    transport_->write(log_on_message);
+    if constexpr (WsOeCoreImpl::ExchangeTraits::requires_listen_key()) {
+      const std::string user_stream_msg =
+          ws_oe_core_.create_user_data_stream_subscribe();
+      if (UNLIKELY(!user_stream_msg.empty())) {
+        api_transport_->write(user_stream_msg);
+        logger_.info("[WsOeApp] Sent userDataStream.start request");
+      }
+    }
   }
 }
-void WsOrderEntryApp::handle_payload(std::string_view payload) {
+void WsOrderEntryApp::handle_api_payload(std::string_view payload) {
   if (payload.empty()) {
     return;
   }
@@ -257,50 +241,15 @@ void WsOrderEntryApp::handle_payload(std::string_view payload) {
       payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size())));
 
   START_MEASURE(Convert_Message);
-  WireMessage message = ws_oe_core_.decode(payload);
+  const WireMessage message = ws_oe_core_.decode(payload);
   END_MEASURE(Convert_Message, logger_);
 
   if (UNLIKELY(std::holds_alternative<std::monostate>(message))) {
     return;
   }
 
-  std::visit(
-      [this, &message](auto&& arg) {
-        using T = std::decay_t<decltype(arg)>;
-
-        // Handle messages requiring special logic
-        if constexpr (std::is_same_v<T, schema::ExecutionReportResponse>) {
-          handle_execution_report(arg);
-        } else if constexpr (std::is_same_v<T,
-                                 schema::OutboundAccountPositionEnvelope>) {
-          handle_account_updated(arg);
-        } else if constexpr (std::is_same_v<T, schema::BalanceUpdateEnvelope>) {
-          handle_balance_update(arg);
-        } else if constexpr (std::is_same_v<T, schema::SessionLogonResponse>) {
-          handle_session_logon(arg);
-        } else if constexpr (std::is_same_v<T,
-                                 schema::SessionUserSubscriptionResponse>) {
-          handle_user_subscription(arg);
-        } else if constexpr (std::is_same_v<T,
-                                 schema::CancelAndReorderResponse>) {
-          handle_cancel_and_reorder_response(arg);
-        } else if constexpr (std::is_same_v<T,
-                                 schema::CancelAllOrdersResponse>) {
-          handle_cancel_all_response(arg);
-        } else if constexpr (std::is_same_v<T, schema::PlaceOrderResponse>) {
-          handle_place_order_response(arg);
-        } else if constexpr (std::is_same_v<T, schema::ApiResponse>) {
-          handle_api_response(arg);
-        }
-        // For all other simple messages, use DispatchRouter
-        else {
-          if (const auto type = WsOeCoreImpl::ExchangeTraits::DispatchRouter::
-                  get_dispatch_type(arg)) {
-            dispatch(std::string(*type), message);
-          }
-        }
-      },
-      message);
+  WsOeCoreImpl::ExchangeTraits::DispatchRouter::process_message(message,
+      dispatch_context_);
 }
 
 void WsOrderEntryApp::dispatch(const std::string& type,
@@ -322,206 +271,36 @@ std::string WsOrderEntryApp::get_signature_base64(const std::string& payload) {
   return signature;
 }
 
-void WsOrderEntryApp::handle_execution_report(
-    const schema::ExecutionReportResponse& ptr) {
-  const auto& event = ptr.event;
-  const WireMessage message = ptr;
-
-  if (event.execution_type == "CANCELED") {
-    if (event.reject_reason != "NONE") {
-      dispatch("9", message);  // Cancel reject
-    } else {
-      dispatch("8", message);  // Regular execution report (cancel success)
+void WsOrderEntryApp::handle_stream_payload(std::string_view payload) {
+  if constexpr (WsOeCoreImpl::ExchangeTraits::requires_stream_transport()) {
+    if (payload.empty()) {
+      return;
     }
+
+    constexpr int kDefaultLogLen = 200;
+    logger_.debug("Received stream payload (size: {}): {}...",
+        payload.size(),
+        payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size())));
+
+    START_MEASURE(Convert_Stream_Message);
+    const WireMessage message = ws_oe_core_.decode(payload);
+    END_MEASURE(Convert_Stream_Message, logger_);
+
+    if (UNLIKELY(std::holds_alternative<std::monostate>(message))) {
+      return;
+    }
+
+    WsOeCoreImpl::ExchangeTraits::DispatchRouter::process_message(message,
+        dispatch_context_);
   } else {
-    // Handle all execution reports including REJECTED, NEW, TRADE, etc.
-    dispatch("8", message);  // Regular execution report
-  }
-  ws_order_manager_.remove_pending_request(ptr.event.client_order_id);
-  ws_order_manager_.remove_cancel_and_reorder_pair(ptr.event.client_order_id);
-}
-
-void WsOrderEntryApp::handle_balance_update(
-    const schema::BalanceUpdateEnvelope& ptr) const {
-  std::ostringstream stream;
-  stream << "BalanceUpdated : " << ptr.event;
-  logger_.debug(stream.str());
-}
-
-void WsOrderEntryApp::handle_account_updated(
-    const schema::OutboundAccountPositionEnvelope& ptr) const {
-  std::ostringstream stream;
-  stream << "AccountUpdated : " << ptr.event;
-  logger_.debug(stream.str());
-}
-
-void WsOrderEntryApp::handle_session_logon(
-    const schema::SessionLogonResponse& ptr) const {
-  if (ptr.status == kHttpOK) {
-    logger_.info("[WsOeApp] session.logon successful");
-    // Automatically start user data stream after successful login
-    const std::string user_stream_msg =
-        ws_oe_core_.create_user_data_stream_subscribe();
-    if (UNLIKELY(!user_stream_msg.empty())) {
-      send(user_stream_msg);
-    }
-  } else {
-    if (ptr.error.has_value())
-      logger_.error("[WsOeApp] session.logon failed: status={}, error={}",
-          ptr.status,
-          ptr.error.value().message);
-  }
-
-  const WireMessage message = ptr;
-  dispatch("A", message);
-}
-
-void WsOrderEntryApp::handle_user_subscription(
-    const schema::SessionUserSubscriptionResponse& ptr) {
-  if (ptr.status != kHttpOK) {
-    logger_.warn("[WsOeApp] UserDataStream response failed: id={}, status={}",
-        ptr.id,
-        ptr.status);
-  }
-
-  // No need to notify user session subscription
-  /*const WireMessage message = ptr;
-  dispatch("sub", message);*/
-}
-
-void WsOrderEntryApp::handle_api_response(const schema::ApiResponse& ptr) {
-  if (ptr.status != kHttpOK) {
-    if (ptr.error.has_value()) {
-      logger_.warn("[WsOeApp] API response failed: id={}, status={}, error={}",
-          ptr.id,
-          ptr.status,
-          ptr.error.value().message);
-
-      const WireMessage message = ptr;
-      dispatch("8", message);
-    }
-  }
-}
-void WsOrderEntryApp::handle_cancel_and_reorder_response(
-    const schema::CancelAndReorderResponse& ptr) {
-  if (ptr.status != kHttpOK && ptr.error.has_value()) {
-    const auto& error = ptr.error.value();
-    logger_.warn(
-        "[WsOeApp] CancelAndReorder failed: id={}, status={}, error={}",
-        ptr.id,
-        ptr.status,
-        error.message);
-
-    if (!error.data.has_value()) {
-      return;
-      // logger_.warn("[WsOeApp] No error data available for cancel_and_reorder");
-      // // Fallback: create single synthetic report
-      // auto synthetic_report =
-      //     ws_order_manager_.create_synthetic_execution_report(ptr.id,
-      //         error.code,
-      //         error.message);
-      // if (synthetic_report.has_value()) {
-      //   dispatch("8", synthetic_report.value());
-      // }
-    }
-
-    const auto& error_data = error.data.value();
-
-    const auto new_order_id_opt =
-        WsOrderManager::extract_client_order_id(ptr.id);
-    if (!new_order_id_opt.has_value()) {
-      logger_.error("[WsOeApp] Failed to extract client_order_id from {}",
-          ptr.id);
-      return;
-    }
-    std::uint64_t new_order_id = new_order_id_opt.value();
-
-    const auto original_order_id_opt =
-        ws_order_manager_.get_original_order_id(new_order_id);
-    if (!original_order_id_opt.has_value()) {
-      logger_.warn(
-          "[WsOeApp] No cancel_and_reorder pair found for new_order_id={}",
-          new_order_id);
-      auto synthetic_report =
-          ws_order_manager_.create_synthetic_execution_report(ptr.id,
-              error.code,
-              error.message);
-      if (synthetic_report.has_value()) {
-        dispatch("8", synthetic_report.value());
-      }
-      return;
-    }
-    const auto original_order_id = original_order_id_opt.value();
-
-    // Handle NEW order based on new_order_result
-    if (error_data.new_order_result != "SUCCESS") {
-      logger_.info("[WsOeApp] New order {}, creating synthetic report",
-          error_data.new_order_result);
-      auto new_order_report =
-          ws_order_manager_.create_synthetic_execution_report(ptr.id,
-              error.code,
-              error.message);
-      if (new_order_report.has_value()) {
-        dispatch("8", new_order_report.value());
-      }
-    }
-
-    if (error_data.cancel_result == "FAILURE" &&
-        error_data.new_order_result != "SUCCESS") {
-      logger_.info("[WsOeApp] Cancel FAILURE, creating synthetic report");
-      const auto orig_request_id =
-          "ordercancel_" + std::to_string(original_order_id);
-      auto cancel_report =
-          ws_order_manager_.create_synthetic_execution_report(orig_request_id,
-              error.code,
-              error.message);
-      if (cancel_report.has_value()) {
-        dispatch("8", cancel_report.value());
-      }
-    } else if (error_data.cancel_result == "SUCCESS") {
-      logger_.info("[WsOeApp] Cancel SUCCESS (no synthetic report needed)");
-    }
-    ws_order_manager_.remove_pending_request(new_order_id);
-    ws_order_manager_.remove_pending_request(original_order_id);
-    ws_order_manager_.remove_cancel_and_reorder_pair(new_order_id);
+    (void)payload;
+    return;
   }
 }
 
-void WsOrderEntryApp::handle_cancel_all_response(
-    const schema::CancelAllOrdersResponse& ptr) {
-  if (ptr.status != kHttpOK && ptr.error.has_value()) {
-    logger_.warn("[WsOeApp] CancelAll failed: id={}, status={}, error={}",
-        ptr.id,
-        ptr.status,
-        ptr.error.value().message);
-
-    auto synthetic_report =
-        ws_order_manager_.create_synthetic_execution_report(ptr.id,
-            ptr.error.value().code,
-            ptr.error.value().message);
-    if (synthetic_report.has_value()) {
-      const WireMessage message = synthetic_report.value();
-      dispatch("8", message);
-    }
-  }
+void WsOrderEntryApp::handle_listen_key_response(
+    const std::string& listen_key) {
+  start_stream_transport_impl(stream_transport_, listen_key);
 }
 
-void WsOrderEntryApp::handle_place_order_response(
-    const schema::PlaceOrderResponse& ptr) {
-  if (ptr.status != kHttpOK && ptr.error.has_value()) {
-    logger_.warn("[WsOeApp] PlaceOrder failed: id={}, status={}, error={}",
-        ptr.id,
-        ptr.status,
-        ptr.error.value().message);
-
-    auto synthetic_report =
-        ws_order_manager_.create_synthetic_execution_report(ptr.id,
-            ptr.error.value().code,
-            ptr.error.value().message);
-    if (synthetic_report.has_value()) {
-      const WireMessage message = synthetic_report.value();
-      dispatch("8", message);
-    }
-  }
-}
 }  // namespace core

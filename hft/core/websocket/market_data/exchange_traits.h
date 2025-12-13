@@ -32,7 +32,6 @@ concept ExchangeTraits = requires(std::string_view payload) {
   typename T::ExchangeInfoResponse;
 
   typename T::SbeOps;
-  typename T::Classifier;
   typename T::Formatter;
   typename T::Encoder;
   typename T::MdDomainConverter;

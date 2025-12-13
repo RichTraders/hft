@@ -14,6 +14,7 @@
 #define QUOTE_RECONCILER_H
 
 #include "fast_clock.h"
+#include "ini_config.hpp"
 #include "layer_book.h"
 #include "logger.h"
 #include "types.h"

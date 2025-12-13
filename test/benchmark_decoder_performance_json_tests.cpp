@@ -11,9 +11,9 @@
  */
 
 #include <benchmark/benchmark.h>
-#include "core/websocket/market_data/ws_md_decoder.h"
-#include "core/websocket/market_data/ws_md_wire_message.h"
 #include "common/logger.h"
+#include "websocket/market_data/json_md_decoder.hpp"
+#include "websocket/market_data/exchanges/binance/spot/binance_spot_traits.h"
 
 // Helper to load file content
 static std::string load_file(const std::string& path) {
@@ -24,21 +24,12 @@ static std::string load_file(const std::string& path) {
     return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
 }
 
-static std::vector<char> load_binary_file(const std::string& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file.is_open()) {
-        throw std::runtime_error("Failed to open file: " + path);
-    }
-    return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
-}
-
-
-// --- WebSocket Benchmark ---
-static void BM_WebSocket_Decode(benchmark::State& state) {
+// --- WebSocket JSON Benchmark ---
+static void BM_WebSocket_JSON_Decode(benchmark::State& state) {
     common::Logger logger;
     logger.clearSink();
     auto producer = logger.make_producer();
-    core::WsMdDecoder<core::JsonDecoderPolicy> decoder(producer);
+    core::JsonMdDecoder<BinanceSpotTraits> decoder(producer);
     std::string json_data = load_file("data/benchmark/json.txt");
 
     for (auto _ : state) {
@@ -46,4 +37,4 @@ static void BM_WebSocket_Decode(benchmark::State& state) {
         benchmark::DoNotOptimize(wire_msg);
     }
 }
-BENCHMARK(BM_WebSocket_Decode);
+BENCHMARK(BM_WebSocket_JSON_Decode);

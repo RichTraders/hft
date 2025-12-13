@@ -40,7 +40,7 @@ void FeatureEngine<Strategy>::on_order_book_updated(
     auto ask_index = book->peek_levels(false, kLevel10);
   }
 
-  logger_.debug("[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
+  logger_.trace("[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
                   common::toString(price), common::toString(side), mkt_price_,
                   agg_trade_qty_ratio_);
 }
@@ -73,7 +73,7 @@ void FeatureEngine<Strategy>::on_trade_updated(
   }
   vwap_index_++;
 
-  logger_.debug("[Updated] {} mkt-price:{} agg-trade-ratio:{}",
+  logger_.trace("[Updated] {} mkt-price:{} agg-trade-ratio:{}",
                             market_update->toString(), mkt_price_,
                             agg_trade_qty_ratio_);
 }

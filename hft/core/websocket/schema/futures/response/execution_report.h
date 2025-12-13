@@ -17,25 +17,25 @@
 namespace schema {
 namespace futures {
 struct OrderUpdateInfo {
-  std::string symbol;           // "s"
-  std::string client_order_id;  // "c"
-  std::string side;             // "S"
-  std::string order_type;       // "o"
-  std::string time_in_force;    // "f"
+  std::string symbol;         // "s"
+  uint64_t client_order_id;   // "c"
+  std::string side;           // "S"
+  std::string order_type;     // "o"
+  std::string time_in_force;  // "f"
 
-  double original_quantity{};  // "q"
-  double original_price{};     // "p"
-  double average_price{};      // "ap"
-  double stop_price{};         // "sp"
+  double order_quantity{};  // "q"
+  double order_price{};     // "p"
+  double average_price{};   // "ap"
+  double stop_price{};      // "sp"
 
   std::string execution_type;  // "x"
   std::string order_status;    // "X"
 
   std::uint64_t order_id{};  // "i"
 
-  double last_filled_quantity{};         // "l"
-  double accumulated_filled_quantity{};  // "z"
-  double last_filled_price{};            // "L"
+  double last_executed_quantity{};      // "l"
+  double cumulative_filled_quantity{};  // "z"
+  double last_filled_price{};           // "L"
 
   std::string commission_asset;  // "N"
   double commission{};           // "n"
@@ -69,20 +69,20 @@ struct OrderUpdateInfo {
   std::string price_match_mode;  // "pm"
 
   std::int64_t gtd_auto_cancel_time{};  // "gtd"
-  std::string expiry_reason;            // "er"
+  std::string reject_reason;            // "er"
 
   // clang-format off
     struct glaze {
         using T = OrderUpdateInfo;
         static constexpr auto value = glz::object(
             "s",  &T::symbol,
-            "c",  &T::client_order_id,
+            "c",  glz::quoted_num<&T::client_order_id>,
             "S",  &T::side,
             "o",  &T::order_type,
             "f",  &T::time_in_force,
 
-            "q",  glz::quoted_num<&T::original_quantity>,
-            "p",  glz::quoted_num<&T::original_price>,
+            "q",  glz::quoted_num<&T::order_quantity>,
+            "p",  glz::quoted_num<&T::order_price>,
             "ap", glz::quoted_num<&T::average_price>,
             "sp", glz::quoted_num<&T::stop_price>,
 
@@ -90,8 +90,8 @@ struct OrderUpdateInfo {
             "X",  &T::order_status,
             "i",  &T::order_id,
 
-            "l",  glz::quoted_num<&T::last_filled_quantity>,
-            "z",  glz::quoted_num<&T::accumulated_filled_quantity>,
+            "l",  glz::quoted_num<&T::last_executed_quantity>,
+            "z",  glz::quoted_num<&T::cumulative_filled_quantity>,
             "L",  glz::quoted_num<&T::last_filled_price>,
 
             "N",  &T::commission_asset,
@@ -122,7 +122,7 @@ struct OrderUpdateInfo {
             "V",  &T::stp_mode,
             "pm", &T::price_match_mode,
             "gtd",&T::gtd_auto_cancel_time,
-            "er", &T::expiry_reason
+            "er", &T::reject_reason
         );
     };
   // clang-format on

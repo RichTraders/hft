@@ -3,9 +3,13 @@ file(GLOB CORE_COMMON_SRC
     "${CMAKE_CURRENT_SOURCE_DIR}/*.tpp"
 )
 
-file(GLOB CORE_HTTP_SRC
-    "${CMAKE_CURRENT_SOURCE_DIR}/http/*.cpp"
-)
+if(USE_REST_API)
+  file(GLOB CORE_HTTP_SRC
+      "${CMAKE_CURRENT_SOURCE_DIR}/http/*.cpp"
+  )
+else()
+  set(CORE_HTTP_SRC "")
+endif()
 
 set(TARGET_EXCHANGE "binance" CACHE STRING "Target exchange (e.g., binance, bybit)")
 
@@ -39,7 +43,7 @@ file(GLOB CORE_WS_SRC
     "${CMAKE_CURRENT_SOURCE_DIR}/websocket/order_entry/*.tpp"
     ${EXCHANGE_TRAITS_DIR}
 )
-add_library(Core_ws STATIC ${CORE_COMMON_SRC} ${CORE_WS_SRC})
+add_library(Core_ws STATIC ${CORE_COMMON_SRC} ${CORE_WS_SRC} ${CORE_HTTP_SRC})
 target_precompile_headers(Core_ws PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
 target_include_directories(Core_ws PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -49,6 +53,9 @@ target_include_directories(Core_ws PUBLIC
     ${EXCHANGE_TRAITS_DIR}
 )
 target_link_libraries(Core_ws PUBLIC Common websockets glaze::glaze)
+if(USE_REST_API)
+  target_link_libraries(Core_ws PUBLIC CURL::libcurl)
+endif()
 target_compile_definitions(Core_ws PRIVATE ENABLE_WEBSOCKET ${EXCHANGE_COMPILE_DEFINITION})
 
 add_subdirectory(fix/NewOroFix44)

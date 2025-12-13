@@ -56,15 +56,15 @@ void ObiVwapMomentumStrategy::on_trade_updated(const MarketData* market_data,
       bbo->bid_price.value == common::kPriceInvalid ||
       bbo->ask_price.value == common::kPriceInvalid ||
       bbo->ask_price.value < bbo->bid_price.value) {
-    this->logger_.trace("Invalid BBO. Skipping quoting.");
+    logger_.warn("Invalid BBO. Skipping quoting.");
     return;
   }
 
   (void)order_book->peek_qty(true, obi_level_, bid_qty_, {});
   (void)order_book->peek_qty(false, obi_level_, ask_qty_, {});
 
-  const auto vwap = this->feature_engine_->get_vwap();
-  const auto spread = this->feature_engine_->get_spread();
+  const auto vwap = feature_engine_->get_vwap();
+  const auto spread = feature_engine_->get_spread();
 
   const double obi =
       FeatureEngineT::orderbook_imbalance_from_levels(bid_qty_, ask_qty_);
@@ -74,16 +74,14 @@ void ObiVwapMomentumStrategy::on_trade_updated(const MarketData* market_data,
   const double denom = std::max({spread, 0.01});
   const auto delta = (mid - vwap) / denom;
   if (!std::isfinite(spread) || spread <= 0.0) {
-    this->logger_.trace("Non-positive spread ({}). Using denom={}",
-        spread,
-        denom);
+    logger_.trace("Non-positive spread ({}). Using denom={}", spread, denom);
   }
   const auto signal = std::abs(delta * obi);
 
   std::vector<QuoteIntent> intents;
   intents.reserve(4);
 
-  this->logger_.trace(
+  logger_.trace(
       "[Updated] delta:{} obi:{} signal:{} mid:{}, vwap:{}, spread:{}",
       delta,
       obi,
@@ -99,7 +97,7 @@ void ObiVwapMomentumStrategy::on_trade_updated(const MarketData* market_data,
         .price = best_bid_price - kSafetyMargin,
         .qty = Qty{round5(signal * position_variance_)}});
 
-    this->logger_.trace(
+    logger_.trace(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:buy, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
@@ -118,7 +116,7 @@ void ObiVwapMomentumStrategy::on_trade_updated(const MarketData* market_data,
         .side = Side::kSell,
         .price = best_ask_price + kSafetyMargin,
         .qty = Qty{round5(signal * position_variance_)}});
-    this->logger_.trace(
+    logger_.trace(
         "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, delta:{} "
         "obi:{} signal:{} "
         "mid:{}, "
@@ -136,7 +134,7 @@ void ObiVwapMomentumStrategy::on_trade_updated(const MarketData* market_data,
     return;
   }
 
-  this->order_manager_->apply(intents);
+  order_manager_->apply(intents);
 }
 
 void ObiVwapMomentumStrategy::on_order_updated(

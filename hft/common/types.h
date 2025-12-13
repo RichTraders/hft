@@ -361,5 +361,18 @@ struct TradeEngineCfg {
 };
 
 using TradeEngineCfgHashMap = std::unordered_map<std::string, TradeEngineCfg>;
+
+template <typename T>
+std::string to_fixed(T data, int precision) {
+  static constexpr size_t kPrecisionBufferSize = 8;
+  std::array<char, kPrecisionBufferSize> buffer;
+  std::snprintf(buffer.data(),
+      sizeof(buffer),
+      "%.*f",
+      precision,
+      static_cast<double>(data));
+  return std::string(buffer.data());
+}
+
 }  // namespace common
 #endif  //TYPES_H

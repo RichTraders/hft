@@ -18,7 +18,6 @@
 #include "binance_spot_domain_converter.h"
 #include "binance_spot_encoder.h"
 #include "binance_spot_formatter.h"
-#include "binance_stream_classifier.h"
 #include "schema/spot/response/api_response.h"
 #include "schema/spot/response/depth_stream.h"
 #include "schema/spot/response/exchange_info_response.h"
@@ -31,7 +30,6 @@
 
 struct BinanceSpotTraits {
   using SbeOps = BinanceSbeOps;
-  using Classifier = BinanceStreamClassifier;
   using Formatter = BinanceSpotFormatter;
   using Encoder = BinanceSpotEncoder;
   using MdDomainConverter = BinanceSpotMdMessageConverter;
@@ -46,6 +44,10 @@ struct BinanceSpotTraits {
   using SbeBestBidAsk = schema::sbe::SbeBestBidAsk;
   using ApiResponse = schema::ApiResponse;
   using ExchangeInfoResponse = schema::ExchangeInfoResponse;
+  using ModifyOrderResponse = std::monostate;
+
+  using WireMessage = std::variant<std::monostate, DepthResponse, DepthSnapshot,
+      TradeEvent, ApiResponse, ExchangeInfoResponse>;
 
   static constexpr std::string_view exchange_name() { return "Binance"; }
   static constexpr std::string_view market_type() { return "Spot"; }

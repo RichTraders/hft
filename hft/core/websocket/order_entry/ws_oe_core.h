@@ -15,6 +15,7 @@
 
 #include "common/logger.h"
 #include "core/order_entry.h"
+#include "oe_exchange_traits.h"
 
 namespace trading {
 class ResponseManager;
@@ -22,16 +23,16 @@ class ResponseManager;
 
 namespace core {
 
-template <typename Traits, typename DecoderType>
+template <OeExchangeTraits Traits, typename DecoderType>
 class WsOeCore {
  public:
   using ExchangeTraits = Traits;
   using Decoder = DecoderType;
-  using WireMessage = typename ExchangeTraits::WireMessage;
-  using WireExecutionReport = typename ExchangeTraits::ExecutionReportResponse;
-  using WireCancelReject = typename ExchangeTraits::ExecutionReportResponse;
-  using WireMassCancelReport = typename ExchangeTraits::ExecutionReportResponse;
-  using WireReject = typename ExchangeTraits::ApiResponse;
+  using WireMessage = ExchangeTraits::WireMessage;
+  using WireExecutionReport = ExchangeTraits::ExecutionReportResponse;
+  using WireCancelReject = ExchangeTraits::ExecutionReportResponse;
+  using WireMassCancelReport = ExchangeTraits::ExecutionReportResponse;
+  using WireReject = ExchangeTraits::ApiResponse;
 
   WsOeCore(const common::Logger::Producer& logger,
       trading::ResponseManager* response_manager)
@@ -43,13 +44,13 @@ class WsOeCore {
 
   ~WsOeCore() = default;
 
-  std::string create_log_on_message(const std::string& signature,
+  [[nodiscard]] std::string create_log_on_message(const std::string& signature,
       const std::string& timestamp) const;
-  std::string create_log_out_message() const;
-  std::string create_heartbeat_message() const;
+  [[nodiscard]] std::string create_log_out_message() const;
+  [[nodiscard]] std::string create_heartbeat_message() const;
 
-  std::string create_user_data_stream_subscribe() const;
-  std::string create_user_data_stream_unsubscribe() const;
+  [[nodiscard]] std::string create_user_data_stream_subscribe() const;
+  [[nodiscard]] std::string create_user_data_stream_unsubscribe() const;
 
   [[nodiscard]] std::string create_order_message(
       const trading::NewSingleOrderData& order) const;
@@ -71,11 +72,10 @@ class WsOeCore {
 
  private:
   const common::Logger::Producer& logger_;
-  typename ExchangeTraits::Mapper mapper_;
+  ExchangeTraits::Mapper mapper_;
   Decoder decoder_;
-  typename ExchangeTraits::Encoder encoder_;
+  ExchangeTraits::Encoder encoder_;
   trading::ResponseManager* response_manager_;
-  mutable uint64_t request_sequence_{0};
 };
 
 }  // namespace core

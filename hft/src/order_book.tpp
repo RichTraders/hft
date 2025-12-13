@@ -324,7 +324,7 @@ auto MarketOrderBook<Strategy>::on_market_data_updated(
       break;
   }
 
-  logger_.debug("[Updated] {} {}",
+  logger_.trace("[Updated] {} {}",
       market_update->toString(),
       bbo_.toString());
 

@@ -307,8 +307,8 @@ struct BinanceSpotMdMessageConverter {
             common::MarketUpdateType::kAdd));
       }
 
-      return MarketUpdateData(msg.result.lastUpdateId,
-          msg.result.lastUpdateId,
+      return MarketUpdateData(msg.result.last_update_id,
+          msg.result.last_update_id,
           MarketDataType::kMarket,
           std::move(entries));
     }

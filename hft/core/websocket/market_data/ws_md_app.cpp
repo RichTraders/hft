@@ -196,15 +196,9 @@ void WsMarketDataApp::handle_stream_payload(std::string_view payload) const {
   const auto wire_msg = stream_core_.decode(payload);
   END_MEASURE(Convert_Message_Stream, logger_);
 
-  std::visit(
-      [this, &wire_msg](const auto& arg) {
-        if (const auto type =
-                WsMdCoreImpl::ExchangeTraits::DispatchRouter::get_dispatch_type(
-                    arg)) {
-          dispatch(*type, wire_msg);
-        }
-      },
-      wire_msg);
+  using StreamRouter = WsMdCoreImpl::ExchangeTraits::DispatchRouter;
+  StreamRouter::template process_message<WsMdCoreImpl::ExchangeTraits>(wire_msg,
+      [this, &wire_msg](std::string_view type) { dispatch(type, wire_msg); });
 }
 
 void WsMarketDataApp::handle_api_payload(std::string_view payload) const {
@@ -226,14 +220,11 @@ void WsMarketDataApp::handle_api_payload(std::string_view payload) const {
   auto api_wire_msg = api_core_.decode(payload);
   END_MEASURE(Convert_Message_API, logger_);
 
-  std::visit(
-      [this, &api_wire_msg](const auto& arg) {
-        if (const auto type = WsMdCoreApiImpl::ExchangeTraits::DispatchRouter::
-                get_dispatch_type(arg)) {
-          dispatch(*type, api_wire_msg);
-        }
-      },
-      api_wire_msg);
+  using ApiRouter = WsMdCoreApiImpl::ExchangeTraits::DispatchRouter;
+  ApiRouter::template process_message<WsMdCoreApiImpl::ExchangeTraits>(
+      api_wire_msg,
+      [this, &api_wire_msg](
+          std::string_view type) { dispatch(type, api_wire_msg); });
 }
 
 void WsMarketDataApp::dispatch(std::string_view type,

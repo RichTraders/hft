@@ -174,7 +174,6 @@ void OrderManager<Strategy>::apply(
   const auto now = fast_clock_.get_timestamp();
 
   if (intents.empty()) {
-    // Sweep expired orders
     auto expired = expiry_manager_.sweep_expired(now);
     for (const auto& key : expired) {
       auto& side_book = layer_book_.side_book(key.symbol, key.side);

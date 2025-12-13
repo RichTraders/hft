@@ -68,7 +68,7 @@ struct WebSocketMarketDataPolicy {
       }
 
       // Limit buffer size to prevent memory exhaustion
-      static constexpr size_t kMaxBufferedEvents = 1000;
+      static constexpr size_t kMaxBufferedEvents = 10;
       if (buffered_events.size() >= kMaxBufferedEvents) {
         const auto* oldest = buffered_events.front();
         for (const auto* market_data : oldest->data)
@@ -87,7 +87,7 @@ struct WebSocketMarketDataPolicy {
 
     // Skip gap check for trade events (they don't have sequence numbers)
     if (data->type != kTrade) {
-      logger.debug("current update index:{}, data start :{}, data end:{}",
+      logger.trace("current update index:{}, data start :{}, data end:{}",
           update_index,
           data->start_idx,
           data->end_idx);

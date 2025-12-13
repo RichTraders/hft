@@ -33,22 +33,34 @@ class WsMdDomainMapper {
       : logger_(logger), market_data_pool_(pool) {}
 
   [[nodiscard]] MarketUpdateData to_market_data(const WireMessage& msg) const {
-    Converter converter(logger_, market_data_pool_);
-    return std::visit(converter.make_market_data_visitor(), msg);
+    if constexpr (std::is_same_v<Converter, std::monostate>) {
+      (void)msg;
+      return MarketUpdateData();  // Not implemented for this exchange
+    } else {
+      Converter converter(logger_, market_data_pool_);
+      return std::visit(converter.make_market_data_visitor(), msg);
+    }
   }
   [[nodiscard]] MarketUpdateData to_snapshot_data(
       const WireMessage& msg) const {
-    Converter converter(logger_, market_data_pool_);
-    return std::visit(converter.make_snapshot_visitor(), msg);
+    if constexpr (std::is_same_v<Converter, std::monostate>) {
+      (void)msg;
+      return MarketUpdateData();  // Not implemented for this exchange
+    } else {
+      Converter converter(logger_, market_data_pool_);
+      return std::visit(converter.make_snapshot_visitor(), msg);
+    }
   }
   [[nodiscard]] InstrumentInfo to_instrument_info(
-      const WireMessage& msg) const {
-    Converter converter(logger_, market_data_pool_);
-    return std::visit(converter.make_instrument_visitor(), msg);
+      const WireMessage& /*msg*/) const {
+    // Converter converter(logger_, market_data_pool_);
+    // return std::visit(converter.make_instrument_visitor(), msg);
+    return InstrumentInfo();
   }
-  [[nodiscard]] MarketDataReject to_reject(const WireMessage& msg) const {
-    Converter converter(logger_, market_data_pool_);
-    return std::visit(converter.make_reject_visitor(), msg);
+  [[nodiscard]] MarketDataReject to_reject(const WireMessage& /*msg*/) const {
+    // Converter converter(logger_, market_data_pool_);
+    // return std::visit(converter.make_reject_visitor(), msg);
+    return MarketDataReject();
   }
 
  private:

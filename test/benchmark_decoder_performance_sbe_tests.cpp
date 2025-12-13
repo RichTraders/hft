@@ -11,10 +11,9 @@
  */
 
 #include <benchmark/benchmark.h>
-#include "core/websocket/market_data/ws_md_decoder.h"
-#include "core/websocket/market_data/ws_md_wire_message.h"
 #include "common/logger.h"
-
+#include "websocket/market_data/sbe_md_decoder.hpp"
+#include "websocket/market_data/exchanges/binance/spot/binance_spot_traits.h"
 
 static std::vector<char> load_binary_file(const std::string& path) {
     std::ifstream file(path, std::ios::binary);
@@ -29,11 +28,11 @@ static void BM_SBE_Decode(benchmark::State& state) {
     common::Logger logger;
     logger.clearSink();
     auto producer = logger.make_producer();
-    core::SbeDecoderPolicy decoder;
+    core::SbeMdDecoder<BinanceSpotTraits> decoder(producer);
     auto binary_data = load_binary_file("data/benchmark/sbe.bin");
 
     for (auto _ : state) {
-        auto wire_msg = decoder.decode({binary_data.data(), binary_data.size()}, producer);
+        auto wire_msg = decoder.decode({binary_data.data(), binary_data.size()});
         benchmark::DoNotOptimize(wire_msg);
     }
 }

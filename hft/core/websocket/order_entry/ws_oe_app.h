@@ -16,12 +16,13 @@
 #include "common/logger.h"
 #include "core/order_entry.h"
 #include "ws_oe_core.h"
-#include "ws_order_manager.h"
+#include "ws_oe_dispatcher_context.h"
+#include "ws_order_manager.hpp"
 #include "ws_transport.h"
 
 #ifdef USE_FUTURES_API
 #include "exchanges/binance/futures/binance_futures_oe_traits.h"
-#include "futures_ws_oe_decoder.h"
+#include "exchanges/binance/futures/futures_ws_oe_decoder.h"
 #else
 #include "exchanges/binance/spot/binance_spot_oe_traits.h"
 #include "spot_ws_oe_decoder.h"
@@ -100,29 +101,75 @@ class WsOrderEntryApp {
       const trading::OrderCancelAndNewOrderSingle& data);
   void post_mass_cancel_order(const trading::OrderMassCancelRequest& data);
 
+  void dispatch(const std::string& type, const WireMessage& message) const;
+
+  [[nodiscard]] std::string create_user_data_stream_subscribe() const {
+    return ws_oe_core_.create_user_data_stream_subscribe();
+  }
+
+  void handle_stream_payload(std::string_view payload);
+  void handle_listen_key_response(const std::string& listen_key);
+
  private:
   void create_log_on() const;
-  void handle_payload(std::string_view payload);
-  void dispatch(const std::string& type, const WireMessage& message) const;
+  void handle_api_payload(std::string_view payload);
   static std::string get_signature_base64(const std::string& payload);
 
-  void handle_execution_report(const schema::ExecutionReportResponse& ptr);
-  void handle_balance_update(const schema::BalanceUpdateEnvelope& ptr) const;
-  void handle_account_updated(
-      const schema::OutboundAccountPositionEnvelope& ptr) const;
-  void handle_session_logon(const schema::SessionLogonResponse& ptr) const;
-  void handle_user_subscription(
-      const schema::SessionUserSubscriptionResponse& ptr);
-  void handle_api_response(const schema::ApiResponse& ptr);
-  void handle_cancel_and_reorder_response(
-      const schema::CancelAndReorderResponse& ptr);
-  void handle_cancel_all_response(const schema::CancelAllOrdersResponse& ptr);
-  void handle_place_order_response(const schema::PlaceOrderResponse& ptr);
+  void stop_stream_transport_impl(
+      std::unique_ptr<WebSocketTransport<"OEStream">>& transport) {
+    if (transport) {
+      transport->interrupt();
+      transport.reset();
+    }
+  }
+  void stop_stream_transport_impl(std::monostate&) {}
+
+  void start_stream_transport_impl(
+      std::unique_ptr<WebSocketTransport<"OEStream">>& transport,
+      const std::string& listen_key) {
+    listen_key_ = listen_key;
+    logger_.info("[WsOeApp] Received listenKey, connecting stream transport");
+
+    const std::string stream_host =
+        std::string(WsOeCoreImpl::ExchangeTraits::get_stream_host());
+    const std::string stream_path =
+        std::string(WsOeCoreImpl::ExchangeTraits::get_stream_endpoint_path()) +
+        "?listenKey=" + listen_key_;
+    const int stream_port = WsOeCoreImpl::ExchangeTraits::get_stream_port();
+
+    transport = std::make_unique<WebSocketTransport<"OEStream">>(stream_host,
+        stream_port,
+        stream_path,
+        use_ssl_,
+        true);
+
+    transport->register_message_callback([this](std::string_view payload) {
+      this->handle_stream_payload(payload);
+    });
+
+    logger_.info("[WsOeApp] Stream transport connected");
+  }
+  void start_stream_transport_impl(std::monostate&, const std::string&) {}
+
+  // Helper type for conditional stream transport
+  template <bool RequiresStream>
+  struct StreamTransportType {
+    using type = std::unique_ptr<WebSocketTransport<"OEStream">>;
+  };
+
+  template <>
+  struct StreamTransportType<false> {
+    using type = std::monostate;
+  };
+
+  using OptionalStreamTransport = typename StreamTransportType<
+      WsOeCoreImpl::ExchangeTraits::requires_stream_transport()>::type;
 
   common::Logger::Producer logger_;
   WsOeCoreImpl ws_oe_core_;
-  WsOrderManager ws_order_manager_;
-  std::unique_ptr<WebSocketTransport<"OERead">> transport_;
+  WsOrderManager<WsOeCoreImpl::ExchangeTraits> ws_order_manager_;
+  WsOeDispatchContext<WsOeCoreImpl::ExchangeTraits> dispatch_context_;
+  std::unique_ptr<WebSocketTransport<"OEApi">> api_transport_;
   std::atomic<bool> running_{false};
 
   std::unordered_map<MsgType, std::function<void(const WireMessage&)>>
@@ -133,8 +180,8 @@ class WsOrderEntryApp {
   const int port_;
   const bool use_ssl_;
 
-  std::unique_ptr<WsOeCoreImpl::ExchangeTraits::ListenKeyManager>
-      listen_key_manager_;
+  [[no_unique_address]] OptionalStreamTransport stream_transport_;
+  std::string listen_key_;
 };
 
 }  // namespace core

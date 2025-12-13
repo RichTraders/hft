@@ -40,6 +40,7 @@ struct BinanceSpotOeTraits {
   using CancelOrderResponse = schema::CancelOrderResponse;
   using ApiResponse = schema::ApiResponse;
   using CancelAndReorderResponse = schema::CancelAndReorderResponse;
+  using ModifyOrderResponse = std::monostate;
   using CancelAllOrdersResponse = schema::CancelAllOrdersResponse;
   using SessionLogonResponse = schema::SessionLogonResponse;
   using SessionUserSubscriptionResponse =
@@ -68,17 +69,22 @@ struct BinanceSpotOeTraits {
   }
 
   static constexpr int kPort = 9443;
-
   static constexpr int get_api_port() { return kPort; }
 
   static constexpr bool use_ssl() { return true; }
 
   static constexpr bool supports_position_side() { return false; }
   static constexpr bool supports_reduce_only() { return false; }
+  static constexpr bool supports_cancel_and_reorder() { return true; }
 
   using ListenKeyManager = DisabledListenKeyManager;
   static constexpr bool requires_listen_key() { return false; }
+  static constexpr bool requires_stream_transport() { return false; }
   static constexpr bool requires_signature_logon() { return true; }
+
+  static constexpr std::string_view get_stream_host() { return ""; }
+  static constexpr std::string_view get_stream_endpoint_path() { return ""; }
+  static constexpr int get_stream_port() { return 0; }
 };
 
 #endif  // BINANCE_SPOT_OE_TRAITS_H

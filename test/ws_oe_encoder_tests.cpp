@@ -12,7 +12,7 @@
 
 #include <gtest/gtest.h>
 #include <glaze/glaze.hpp>
-#include "websocket/order_entry/ws_oe_encoder.h"
+#include "websocket/order_entry/exchanges/binance/spot/binance_spot_oe_encoder.h"
 #include "order_entry.h"
 #include "logger.h"
 
@@ -43,7 +43,7 @@ class WsOeEncoderTest : public ::testing::Test {
     logger_->setLevel(LogLevel::kDebug);
     logger_->clearSink();
     producer_ = std::make_unique<Logger::Producer>(logger_->make_producer());
-    encoder_ = std::make_unique<WsOeEncoder>(*producer_);
+    encoder_ = std::make_unique<BinanceSpotOeEncoder>(*producer_);
   }
 
   static void TearDownTestSuite() {
@@ -55,11 +55,11 @@ class WsOeEncoderTest : public ::testing::Test {
 
   static std::unique_ptr<Logger> logger_;
   static std::unique_ptr<Logger::Producer> producer_;
-  static std::unique_ptr<WsOeEncoder> encoder_;
+  static std::unique_ptr<BinanceSpotOeEncoder> encoder_;
 };
 std::unique_ptr<Logger> WsOeEncoderTest::logger_;
 std::unique_ptr<Logger::Producer> WsOeEncoderTest::producer_;
-std::unique_ptr<WsOeEncoder> WsOeEncoderTest::encoder_;
+std::unique_ptr<BinanceSpotOeEncoder> WsOeEncoderTest::encoder_;
 
 // ============================================================================
 // Session Management Tests

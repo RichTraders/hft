@@ -25,12 +25,8 @@ class JsonMdDecoder : public WsMdDecoderBase<JsonMdDecoder<Exchange>> {
  public:
   using ExchangeTraits = Exchange;
 
-  using WireMessage = std::variant<std::monostate,
-      typename Exchange::DepthResponse, typename Exchange::TradeEvent,
-      typename Exchange::DepthSnapshot, typename Exchange::SbeDepthResponse,
-      typename Exchange::SbeDepthSnapshot, typename Exchange::SbeTradeEvent,
-      typename Exchange::SbeBestBidAsk, typename Exchange::ExchangeInfoResponse,
-      typename Exchange::ApiResponse>;
+  // Use WireMessage from traits to avoid duplicate std::monostate types
+  using WireMessage = typename Exchange::WireMessage;
 
   static constexpr std::string_view protocol_name() { return "JSON"; }
   static constexpr bool requires_api_key() { return false; }
@@ -46,40 +42,43 @@ class JsonMdDecoder : public WsMdDecoderBase<JsonMdDecoder<Exchange>> {
       return WireMessage{};
     }
 
-    if (Exchange::Classifier::is_depth(payload)) {
+    if (Exchange::is_depth_message(payload)) {
       return this->template decode_or_log<typename Exchange::DepthResponse,
           "[DepthStream]">(payload);
     }
 
-    if (Exchange::Classifier::is_trade(payload)) {
+    if (Exchange::is_trade_message(payload)) {
       return this->template decode_or_log<typename Exchange::TradeEvent,
           "[TradeStream]">(payload);
     }
 
     if constexpr (requires { typename Exchange::DepthSnapshot; }) {
-      if (Exchange::Classifier::is_snapshot(payload)) {
+      if (Exchange::is_snapshot_message(payload)) {
         return this->template decode_or_log<typename Exchange::DepthSnapshot,
             "[DepthSnapshot]">(payload);
       }
     }
 
-    if (payload.find("exchangeInfo") != std::string_view::npos) {
-      typename Exchange::ExchangeInfoResponse exchange;
-      auto error_code =
-          glz::read<glz::opts{.error_on_unknown_keys = 0}>(exchange, payload);
+    if constexpr (!std::is_same_v<typename Exchange::ExchangeInfoResponse,
+                      std::monostate>) {
+      if (payload.contains("exchangeInfo")) {
+        typename Exchange::ExchangeInfoResponse exchange;
+        auto error_code =
+            glz::read<glz::opts{.error_on_unknown_keys = 0}>(exchange, payload);
 
-      if (error_code != glz::error_code::none) {
-        const std::string_view view{payload.data(), payload.size()};
-        auto msg = glz::format_error(error_code, view);
-        this->logger_.error(
-            std::format("Failed to [ExchangeInfo] payload:{}. msg:{}",
-                payload,
-                msg));
-        return WireMessage{};
+        if (error_code != glz::error_code::none) {
+          const std::string_view view{payload.data(), payload.size()};
+          auto msg = glz::format_error(error_code, view);
+          this->logger_.error(
+              std::format("Failed to [ExchangeInfo] payload:{}. msg:{}",
+                  payload,
+                  msg));
+          return WireMessage{};
+        }
+        return WireMessage{
+            std::in_place_type<typename Exchange::ExchangeInfoResponse>,
+            exchange};
       }
-      return WireMessage{
-          std::in_place_type<typename Exchange::ExchangeInfoResponse>,
-          exchange};
     }
 
     if (const auto api_response =

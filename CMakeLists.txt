@@ -17,6 +17,7 @@ option(ENABLE_WEBSOCKET "Build WebSocket transport support" ON)
 option(ENABLE_SBE_DECODER "Use SBE decoder for WebSocket market data" OFF)
 option(ENABLE_SBE_DECODER_ORDER_ENTRY "Use SBE decoder for WebSocket order entry" OFF)
 option(USE_FUTURES_API "Use Binance Futures API instead of Spot API" OFF)
+option(USE_REST_API "Enable REST API support with libcurl" OFF)
 option(ENABLE_TESTS "Build and fetch test dependencies" ON)
 
 if (ENABLE_WEBSOCKET)
@@ -41,6 +42,12 @@ if (USE_FUTURES_API)
     message(STATUS "Using Binance Futures API")
 else ()
     message(STATUS "Using Binance Spot API (default)")
+endif ()
+
+if (USE_REST_API)
+    find_package(CURL REQUIRED)
+    add_compile_definitions(USE_REST_API)
+    message(STATUS "REST API support enabled with libcurl")
 endif ()
 
 include_directories(

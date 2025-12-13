@@ -10,8 +10,8 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#ifndef HFT_BINANCE_MD_ENCODER_H
-#define HFT_BINANCE_MD_ENCODER_H
+#ifndef BINANCE_MD_ENCODER_H
+#define BINANCE_MD_ENCODER_H
 
 #include <glaze/glaze.hpp>
 #include "schema/spot/request/exchange_info.h"
@@ -91,4 +91,4 @@ struct BinanceSpotEncoder {
   mutable int request_sequence_{1};
 };
 
-#endif  //HFT_BINANCE_MD_ENCODER_H
+#endif  //BINANCE_MD_ENCODER_H

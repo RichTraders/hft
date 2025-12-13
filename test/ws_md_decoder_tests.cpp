@@ -14,8 +14,8 @@
 #include <fstream>
 #include <sstream>
 #include <glaze/glaze.hpp>
-#include "websocket/market_data/ws_md_decoder.h"
-#include "websocket/market_data/ws_md_wire_message.h"
+#include "websocket/market_data/json_md_decoder.hpp"
+#include "websocket/market_data/exchanges/binance/spot/binance_spot_traits.h"
 #include "logger.h"
 
 using namespace core;
@@ -23,9 +23,8 @@ using namespace common;
 
 namespace test_utils {
 
-// Load test data from file
 std::string load_test_data(const std::string& filename) {
-  std::string path = "data/market_data/" + filename;
+  std::string path = "data/json/market_data/" + filename;
   std::ifstream file(path);
   if (!file.is_open()) {
     return "";
@@ -66,6 +65,8 @@ const T& get_or_fail(const VariantT& var, const std::string& context) {
 
 }  // namespace test_utils
 
+using TestMdDecoder = JsonMdDecoder<BinanceSpotTraits>;
+
 class WsMdDecoderTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
@@ -73,7 +74,7 @@ class WsMdDecoderTest : public ::testing::Test {
     logger_->setLevel(LogLevel::kDebug);
     logger_->clearSink();
     producer_ = std::make_unique<Logger::Producer>(logger_->make_producer());
-    decoder_ = std::make_unique<WsMdDecoder<JsonDecoderPolicy>>(*producer_);
+    decoder_ = std::make_unique<TestMdDecoder>(*producer_);
   }
 
   static void TearDownTestSuite() {
@@ -84,11 +85,11 @@ class WsMdDecoderTest : public ::testing::Test {
   }
   static std::unique_ptr<Logger> logger_;
   static std::unique_ptr<Logger::Producer> producer_;
-  static std::unique_ptr<WsMdDecoder<JsonDecoderPolicy>> decoder_;
+  static std::unique_ptr<TestMdDecoder> decoder_;
 };
 std::unique_ptr<Logger> WsMdDecoderTest::logger_;
 std::unique_ptr<Logger::Producer> WsMdDecoderTest::producer_;
-std::unique_ptr<WsMdDecoder<JsonDecoderPolicy>> WsMdDecoderTest::decoder_;
+std::unique_ptr<TestMdDecoder> WsMdDecoderTest::decoder_;
 
 // ============================================================================
 // DepthResponse Tests

@@ -10,8 +10,8 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#ifndef FUTURES_SESSION_H
-#define FUTURES_SESSION_H
+#ifndef FUTURES_USERDATA_STREAM_REQUEST_H
+#define FUTURES_USERDATA_STREAM_REQUEST_H
 
 #include <glaze/glaze.hpp>
 
@@ -22,6 +22,11 @@ struct UserDataStreamStartRequest {
   std::string method = "userDataStream.start";
   struct Params {
     std::string apiKey;
+
+    struct glaze {
+      using T = Params;
+      static constexpr auto value = glz::object("apiKey", &T::apiKey);
+    };
   } params;
 
   struct glaze {
@@ -36,6 +41,11 @@ struct UserDataStreamPingRequest {
   std::string method = "userDataStream.ping";
   struct Params {
     std::string apiKey;
+
+    struct glaze {
+      using T = Params;
+      static constexpr auto value = glz::object("apiKey", &T::apiKey);
+    };
   } params;
 
   struct glaze {
@@ -50,6 +60,11 @@ struct UserDataStreamStopRequest {
   std::string method = "userDataStream.stop";
   struct Params {
     std::string apiKey;
+
+    struct glaze {
+      using T = Params;
+      static constexpr auto value = glz::object("apiKey", &T::apiKey);
+    };
   } params;
 
   struct glaze {
@@ -61,22 +76,4 @@ struct UserDataStreamStopRequest {
 
 }  // namespace schema::futures
 
-template <>
-struct glz::meta<schema::futures::UserDataStreamStartRequest::Params> {
-  using T = schema::futures::UserDataStreamStartRequest::Params;
-  static constexpr auto value = object("apiKey", &T::apiKey);
-};
-
-template <>
-struct glz::meta<schema::futures::UserDataStreamPingRequest::Params> {
-  using T = schema::futures::UserDataStreamPingRequest::Params;
-  static constexpr auto value = object("apiKey", &T::apiKey);
-};
-
-template <>
-struct glz::meta<schema::futures::UserDataStreamStopRequest::Params> {
-  using T = schema::futures::UserDataStreamStopRequest::Params;
-  static constexpr auto value = object("apiKey", &T::apiKey);
-};
-
-#endif  // FUTURES_SESSION_H
+#endif  // FUTURES_USERDATA_STREAM_REQUEST_H

@@ -89,7 +89,7 @@ struct CancelOrderResponse {
   std::string id;
   int status{};
   CancelOrderResult result;
-  std::vector<RateLimit> rate_limits;
+  std::optional<std::vector<RateLimit>> rate_limits;
 
   // clang-format off
     struct glaze {

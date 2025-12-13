@@ -1,7 +1,20 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2025 NewOro Corporation
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
+ * copyright notice appears in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ */
+
 #include <benchmark/benchmark.h>
 #include <fstream>
 #include <sstream>
-#include "websocket/order_entry/ws_oe_decoder.h"
+#include "logger.h"
+#include "websocket/order_entry/spot_ws_oe_decoder.h"
 
 // Helper function to load test data from file
 std::string load_test_data(const std::string& filename) {
@@ -103,7 +116,9 @@ static const char* kFallbackPlaceOrderJson = R"({
 
 static void BM_DecodeExecutionReport(benchmark::State& state) {
   auto logger = std::make_unique<common::Logger>();
-  auto decoder = std::make_unique<core::WsOeDecoder>(logger->make_producer());
+  logger->clearSink();
+  auto producer = logger->make_producer();
+  auto decoder = std::make_unique<core::SpotWsOeDecoder>(producer);
 
   // Try to load user-provided data, fallback to inline JSON
   std::string json = load_test_data("execution_report_trade.json");
@@ -123,7 +138,9 @@ BENCHMARK(BM_DecodeExecutionReport);
 
 static void BM_DecodeSessionLogon(benchmark::State& state) {
   auto logger = std::make_unique<common::Logger>();
-  auto decoder = std::make_unique<core::WsOeDecoder>(logger->make_producer());
+  logger->clearSink();
+  auto producer = logger->make_producer();
+  auto decoder = std::make_unique<core::SpotWsOeDecoder>(producer);
 
   std::string json = load_test_data("session_logon_success.json");
   if (json.empty()) {
@@ -142,7 +159,9 @@ BENCHMARK(BM_DecodeSessionLogon);
 
 static void BM_DecodePlaceOrderResponse(benchmark::State& state) {
   auto logger = std::make_unique<common::Logger>();
-  auto decoder = std::make_unique<core::WsOeDecoder>(logger->make_producer());
+  logger->clearSink();
+  auto producer = logger->make_producer();
+  auto decoder = std::make_unique<core::SpotWsOeDecoder>(producer);
 
   std::string json = load_test_data("place_order_response_ack.json");
   if (json.empty()) {
@@ -161,7 +180,9 @@ BENCHMARK(BM_DecodePlaceOrderResponse);
 
 static void BM_DecodeExecutionReport_Complex(benchmark::State& state) {
   auto logger = std::make_unique<common::Logger>();
-  auto decoder = std::make_unique<core::WsOeDecoder>(logger->make_producer());
+  logger->clearSink();
+  auto producer = logger->make_producer();
+  auto decoder = std::make_unique<core::SpotWsOeDecoder>(producer);
 
   // Use the most complex execution report (TRADE with all fields)
   std::string json = load_test_data("execution_report_filled.json");

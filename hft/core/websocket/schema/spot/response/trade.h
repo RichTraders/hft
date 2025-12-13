@@ -21,8 +21,8 @@ struct AggregateTradeEvent {
   std::int64_t event_time;          // "E"
   std::string symbol;               // "s"
   std::int64_t aggregate_trade_id;  // "a"
-  double price;                     // "p" (quoted)
-  double quantity;                  // "q" (quoted)
+  double price;                     // "p"
+  double quantity;                  // "q"
   std::int64_t first_trade_id;      // "f"
   std::int64_t last_trade_id;       // "l"
   std::int64_t trade_time;          // "T"
@@ -54,8 +54,8 @@ struct TradeData {
   std::int64_t event_time;     // "E"
   std::string symbol;          // "s"
   std::int64_t trade_id;       // "t"
-  double price;                // "p" (quoted)
-  double quantity;             // "q" (quoted)
+  double price;                // "p"
+  double quantity;             // "q"
   std::int64_t trade_time;     // "T"
   bool is_buyer_market_maker;  // "m"
   bool ignore_flag;            // "M"

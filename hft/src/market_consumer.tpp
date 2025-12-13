@@ -84,7 +84,6 @@ void MarketConsumer<Strategy>::on_login(WireMessage msg) {
 #endif
 }
 
-// erase_buffer_lower_than_snapshot implementation moved to MarketConsumerRecoveryMixin
 template <typename Strategy>
 void MarketConsumer<Strategy>::on_snapshot(WireMessage msg) {
   logger_.info("[MarketConsumer]Snapshot making start");
@@ -96,7 +95,6 @@ void MarketConsumer<Strategy>::on_snapshot(WireMessage msg) {
     logger_.error(
         "[MarketConsumer] Market update data pool exhausted on snapshot");
 #ifdef ENABLE_WEBSOCKET
-    // Clear buffered events to free memory
     logger_.warn("[MarketConsumer] Clearing {} buffered events to free memory",
         buffered_events_.size());
     for (auto* buffered : buffered_events_) {

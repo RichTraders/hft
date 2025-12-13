@@ -86,8 +86,9 @@ struct OrderResult {
 struct PlaceOrderResponse {
   std::string id;
   int status{};
-  OrderResult result;
-  std::vector<RateLimit> rate_limits;
+  std::optional<OrderResult> result;
+  std::optional<std::vector<RateLimit>> rate_limits;
+  std::optional<ErrorResponse<>> error;
 
   struct glaze {
     using T = PlaceOrderResponse;

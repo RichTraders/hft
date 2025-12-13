@@ -18,14 +18,14 @@
 
 namespace schema {
 struct DepthSnapshotResult {
-  std::uint64_t lastUpdateId;
+  std::uint64_t last_update_id;
   std::vector<std::array<double, 2>> bids;
   std::vector<std::array<double, 2>> asks;
 
   struct glaze {
     using T = DepthSnapshotResult;
     static constexpr auto value = glz::object(
-        "lastUpdateId", &T::lastUpdateId,
+        "lastUpdateId", &T::last_update_id,
         "bids", glz::quoted_num<&T::bids>,
         "asks", glz::quoted_num<&T::asks>
     );
@@ -36,7 +36,7 @@ struct DepthSnapshot {
   std::string id;
   int status;
   DepthSnapshotResult result;
-  std::vector<RateLimit> rateLimits;
+  std::vector<RateLimit> rate_limits;
 
   struct glaze {
     using T = DepthSnapshot;
@@ -44,7 +44,7 @@ struct DepthSnapshot {
         "id", &T::id,
         "status", &T::status,
         "result", &T::result,
-        "rateLimits", &T::rateLimits
+        "rateLimits", &T::rate_limits
     );
   };
 };

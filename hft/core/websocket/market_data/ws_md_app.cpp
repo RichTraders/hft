@@ -13,6 +13,7 @@
 #include "ws_md_app.h"
 
 #include "authorization.h"
+#include "core/http/futures_exchange_info_fetcher.h"
 #include "performance.h"
 
 namespace core {
@@ -175,6 +176,18 @@ InstrumentInfo WsMarketDataApp::create_instrument_list_message(
 MarketDataReject WsMarketDataApp::create_reject_message(
     const WireMessage& msg) const {
   return stream_core_.create_reject_message(msg);
+}
+
+std::optional<InstrumentInfo> WsMarketDataApp::fetch_instrument_info_http(
+    const std::string& symbol) const {
+  if constexpr (ExchangeTraits::uses_http_exchange_info()) {
+    http::FuturesExchangeInfoFetcher fetcher(logger_);
+    return fetcher.fetch(symbol);
+  } else {
+    // For Spot or non-HTTP exchange info, return nullopt
+    // (use WebSocket-based request_instrument_list_message instead)
+    return std::nullopt;
+  }
 }
 
 void WsMarketDataApp::handle_stream_payload(std::string_view payload) const {

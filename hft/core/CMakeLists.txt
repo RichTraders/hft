@@ -3,7 +3,8 @@ file(GLOB CORE_COMMON_SRC
     "${CMAKE_CURRENT_SOURCE_DIR}/*.tpp"
 )
 
-if(USE_REST_API)
+if(USE_FUTURES_API)
+  find_package(CURL REQUIRED)
   file(GLOB CORE_HTTP_SRC
       "${CMAKE_CURRENT_SOURCE_DIR}/http/*.cpp"
   )
@@ -53,7 +54,7 @@ target_include_directories(Core_ws PUBLIC
     ${EXCHANGE_TRAITS_DIR}
 )
 target_link_libraries(Core_ws PUBLIC Common websockets glaze::glaze)
-if(USE_REST_API)
+if(USE_FUTURES_API)
   target_link_libraries(Core_ws PUBLIC CURL::libcurl)
 endif()
 target_compile_definitions(Core_ws PRIVATE ENABLE_WEBSOCKET ${EXCHANGE_COMPILE_DEFINITION})

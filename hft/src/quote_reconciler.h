@@ -13,6 +13,7 @@
 #ifndef QUOTE_RECONCILER_H
 #define QUOTE_RECONCILER_H
 
+#include "common/precision_config.hpp"
 #include "fast_clock.h"
 #include "ini_config.hpp"
 #include "layer_book.h"
@@ -47,7 +48,7 @@ struct ActionCancel {
 
 inline std::string toString(const ActionNew& action) {
   std::ostringstream stream;
-  stream << std::fixed << std::setprecision(kStringPrecision);
+  stream << std::fixed << std::setprecision(PRECISION_CONFIG.qty_precision());
   stream << "ActionNew{" << "layer=" << action.layer << ", "
          << "price=" << action.price.value << ", " << "qty=" << action.qty.value
          << ", " << "side=" << common::toString(action.side) << ", "
@@ -57,7 +58,7 @@ inline std::string toString(const ActionNew& action) {
 
 inline std::string toString(const ActionReplace& action) {
   std::ostringstream stream;
-  stream << std::fixed << std::setprecision(kStringPrecision);
+  stream << std::fixed << std::setprecision(PRECISION_CONFIG.qty_precision());
   stream << "ActionReplace{" << "layer=" << action.layer << ", "
          << "price=" << action.price.value << ", " << "qty=" << action.qty.value
          << ", " << "side=" << common::toString(action.side) << ", "

@@ -14,6 +14,7 @@
 #define BINANCE_SPOT_OE_ENCODER_H
 
 #include "common/logger.h"
+#include "common/precision_config.hpp"
 #include "order_entry.h"
 
 namespace core {
@@ -21,7 +22,9 @@ namespace core {
 class BinanceSpotOeEncoder {
  public:
   explicit BinanceSpotOeEncoder(const common::Logger::Producer& logger)
-      : logger_(logger) {}
+      : logger_(logger),
+        price_precision_(PRECISION_CONFIG.price_precision()),
+        qty_precision_(PRECISION_CONFIG.qty_precision()) {}
 
   [[nodiscard]] std::string create_log_on_message(const std::string& signature,
       const std::string& timestamp) const;
@@ -41,9 +44,9 @@ class BinanceSpotOeEncoder {
       const trading::OrderMassCancelRequest& request) const;
 
  private:
-  static constexpr int kPricePrecision = 2;
-  static constexpr int kQtyPrecision = 5;
   const common::Logger::Producer& logger_;
+  int price_precision_;
+  int qty_precision_;
 
   template <typename T>
   std::string to_fixed(T data, int precision) const;

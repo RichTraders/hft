@@ -111,11 +111,11 @@ inline std::string BinanceSpotOeEncoder::create_order_message(
   payload.params.new_client_order_id = std::to_string(order.cl_order_id.value);
   payload.params.side = std::string(toString(order.side));
   payload.params.type = std::string(toString(order.ord_type));
-  payload.params.quantity = to_fixed(order.order_qty.value, kQtyPrecision);
+  payload.params.quantity = common::to_fixed(order.order_qty.value, qty_precision_);
 
   if (order.ord_type == trading::OrderType::kLimit) {
     payload.params.time_in_force = std::string(toString(order.time_in_force));
-    payload.params.price = to_fixed(order.price.value, kPricePrecision);
+    payload.params.price = common::to_fixed(order.price.value, price_precision_);
   }
   payload.params.self_trade_prevention_mode =
       toString(order.self_trade_prevention_mode);
@@ -155,10 +155,10 @@ inline std::string BinanceSpotOeEncoder::create_cancel_and_reorder_message(
       std::to_string(replace.cancel_new_order_id.value);
   payload.params.new_client_order_id =
       std::to_string(replace.cl_new_order_id.value);
-  payload.params.quantity = to_fixed(replace.order_qty.value, kQtyPrecision);
+  payload.params.quantity = common::to_fixed(replace.order_qty.value, qty_precision_);
   if (replace.ord_type == trading::OrderType::kLimit) {
     payload.params.time_in_force = std::string(toString(replace.time_in_force));
-    payload.params.price = to_fixed(replace.price.value, kPricePrecision);
+    payload.params.price = common::to_fixed(replace.price.value, price_precision_);
   }
   payload.params.self_trade_prevention_mode =
       toString(replace.self_trade_prevention_mode);
@@ -177,22 +177,4 @@ inline std::string BinanceSpotOeEncoder::create_order_all_cancel(
   return glz::write_json(payload).value_or(std::string{});
 }
 
-template <typename T>
-inline std::string BinanceSpotOeEncoder::to_fixed(T data, int precision) const {
-  static constexpr size_t kPrecisionBufferSize = 32;
-  char buffer[kPrecisionBufferSize];
-  std::snprintf(buffer,
-      sizeof(buffer),
-      "%.*f",
-      precision,
-      static_cast<double>(data));
-  return std::string(buffer);
-}
-
 }  // namespace core
-
-// Explicit instantiations
-template std::string core::BinanceSpotOeEncoder::to_fixed<double>(double,
-    int) const;
-template std::string core::BinanceSpotOeEncoder::to_fixed<float>(float,
-    int) const;

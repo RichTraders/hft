@@ -13,8 +13,8 @@
 #ifndef LAYER_BOOK_H
 #define LAYER_BOOK_H
 #include "absl/container/flat_hash_map.h"
+#include "common/precision_config.hpp"
 #include "orders.h"
-constexpr int kStringPrecision = 5;
 
 namespace trading::order {
 struct OrderSlot {
@@ -28,7 +28,7 @@ struct OrderSlot {
 
 inline std::string toString(const OrderSlot& slot) {
   std::ostringstream ostream;
-  ostream << std::fixed << std::setprecision(kStringPrecision);
+  ostream << std::fixed << std::setprecision(PRECISION_CONFIG.qty_precision());
   ostream << "OrderSlot{" << "state=" << toString(slot.state) << ", "
           << "price=" << slot.price.value << ", " << "qty=" << slot.qty.value
           << ", " << "last_used=" << slot.last_used << ", "

@@ -17,6 +17,7 @@
 
 #include "market_data.h"
 #include "schema/futures/response/depth_stream.h"
+#include "schema/futures/response/exchange_info_response.h"
 #include "schema/futures/response/snapshot.h"
 #include "schema/futures/response/trade.h"
 #include "types.h"
@@ -170,6 +171,12 @@ struct BinanceFuturesMdMessageConverter {
       return MarketUpdateData{};
     }
 
+    [[nodiscard]] MarketUpdateData operator()(
+        const schema::futures::ExchangeInfoHttpResponse& /*msg*/) const {
+      logger_.debug("ExchangeInfoHttpResponse received in MarketDataVisitor");
+      return MarketUpdateData{};
+    }
+
    private:
     const common::Logger::Producer& logger_;
     common::MemoryPool<MarketData>* pool_;
@@ -258,6 +265,79 @@ struct BinanceFuturesMdMessageConverter {
         : logger_(converter.logger_) {}
 
     [[nodiscard]] InstrumentInfo operator()(std::monostate) const { return {}; }
+
+    [[nodiscard]] InstrumentInfo operator()(
+        const schema::futures::ExchangeInfoHttpResponse& payload) const {
+      InstrumentInfo info;
+      info.instrument_req_id = "futures_http";
+      const auto& symbols = payload.symbols;
+      info.no_related_sym = static_cast<int>(symbols.size());
+      info.symbols.reserve(symbols.size());
+
+      auto parse_or_default = [](const std::optional<std::string>& str,
+                                  double default_value = 0.0) -> double {
+        if (!str || str->empty())
+          return default_value;
+        const char* begin = str->c_str();
+        char* end = nullptr;
+        const double data = std::strtod(begin, &end);
+        if (end == begin) {
+          return default_value;
+        }
+        return data;
+      };
+
+      for (const auto& sym : symbols) {
+        InstrumentInfo::RelatedSymT related{};
+
+        related.symbol = sym.symbol;
+        related.currency = sym.quote_asset;
+
+        const schema::futures::SymbolFilter* lot_filter = nullptr;
+        const schema::futures::SymbolFilter* mlot_filter = nullptr;
+        const schema::futures::SymbolFilter* price_filter = nullptr;
+
+        for (const auto& filter : sym.filters) {
+          if (filter.filter_type == "LOT_SIZE") {
+            lot_filter = &filter;
+          } else if (filter.filter_type == "MARKET_LOT_SIZE") {
+            mlot_filter = &filter;
+          } else if (filter.filter_type == "PRICE_FILTER") {
+            price_filter = &filter;
+          }
+        }
+
+        if (lot_filter) {
+          related.min_trade_vol = parse_or_default(lot_filter->min_qty, 0.0);
+          related.max_trade_vol = parse_or_default(lot_filter->max_qty, 0.0);
+          related.min_qty_increment =
+              parse_or_default(lot_filter->step_size, 0.0);
+        }
+
+        if (mlot_filter) {
+          related.market_min_trade_vol =
+              parse_or_default(mlot_filter->min_qty, related.min_trade_vol);
+          related.market_max_trade_vol =
+              parse_or_default(mlot_filter->max_qty, related.max_trade_vol);
+          related.market_min_qty_increment =
+              parse_or_default(mlot_filter->step_size,
+                  related.min_qty_increment);
+        } else {
+          related.market_min_trade_vol = related.min_trade_vol;
+          related.market_max_trade_vol = related.max_trade_vol;
+          related.market_min_qty_increment = related.min_qty_increment;
+        }
+
+        if (price_filter) {
+          constexpr double kTickSize = 0.00001;
+          related.min_price_increment =
+              parse_or_default(price_filter->tick_size, kTickSize);
+        }
+
+        info.symbols.push_back(std::move(related));
+      }
+      return info;
+    }
 
     template <typename T>
     [[nodiscard]] InstrumentInfo operator()(const T&) const {

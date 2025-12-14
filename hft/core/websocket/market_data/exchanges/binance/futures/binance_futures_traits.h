@@ -20,6 +20,7 @@
 #include "binance_futures_md_connection_handler.h"
 #include "schema/futures/response/api_response.h"
 #include "schema/futures/response/depth_stream.h"
+#include "schema/futures/response/exchange_info_response.h"
 #include "schema/futures/response/session_response.h"
 #include "schema/futures/response/snapshot.h"
 #include "schema/futures/response/trade.h"
@@ -36,8 +37,13 @@ struct BinanceFuturesTraits {
   using SbeTradeEvent = std::monostate;
   using SbeDepthSnapshot = std::monostate;
   using SbeBestBidAsk = std::monostate;
-  using ExchangeInfoResponse = std::monostate;
+  using ExchangeInfoResponse = schema::futures::ExchangeInfoHttpResponse;
   using ModifyOrderResponse = std::monostate;  // Not used in market data
+
+  static constexpr bool uses_http_exchange_info() { return true; }
+  static constexpr std::string_view get_exchange_info_url() {
+    return "https://fapi.binance.com/fapi/v1/exchangeInfo";
+  }
 
   using DepthResponse = schema::futures::DepthResponse;
   using TradeEvent = schema::futures::TradeEvent;
@@ -46,7 +52,7 @@ struct BinanceFuturesTraits {
   using SessionLogOnResponse = std::monostate;  // Not used
 
   using WireMessage = std::variant<std::monostate, DepthResponse, TradeEvent,
-      DepthSnapshot, ApiResponse>;
+      DepthSnapshot, ApiResponse, ExchangeInfoResponse>;
 
   static constexpr std::string_view exchange_name() { return "Binance"; }
   static constexpr std::string_view market_type() { return "Futures"; }

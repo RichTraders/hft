@@ -48,6 +48,8 @@ struct BinanceSpotTraits {
   using ExchangeInfoResponse = schema::ExchangeInfoResponse;
   using ModifyOrderResponse = std::monostate;
 
+  static constexpr bool uses_http_exchange_info() { return false; }
+
   using WireMessage = std::variant<std::monostate, DepthResponse, DepthSnapshot,
       TradeEvent, ApiResponse, ExchangeInfoResponse>;
 

@@ -96,6 +96,10 @@ class WsMarketDataApp {
       const std::string& symbol = "") const;
   InstrumentInfo create_instrument_list_message(const WireMessage& msg) const;
   MarketDataReject create_reject_message(const WireMessage& msg) const;
+
+  // Fetch instrument info via HTTP (for Futures)
+  std::optional<InstrumentInfo> fetch_instrument_info_http(
+      const std::string& symbol = "") const;
   void dispatch(std::string_view type, const WireMessage& message) const;
 
  private:

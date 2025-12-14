@@ -15,7 +15,7 @@
 
 struct BinanceFuturesFormatter {
   static std::string format_depth_stream(std::string_view symbol) {
-    return std::format("{0}@depth", symbol);
+    return std::format("{0}@depth@100ms", symbol);
   }
 
   static std::string format_trade_stream(std::string_view symbol) {

@@ -18,6 +18,7 @@
 #include "core/market_data.h"
 #include "json_md_decoder.hpp"
 #include "sbe_md_decoder.hpp"
+#include "websocket/connection_handler.h"
 #include "ws_md_core.h"
 #include "ws_transport.h"
 
@@ -52,6 +53,7 @@ using WsMdCoreApiImpl = WsMdCore<BinanceSpotTraits, JsonMdDecoder>;
 
 class WsMarketDataApp {
  public:
+  using ExchangeTraits = WsMdCoreImpl::ExchangeTraits;
   using WireMessage = WsMdCoreImpl::WireMessage;
   using MsgType = std::string;
   using RequestId = std::string_view;
@@ -94,12 +96,12 @@ class WsMarketDataApp {
       const std::string& symbol = "") const;
   InstrumentInfo create_instrument_list_message(const WireMessage& msg) const;
   MarketDataReject create_reject_message(const WireMessage& msg) const;
+  void dispatch(std::string_view type, const WireMessage& message) const;
 
  private:
   void initialize_stream();
   void handle_stream_payload(std::string_view payload) const;
   void handle_api_payload(std::string_view payload) const;
-  void dispatch(std::string_view type, const WireMessage& message) const;
 
   common::Logger::Producer logger_;
   WsMdCoreImpl stream_core_;

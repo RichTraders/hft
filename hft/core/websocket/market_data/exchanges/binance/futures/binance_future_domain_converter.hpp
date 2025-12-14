@@ -73,10 +73,10 @@ struct BinanceFuturesMdMessageConverter {
     [[nodiscard]] MarketUpdateData operator()(
         const schema::futures::DepthResponse& msg) const {
       std::vector<MarketData*> entries;
-      entries.reserve(msg.bids.size() + msg.asks.size());
+      entries.reserve(msg.data.bids.size() + msg.data.asks.size());
 
-      const auto& symbol = msg.symbol;
-      for (const auto& bid : msg.bids) {
+      const auto& symbol = msg.data.symbol;
+      for (const auto& bid : msg.data.bids) {
         entries.push_back(make_entry(pool_,
             symbol,
             common::Side::kBuy,
@@ -85,7 +85,7 @@ struct BinanceFuturesMdMessageConverter {
             common::MarketUpdateType::kAdd));
       }
 
-      for (const auto& ask : msg.asks) {
+      for (const auto& ask : msg.data.asks) {
         entries.push_back(make_entry(pool_,
             symbol,
             common::Side::kSell,
@@ -94,23 +94,25 @@ struct BinanceFuturesMdMessageConverter {
             common::MarketUpdateType::kAdd));
       }
 
-      return MarketUpdateData(msg.start_update_id,
-          msg.end_update_id,
+      MarketUpdateData result(msg.data.start_update_id,
+          msg.data.end_update_id,
           MarketDataType::kMarket,
           std::move(entries));
+      result.prev_end_idx = msg.data.final_update_id_in_last_stream;
+      return result;
     }
     [[nodiscard]] MarketUpdateData operator()(
-        const schema::futures::AggregateTradeEvent& msg) const {
+        const schema::futures::TradeEvent& msg) const {
       std::vector<MarketData*> entries;
       entries.reserve(1);
 
-      const auto side =
-          msg.is_buyer_market_maker ? common::Side::kSell : common::Side::kBuy;
+      const auto side = msg.data.is_buyer_market_maker ? common::Side::kSell
+                                                       : common::Side::kBuy;
       auto* entry = make_entry(pool_,
-          msg.symbol,
+          msg.data.symbol,
           side,
-          msg.price,
-          msg.quantity,
+          msg.data.price,
+          msg.data.quantity,
           common::MarketUpdateType::kTrade);
       if (entry) {
         entries.push_back(entry);
@@ -120,6 +122,52 @@ struct BinanceFuturesMdMessageConverter {
           -1,
           MarketDataType::kTrade,
           std::move(entries));
+    }
+
+    [[nodiscard]] MarketUpdateData operator()(
+        const schema::futures::DepthSnapshot& msg) const {
+      std::vector<MarketData*> entries;
+      entries.reserve(msg.result.bids.size() + msg.result.asks.size() + 1);
+
+      // TODO(JB): Remove Hardcoding
+      const auto& symbol = "BTCUSDT";
+
+      // Clear data
+      entries.push_back(pool_->allocate(common::MarketUpdateType::kClear,
+          common::OrderId{},
+          common::TickerId{symbol},
+          common::Side::kInvalid,
+          common::Price{},
+          common::Qty{}));
+
+      for (const auto& [price, qty] : msg.result.bids) {
+        entries.push_back(make_entry(pool_,
+            symbol,
+            common::Side::kBuy,
+            price,
+            qty,
+            common::MarketUpdateType::kAdd));
+      }
+
+      for (const auto& [price, qty] : msg.result.asks) {
+        entries.push_back(make_entry(pool_,
+            symbol,
+            common::Side::kSell,
+            price,
+            qty,
+            common::MarketUpdateType::kAdd));
+      }
+
+      return MarketUpdateData(msg.result.book_update_id,
+          msg.result.book_update_id,
+          kMarket,
+          std::move(entries));
+    }
+
+    [[nodiscard]] MarketUpdateData operator()(
+        const schema::futures::ApiResponse& /*msg*/) const {
+      logger_.debug("ApiResponse received in MarketDataVisitor");
+      return MarketUpdateData{};
     }
 
    private:
@@ -188,8 +236,8 @@ struct BinanceFuturesMdMessageConverter {
             common::MarketUpdateType::kAdd));
       }
 
-      return MarketUpdateData(msg.result.last_update_id,
-          msg.result.last_update_id,
+      return MarketUpdateData(msg.result.book_update_id,
+          msg.result.book_update_id,
           MarketDataType::kMarket,
           std::move(entries));
     }

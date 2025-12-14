@@ -42,6 +42,11 @@ std::string WsOeCore<Traits, DecoderType>::create_user_data_stream_unsubscribe()
 }
 
 template <OeExchangeTraits Traits, typename DecoderType>
+std::string WsOeCore<Traits, DecoderType>::create_user_data_stream_ping() const {
+  return encoder_.create_user_data_stream_ping();
+}
+
+template <OeExchangeTraits Traits, typename DecoderType>
 std::string WsOeCore<Traits, DecoderType>::create_order_message(
     const trading::NewSingleOrderData& order) const {
   return encoder_.create_order_message(order);

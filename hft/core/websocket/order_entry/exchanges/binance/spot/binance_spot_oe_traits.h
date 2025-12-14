@@ -13,10 +13,10 @@
 #ifndef BINANCE_SPOT_OE_TRAITS_H
 #define BINANCE_SPOT_OE_TRAITS_H
 
+#include "binance_spot_oe_connection_handler.h"
 #include "binance_spot_oe_dispatcher.h"
 #include "binance_spot_oe_encoder.h"
 #include "binance_spot_oe_mapper.h"
-#include "diabled_listen_key_manager.h"
 #include "schema/spot/request/cancel_all_orders.h"
 #include "schema/spot/request/cancel_and_reorder.h"
 #include "schema/spot/request/order_cancel.h"
@@ -28,6 +28,7 @@
 #include "schema/spot/response/session_response.h"
 
 struct BinanceSpotOeTraits {
+  using ConnectionHandler = BinanceSpotOeConnectionHandler;
   using DispatchRouter = BinanceSpotOeDispatchRouter;
   using Encoder = core::BinanceSpotOeEncoder;
   using Mapper = core::BinanceSpotOeMapper;
@@ -77,10 +78,10 @@ struct BinanceSpotOeTraits {
   static constexpr bool supports_reduce_only() { return false; }
   static constexpr bool supports_cancel_and_reorder() { return true; }
 
-  using ListenKeyManager = DisabledListenKeyManager;
   static constexpr bool requires_listen_key() { return false; }
   static constexpr bool requires_stream_transport() { return false; }
   static constexpr bool requires_signature_logon() { return true; }
+  static constexpr int get_keepalive_interval_ms() { return 0; }
 
   static constexpr std::string_view get_stream_host() { return ""; }
   static constexpr std::string_view get_stream_endpoint_path() { return ""; }

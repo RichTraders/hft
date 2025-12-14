@@ -72,6 +72,7 @@ class MarketConsumer
 #ifdef ENABLE_WEBSOCKET
   std::deque<MarketUpdateData*> buffered_events_;
   uint64_t first_buffered_update_id_{0};
+  bool first_depth_after_snapshot_{false};
 #else
   std::atomic<uint64_t> generation_{0};
   std::atomic<uint64_t> current_generation_{0};

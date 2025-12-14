@@ -34,15 +34,15 @@ class SpotWsOeDecoder : public WsOeDecoderBase<SpotWsOeDecoder> {
     }
     logger_.info("[WsOeCore]payload :{}", payload);
 
-    if (payload.find("executionReport") != std::string_view::npos) {
+    if (payload.contains("executionReport")) {
       return this->decode_or_log<BinanceSpotOeTraits::ExecutionReportResponse,
           "[executionReport]">(payload);
     }
-    if (payload.find("outboundAccountPosition") != std::string_view::npos) {
+    if (payload.contains("outboundAccountPosition")) {
       return this->decode_or_log<schema::OutboundAccountPositionEnvelope,
           "[outboundAccountPosition]">(payload);
     }
-    if (payload.find("balanceUpdate") != std::string_view::npos) {
+    if (payload.contains("balanceUpdate")) {
       return this
           ->decode_or_log<schema::BalanceUpdateEnvelope, "[balanceUpdate]">(
               payload);

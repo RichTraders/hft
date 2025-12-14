@@ -124,17 +124,14 @@ void BinanceFuturesOeDispatchRouter::handle_user_subscription(
     return;
   }
 
-  // Futures-specific: Extract and handle listen key
   if constexpr (ExchangeTraits::requires_listen_key()) {
     if (response.result.has_value() && !response.result.value().listen_key.empty()) {
-      // Call back to App to set up stream transport
       context.app->handle_listen_key_response(response.result.value().listen_key);
       context.logger->info("[Dispatcher] Received listenKey, delegating to app for stream setup");
     } else {
       context.logger->error("[Dispatcher] UserDataStream response missing listenKey");
     }
   }
-  // Spot: No listen key needed
 }
 
 template <typename ExchangeTraits>

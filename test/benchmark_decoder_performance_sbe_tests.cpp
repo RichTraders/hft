@@ -29,7 +29,7 @@ static void BM_SBE_Decode(benchmark::State& state) {
     logger.clearSink();
     auto producer = logger.make_producer();
     core::SbeMdDecoder<BinanceSpotTraits> decoder(producer);
-    auto binary_data = load_binary_file("data/benchmark/sbe.bin");
+    auto binary_data = load_binary_file("data/binance_spot/benchmark/sbe.bin");
 
     for (auto _ : state) {
         auto wire_msg = decoder.decode({binary_data.data(), binary_data.size()});

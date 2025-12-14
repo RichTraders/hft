@@ -13,6 +13,7 @@
 #ifndef MARKET_DATA_PROTOCOL_POLICY_H
 #define MARKET_DATA_PROTOCOL_POLICY_H
 
+#include "depth_validator.h"
 #include "ini_config.hpp"
 #include "market_data.h"
 #include "stream_state.h"
@@ -49,7 +50,7 @@ struct WebSocketMarketDataPolicy {
   static void handle_subscribe(App& app, typename App::WireMessage msg,
       StreamState state, std::deque<MarketUpdateData*>& buffered_events,
       uint64_t& first_buffered_update_id, uint64_t& update_index,
-      OnMarketDataFn& on_market_data_fn,
+      bool& first_depth_after_snapshot, OnMarketDataFn& on_market_data_fn,
       MarketUpdateDataPool* market_update_data_pool,
       MarketDataPool* market_data_pool, Logger& logger, auto recover_fn) {
     auto* data =
@@ -87,19 +88,39 @@ struct WebSocketMarketDataPolicy {
 
     // Skip gap check for trade events (they don't have sequence numbers)
     if (data->type != kTrade) {
-      logger.trace("current update index:{}, data start :{}, data end:{}",
+      logger.debug("current update index:{}, data start :{}, data end:{}",
           update_index,
           data->start_idx,
           data->end_idx);
-      if (data->start_idx != update_index + 1 && update_index != 0) {
-        logger.error("Gap detected");
+
+      DepthValidationResult validation_result;
+      if (first_depth_after_snapshot) {
+        validation_result = validate_first_depth_after_snapshot(data->start_idx,
+            data->end_idx,
+            update_index);
+        first_depth_after_snapshot = false;
+      } else {
+        constexpr auto kMarketType =
+            get_market_type<typename App::ExchangeTraits>();
+        validation_result = validate_continuous_depth(kMarketType,
+            data->start_idx,
+            data->end_idx,
+            data->prev_end_idx,
+            update_index);
+      }
+
+      if (!validation_result.valid) {
+        logger.error("Gap detected: expected {}, got start:{}, end:{}",
+            update_index + 1,
+            data->start_idx,
+            data->end_idx);
         recover_fn();
         for (auto* market_data : data->data)
           market_data_pool->deallocate(market_data);
         market_update_data_pool->deallocate(data);
         return;
       }
-      update_index = data->end_idx;
+      update_index = validation_result.new_update_index;
     }
 
     on_market_data_fn(data);
@@ -136,7 +157,7 @@ struct FixMarketDataPolicy {
   static void handle_subscribe(App& app, typename App::WireMessage msg,
       StreamState state, std::deque<MarketUpdateData*>& /*buffered_events*/,
       uint64_t& /*first_buffered_update_id*/, uint64_t& update_index,
-      OnMarketDataFn& on_market_data_fn,
+      bool& /*first_depth_after_snapshot*/, OnMarketDataFn& on_market_data_fn,
       MarketUpdateDataPool* market_update_data_pool,
       MarketDataPool* market_data_pool, Logger& logger, auto resubscribe_fn) {
     auto* data =

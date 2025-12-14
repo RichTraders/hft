@@ -18,6 +18,7 @@
 #include "schema/spot/response/execution_report.h"
 #include "schema/spot/response/order.h"
 #include "schema/spot/response/session_response.h"
+#include "websocket/connection_handler.h"
 #include "websocket/order_entry/ws_oe_dispatcher_context.h"
 
 struct BinanceSpotOeDispatchRouter {

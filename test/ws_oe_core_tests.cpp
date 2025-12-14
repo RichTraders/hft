@@ -492,3 +492,37 @@ TEST_F(WsOeDecoderTest, DecodeInsufficientBalance_ValidPayload) {
   ASSERT_FALSE(std::holds_alternative<std::monostate>(wire_msg));
 }
 
+// ============================================================================
+// Encoder Tests (Ping Method)
+// ============================================================================
+
+class WsOeEncoderTest : public ::testing::Test {
+ protected:
+  static void SetUpTestSuite() {
+    logger_ = std::make_unique<Logger>();
+    logger_->setLevel(LogLevel::kDebug);
+    logger_->clearSink();
+    producer_ = std::make_unique<Logger::Producer>(logger_->make_producer());
+    encoder_ = std::make_unique<BinanceSpotOeTraits::Encoder>(*producer_);
+  }
+
+  static void TearDownTestSuite() {
+    encoder_.reset();
+    producer_.reset();
+    logger_->shutdown();
+    logger_.reset();
+  }
+
+  static std::unique_ptr<Logger> logger_;
+  static std::unique_ptr<Logger::Producer> producer_;
+  static std::unique_ptr<BinanceSpotOeTraits::Encoder> encoder_;
+};
+
+std::unique_ptr<Logger> WsOeEncoderTest::logger_;
+std::unique_ptr<Logger::Producer> WsOeEncoderTest::producer_;
+std::unique_ptr<BinanceSpotOeTraits::Encoder> WsOeEncoderTest::encoder_;
+
+TEST_F(WsOeEncoderTest, CreateUserDataStreamPing_SpotReturnsEmpty) {
+  auto ping_msg = encoder_->create_user_data_stream_ping();
+  EXPECT_TRUE(ping_msg.empty());
+}

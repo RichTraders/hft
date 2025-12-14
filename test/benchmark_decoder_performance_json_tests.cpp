@@ -30,7 +30,7 @@ static void BM_WebSocket_JSON_Decode(benchmark::State& state) {
     logger.clearSink();
     auto producer = logger.make_producer();
     core::JsonMdDecoder<BinanceSpotTraits> decoder(producer);
-    std::string json_data = load_file("data/benchmark/json.txt");
+    std::string json_data = load_file("data/binance_spot/benchmark/json.txt");
 
     for (auto _ : state) {
         auto wire_msg = decoder.decode(json_data);

@@ -60,7 +60,7 @@ constexpr int kSummaryWords = (kBucketCount + kBitsPerWord - 1) / kBitsPerWord;
 struct MarketOrder {
   common::Qty qty = common::Qty{.0f};
   bool active = false;
-  MarketOrder();
+  MarketOrder() noexcept;
   explicit MarketOrder(common::Qty qty_, bool active_ = false) noexcept;
   [[nodiscard]] auto toString() const -> std::string;
 };

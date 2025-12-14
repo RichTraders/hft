@@ -24,7 +24,7 @@ using namespace common;
 namespace test_utils {
 
 std::string load_test_data(const std::string& filename) {
-  std::string path = "data/json/market_data/" + filename;
+  std::string path = "data/binance_spot/json/market_data/" + filename;
   std::ifstream file(path);
   if (!file.is_open()) {
     return "";

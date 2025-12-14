@@ -29,7 +29,12 @@ struct PriceLevel {
 };
 
 struct MarketDataMessage {
-  enum class Type : std::uint8_t { kSnapshot, kIncremental, kTrade, kDepthUpdate };
+  enum class Type : std::uint8_t {
+    kSnapshot,
+    kIncremental,
+    kTrade,
+    kDepthUpdate
+  };
 
   Type type{Type::kSnapshot};
   std::string symbol;
@@ -111,6 +116,7 @@ enum MarketDataType : uint8_t {
 struct MarketUpdateData {
   uint64_t start_idx = 0ULL;
   uint64_t end_idx = 0ULL;
+  uint64_t prev_end_idx = 0ULL;
   MarketDataType type;
   std::vector<MarketData*> data;
   explicit MarketUpdateData() = default;

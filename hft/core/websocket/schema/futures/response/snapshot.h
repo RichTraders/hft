@@ -18,7 +18,7 @@
 namespace schema {
 namespace futures {
 struct DepthSnapshotResult {
-  std::uint64_t last_update_id;
+  std::uint64_t book_update_id;
   std::uint64_t message_output_time;
   std::uint64_t transaction_time;
   std::vector<std::array<double, 2>> bids;
@@ -28,7 +28,7 @@ struct DepthSnapshotResult {
   struct glaze {
     using T = DepthSnapshotResult;
     static constexpr auto value = glz::object(
-        "lastUpdateId", &T::last_update_id,
+        "lastUpdateId", &T::book_update_id,
         "E", &T::message_output_time,
         "T",&T::transaction_time,
         "bids", glz::quoted_num<&T::bids>,

@@ -26,7 +26,7 @@ namespace test_utils {
 
 // Load test data from file
 std::string load_test_data(const std::string& filename) {
-  std::string path = "data/json/execution_reports/" + filename;
+  std::string path = "data/binance_spot/json/execution_reports/" + filename;
   std::ifstream file(path);
   if (!file.is_open()) {
     // Return empty string if file doesn't exist (user hasn't provided data yet)

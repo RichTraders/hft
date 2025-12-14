@@ -13,6 +13,7 @@
 #ifndef BINANCE_SPOT_TRAITS_H
 #define BINANCE_SPOT_TRAITS_H
 
+#include "binance_md_connection_handler.h"
 #include "binance_sbe_ops.h"
 #include "binance_spot_dispatcher.h"
 #include "binance_spot_domain_converter.h"
@@ -29,6 +30,7 @@
 #include "schema/spot/sbe/trade_sbe.h"
 
 struct BinanceSpotTraits {
+  using ConnectionHandler = BinanceMdConnectionHandler;
   using SbeOps = BinanceSbeOps;
   using Formatter = BinanceSpotFormatter;
   using Encoder = BinanceSpotEncoder;

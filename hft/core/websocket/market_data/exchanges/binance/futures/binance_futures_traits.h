@@ -13,9 +13,11 @@
 #ifndef BINANCE_FUTURES_TRAITS_H
 #define BINANCE_FUTURES_TRAITS_H
 
+#include "binance_future_domain_converter.hpp"
 #include "binance_futures_dispatcher.h"
-#include "binance_futures_encoder.h"
+#include "binance_futures_encoder.hpp"
 #include "binance_futures_formatter.h"
+#include "binance_futures_md_connection_handler.h"
 #include "schema/futures/response/api_response.h"
 #include "schema/futures/response/depth_stream.h"
 #include "schema/futures/response/session_response.h"
@@ -23,10 +25,11 @@
 #include "schema/futures/response/trade.h"
 
 struct BinanceFuturesTraits {
+  using ConnectionHandler = BinanceFuturesMdConnectionHandler;
   using SbeOps = std::monostate;
   using Formatter = BinanceFuturesFormatter;
   using Encoder = BinanceFuturesEncoder;
-  using MdDomainConverter = std::monostate;
+  using MdDomainConverter = BinanceFuturesMdMessageConverter;
   using DispatchRouter = BinanceDispatchRouter;
 
   using SbeDepthResponse = std::monostate;
@@ -37,7 +40,7 @@ struct BinanceFuturesTraits {
   using ModifyOrderResponse = std::monostate;  // Not used in market data
 
   using DepthResponse = schema::futures::DepthResponse;
-  using TradeEvent = schema::futures::AggregateTradeEvent;
+  using TradeEvent = schema::futures::TradeEvent;
   using ApiResponse = schema::futures::ApiResponse;
   using DepthSnapshot = schema::futures::DepthSnapshot;
   using SessionLogOnResponse = std::monostate;  // Not used

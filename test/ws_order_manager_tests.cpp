@@ -26,7 +26,7 @@ using TestWsOrderManager = WsOrderManager<BinanceSpotOeTraits>;
 
 namespace test_utils {
 std::string load_test_data(const std::string& filename) {
-  std::string path = "data/json/execution_reports/" + filename;
+  std::string path = "data/binance_spot/json/execution_reports/" + filename;
   std::ifstream file(path);
   if (!file.is_open()) {
     return "";

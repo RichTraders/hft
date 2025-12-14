@@ -30,6 +30,7 @@ class BinanceSpotOeEncoder {
 
   [[nodiscard]] std::string create_user_data_stream_subscribe() const;
   [[nodiscard]] std::string create_user_data_stream_unsubscribe() const;
+  [[nodiscard]] std::string create_user_data_stream_ping() const;
   [[nodiscard]] std::string create_order_message(
       const trading::NewSingleOrderData& order) const;
   [[nodiscard]] std::string create_cancel_order_message(

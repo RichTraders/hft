@@ -23,11 +23,8 @@
 
 namespace core {
 
-
 inline std::string BinanceSpotOeEncoder::create_log_on_message(
     const std::string& signature, const std::string& timestamp) const {
-  constexpr int64_t kRecvWindow = 5000;
-
   int64_t ts_value = 0;
   if (!timestamp.empty()) {
     try {
@@ -44,17 +41,15 @@ inline std::string BinanceSpotOeEncoder::create_log_on_message(
   }
 
   const std::string request = std::format(
-      R"({{"id":"login_{}","method":"session.logon","params":{{"apiKey":"{}","signature":"{}","timestamp":{},"recvWindow":{}}}}})",
+      R"({{"id":"login_{}","method":"session.logon","params":{{"apiKey":"{}","signature":"{}","timestamp":{}}}}})",
       ts_value,
       AUTHORIZATION.get_api_key(),
       signature,
-      ts_value,
-      kRecvWindow);
+      ts_value);
 
   logger_.info("[WsOeCore] session.logon 요청 생성");
   return request;
 }
-
 
 inline std::string BinanceSpotOeEncoder::create_log_out_message() const {
   const auto timestamp = util::get_timestamp_epoch();
@@ -67,13 +62,12 @@ inline std::string BinanceSpotOeEncoder::create_log_out_message() const {
   return request;
 }
 
-
 inline std::string BinanceSpotOeEncoder::create_heartbeat_message() const {
   return "";
 }
 
-
-inline std::string BinanceSpotOeEncoder::create_user_data_stream_subscribe() const {
+inline std::string BinanceSpotOeEncoder::create_user_data_stream_subscribe()
+    const {
   const auto timestamp = std::to_string(util::get_timestamp_epoch());
   const schema::SessionUserSubscriptionRequest request{
       "subscribe_" + timestamp};
@@ -88,8 +82,8 @@ inline std::string BinanceSpotOeEncoder::create_user_data_stream_subscribe() con
   return request_str;
 }
 
-
-inline std::string BinanceSpotOeEncoder::create_user_data_stream_unsubscribe() const {
+inline std::string BinanceSpotOeEncoder::create_user_data_stream_unsubscribe()
+    const {
   const auto timestamp = std::to_string(util::get_timestamp_epoch());
   const schema::SessionUserUnsubscriptionRequest request{
       "unsubscribe_" + timestamp};
@@ -104,6 +98,9 @@ inline std::string BinanceSpotOeEncoder::create_user_data_stream_unsubscribe() c
   return request_str;
 }
 
+inline std::string BinanceSpotOeEncoder::create_user_data_stream_ping() const {
+  return "";
+}
 
 inline std::string BinanceSpotOeEncoder::create_order_message(
     const trading::NewSingleOrderData& order) const {
@@ -127,7 +124,6 @@ inline std::string BinanceSpotOeEncoder::create_order_message(
   return glz::write_json(payload).value_or(std::string{});
 }
 
-
 inline std::string BinanceSpotOeEncoder::create_cancel_order_message(
     const trading::OrderCancelRequest& cancel) const {
   schema::OrderCancelRequest payload;
@@ -141,7 +137,6 @@ inline std::string BinanceSpotOeEncoder::create_cancel_order_message(
   payload.params.timestamp = util::get_timestamp_epoch();
   return glz::write_json(payload).value_or(std::string{});
 }
-
 
 inline std::string BinanceSpotOeEncoder::create_cancel_and_reorder_message(
     const trading::OrderCancelAndNewOrderSingle& replace) const {
@@ -171,7 +166,6 @@ inline std::string BinanceSpotOeEncoder::create_cancel_and_reorder_message(
   return glz::write_json(payload).value_or(std::string{});
 }
 
-
 inline std::string BinanceSpotOeEncoder::create_order_all_cancel(
     const trading::OrderMassCancelRequest& request) const {
   schema::OpenOrdersCancelAllRequest payload;
@@ -187,12 +181,18 @@ template <typename T>
 inline std::string BinanceSpotOeEncoder::to_fixed(T data, int precision) const {
   static constexpr size_t kPrecisionBufferSize = 32;
   char buffer[kPrecisionBufferSize];
-  std::snprintf(buffer, sizeof(buffer), "%.*f", precision, static_cast<double>(data));
+  std::snprintf(buffer,
+      sizeof(buffer),
+      "%.*f",
+      precision,
+      static_cast<double>(data));
   return std::string(buffer);
 }
 
 }  // namespace core
 
 // Explicit instantiations
-template std::string core::BinanceSpotOeEncoder::to_fixed<double>(double, int) const;
-template std::string core::BinanceSpotOeEncoder::to_fixed<float>(float, int) const;
+template std::string core::BinanceSpotOeEncoder::to_fixed<double>(double,
+    int) const;
+template std::string core::BinanceSpotOeEncoder::to_fixed<float>(float,
+    int) const;

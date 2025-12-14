@@ -51,7 +51,7 @@ std::unique_ptr<core::FixMdCore> FixBenchmark::fix;
 std::unique_ptr<common::MemoryPool<MarketData>> FixBenchmark::pool_;
 
 BENCHMARK_F(FixBenchmark, BM_FIX_Decode)(benchmark::State& state) {
-  auto fix_data = load_file("data/benchmark/fix.txt");
+  auto fix_data = load_file("data/binance_spot/benchmark/fix.txt");
     for (auto _ : state) {
         FIX8::Message* msg = fix->decode(fix_data);
         benchmark::DoNotOptimize(msg);

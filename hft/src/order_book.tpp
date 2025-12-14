@@ -25,7 +25,7 @@ using common::TickerId;
 constexpr int kBucketPoolSize = 1024 * 8;
 
 namespace trading {
-inline MarketOrder::MarketOrder() = default;
+inline MarketOrder::MarketOrder() noexcept = default;
 
 inline MarketOrder::MarketOrder(const Qty qty_, const bool active_) noexcept
     : qty(qty_), active(active_) {}

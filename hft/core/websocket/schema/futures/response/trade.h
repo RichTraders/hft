@@ -14,8 +14,7 @@
 #define TRADE_H
 
 #include <glaze/glaze.hpp>
-namespace schema {
-namespace futures {
+namespace schema::futures {
 struct AggregateTradeEvent {
   std::string event_type;           // "e"
   std::int64_t event_time;          // "E"
@@ -46,6 +45,15 @@ struct AggregateTradeEvent {
     // clang-format on
   };
 };
-}
+struct TradeEvent {
+  std::string stream;
+  AggregateTradeEvent data;
+
+  struct glaze {
+    using T = TradeEvent;
+    static constexpr auto value =
+        glz::object("stream", &T::stream, "data", &T::data);
+  };
+};
 }
 #endif //TRADE_H

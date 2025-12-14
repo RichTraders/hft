@@ -80,6 +80,7 @@ void WsOrderEntryApp::stop() {
     return;
   }
 
+  stop_keepalive_impl(keepalive_thread_);
   stop_stream_transport_impl(stream_transport_);
 
   if (api_transport_) {
@@ -206,37 +207,29 @@ void WsOrderEntryApp::post_mass_cancel_order(
   ws_order_manager_.register_pending_request(request);
 }
 
-void WsOrderEntryApp::create_log_on() const {
+void WsOrderEntryApp::initiate_session_logon() {
   if constexpr (WsOeCoreImpl::ExchangeTraits::requires_signature_logon()) {
     const auto cur_timestamp = std::to_string(util::get_timestamp_epoch());
-    constexpr int kRecvWindow = 5000;
-    const std::string sig_b64 =
-        ::get_signature_base64(cur_timestamp, kRecvWindow);
+    const std::string sig_b64 = ::get_signature_base64(cur_timestamp, 0);
     auto log_on_message =
         ws_oe_core_.create_log_on_message(sig_b64, cur_timestamp);
     api_transport_->write(log_on_message);
-  } else {
-    if constexpr (WsOeCoreImpl::ExchangeTraits::requires_listen_key()) {
-      const std::string user_stream_msg =
-          ws_oe_core_.create_user_data_stream_subscribe();
-      if (UNLIKELY(!user_stream_msg.empty())) {
-        api_transport_->write(user_stream_msg);
-        logger_.info("[WsOeApp] Sent userDataStream.start request");
-      }
-    }
   }
 }
+
 void WsOrderEntryApp::handle_api_payload(std::string_view payload) {
   if (payload.empty()) {
     return;
   }
   if (payload == "__CONNECTED__") {
-    create_log_on();
+    using ConnectionHandler = WsOeCoreImpl::ExchangeTraits::ConnectionHandler;
+    ConnectionContext<WsOrderEntryApp> ctx(this, TransportId::kApi);
+    ConnectionHandler::on_connected(ctx, TransportId::kApi);
     return;
   }
 
   constexpr int kDefaultLogLen = 200;
-  logger_.debug("Received payload (size: {}): {}...",
+  logger_.info("[WsOrderEntryApp]Received payload (size: {}): {}...",
       payload.size(),
       payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size())));
 
@@ -277,8 +270,15 @@ void WsOrderEntryApp::handle_stream_payload(std::string_view payload) {
       return;
     }
 
+    if (payload == "__CONNECTED__") {
+      using ConnectionHandler = WsOeCoreImpl::ExchangeTraits::ConnectionHandler;
+      ConnectionContext<WsOrderEntryApp> ctx(this, TransportId::kStream);
+      ConnectionHandler::on_connected(ctx, TransportId::kStream);
+      return;
+    }
+
     constexpr int kDefaultLogLen = 200;
-    logger_.debug("Received stream payload (size: {}): {}...",
+    logger_.info("[WsOrderEntryApp]Received stream payload (size: {}): {}...",
         payload.size(),
         payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size())));
 
@@ -301,6 +301,62 @@ void WsOrderEntryApp::handle_stream_payload(std::string_view payload) {
 void WsOrderEntryApp::handle_listen_key_response(
     const std::string& listen_key) {
   start_stream_transport_impl(stream_transport_, listen_key);
+}
+
+void WsOrderEntryApp::start_keepalive_impl(
+    std::unique_ptr<common::Thread<"ListenKeyOE">>& thread) {
+  if (keepalive_running_.exchange(true)) {
+    return;
+  }
+
+  thread = std::make_unique<common::Thread<"ListenKeyOE">>();
+  thread->start([this]() { keepalive_loop(); });
+  logger_.info("[WsOeApp] Listen key keepalive thread started");
+}
+
+void WsOrderEntryApp::stop_keepalive_impl(
+    std::unique_ptr<common::Thread<"ListenKeyOE">>& thread) {
+  if (!keepalive_running_.exchange(false)) {
+    return;
+  }
+
+  if (thread) {
+    thread->join();
+    thread.reset();
+  }
+  logger_.info("[WsOeApp] Listen key keepalive thread stopped");
+}
+
+void WsOrderEntryApp::keepalive_loop() {
+  if constexpr (!WsOeCoreImpl::ExchangeTraits::requires_listen_key()) {
+    return;
+  }
+
+  constexpr int kKeepaliveIntervalMs =
+      WsOeCoreImpl::ExchangeTraits::get_keepalive_interval_ms();
+  constexpr int kSleepIntervalMs = 1000;
+
+  int elapsed_ms = 0;
+
+  while (keepalive_running_.load(std::memory_order_relaxed)) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(kSleepIntervalMs));
+    elapsed_ms += kSleepIntervalMs;
+
+    if (elapsed_ms >= kKeepaliveIntervalMs) {
+      elapsed_ms = 0;
+
+      if (!api_transport_) {
+        logger_.warn("[WsOeApp] API transport not available for keepalive");
+        continue;
+      }
+
+      const std::string ping_msg = ws_oe_core_.create_user_data_stream_ping();
+      if (!ping_msg.empty()) {
+        api_transport_->write(ping_msg);
+        logger_.trace("[WsOeApp] Sent userDataStream.ping keepalive");
+      }
+    }
+  }
 }
 
 }  // namespace core

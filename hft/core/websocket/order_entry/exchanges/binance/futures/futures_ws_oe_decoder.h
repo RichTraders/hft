@@ -14,8 +14,8 @@
 #define FUTURES_WS_OE_DECODER_H
 
 #include <glaze/glaze.hpp>
-#include "../../../ws_oe_decoder_base.hpp"
 #include "binance_futures_oe_traits.h"
+#include "websocket/order_entry/ws_oe_decoder_base.hpp"
 
 namespace core {
 
@@ -33,14 +33,12 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
     }
     logger_.info("[WsOeCore]payload :{}", payload);
 
-    // Check for stream events (no ID field)
-    if (payload.find("ORDER_TRADE_UPDATE") != std::string_view::npos) {
+    if (payload.contains("ORDER_TRADE_UPDATE")) {
       return this
           ->decode_or_log<BinanceFuturesOeTraits::ExecutionReportResponse,
               "[executionReport]">(payload);
     }
 
-    // Parse header to determine message type by ID
     schema::WsHeader header{};
     const auto error_code =
         glz::read<glz::opts{.error_on_unknown_keys = 0, .partial_read = 1}>(
@@ -58,10 +56,16 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
           "[userDataStream.subscribe]">(payload);
     }
 
-    // if (header.id.starts_with("unsubscribe")) {
-    //   return this->decode_or_log<BinanceFuturesOeTraits::SessionUserUnsubscriptionResponse,
-    //       "[userDataStream.unsubscribe]">(payload);
-    // }
+    if (header.id.starts_with("unsubscribe")) {
+      return this->decode_or_log<
+          BinanceFuturesOeTraits::SessionUserUnsubscriptionResponse,
+          "[userDataStream.unsubscribe]">(payload);
+    }
+
+    if (header.id.starts_with("login_")) {
+      return this->decode_or_log<BinanceFuturesOeTraits::SessionLogonResponse,
+          "[session.logon]">(payload);
+    }
 
     if (header.id.starts_with("order")) {
       if (header.id.starts_with("orderreplace")) {

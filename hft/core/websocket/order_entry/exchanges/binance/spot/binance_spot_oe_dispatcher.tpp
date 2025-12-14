@@ -95,11 +95,9 @@ void BinanceSpotOeDispatchRouter::handle_session_logon(
   if (response.status == kHttpOK) {
     context.logger->info("[Dispatcher] session.logon successful");
 
-    const std::string user_stream_msg =
-        context.app->create_user_data_stream_subscribe();
-    if (!user_stream_msg.empty()) {
-      context.app->send(user_stream_msg);
-    }
+    using ConnHandler = typename ExchangeTraits::ConnectionHandler;
+    core::ConnectionContext ctx(context.app, core::TransportId::kApi);
+    ConnHandler::on_session_logon(ctx, response);
   } else {
     if (response.error.has_value()) {
       context.logger->error(
@@ -126,15 +124,9 @@ void BinanceSpotOeDispatchRouter::handle_user_subscription(
     return;
   }
 
-  if constexpr (ExchangeTraits::requires_listen_key()) {
-    if (response.result.has_value() &&
-        !response.result.value().listen_key.empty()) {
-      context.app->handle_listen_key_response(response.result.value().listen_key);
-    } else {
-      context.logger->error(
-          "[Dispatcher] UserDataStream response missing listenKey");
-    }
-  }
+  using ConnHandler = typename ExchangeTraits::ConnectionHandler;
+  core::ConnectionContext ctx(context.app, core::TransportId::kApi);
+  ConnHandler::on_user_subscription(ctx, response);
 }
 
 template <typename ExchangeTraits>

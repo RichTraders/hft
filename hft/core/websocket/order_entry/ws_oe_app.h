@@ -14,7 +14,9 @@
 #define WS_ORDER_ENTRY_APP_H
 
 #include "common/logger.h"
+#include "common/thread.hpp"
 #include "core/order_entry.h"
+#include "websocket/connection_handler.h"
 #include "ws_oe_core.h"
 #include "ws_oe_dispatcher_context.h"
 #include "ws_order_manager.hpp"
@@ -109,9 +111,10 @@ class WsOrderEntryApp {
 
   void handle_stream_payload(std::string_view payload);
   void handle_listen_key_response(const std::string& listen_key);
+  void initiate_session_logon();
+  void start_listen_key_keepalive() { start_keepalive_impl(keepalive_thread_); }
 
  private:
-  void create_log_on() const;
   void handle_api_payload(std::string_view payload);
   static std::string get_signature_base64(const std::string& payload);
 
@@ -141,7 +144,7 @@ class WsOrderEntryApp {
         stream_port,
         stream_path,
         use_ssl_,
-        true);
+        false);
 
     transport->register_message_callback([this](std::string_view payload) {
       this->handle_stream_payload(payload);
@@ -152,18 +155,9 @@ class WsOrderEntryApp {
   void start_stream_transport_impl(std::monostate&, const std::string&) {}
 
   // Helper type for conditional stream transport
-  template <bool RequiresStream>
-  struct StreamTransportType {
-    using type = std::unique_ptr<WebSocketTransport<"OEStream">>;
-  };
-
-  template <>
-  struct StreamTransportType<false> {
-    using type = std::monostate;
-  };
-
-  using OptionalStreamTransport = typename StreamTransportType<
-      WsOeCoreImpl::ExchangeTraits::requires_stream_transport()>::type;
+  using OptionalStreamTransport = std::conditional_t<
+      WsOeCoreImpl::ExchangeTraits::requires_stream_transport(),
+      std::unique_ptr<WebSocketTransport<"OEStream">>, std::monostate>;
 
   common::Logger::Producer logger_;
   WsOeCoreImpl ws_oe_core_;
@@ -182,6 +176,21 @@ class WsOrderEntryApp {
 
   [[no_unique_address]] OptionalStreamTransport stream_transport_;
   std::string listen_key_;
+
+  using OptionalKeepaliveThread =
+      std::conditional_t<WsOeCoreImpl::ExchangeTraits::requires_listen_key(),
+          std::unique_ptr<common::Thread<"ListenKeyOE">>, std::monostate>;
+
+  [[no_unique_address]] OptionalKeepaliveThread keepalive_thread_;
+  std::atomic<bool> keepalive_running_{false};
+
+  void start_keepalive_impl(
+      std::unique_ptr<common::Thread<"ListenKeyOE">>& thread);
+  void start_keepalive_impl(std::monostate&) {}
+  void stop_keepalive_impl(
+      std::unique_ptr<common::Thread<"ListenKeyOE">>& thread);
+  void stop_keepalive_impl(std::monostate&) {}
+  void keepalive_loop();
 };
 
 }  // namespace core

@@ -182,12 +182,15 @@ void WsMarketDataApp::handle_stream_payload(std::string_view payload) const {
     return;
   }
   if (payload == "__CONNECTED__") {
-    dispatch("A", WireMessage{});
+    using ConnHandler = WsMdCoreImpl::ExchangeTraits::ConnectionHandler;
+    ConnectionContext ctx(const_cast<WsMarketDataApp*>(this),
+        TransportId::kStream);
+    ConnHandler::on_connected(ctx, TransportId::kStream);
     return;
   }
 
   static constexpr int kMinimumLogPrintSize = 200;
-  logger_.trace("Received stream payload (size: {}): {}...",
+  logger_.trace("[WsMarketDataApp]Received stream payload (size: {}): {}...",
       payload.size(),
       payload.substr(0,
           std::min<size_t>(kMinimumLogPrintSize, payload.size())));
@@ -206,12 +209,15 @@ void WsMarketDataApp::handle_api_payload(std::string_view payload) const {
     return;
   }
   if (payload == "__CONNECTED__") {
-    dispatch("A", WireMessage{});
+    using ConnHandler = WsMdCoreApiImpl::ExchangeTraits::ConnectionHandler;
+    ConnectionContext ctx(const_cast<WsMarketDataApp*>(this),
+        TransportId::kApi);
+    ConnHandler::on_connected(ctx, TransportId::kApi);
     return;
   }
 
   static constexpr int kMinimumLogPrintSize = 200;
-  logger_.trace("Received API payload (size: {}): {}...",
+  logger_.info("[WsMarketDataApp]Received API payload (size: {}): {}...",
       payload.size(),
       payload.substr(0,
           std::min<size_t>(kMinimumLogPrintSize, payload.size())));

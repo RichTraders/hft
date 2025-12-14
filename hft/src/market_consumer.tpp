@@ -168,15 +168,33 @@ void MarketConsumer<Strategy>::on_snapshot(WireMessage msg) {
   }
 
 #ifdef ENABLE_WEBSOCKET
+  bool first_buffered = true;
+  constexpr auto market_type =
+      get_market_type<typename MdApp::ExchangeTraits>();
+
   for (auto* buffered : buffered_events_) {
-    if (buffered->start_idx == update_index_ + 1) {
-      update_index_ = buffered->end_idx;
+    DepthValidationResult validation_result;
+    if (first_buffered) {
+      validation_result = validate_first_depth_after_snapshot(
+          buffered->start_idx, buffered->end_idx, update_index_);
+      first_buffered = false;
+    } else {
+      validation_result = validate_continuous_depth(market_type,
+          buffered->start_idx, buffered->end_idx, buffered->prev_end_idx,
+          update_index_);
+    }
+
+    if (validation_result.valid) {
+      update_index_ = validation_result.new_update_index;
       on_market_data_fn_(buffered);
     } else {
       logger_.error(
-          "[MarketConsumer]Buffered event gap detected! Expected {}, got {}",
-          update_index_ + 1,
-          buffered->start_idx);
+          "[MarketConsumer]Buffered event gap detected! Expected pu:{}, got "
+          "pu:{}, start:{}, end:{}",
+          update_index_,
+          buffered->prev_end_idx,
+          buffered->start_idx,
+          buffered->end_idx);
       buffered_events_.clear();
 
       if (++retry_count_ >= kMaxRetries) {
@@ -194,6 +212,7 @@ void MarketConsumer<Strategy>::on_snapshot(WireMessage msg) {
   }
   buffered_events_.clear();
   retry_count_ = 0;
+  first_depth_after_snapshot_ = true;
 #else
   if (UNLIKELY(snapshot_data == nullptr)) {
     logger_.error("[Message] failed to create snapshot");
@@ -215,14 +234,15 @@ template <typename Strategy>
 void MarketConsumer<Strategy>::on_subscribe(WireMessage msg) {
 #ifdef ENABLE_WEBSOCKET
   ProtocolPolicy::handle_subscribe(*app_, msg, state_, buffered_events_,
-      first_buffered_update_id_, update_index_, on_market_data_fn_,
-      market_update_data_pool_, market_data_pool_, logger_,
+      first_buffered_update_id_, update_index_, first_depth_after_snapshot_,
+      on_market_data_fn_, market_update_data_pool_, market_data_pool_, logger_,
       [this]() { recover_from_gap(); });
 #else
   std::deque<MarketUpdateData*> dummy_buffered;
   uint64_t dummy_first_buffered = 0;
+  bool dummy_first_depth = false;
   ProtocolPolicy::handle_subscribe(*app_, msg, state_, dummy_buffered,
-      dummy_first_buffered, update_index_, on_market_data_fn_,
+      dummy_first_buffered, update_index_, dummy_first_depth, on_market_data_fn_,
       market_update_data_pool_, market_data_pool_, logger_,
       [this]() { resubscribe(); });
 #endif

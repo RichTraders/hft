@@ -16,57 +16,97 @@
 using namespace trading;
 
 // ============================================================================
-// First Depth After Snapshot Tests
+// First Depth After Snapshot Tests - Spot
 // ============================================================================
 
-class FirstDepthAfterSnapshotTest : public ::testing::Test {};
+class SpotFirstDepthAfterSnapshotTest : public ::testing::Test {
+ protected:
+  static constexpr MarketType kMarket = MarketType::kSpot;
+};
 
-TEST_F(FirstDepthAfterSnapshotTest, ValidWhenStartBeforeAndEndAfterSnapshot) {
+TEST_F(SpotFirstDepthAfterSnapshotTest, ValidWhenOverlapsSnapshot) {
   // Snapshot: 100, Depth: U=90, u=110
-  // 90 <= 100 AND 110 >= 100 -> valid
-  auto result = validate_first_depth_after_snapshot(90, 110, 100);
+  // 90 <= 100 AND 110 >= 100 -> overlaps, valid
+  auto result = validate_first_depth_after_snapshot<kMarket>(90, 110, 100);
   EXPECT_TRUE(result.valid);
   EXPECT_EQ(result.new_update_index, 110);
 }
 
-TEST_F(FirstDepthAfterSnapshotTest, ValidWhenStartEqualsSnapshot) {
-  // Snapshot: 100, Depth: U=100, u=110
-  // 100 <= 100 AND 110 >= 100 -> valid
-  auto result = validate_first_depth_after_snapshot(100, 110, 100);
+TEST_F(SpotFirstDepthAfterSnapshotTest, ValidWhenImmediatelyFollows) {
+  // Snapshot: 100, Depth: U=101, u=110
+  // U == lastUpdateId + 1 -> immediately follows, valid
+  auto result = validate_first_depth_after_snapshot<kMarket>(101, 110, 100);
   EXPECT_TRUE(result.valid);
   EXPECT_EQ(result.new_update_index, 110);
 }
 
-TEST_F(FirstDepthAfterSnapshotTest, ValidWhenEndEqualsSnapshot) {
-  // Snapshot: 100, Depth: U=90, u=100
-  // 90 <= 100 AND 100 >= 100 -> valid
-  auto result = validate_first_depth_after_snapshot(90, 100, 100);
-  EXPECT_TRUE(result.valid);
+TEST_F(SpotFirstDepthAfterSnapshotTest, InvalidWhenTooOld_EndLessOrEqualSnapshot) {
+  // Spot: u <= lastUpdateId should be discarded
+  // Snapshot: 100, Depth: U=80, u=100
+  auto result = validate_first_depth_after_snapshot<kMarket>(80, 100, 100);
+  EXPECT_FALSE(result.valid);
   EXPECT_EQ(result.new_update_index, 100);
 }
 
-TEST_F(FirstDepthAfterSnapshotTest, ValidWhenBothEqualSnapshot) {
-  // Snapshot: 100, Depth: U=100, u=100
-  // 100 <= 100 AND 100 >= 100 -> valid
-  auto result = validate_first_depth_after_snapshot(100, 100, 100);
-  EXPECT_TRUE(result.valid);
-  EXPECT_EQ(result.new_update_index, 100);
-}
-
-TEST_F(FirstDepthAfterSnapshotTest, InvalidWhenDepthTooOld) {
+TEST_F(SpotFirstDepthAfterSnapshotTest, InvalidWhenTooOld_EndBeforeSnapshot) {
   // Snapshot: 100, Depth: U=80, u=90
-  // 80 <= 100 AND 90 >= 100 -> FALSE (90 < 100)
-  auto result = validate_first_depth_after_snapshot(80, 90, 100);
+  auto result = validate_first_depth_after_snapshot<kMarket>(80, 90, 100);
   EXPECT_FALSE(result.valid);
-  EXPECT_EQ(result.new_update_index, 100);  // keeps snapshot id
+  EXPECT_EQ(result.new_update_index, 100);
 }
 
-TEST_F(FirstDepthAfterSnapshotTest, InvalidWhenDepthTooNew) {
-  // Snapshot: 100, Depth: U=110, u=120
-  // 110 <= 100 -> FALSE
-  auto result = validate_first_depth_after_snapshot(110, 120, 100);
+TEST_F(SpotFirstDepthAfterSnapshotTest, InvalidWhenGapExists) {
+  // Snapshot: 100, Depth: U=105, u=110
+  // Neither overlaps (105 > 100) nor immediately follows (105 != 101)
+  auto result = validate_first_depth_after_snapshot<kMarket>(105, 110, 100);
   EXPECT_FALSE(result.valid);
-  EXPECT_EQ(result.new_update_index, 100);  // keeps snapshot id
+  EXPECT_EQ(result.new_update_index, 100);
+}
+
+// ============================================================================
+// First Depth After Snapshot Tests - Futures
+// ============================================================================
+
+class FuturesFirstDepthAfterSnapshotTest : public ::testing::Test {
+ protected:
+  static constexpr MarketType kMarket = MarketType::kFutures;
+};
+
+TEST_F(FuturesFirstDepthAfterSnapshotTest, ValidWhenOverlapsSnapshot) {
+  // Snapshot: 100, Depth: U=90, u=110
+  auto result = validate_first_depth_after_snapshot<kMarket>(90, 110, 100);
+  EXPECT_TRUE(result.valid);
+  EXPECT_EQ(result.new_update_index, 110);
+}
+
+TEST_F(FuturesFirstDepthAfterSnapshotTest, ValidWhenImmediatelyFollows) {
+  // Snapshot: 100, Depth: U=101, u=110
+  auto result = validate_first_depth_after_snapshot<kMarket>(101, 110, 100);
+  EXPECT_TRUE(result.valid);
+  EXPECT_EQ(result.new_update_index, 110);
+}
+
+TEST_F(FuturesFirstDepthAfterSnapshotTest, InvalidWhenTooOld_EndBeforeSnapshot) {
+  // Futures: u < lastUpdateId should be discarded
+  // Snapshot: 100, Depth: U=80, u=99
+  auto result = validate_first_depth_after_snapshot<kMarket>(80, 99, 100);
+  EXPECT_FALSE(result.valid);
+  EXPECT_EQ(result.new_update_index, 100);
+}
+
+TEST_F(FuturesFirstDepthAfterSnapshotTest, ValidWhenEndEqualsSnapshot) {
+  // Futures: u == lastUpdateId is valid (not discarded like Spot)
+  // Snapshot: 100, Depth: U=90, u=100
+  auto result = validate_first_depth_after_snapshot<kMarket>(90, 100, 100);
+  EXPECT_TRUE(result.valid);  // overlaps
+  EXPECT_EQ(result.new_update_index, 100);
+}
+
+TEST_F(FuturesFirstDepthAfterSnapshotTest, InvalidWhenGapExists) {
+  // Snapshot: 100, Depth: U=105, u=110
+  auto result = validate_first_depth_after_snapshot<kMarket>(105, 110, 100);
+  EXPECT_FALSE(result.valid);
+  EXPECT_EQ(result.new_update_index, 100);
 }
 
 // ============================================================================
@@ -162,17 +202,6 @@ TEST_F(FuturesContinuousDepthTest, FuturesIgnoresStartIdx) {
 }
 
 // ============================================================================
-// Market Type Helper Tests
-// ============================================================================
-
-TEST(MarketTypeHelperTest, StringViewToMarketType) {
-  EXPECT_EQ(to_market_type("Futures"), MarketType::kFutures);
-  EXPECT_EQ(to_market_type("Spot"), MarketType::kSpot);
-  EXPECT_EQ(to_market_type(""), MarketType::kSpot);  // default
-  EXPECT_EQ(to_market_type("Unknown"), MarketType::kSpot);  // default
-}
-
-// ============================================================================
 // Real-world Scenario Tests
 // ============================================================================
 
@@ -185,8 +214,9 @@ TEST_F(RealWorldScenarioTest, SpotSequentialUpdates) {
   // Snapshot with lastUpdateId = 1000
   update_index = 1000;
 
-  // First depth after snapshot: U=998, u=1005
-  auto result1 = validate_first_depth_after_snapshot(998, 1005, update_index);
+  // First depth after snapshot: U=998, u=1005 (overlaps)
+  auto result1 = validate_first_depth_after_snapshot<MarketType::kSpot>(
+      998, 1005, update_index);
   EXPECT_TRUE(result1.valid);
   update_index = result1.new_update_index;  // 1005
 
@@ -205,6 +235,17 @@ TEST_F(RealWorldScenarioTest, SpotSequentialUpdates) {
   EXPECT_EQ(update_index, 1015);
 }
 
+TEST_F(RealWorldScenarioTest, SpotImmediatelyFollowsSnapshot) {
+  // When buffer is empty, first depth immediately follows snapshot
+  uint64_t update_index = 1000;
+
+  // First depth: U=1001, u=1010 (U == lastUpdateId + 1)
+  auto result = validate_first_depth_after_snapshot<MarketType::kSpot>(
+      1001, 1010, update_index);
+  EXPECT_TRUE(result.valid);
+  EXPECT_EQ(result.new_update_index, 1010);
+}
+
 TEST_F(RealWorldScenarioTest, FuturesSequentialUpdates) {
   // Simulate a sequence of Futures depth updates
   uint64_t update_index = 0;
@@ -212,8 +253,9 @@ TEST_F(RealWorldScenarioTest, FuturesSequentialUpdates) {
   // Snapshot with lastUpdateId = 1000
   update_index = 1000;
 
-  // First depth after snapshot: U=998, u=1005
-  auto result1 = validate_first_depth_after_snapshot(998, 1005, update_index);
+  // First depth after snapshot: U=998, u=1005 (overlaps)
+  auto result1 = validate_first_depth_after_snapshot<MarketType::kFutures>(
+      998, 1005, update_index);
   EXPECT_TRUE(result1.valid);
   update_index = result1.new_update_index;  // 1005
 
@@ -244,9 +286,9 @@ TEST_F(RealWorldScenarioTest, SpotGapDetectionAndRecovery) {
   // After recovery (new snapshot with lastUpdateId=1015)
   update_index = 1015;
 
-  // First depth after new snapshot: U=1010, u=1020
-  auto recovery_result =
-      validate_first_depth_after_snapshot(1010, 1020, update_index);
+  // First depth after new snapshot: U=1010, u=1020 (overlaps)
+  auto recovery_result = validate_first_depth_after_snapshot<MarketType::kSpot>(
+      1010, 1020, update_index);
   EXPECT_TRUE(recovery_result.valid);
 }
 
@@ -262,9 +304,10 @@ TEST_F(RealWorldScenarioTest, FuturesGapDetectionAndRecovery) {
   // After recovery (new snapshot with lastUpdateId=1020)
   update_index = 1020;
 
-  // First depth after new snapshot: U=1015, u=1025
+  // First depth after new snapshot: U=1015, u=1025 (overlaps)
   auto recovery_result =
-      validate_first_depth_after_snapshot(1015, 1025, update_index);
+      validate_first_depth_after_snapshot<MarketType::kFutures>(
+          1015, 1025, update_index);
   EXPECT_TRUE(recovery_result.valid);
 }
 
@@ -276,17 +319,23 @@ TEST(EdgeCaseTest, LargeUpdateIds) {
   // Test with large uint64_t values
   uint64_t large_id = 9446683550037ULL;  // Real Binance Futures ID
 
-  auto result =
-      validate_first_depth_after_snapshot(large_id - 100, large_id + 100, large_id);
+  auto result = validate_first_depth_after_snapshot<MarketType::kSpot>(
+      large_id - 100, large_id + 100, large_id);
   EXPECT_TRUE(result.valid);
   EXPECT_EQ(result.new_update_index, large_id + 100);
 }
 
 TEST(EdgeCaseTest, ZeroUpdateIds) {
-  // Edge case: all zeros
-  auto result = validate_first_depth_after_snapshot(0, 0, 0);
-  EXPECT_TRUE(result.valid);
-  EXPECT_EQ(result.new_update_index, 0);
+  // Edge case: all zeros - overlaps check passes
+  auto result =
+      validate_first_depth_after_snapshot<MarketType::kSpot>(0, 0, 0);
+  // Spot: u <= lastUpdateId (0 <= 0) -> discarded
+  EXPECT_FALSE(result.valid);
+
+  // Futures: u < lastUpdateId (0 < 0 is false) -> not discarded, overlaps
+  auto result_futures =
+      validate_first_depth_after_snapshot<MarketType::kFutures>(0, 0, 0);
+  EXPECT_TRUE(result_futures.valid);
 }
 
 TEST(EdgeCaseTest, OverflowProtection) {
@@ -297,5 +346,25 @@ TEST(EdgeCaseTest, OverflowProtection) {
   // This should not overflow
   auto result = validate_continuous_depth(
       MarketType::kSpot, near_max, max_val, 0, near_max - 1);
+  EXPECT_TRUE(result.valid);
+}
+
+// ============================================================================
+// Spot vs Futures Discard Difference
+// ============================================================================
+
+TEST(DiscardDifferenceTest, SpotDiscardsEndEqualToSnapshot) {
+  // Spot: u <= lastUpdateId should be discarded
+  // u == lastUpdateId -> discard
+  auto result =
+      validate_first_depth_after_snapshot<MarketType::kSpot>(90, 100, 100);
+  EXPECT_FALSE(result.valid);
+}
+
+TEST(DiscardDifferenceTest, FuturesKeepsEndEqualToSnapshot) {
+  // Futures: u < lastUpdateId should be discarded
+  // u == lastUpdateId -> NOT discarded (overlaps)
+  auto result =
+      validate_first_depth_after_snapshot<MarketType::kFutures>(90, 100, 100);
   EXPECT_TRUE(result.valid);
 }

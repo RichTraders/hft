@@ -93,15 +93,16 @@ struct WebSocketMarketDataPolicy {
           data->start_idx,
           data->end_idx);
 
+      constexpr auto kMarketType =
+          get_market_type<typename App::ExchangeTraits>();
       DepthValidationResult validation_result;
       if (first_depth_after_snapshot) {
-        validation_result = validate_first_depth_after_snapshot(data->start_idx,
-            data->end_idx,
-            update_index);
+        validation_result =
+            validate_first_depth_after_snapshot<kMarketType>(data->start_idx,
+                data->end_idx,
+                update_index);
         first_depth_after_snapshot = false;
       } else {
-        constexpr auto kMarketType =
-            get_market_type<typename App::ExchangeTraits>();
         validation_result = validate_continuous_depth(kMarketType,
             data->start_idx,
             data->end_idx,

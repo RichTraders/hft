@@ -30,8 +30,7 @@ struct BinanceDispatchRouter {
     // Market data updates → "X"
     else if constexpr (std::is_same_v<MsgType,
                            schema::futures::DepthResponse> ||
-                       std::is_same_v<MsgType,
-                           schema::futures::AggregateTradeEvent>) {
+                       std::is_same_v<MsgType, schema::futures::TradeEvent>) {
       return "X";
     }
     // Exchange info → "y"

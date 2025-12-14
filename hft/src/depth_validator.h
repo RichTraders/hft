@@ -23,12 +23,31 @@ struct DepthValidationResult {
 };
 
 // Pure function for first depth after snapshot validation
-// Both Spot and Futures: U <= lastUpdateId AND u >= lastUpdateId
+// Spot: First buffered event should have U <= lastUpdateId <= u (range check)
+//       But if buffer is empty, U == lastUpdateId + 1 is also valid
+// Futures: U <= lastUpdateId AND u >= lastUpdateId
+template <MarketType Type>
 constexpr DepthValidationResult validate_first_depth_after_snapshot(
     uint64_t start_idx, uint64_t end_idx, uint64_t snapshot_update_id) {
-  const bool valid =
+  // Drop events that are entirely before/at the snapshot
+  // Spot: u <= lastUpdateId should be discarded
+  // Futures: u < lastUpdateId should be discarded
+  if constexpr (Type == MarketType::kSpot) {
+    if (end_idx <= snapshot_update_id) {
+      return {.valid = false, .new_update_index = snapshot_update_id};
+    }
+  } else {
+    if (end_idx < snapshot_update_id) {
+      return {.valid = false, .new_update_index = snapshot_update_id};
+    }
+  }
+  const bool overlaps =
       (start_idx <= snapshot_update_id) && (end_idx >= snapshot_update_id);
-  return {valid, valid ? end_idx : snapshot_update_id};
+  const bool immediately_follows = (start_idx == snapshot_update_id + 1);
+
+  const bool valid = overlaps || immediately_follows;
+  return {.valid = valid,
+      .new_update_index = valid ? end_idx : snapshot_update_id};
 }
 
 constexpr DepthValidationResult validate_continuous_depth(
@@ -47,7 +66,8 @@ constexpr DepthValidationResult validate_continuous_depth(
     valid = (start_idx == current_update_index + 1);
   }
 
-  return {valid, valid ? end_idx : current_update_index};
+  return {.valid = valid,
+      .new_update_index = valid ? end_idx : current_update_index};
 }
 
 constexpr MarketType to_market_type(std::string_view market_type_str) {

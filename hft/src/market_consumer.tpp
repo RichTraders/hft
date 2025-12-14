@@ -169,17 +169,17 @@ void MarketConsumer<Strategy>::on_snapshot(WireMessage msg) {
 
 #ifdef ENABLE_WEBSOCKET
   bool first_buffered = true;
-  constexpr auto market_type =
+  constexpr auto kMarketType =
       get_market_type<typename MdApp::ExchangeTraits>();
 
   for (auto* buffered : buffered_events_) {
     DepthValidationResult validation_result;
     if (first_buffered) {
-      validation_result = validate_first_depth_after_snapshot(
+      validation_result = validate_first_depth_after_snapshot<kMarketType>(
           buffered->start_idx, buffered->end_idx, update_index_);
       first_buffered = false;
     } else {
-      validation_result = validate_continuous_depth(market_type,
+      validation_result = validate_continuous_depth(kMarketType,
           buffered->start_idx, buffered->end_idx, buffered->prev_end_idx,
           update_index_);
     }

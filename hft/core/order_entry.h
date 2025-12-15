@@ -159,6 +159,7 @@ struct NewSingleOrderData {
   TimeInForce time_in_force;
   SelfTradePreventionMode self_trade_prevention_mode =
       SelfTradePreventionMode::kExpireTaker;
+  std::optional<common::PositionSide> position_side;  // For futures trading
 };
 
 enum class ExecType : char {
@@ -374,6 +375,7 @@ struct OrderCancelAndNewOrderSingle {
   TimeInForce time_in_force;
   SelfTradePreventionMode self_trade_prevention_mode =
       SelfTradePreventionMode::kExpireTaker;
+  std::optional<common::PositionSide> position_side;  // For futures trading
 };
 
 struct OrderMassCancelRequest {

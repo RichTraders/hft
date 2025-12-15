@@ -394,7 +394,7 @@ using TradeEngineCfgHashMap = std::unordered_map<std::string, TradeEngineCfg>;
 
 template <typename T>
 std::string to_fixed(T data, int precision) {
-  static constexpr size_t kPrecisionBufferSize = 8;
+  static constexpr size_t kPrecisionBufferSize = 16;
   std::array<char, kPrecisionBufferSize> buffer;
   std::snprintf(buffer.data(),
       sizeof(buffer),

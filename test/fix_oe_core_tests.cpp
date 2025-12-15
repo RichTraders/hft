@@ -1,14 +1,24 @@
-//
-// Created by neworo2 on 25. 7. 26.
-//
-#include "fix_oe_core.h"
+/*
+ * MIT License
+ *
+ * Copyright (c) 2025 NewOro Corporation
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
+ * copyright notice appears in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ */
+
+
+#include "core/fix/fix_oe_core.h"
 #include "gtest/gtest.h"
 #include <fix8/f8includes.hpp>
-#include "NewOroFix44OE_types.hpp"
+#include "core/fix/NewOroFix44/NewOroFix44OE_types.hpp"
 #include "ini_config.hpp"
 #include "memory_pool.hpp"
 #include "logger.h"
-#include "../hft/core/NewOroFix44/response_manager.h"
+#include "core/response_manager.h"
 #include "order_entry.h"
 
 using namespace core;

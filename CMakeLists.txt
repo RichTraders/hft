@@ -8,17 +8,52 @@ add_compile_options(-Wall -Wextra -Werror -Wno-pedantic)
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(-march=native)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g -fno-omit-frame-pointer")
-    set(CMAKE_C_FLAGS_RELEASE   "${CMAKE_C_FLAGS_RELEASE} -g -fno-omit-frame-pointer")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -g -fno-omit-frame-pointer")
     # Enable LTO for maximum performance
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif ()
+
+option(ENABLE_WEBSOCKET "Build WebSocket transport support" ON)
+option(ENABLE_SBE_DECODER "Use SBE decoder for WebSocket market data" OFF)
+option(ENABLE_SBE_DECODER_ORDER_ENTRY "Use SBE decoder for WebSocket order entry" OFF)
+option(USE_FUTURES_API "Use Binance Futures API instead of Spot API" ON)
+option(USE_REST_API "Enable REST API support with libcurl" OFF)
+option(ENABLE_TESTS "Build and fetch test dependencies" ON)
+
+if (ENABLE_WEBSOCKET)
+    include(${CMAKE_SOURCE_DIR}/cmake/libwebsockets.cmake)
+    include(${CMAKE_SOURCE_DIR}/cmake/glaze.cmake)
+    message(STATUS "WebSocket transport enabled")
+endif ()
+
+if (ENABLE_SBE_DECODER AND NOT ENABLE_WEBSOCKET)
+    message(FATAL_ERROR "ENABLE_SBE_DECODER requires ENABLE_WEBSOCKET=ON")
+endif ()
+
+if (ENABLE_SBE_DECODER)
+    add_compile_definitions(ENABLE_SBE_DECODER)
+    message(STATUS "SBE binary decoder enabled for WebSocket market data")
+else ()
+    message(STATUS "JSON decoder enabled for WebSocket market data (default)")
+endif ()
+
+if (USE_FUTURES_API)
+    add_compile_definitions(USE_FUTURES_API)
+    message(STATUS "Using Binance Futures API")
+else ()
+    message(STATUS "Using Binance Spot API (default)")
+endif ()
+
+if (USE_REST_API)
+    find_package(CURL REQUIRED)
+    add_compile_definitions(USE_REST_API)
+    message(STATUS "REST API support enabled with libcurl")
 endif ()
 
 include_directories(
         hft
 )
 add_subdirectory(hft)
-
-option(ENABLE_TESTS "Build and fetch test dependencies" OFF)
 
 set(STRATEGY_CONFIG_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/strategy_config.hpp.in")
 
@@ -31,7 +66,12 @@ function(add_strategy_target target_name strategy_type strategy_name)
 
     add_executable(${target_name} main.cpp)
     target_include_directories(${target_name} PRIVATE "${gen_dir}")
-    target_link_libraries(${target_name} PRIVATE HftLib)
+    if (ENABLE_WEBSOCKET)
+        target_link_libraries(${target_name} PRIVATE HftLib_ws)
+        target_compile_definitions(${target_name} PRIVATE ENABLE_WEBSOCKET)
+    else ()
+        target_link_libraries(${target_name} PRIVATE HftLib_fix)
+    endif ()
 
     if (CMAKE_BUILD_TYPE STREQUAL "Release")
         set_property(TARGET ${target_name} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
@@ -40,7 +80,7 @@ endfunction()
 
 add_strategy_target(HFT_maker "trading::ObiVwapMomentumStrategy" "ObiVwapMomentumStrategy")
 add_strategy_target(HFT_taker "trading::LiquidTaker" "LiquidTaker")
-# Default target for backward compatibility (uses market maker strategy)
+# Default target for backward compatibility (uses obi vwap momentum strategy)
 add_strategy_target(HFT "trading::ObiVwapMomentumStrategy" "ObiVwapMomentumStrategy")
 
 add_subdirectory(repository)
@@ -50,7 +90,7 @@ if (ENABLE_TESTS)
     set(STRATEGY_TYPE "trading::ObiVwapMomentumStrategy")
     set(STRATEGY_NAME "ObiVwapMomentumStrategy")
     configure_file("${STRATEGY_CONFIG_TEMPLATE}"
-                   "${TEST_STRATEGY_INCLUDE_DIR}/strategy_config.hpp" @ONLY)
+            "${TEST_STRATEGY_INCLUDE_DIR}/strategy_config.hpp" @ONLY)
     add_subdirectory(test)
 endif ()
 

@@ -1,0 +1,100 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2025 NewOro Corporation
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
+ * copyright notice appears in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+ */
+
+#ifndef BINANCE_FUTURES_TRAITS_H
+#define BINANCE_FUTURES_TRAITS_H
+
+#include "binance_future_domain_converter.hpp"
+#include "binance_futures_dispatcher.h"
+#include "binance_futures_encoder.hpp"
+#include "binance_futures_formatter.h"
+#include "binance_futures_md_connection_handler.h"
+#include "schema/futures/response/api_response.h"
+#include "schema/futures/response/depth_stream.h"
+#include "schema/futures/response/exchange_info_response.h"
+#include "schema/futures/response/session_response.h"
+#include "schema/futures/response/snapshot.h"
+#include "schema/futures/response/trade.h"
+
+struct BinanceFuturesTraits {
+  using ConnectionHandler = BinanceFuturesMdConnectionHandler;
+  using SbeOps = std::monostate;
+  using Formatter = BinanceFuturesFormatter;
+  using Encoder = BinanceFuturesEncoder;
+  using MdDomainConverter = BinanceFuturesMdMessageConverter;
+  using DispatchRouter = BinanceDispatchRouter;
+
+  using SbeDepthResponse = std::monostate;
+  using SbeTradeEvent = std::monostate;
+  using SbeDepthSnapshot = std::monostate;
+  using SbeBestBidAsk = std::monostate;
+  using ExchangeInfoResponse = schema::futures::ExchangeInfoHttpResponse;
+  using ModifyOrderResponse = std::monostate;  // Not used in market data
+
+  static constexpr bool uses_http_exchange_info() { return true; }
+  static constexpr std::string_view get_exchange_info_url() {
+    return "https://fapi.binance.com/fapi/v1/exchangeInfo";
+  }
+
+  using DepthResponse = schema::futures::DepthResponse;
+  using TradeEvent = schema::futures::TradeEvent;
+  using ApiResponse = schema::futures::ApiResponse;
+  using DepthSnapshot = schema::futures::DepthSnapshot;
+  using SessionLogOnResponse = std::monostate;  // Not used
+
+  using WireMessage = std::variant<std::monostate, DepthResponse, TradeEvent,
+      DepthSnapshot, ApiResponse, ExchangeInfoResponse>;
+
+  static constexpr std::string_view exchange_name() { return "Binance"; }
+  static constexpr std::string_view market_type() { return "Futures"; }
+
+  static constexpr std::string_view get_api_host() {
+    return "ws-fapi.binance.com";
+  }
+
+  static constexpr std::string_view get_stream_host() {
+    return "fstream.binance.com";
+  }
+
+  static constexpr std::string_view get_api_endpoint_path() {
+    return "/ws-fapi/v1?returnRateLimits=false";
+  }
+
+  static constexpr std::string_view get_stream_endpoint_path() {
+    return "/stream?streams=btcusdt@depth/btcusdt@aggTrade";
+  }
+
+  static constexpr int kPort = 443;
+
+  static constexpr int get_api_port() { return kPort; }
+
+  static constexpr int get_stream_port() { return kPort; }
+
+  static constexpr bool use_ssl() { return true; }
+
+  static constexpr bool supports_json() { return true; }
+  static constexpr bool supports_sbe() { return false; }
+
+  static bool is_depth_message(std::string_view payload) {
+    return payload.contains("@depth");
+  }
+
+  static bool is_trade_message(std::string_view payload) {
+    return payload.contains("@aggTrade");
+  }
+
+  static bool is_snapshot_message(std::string_view payload) {
+    return payload.contains("snapshot");
+  }
+};
+
+#endif  //BINANCE_FUTURES_TRAITS_H

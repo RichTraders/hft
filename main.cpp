@@ -10,18 +10,23 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "hft/common/CpuManager/cpu_manager.h"
-#include "hft/core/NewOroFix44/response_manager.h"
-#include "ini_config.hpp"
-#include "logger.h"
-#include "market_consumer.h"
-#include "order_entry.h"
-#include "order_gateway.h"
-#include "risk_manager.h"
-#include "trade_engine.h"
+#include "hft_lib.h"
+
+#include <csignal>
 #include "strategy_config.hpp"
 
+using SelectedOrderGateway = trading::OrderGateway<SelectedStrategy>;
+using SelectedTradeEngine = trading::TradeEngine<SelectedStrategy>;
+using SelectedMarketConsumer = trading::MarketConsumer<SelectedStrategy>;
+
+void block_all_signals(sigset_t& set) {
+  sigfillset(&set);
+  pthread_sigmask(SIG_BLOCK, &set, nullptr);
+}
 int main() {
+  sigset_t set;
+  block_all_signals(set);
+
   try {
 #ifdef TEST_NET
     INI_CONFIG.load("resources/test_config.ini");
@@ -33,8 +38,8 @@ int main() {
     logger->setLevel(logger->string_to_level(INI_CONFIG.get("log", "level")));
     logger->clearSink();
     logger->addSink(std::make_unique<common::ConsoleSink>());
-    logger->addSink(std::make_unique<common::FileSink>(
-        "log", INI_CONFIG.get_int("log", "size")));
+    logger->addSink(std::make_unique<common::FileSink>("log",
+        INI_CONFIG.get_int("log", "size")));
 
     auto market_update_data_pool =
         std::make_unique<common::MemoryPool<MarketUpdateData>>(
@@ -56,8 +61,7 @@ int main() {
             k_response_memory_pool_size);
 
     common::TradeEngineCfgHashMap config_map;
-    config_map[INI_CONFIG.get("meta", "ticker")] = {
-        .clip_ = common::Qty{0},
+    config_map[INI_CONFIG.get("meta", "ticker")] = {.clip_ = common::Qty{0},
         .threshold_ = 0,
         .risk_cfg_ = common::RiskCfg(
             common::Qty{INI_CONFIG.get_double("risk", "max_order_size")},
@@ -65,28 +69,31 @@ int main() {
             common::Qty{INI_CONFIG.get_double("risk", "min_position", 0.)},
             INI_CONFIG.get_double("risk", "max_loss"))};
 
-    auto response_manager = std::make_unique<trading::ResponseManager>(
-        logger.get(), execution_report_pool.get(),
-        order_cancel_reject_pool.get(), order_mass_cancel_report_pool.get());
+    auto response_manager =
+        std::make_unique<trading::ResponseManager>(logger.get(),
+            execution_report_pool.get(),
+            order_cancel_reject_pool.get(),
+            order_mass_cancel_report_pool.get());
 
-    auto order_gateway =
-        std::make_unique<trading::OrderGateway<SelectedStrategy>>(
-            logger.get(), response_manager.get());
+    auto order_gateway = std::make_unique<SelectedOrderGateway>(logger.get(),
+        response_manager.get());
 
-    auto engine = std::make_unique<trading::TradeEngine<SelectedStrategy>>(
-        logger.get(), market_update_data_pool.get(), market_data_pool.get(),
-        response_manager.get(), config_map);
+    auto engine = std::make_unique<SelectedTradeEngine>(logger.get(),
+        market_update_data_pool.get(),
+        market_data_pool.get(),
+        response_manager.get(),
+        config_map);
     engine->init_order_gateway(order_gateway.get());
     order_gateway->init_trade_engine(engine.get());
 
-    const trading::MarketConsumer<SelectedStrategy> consumer(
-        logger.get(), engine.get(), market_update_data_pool.get(),
+    const auto consumer = std::make_unique<SelectedMarketConsumer>(logger.get(),
+        engine.get(),
+        market_update_data_pool.get(),
         market_data_pool.get());
 
-    std::unique_ptr<common::CpuManager> cpu_manager =
-        std::make_unique<common::CpuManager>(logger.get());
+    const auto cpu_manager = std::make_unique<common::CpuManager>(logger.get());
 
-    auto log = logger->make_producer();
+    const auto log = logger->make_producer();
     std::string cpu_init_result;
     if (cpu_manager->init_cpu_group(cpu_init_result)) {
       log.info(std::format("don't init cpu group: {}", cpu_init_result));
@@ -96,9 +103,19 @@ int main() {
       log.info("don't init cpu to tid");
     }
 
-    constexpr int kSleepCount = 10;
-    while (true)
-      sleep(kSleepCount);  // TODO(neworo2):
+    int sig;
+    while (true) {
+      sigwait(&set, &sig);
+
+      if (sig == SIGINT || sig == SIGTERM) {
+        std::cout << "\n[Main] Signal received\n";
+        order_gateway->stop();
+        consumer->stop();
+        engine->stop();
+        logger->shutdown();
+        break;
+      }
+    }
   } catch (std::exception& e) {
     std::cerr << e.what() << "\n";
   }

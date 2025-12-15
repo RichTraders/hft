@@ -14,7 +14,7 @@
 #define FEATURE_ENGINE_TPP
 #include "feature_engine.h"
 #include "common/logger.h"
-#include "core/NewOroFix44/market_data.h"
+#include "core/market_data.h"
 #include "order_book.h"
 
 using common::Price;
@@ -25,8 +25,9 @@ constexpr int kLevel10 = 10;
 namespace trading {
 
 template<class Strategy>
-void FeatureEngine<Strategy>::on_order_book_updated(const Price price, const Side side,
-                                          MarketOrderBook<Strategy>* book) noexcept {
+void FeatureEngine<Strategy>::on_order_book_updated(
+    const Price price, const Side side,
+    MarketOrderBook<Strategy>* book) noexcept {
   const auto* bbo = book->get_bbo();
   if (LIKELY(bbo->bid_price != common::kPriceInvalid &&
              bbo->ask_price != common::kPriceInvalid)) {
@@ -39,14 +40,14 @@ void FeatureEngine<Strategy>::on_order_book_updated(const Price price, const Sid
     auto ask_index = book->peek_levels(false, kLevel10);
   }
 
-  logger_.debug(
-      std::format("[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
+  logger_.trace("[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
                   common::toString(price), common::toString(side), mkt_price_,
-                  agg_trade_qty_ratio_));
+                  agg_trade_qty_ratio_);
 }
 template<class Strategy>
-void FeatureEngine<Strategy>::on_trade_updated(const MarketData* market_update,
-                                     MarketOrderBook<Strategy>* book) noexcept {
+void FeatureEngine<Strategy>::on_trade_updated(
+    const MarketData* market_update,
+    MarketOrderBook<Strategy>* book) noexcept {
   const auto* bbo = book->get_bbo();
   if (LIKELY(bbo->bid_price.value != common::kPriceInvalid &&
              bbo->ask_price.value != common::kPriceInvalid)) {
@@ -72,13 +73,14 @@ void FeatureEngine<Strategy>::on_trade_updated(const MarketData* market_update,
   }
   vwap_index_++;
 
-  logger_.debug(std::format("[Updated] {} mkt-price:{} agg-trade-ratio:{}",
+  logger_.trace("[Updated] {} mkt-price:{} agg-trade-ratio:{}",
                             market_update->toString(), mkt_price_,
-                            agg_trade_qty_ratio_));
+                            agg_trade_qty_ratio_);
 }
 
 template<class Strategy>
-double FeatureEngine<Strategy>::vwap_from_levels(const std::vector<LevelView>& level) {
+double FeatureEngine<Strategy>::vwap_from_levels(
+    const std::vector<LevelView>& level) {
   double num = 0.0L;
   double den = 0.0L;
   const auto level_size = level.size();

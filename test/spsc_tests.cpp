@@ -10,6 +10,8 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
+#include <spsc_queue.h>
+
 #include <barrier>
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -69,7 +71,7 @@ TEST(SPSCQueueTest, SingleThreadBasic) {
 // 멀티스레드: 순서/중복/누락 검증 + 타이밍 교란
 template <std::size_t Capacity>
 void RunSPSCScenario(std::size_t N) {
-  common::SPSCQueue<std::size_t, Capacity> q;
+  SPSCQueue<std::size_t, Capacity> q;
 
   std::vector<std::atomic<int>> seen(N);
   for (auto& a : seen)

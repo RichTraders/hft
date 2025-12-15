@@ -15,57 +15,72 @@
 
 #include "logger.h"
 #include "market_data.h"
+#include "market_data_protocol_policy.h"
 #include "memory_pool.hpp"
-
-namespace FIX8 {  // NOLINT(readability-identifier-naming)
-class Message;
-}
-
-namespace core {
-template <typename Derived, FixedString ReadThreadName,
-          FixedString WriteThreadName>
-class FixApp;
-class FixMarketDataApp;
-}  // namespace core
+#include "protocol_impl.h"
+#include "stream_state.h"
 
 namespace trading {
 template <typename Strategy>
 class TradeEngine;
 
-enum class StreamState : uint8_t {
-  kRunning,
-  kAwaitingSnapshot,
-  kApplyingSnapshot
-};
+template <typename Derived>
+class MarketConsumerRecoveryMixin;
 
 template <typename Strategy>
-class MarketConsumer {
+class MarketConsumer
+    : public MarketConsumerRecoveryMixin<MarketConsumer<Strategy>> {
+  friend class MarketConsumerRecoveryMixin<MarketConsumer>;
+
  public:
+  using MdApp = protocol_impl::MarketDataApp;
+  using AppType = MdApp;
+  using ProtocolPolicy = typename MarketDataProtocolPolicySelector<MdApp>::type;
+  using WireMessage = MdApp::WireMessage;
+
   MarketConsumer(common::Logger* logger, TradeEngine<Strategy>* trade_engine,
-                 common::MemoryPool<MarketUpdateData>* market_update_data_pool,
-                 common::MemoryPool<MarketData>* market_data_pool);
+      common::MemoryPool<MarketUpdateData>* market_update_data_pool,
+      common::MemoryPool<MarketData>* market_data_pool);
   ~MarketConsumer();
   void stop();
-  void on_login(FIX8::Message*);
-  void on_snapshot(FIX8::Message* msg);
-  void on_subscribe(FIX8::Message* msg);
-  void on_reject(FIX8::Message*);
-  void on_logout(FIX8::Message*);
-  void on_instrument_list(FIX8::Message* msg);
-  void on_heartbeat(FIX8::Message* msg);
-  void resubscribe();
+  void on_login(WireMessage msg);
+  void on_snapshot(WireMessage msg);
+  void on_subscribe(WireMessage msg);
+  void on_reject(WireMessage msg) const;
+  void on_logout(WireMessage msg) const;
+  void on_instrument_list(WireMessage msg) const;
+  void on_heartbeat(WireMessage msg) const;
+
+  // Recovery methods (implementation in CRTP base)
+  void recover_from_gap() { this->recover_from_gap_impl(); }
+  void erase_buffer_lower_than_snapshot(uint64_t snapshot_update_id) {
+    this->erase_buffer_lower_than_snapshot_impl(snapshot_update_id);
+  }
+  void resubscribe() { this->resubscribe_impl(); }
 
  private:
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
   common::Logger::Producer logger_;
-  TradeEngine<Strategy>* trade_engine_;
-  std::unique_ptr<core::FixMarketDataApp> app_;
+  std::function<bool(MarketUpdateData*)> on_market_data_fn_;
+  std::function<void(const InstrumentInfo&)> on_instrument_info_fn_;
+  std::unique_ptr<MdApp> app_;
   uint64_t update_index_ = 0ULL;
 
+  StreamState state_{StreamState::kAwaitingSnapshot};
+  int retry_count_{0};
+#ifdef ENABLE_WEBSOCKET
+  std::deque<MarketUpdateData*> buffered_events_;
+  uint64_t first_buffered_update_id_{0};
+  bool first_depth_after_snapshot_{false};
+#else
   std::atomic<uint64_t> generation_{0};
   std::atomic<uint64_t> current_generation_{0};
-  StreamState state_{StreamState::kAwaitingSnapshot};
+#endif
 };
+
 }  // namespace trading
+
+#include "market_consumer_recovery.hpp"
+
 #endif  //MARKET_CONSUMER_H

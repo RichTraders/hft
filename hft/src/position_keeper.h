@@ -10,11 +10,12 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#ifndef POSITIONKEEPER_H
-#define POSITIONKEEPER_H
-#include "ini_config.hpp"
-#include "logger.h"
-#include "types.h"
+#ifndef POSITION_KEEPER_H
+#define POSITION_KEEPER_H
+
+#include "common/ini_config.hpp"
+#include "common/logger.h"
+#include "common/types.h"
 
 namespace trading {
 struct BBO;
@@ -32,15 +33,16 @@ struct PositionInfo {
   [[nodiscard]] std::string toString() const;
 
   void add_fill(const ExecutionReport* report,
-                common::Logger::Producer& logger) noexcept;
+      const common::Logger::Producer& logger) noexcept;
 
-  void update_bbo(const BBO* bbo, common::Logger::Producer& logger) noexcept;
+  void update_bbo(const BBO* bbo,
+      const common::Logger::Producer& logger) noexcept;
 };
 
 class PositionKeeper {
  public:
-  explicit PositionKeeper(common::Logger* logger)
-      : logger_(logger->make_producer()),
+  explicit PositionKeeper(const common::Logger::Producer& logger)
+      : logger_(logger),
         ticker_position_{{INI_CONFIG.get("meta", "ticker"), PositionInfo{}}} {
     logger_.info("[Constructor] PositionKeeper Created");
   }
@@ -68,10 +70,10 @@ class PositionKeeper {
   PositionKeeper& operator=(const PositionKeeper&&) = delete;
 
  private:
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
 
   std::unordered_map<std::string, PositionInfo> ticker_position_;
 };
 }  // namespace trading
 
-#endif  //POSITIONKEEPER_H
+#endif  //POSITION_KEEPER_H

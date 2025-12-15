@@ -41,7 +41,7 @@ std::string PositionInfo::toString() const {
 }
 
 void PositionInfo::add_fill(const ExecutionReport* report,
-                            common::Logger::Producer& logger) noexcept {
+    const common::Logger::Producer& logger) noexcept {
   const auto old_position = position_;
   const auto idx = sideToIndex(report->side);
   const auto opp_side_index = oppIndex(idx);
@@ -74,7 +74,7 @@ void PositionInfo::add_fill(const ExecutionReport* report,
     else
       unreal_pnl_ =
           (open_vwap_[sideToIndex(Side::kSell)] / std::abs(position_) -
-           report->price.value) *
+              report->price.value) *
           std::abs(position_);
   }
 
@@ -84,7 +84,7 @@ void PositionInfo::add_fill(const ExecutionReport* report,
 }
 
 void PositionInfo::update_bbo(const BBO* bbo,
-                              common::Logger::Producer& logger) noexcept {
+    const common::Logger::Producer& logger) noexcept {
   bbo_ = bbo;
 
   if (position_ != 0 && bbo->bid_price != common::kPriceInvalid &&
@@ -97,15 +97,16 @@ void PositionInfo::update_bbo(const BBO* bbo,
     else
       unreal_pnl_ =
           (open_vwap_[sideToIndex(Side::kSell)] / std::abs(position_) -
-           mid_price) *
+              mid_price) *
           std::abs(position_);
 
     const auto old_total_pnl = total_pnl_;
     total_pnl_ = unreal_pnl_ + real_pnl_;
 
     if (total_pnl_ != old_total_pnl)
-      logger.info(std::format("[PositionInfo][Updated] {} {}", toString(),
-                              bbo_->toString()));
+      logger.info("[PositionInfo][Updated] {} {}",
+          toString(),
+          bbo_->toString());
   }
 }
 
@@ -114,7 +115,7 @@ void PositionKeeper::add_fill(const ExecutionReport* report) noexcept {
 }
 
 void PositionKeeper::update_bbo(const common::TickerId& ticker_id,
-                                const BBO* bbo) noexcept {
+    const BBO* bbo) noexcept {
   ticker_position_.at(ticker_id).update_bbo(bbo, logger_);
 }
 

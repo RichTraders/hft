@@ -10,7 +10,7 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "fix_md_app.h"
+#include "core/fix/fix_md_app.h"
 #include <fix8/f8includes.hpp>
 
 #include "ini_config.hpp"

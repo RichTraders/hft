@@ -13,18 +13,18 @@
 #include "liquid_taker.h"
 
 namespace trading {
-LiquidTaker::LiquidTaker(OrderManager<LiquidTaker>* const order_manager,
-                         const FeatureEngine<LiquidTaker>* const feature_engine,
-                         common::Logger* logger,
-                         const common::TradeEngineCfgHashMap&)
-    : BaseStrategy(order_manager, feature_engine, logger) {}
 
-void LiquidTaker::on_orderbook_updated(
-    const common::TickerId&, common::Price, common::Side,
-    const MarketOrderBook<LiquidTaker>*) const noexcept {}
+LiquidTaker::LiquidTaker(OrderManagerT* const order_manager,
+    const FeatureEngineT* const feature_engine,
+    const common::Logger::Producer& logger,
+    const common::TradeEngineCfgHashMap&)
+    : Base(order_manager, feature_engine, logger) {}
 
-void LiquidTaker::on_trade_updated(
-    const MarketData*, MarketOrderBook<LiquidTaker>*) const noexcept {}
+void LiquidTaker::on_orderbook_updated(const common::TickerId&, common::Price,
+    common::Side, const MarketOrderBookT*) const noexcept {}
+
+void LiquidTaker::on_trade_updated(const MarketData*,
+    MarketOrderBookT*) const noexcept {}
 
 void LiquidTaker::on_order_updated(const ExecutionReport*) noexcept {}
 

@@ -13,12 +13,19 @@
 #ifndef PCH_H
 #define PCH_H
 
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#include <emmintrin.h>
+#endif
+
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <concepts>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <future>
@@ -37,23 +44,12 @@
 #include <string_view>
 #include <thread>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
 
-#include "absl/container/flat_hash_map.h"
-
 #define LIKELY(x) __builtin_expect(!!(x), 1)
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
-
-// 매크로 편의 함수
-#define LOG_INFO(logger, text) \
-  logger.log(LogLevel::kInfo, __FILE__, __LINE__, __func__, text)
-
-#define LOG_DEBUG(logger, text) \
-  logger.log(LogLevel::kDebug, __FILE__, __LINE__, __func__, text)
-
-#define LOG_ERROR(logger, text) \
-  logger.log(LogLevel::kError, __FILE__, __LINE__, __func__, text)
 
 #endif  // PCH_H

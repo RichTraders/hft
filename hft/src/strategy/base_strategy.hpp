@@ -23,19 +23,19 @@
 #include "trade_engine.tpp"
 
 namespace trading {
-template <class Strategy>
+template <typename Strategy, typename OeTraits>
 class MarketOrderBook;
-template <class Strategy>
+template <typename Strategy, typename OeTraits>
 class FeatureEngine;
-template <class Strategy>
+template <typename Strategy, typename OeTraits>
 class OrderManager;
 struct ExecutionReport;
 
-template <class Strategy>
+template <typename Strategy, typename OeTraits>
 class BaseStrategy {
  public:
-  BaseStrategy(OrderManager<Strategy>* const order_manager,
-      const FeatureEngine<Strategy>* const feature_engine,
+  BaseStrategy(OrderManager<Strategy, OeTraits>* const order_manager,
+      const FeatureEngine<Strategy, OeTraits>* const feature_engine,
       const common::Logger::Producer& logger)
       : order_manager_(order_manager),
         feature_engine_(feature_engine),
@@ -44,8 +44,8 @@ class BaseStrategy {
   ~BaseStrategy() = default;
 
  protected:
-  OrderManager<Strategy>* order_manager_;
-  const FeatureEngine<Strategy>* feature_engine_;
+  OrderManager<Strategy, OeTraits>* order_manager_;
+  const FeatureEngine<Strategy, OeTraits>* feature_engine_;
   const common::Logger::Producer& logger_;
 };
 }  // namespace trading

@@ -22,7 +22,7 @@
 struct MarketData;
 
 namespace trading {
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 class TradeEngine;
 
 struct BBO {
@@ -100,7 +100,7 @@ inline const MarketOrder* level_ptr(const Bucket* bucket, int off) noexcept {
   return &bucket->orders[off];
 }
 
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 class MarketOrderBook final {
  public:
   MarketOrderBook(const common::TickerId& ticker_id,
@@ -110,7 +110,7 @@ class MarketOrderBook final {
 
   auto on_market_data_updated(const MarketData* market_update) noexcept -> void;
 
-  auto set_trade_engine(TradeEngine<Strategy>* trade_engine) {
+  auto set_trade_engine(TradeEngine<Strategy, OeTraits>* trade_engine) {
     trade_engine_ = trade_engine;
   }
 
@@ -142,7 +142,7 @@ class MarketOrderBook final {
 
  private:
   const common::TickerId ticker_id_;
-  TradeEngine<Strategy>* trade_engine_ = nullptr;
+  TradeEngine<Strategy, OeTraits>* trade_engine_ = nullptr;
   const common::Logger::Producer& logger_;
 
   std::array<Bucket*, kBucketCount> bidBuckets_{};
@@ -182,9 +182,9 @@ class MarketOrderBook final {
   }
 };
 
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 using MarketOrderBookHashMap =
-    std::map<std::string, std::unique_ptr<MarketOrderBook<Strategy>>>;
+    std::map<std::string, std::unique_ptr<MarketOrderBook<Strategy, OeTraits>>>;
 
 //NOLINTBEGIN
 inline bool push_if_active(const Bucket* bucket, int bidx, int off,

@@ -21,15 +21,15 @@
 #include "stream_state.h"
 
 namespace trading {
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 class TradeEngine;
 
 template <typename Derived>
 class MarketConsumerRecoveryMixin;
 
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 class MarketConsumer
-    : public MarketConsumerRecoveryMixin<MarketConsumer<Strategy>> {
+    : public MarketConsumerRecoveryMixin<MarketConsumer<Strategy, OeTraits>> {
   friend class MarketConsumerRecoveryMixin<MarketConsumer>;
 
  public:
@@ -38,7 +38,8 @@ class MarketConsumer
   using ProtocolPolicy = typename MarketDataProtocolPolicySelector<MdApp>::type;
   using WireMessage = MdApp::WireMessage;
 
-  MarketConsumer(common::Logger* logger, TradeEngine<Strategy>* trade_engine,
+  MarketConsumer(common::Logger* logger,
+      TradeEngine<Strategy, OeTraits>* trade_engine,
       common::MemoryPool<MarketUpdateData>* market_update_data_pool,
       common::MemoryPool<MarketData>* market_data_pool);
   ~MarketConsumer();

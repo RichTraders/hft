@@ -3,5 +3,6 @@
 #include "strategy/momentum_strategy.h"
 #include "strategy/liquid_taker.h"
 
-using SelectedStrategy = @STRATEGY_TYPE@;
+template <typename OeTraits>
+using SelectedStrategy = @STRATEGY_TYPE@<OeTraits>;
 inline constexpr std::string_view kSelectedStrategyName = "@STRATEGY_NAME@";

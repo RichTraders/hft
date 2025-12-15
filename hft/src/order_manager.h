@@ -25,31 +25,43 @@
 #include "reserved_position_tracker.h"
 
 namespace trading {
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 class TradeEngine;
 
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 class OrderManager {
  public:
+  using QuoteIntentType = typename Strategy::QuoteIntentType;
+
+  static constexpr bool kSupportsCancelAndReorder =
+      OeTraits::supports_cancel_and_reorder();
+  static constexpr bool kSupportsPositionSide =
+      OeTraits::supports_position_side();
+
   OrderManager(const common::Logger::Producer& logger,
-      TradeEngine<Strategy>* trade_engine, RiskManager& risk_manager);
+      TradeEngine<Strategy, OeTraits>* trade_engine, RiskManager& risk_manager);
   ~OrderManager();
   void on_order_updated(const ExecutionReport* response) noexcept;
   void on_instrument_info(const InstrumentInfo& instrument_info) noexcept;
 
   void new_order(const common::TickerId& ticker_id, common::Price price,
-      common::Side side, common::Qty qty, common::OrderId order_id) noexcept;
+      common::Side side, common::Qty qty, common::OrderId order_id,
+      std::optional<common::PositionSide> position_side =
+          std::nullopt) noexcept;
+
   void modify_order(const common::TickerId& ticker_id,
       const common::OrderId& order_id,
       const common::OrderId& cancel_new_order_id,
       const common::OrderId& original_order_id, common::Price price,
-      common::Side side, common::Qty qty) noexcept;
+      common::Side side, common::Qty qty,
+      std::optional<common::PositionSide> position_side =
+          std::nullopt) noexcept;
 
   void cancel_order(const common::TickerId& ticker_id,
       const common::OrderId& original_order_id,
       const common::OrderId& order_id) noexcept;
 
-  void apply(const std::vector<QuoteIntent>& intents) noexcept;
+  void apply(const std::vector<QuoteIntentType>& intents) noexcept;
 
   OrderManager() = delete;
 
@@ -63,21 +75,20 @@ class OrderManager {
 
  private:
   order::LayerBook layer_book_;
-  TradeEngine<Strategy>* trade_engine_ = nullptr;
+  TradeEngine<Strategy, OeTraits>* trade_engine_ = nullptr;
   RiskManager& risk_manager_;
   const common::Logger::Producer& logger_;
   common::FastClock fast_clock_;
   const double ticker_size_ = 0;
-  order::QuoteReconciler reconciler_;
+  order::QuoteReconciler<QuoteIntentType> reconciler_;
   order::VenuePolicy venue_policy_;
   order::TickConverter tick_converter_;
 
-  // Delegated components for separation of concerns
   OrderStateManager state_manager_;
   ReservedPositionTracker position_tracker_;
   OrderExpiryManager expiry_manager_;
 
-  void filter_by_risk(const std::vector<QuoteIntent>& intents,
+  void filter_by_risk(const std::vector<QuoteIntentType>& intents,
       order::Actions& acts);
 
   [[nodiscard]] common::OrderId gen_order_id() noexcept;

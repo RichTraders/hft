@@ -29,9 +29,9 @@ using common::TickerId;
 using order::LayerBook;
 using order::PendingReplaceInfo;
 
-template <typename Strategy>
-OrderManager<Strategy>::OrderManager(const common::Logger::Producer& logger,
-    TradeEngine<Strategy>* trade_engine, RiskManager& risk_manager)
+template <typename Strategy, typename OeTraits>
+OrderManager<Strategy, OeTraits>::OrderManager(const common::Logger::Producer& logger,
+    TradeEngine<Strategy, OeTraits>* trade_engine, RiskManager& risk_manager)
     : layer_book_(INI_CONFIG.get("meta", "ticker")),
       trade_engine_(trade_engine),
       risk_manager_(risk_manager),
@@ -46,13 +46,13 @@ OrderManager<Strategy>::OrderManager(const common::Logger::Producer& logger,
           INI_CONFIG.get_double("orders", "ttl_live_ns")) {
   logger_.info("[Constructor] OrderManager Created");
 }
-template <typename Strategy>
-OrderManager<Strategy>::~OrderManager() {
+template <typename Strategy, typename OeTraits>
+OrderManager<Strategy, OeTraits>::~OrderManager() {
   logger_.info("[Destructor] OrderManager Destroy");
 }
 
-template <typename Strategy>
-void OrderManager<Strategy>::on_order_updated(
+template <typename Strategy, typename OeTraits>
+void OrderManager<Strategy, OeTraits>::on_order_updated(
     const ExecutionReport* response) noexcept {
 
   auto& side_book = layer_book_.side_book(response->symbol, response->side);
@@ -102,10 +102,11 @@ void OrderManager<Strategy>::on_order_updated(
           response->cl_order_id.value));
 }
 
-template <typename Strategy>
-void OrderManager<Strategy>::new_order(const TickerId& ticker_id,
+template <typename Strategy, typename OeTraits>
+void OrderManager<Strategy, OeTraits>::new_order(const TickerId& ticker_id,
     const Price price, const Side side, const Qty qty,
-    const OrderId order_id) noexcept {
+    const OrderId order_id,
+    [[maybe_unused]] std::optional<common::PositionSide> position_side) noexcept {
   const RequestCommon new_request{.req_type = ReqeustType::kNewSingleOrderData,
       .cl_order_id = order_id,
       .symbol = ticker_id,
@@ -119,11 +120,12 @@ void OrderManager<Strategy>::new_order(const TickerId& ticker_id,
   logger_.info("[OrderRequest]Sent new order {}", new_request.toString());
 }
 
-template <typename Strategy>
-void OrderManager<Strategy>::modify_order(const TickerId& ticker_id,
+template <typename Strategy, typename OeTraits>
+void OrderManager<Strategy, OeTraits>::modify_order(const TickerId& ticker_id,
     const OrderId& cancel_new_order_id, const OrderId& order_id,
     const OrderId& original_order_id, Price price, Side side,
-    const Qty qty) noexcept {
+    const Qty qty,
+    [[maybe_unused]] std::optional<common::PositionSide> position_side) noexcept {
   const RequestCommon new_request{
       .req_type = ReqeustType::kOrderCancelRequestAndNewOrderSingle,
       .cl_cancel_order_id = cancel_new_order_id,
@@ -141,8 +143,8 @@ void OrderManager<Strategy>::modify_order(const TickerId& ticker_id,
       new_request.toString());
 }
 
-template <typename Strategy>
-void OrderManager<Strategy>::cancel_order(const TickerId& ticker_id,
+template <typename Strategy, typename OeTraits>
+void OrderManager<Strategy, OeTraits>::cancel_order(const TickerId& ticker_id,
     const OrderId& original_order_id, const OrderId& order_id) noexcept {
   const RequestCommon cancel_request{
       .req_type = ReqeustType::kOrderCancelRequest,
@@ -154,8 +156,8 @@ void OrderManager<Strategy>::cancel_order(const TickerId& ticker_id,
   logger_.info("[OrderRequest]Sent cancel {}", cancel_request.toString());
 }
 
-template <typename Strategy>
-void OrderManager<Strategy>::on_instrument_info(
+template <typename Strategy, typename OeTraits>
+void OrderManager<Strategy, OeTraits>::on_instrument_info(
     const InstrumentInfo& instrument_info) noexcept {
   if (!instrument_info.symbols.empty()) {
     venue_policy_.set_qty_increment(
@@ -165,9 +167,9 @@ void OrderManager<Strategy>::on_instrument_info(
   }
 }
 
-template <typename Strategy>
-void OrderManager<Strategy>::apply(
-    const std::vector<QuoteIntent>& intents) noexcept {
+template <typename Strategy, typename OeTraits>
+void OrderManager<Strategy, OeTraits>::apply(
+    const std::vector<QuoteIntentType>& intents) noexcept {
   START_MEASURE(Trading_OrderManager_apply);
 
   auto actions = reconciler_.diff(intents, layer_book_, fast_clock_);
@@ -215,7 +217,7 @@ void OrderManager<Strategy>::apply(
   filter_by_risk(intents, actions);
 
   for (auto& action : actions.news) {
-    auto& side_book = layer_book_.side_book(ticker, action.side);
+    auto& side_book = layer_book_.side_book(ticker, action.side, action.position_side);
     auto& [state, price, qty, last_used, cl_order_id] =
         side_book.slots[action.layer];
 
@@ -236,7 +238,8 @@ void OrderManager<Strategy>::apply(
         action.price,
         action.side,
         action.qty,
-        action.cl_order_id);
+        action.cl_order_id,
+        action.position_side);
     position_tracker_.add_reserved(action.side, action.qty);
 
     logger_.info("[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}, "
@@ -255,7 +258,7 @@ void OrderManager<Strategy>::apply(
         now);
   }
   for (auto& action : actions.repls) {
-    auto& side_book = layer_book_.side_book(ticker, action.side);
+    auto& side_book = layer_book_.side_book(ticker, action.side, action.position_side);
     auto& slot = side_book.slots[action.layer];
 
     const uint64_t tick = tick_converter_.to_ticks(action.price.value);
@@ -301,7 +304,8 @@ void OrderManager<Strategy>::apply(
         action.original_cl_order_id,
         action.price,
         action.side,
-        action.qty);
+        action.qty,
+        action.position_side);
 
     const auto delta_qty = action.qty - action.last_qty;
     position_tracker_.add_reserved(action.side, delta_qty);
@@ -320,7 +324,7 @@ void OrderManager<Strategy>::apply(
         now);
   }
   for (auto& action : actions.cancels) {
-    auto& side_book = layer_book_.side_book(ticker, action.side);
+    auto& side_book = layer_book_.side_book(ticker, action.side, action.position_side);
     auto& slot = side_book.slots[action.layer];
     slot.state = OMOrderState::kCancelReserved;
     slot.last_used = now;
@@ -370,9 +374,9 @@ void OrderManager<Strategy>::apply(
   END_MEASURE(Trading_OrderManager_apply, logger_);
 }
 
-template <typename Strategy>
-void OrderManager<Strategy>::filter_by_risk(
-    const std::vector<QuoteIntent>& intents, order::Actions& acts) {
+template <typename Strategy, typename OeTraits>
+void OrderManager<Strategy, OeTraits>::filter_by_risk(
+    const std::vector<QuoteIntentType>& intents, order::Actions& acts) {
   const auto& ticker = intents.empty() ? std::string{} : intents.front().ticker;
   auto running = position_tracker_.get_reserved();
   auto allow_new = [&](auto& actions) {
@@ -408,14 +412,14 @@ void OrderManager<Strategy>::filter_by_risk(
   allow_repl(acts.repls);
 }
 
-template <typename Strategy>
-OrderId OrderManager<Strategy>::gen_order_id() noexcept {
+template <typename Strategy, typename OeTraits>
+OrderId OrderManager<Strategy, OeTraits>::gen_order_id() noexcept {
   const auto now = fast_clock_.get_timestamp();
   return OrderId{now};
 }
 
-template <typename Strategy>
-void OrderManager<Strategy>::dump_all_slots(const std::string& symbol,
+template <typename Strategy, typename OeTraits>
+void OrderManager<Strategy, OeTraits>::dump_all_slots(const std::string& symbol,
     std::string_view context) noexcept {
   logger_.debug("[SLOT_DUMP] ========== {} ==========", context);
   logger_.debug("[SLOT_DUMP] Symbol: {}, Reserved: {:.10f}",

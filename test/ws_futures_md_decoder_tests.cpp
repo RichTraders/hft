@@ -255,3 +255,43 @@ TEST_F(WsFuturesMdDecoderTest, Decode_InvalidJson_ReturnsMonostate) {
 
   EXPECT_TRUE(futures_test_utils::holds_type<std::monostate>(wire_msg));
 }
+
+// ============================================================================
+// ExchangeInfoResponse Tests
+// ============================================================================
+
+TEST_F(WsFuturesMdDecoderTest, DecodeExchangeInfo_RealData_ParsesCorrectly) {
+  // Load from response directory
+  std::string path = "data/binance_futures/json/response/exchange_info.json";
+  std::ifstream file(path);
+  if (!file.is_open()) {
+    GTEST_SKIP() << "exchange_info.json not available";
+  }
+
+  std::string json{std::istreambuf_iterator<char>(file),
+                   std::istreambuf_iterator<char>()};
+
+  EXPECT_TRUE(futures_test_utils::is_valid_json(json));
+
+  // Parse directly with glaze since the JSON file contains raw ExchangeInfo data
+  schema::futures::ExchangeInfoHttpResponse exchange_info;
+  auto error = glz::read_json(exchange_info, json);
+  ASSERT_FALSE(error) << "Failed to parse exchange_info.json: "
+                      << glz::format_error(error, json);
+
+  // Verify exchange info data
+  EXPECT_EQ(exchange_info.timezone, "UTC");
+  EXPECT_FALSE(exchange_info.symbols.empty());
+
+  // Verify BTCUSDT exists
+  auto it = std::find_if(exchange_info.symbols.begin(),
+                          exchange_info.symbols.end(),
+                          [](const auto& sym) { return sym.symbol == "BTCUSDT"; });
+  ASSERT_NE(it, exchange_info.symbols.end()) << "BTCUSDT not found in symbols";
+
+  const auto& btc_symbol = *it;
+  EXPECT_EQ(btc_symbol.status, "TRADING");
+  EXPECT_EQ(btc_symbol.base_asset, "BTC");
+  EXPECT_EQ(btc_symbol.quote_asset, "USDT");
+  EXPECT_EQ(btc_symbol.contract_type, "PERPETUAL");
+}

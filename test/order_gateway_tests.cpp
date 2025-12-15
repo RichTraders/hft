@@ -20,12 +20,21 @@
 #include "trade_engine.h"
 #include "types.h"
 
+#ifdef USE_FUTURES_API
+#include "core/websocket/order_entry/exchanges/binance/futures/binance_futures_oe_traits.h"
+using TestOeTraits = BinanceFuturesOeTraits;
+#else
+#include "core/websocket/order_entry/exchanges/binance/spot/binance_spot_oe_traits.h"
+using TestOeTraits = BinanceSpotOeTraits;
+#endif
+
 using namespace core;
 using namespace common;
 using namespace trading;
 
-using TestTradeEngine = TradeEngine<SelectedStrategy>;
-using TestOrderGateway = OrderGateway<SelectedStrategy>;
+using TestStrategy = SelectedStrategy<TestOeTraits>;
+using TestTradeEngine = TradeEngine<TestStrategy, TestOeTraits>;
+using TestOrderGateway = OrderGateway<TestStrategy, TestOeTraits>;
 
 constexpr int cl_order_id = 2075;
 

@@ -25,25 +25,25 @@
 namespace trading {
 class PositionKeeper;
 struct ExecutionReport;
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 class FeatureEngine;
 class RiskManager;
-template <class Strategy>
+template <typename Strategy, typename OeTraits>
 class OrderManager;
 class ResponseManager;
 
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 class OrderGateway;
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 class MarketOrderBook;
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 using MarketOrderBookHashMap =
-    std::map<std::string, std::unique_ptr<MarketOrderBook<Strategy>>>;
+    std::map<std::string, std::unique_ptr<MarketOrderBook<Strategy, OeTraits>>>;
 
 constexpr std::size_t kMarketDataCapacity = 128;
 constexpr int kResponseQueueSize = 64;
 
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 class TradeEngine {
  public:
   explicit TradeEngine(common::Logger* logger,
@@ -51,18 +51,20 @@ class TradeEngine {
       common::MemoryPool<MarketData>* market_data_pool,
       ResponseManager* response_manager,
       const common::TradeEngineCfgHashMap& ticker_cfg)
-    requires std::is_constructible_v<Strategy, OrderManager<Strategy>*,
-        const FeatureEngine<Strategy>*, const common::Logger::Producer&,
-        const common::TradeEngineCfgHashMap&>;
+    requires std::is_constructible_v<Strategy,
+        OrderManager<Strategy, OeTraits>*,
+        const FeatureEngine<Strategy, OeTraits>*,
+        const common::Logger::Producer&, const common::TradeEngineCfgHashMap&>;
   ~TradeEngine();
 
-  void init_order_gateway(OrderGateway<Strategy>* order_gateway);
+  void init_order_gateway(OrderGateway<Strategy, OeTraits>* order_gateway);
   void stop();
   bool on_market_data_updated(MarketUpdateData* data);
   void on_orderbook_updated(const common::TickerId& ticker, common::Price price,
-      common::Side side, MarketOrderBook<Strategy>* market_order_book);
+      common::Side side,
+      MarketOrderBook<Strategy, OeTraits>* market_order_book);
   void on_trade_updated(const MarketData* market_data,
-      MarketOrderBook<Strategy>* order_book);
+      MarketOrderBook<Strategy, OeTraits>* order_book);
   void on_order_updated(const ExecutionReport* report) noexcept;
   bool enqueue_response(const ResponseCommon& response);
   void send_request(const RequestCommon& request);
@@ -78,19 +80,19 @@ class TradeEngine {
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
   ResponseManager* response_manager_;
-  OrderGateway<Strategy>* order_gateway_;
+  OrderGateway<Strategy, OeTraits>* order_gateway_;
   std::unique_ptr<common::SPSCQueue<MarketUpdateData*, kMarketDataCapacity>>
       queue_;
   common::Thread<"TradeEngine"> thread_;
   std::unique_ptr<common::SPSCQueue<ResponseCommon, kResponseQueueSize>>
       response_queue_;
-  MarketOrderBookHashMap<Strategy> ticker_order_book_;
+  MarketOrderBookHashMap<Strategy, OeTraits> ticker_order_book_;
 
   std::atomic<bool> running_{true};
-  std::unique_ptr<FeatureEngine<Strategy>> feature_engine_;
+  std::unique_ptr<FeatureEngine<Strategy, OeTraits>> feature_engine_;
   std::unique_ptr<PositionKeeper> position_keeper_;
   std::unique_ptr<RiskManager> risk_manager_;
-  std::unique_ptr<OrderManager<Strategy>> order_manager_;
+  std::unique_ptr<OrderManager<Strategy, OeTraits>> order_manager_;
 
   Strategy strategy_;
 

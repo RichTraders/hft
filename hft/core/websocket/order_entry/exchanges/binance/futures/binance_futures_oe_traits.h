@@ -76,7 +76,8 @@ struct BinanceFuturesOeTraits {
   }
 
   static constexpr int kPort = 443;
-  static constexpr int kKeepaliveMinutes = 60;
+  // close to 60min, but smaller than 60 min.
+  static constexpr int kKeepaliveMinutes = 58;
   static constexpr int kSecondsPerMinute = 60;
   static constexpr int kMsPerSecond = 1000;
 

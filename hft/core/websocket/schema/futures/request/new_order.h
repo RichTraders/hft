@@ -31,7 +31,7 @@ struct PlaceOrderParams {
   double quantity;
 
   std::optional<std::string> time_in_force;
-  std::optional<std::string> reduce_only;
+  std::optional<std::string> reduce_only{"false"};
   std::optional<std::string> new_client_order_id;
   std::optional<double> stop_price;
 

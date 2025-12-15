@@ -150,14 +150,13 @@ inline std::string toString(SelfTradePreventionMode mode) {
 }
 
 struct NewSingleOrderData {
-  common::OrderId cl_order_id = common::OrderId(common::kOrderIdInvalid);
-  std::string symbol;  // Tag 55: 종목 (예: "BTCUSDT")
-  OrderSide side;      // Tag 54: 매매 방향 ('1' = Buy, '2' = Sell)
-  common::Qty order_qty = common::Qty{.0f};
-  OrderType ord_type;  // Tag 40: 주문 유형 ('1' = Market, '2' = Limit)
-  common::Price price = common::Price{.0f};
-  TimeInForce
-      time_in_force;  // Tag 59: 주문 유효 기간 ('0' = Day, '1' = GTC 등)
+  common::OrderId cl_order_id;
+  std::string symbol;
+  OrderSide side;
+  common::Qty order_qty;
+  OrderType ord_type;
+  common::Price price;
+  TimeInForce time_in_force;
   SelfTradePreventionMode self_trade_prevention_mode =
       SelfTradePreventionMode::kExpireTaker;
 };

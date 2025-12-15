@@ -16,12 +16,19 @@
 #include "strategy_config.hpp"
 #include "trade_engine.h"
 
+#ifdef USE_FUTURES_API
+#include "core/websocket/order_entry/exchanges/binance/futures/binance_futures_oe_traits.h"
+using TestOeTraits = BinanceFuturesOeTraits;
+#else
+#include "core/websocket/order_entry/exchanges/binance/spot/binance_spot_oe_traits.h"
+using TestOeTraits = BinanceSpotOeTraits;
+#endif
+
 using namespace trading;
 using namespace common;
-using TestTradeEngine =
-    trading::TradeEngine<SelectedStrategy>;
-using TestOrderBook =
-    trading::MarketOrderBook<SelectedStrategy>;
+using TestStrategy = SelectedStrategy<TestOeTraits>;
+using TestTradeEngine = trading::TradeEngine<TestStrategy, TestOeTraits>;
+using TestOrderBook = trading::MarketOrderBook<TestStrategy, TestOeTraits>;
 
 class MarketOrderBookTest : public ::testing::Test {
 public:

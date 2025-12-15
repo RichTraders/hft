@@ -81,9 +81,17 @@ struct Order {
   }
 };
 
-struct QuoteIntent {
+struct SpotQuoteIntent {
   common::TickerId ticker;
   common::Side side;
+  std::optional<common::Price> price;
+  common::Qty qty;
+};
+
+struct FuturesQuoteIntent {
+  common::TickerId ticker;
+  common::Side side;
+  common::PositionSide position_side;
   std::optional<common::Price> price;
   common::Qty qty;
 };

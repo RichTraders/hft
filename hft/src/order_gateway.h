@@ -18,11 +18,11 @@
 #include "protocol_impl.h"
 
 namespace trading {
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 class TradeEngine;
 class ResponseManager;
 
-template <typename Strategy>
+template <typename Strategy, typename OeTraits>
 class OrderGateway {
  public:
   using OeApp = protocol_impl::OrderEntryApp;
@@ -37,7 +37,7 @@ class OrderGateway {
   OrderGateway(common::Logger* logger, ResponseManager* response_manager);
   ~OrderGateway();
 
-  void init_trade_engine(TradeEngine<Strategy>* trade_engine);
+  void init_trade_engine(TradeEngine<Strategy, OeTraits>* trade_engine);
   void stop() const;
 
   void on_login(WireMessage msg);
@@ -64,7 +64,7 @@ class OrderGateway {
   void register_typed_callback(const std::string& type, Handler&& handler);
 
   common::Logger::Producer logger_;
-  TradeEngine<Strategy>* trade_engine_;
+  TradeEngine<Strategy, OeTraits>* trade_engine_;
 
   std::unique_ptr<OeApp> app_;
 };

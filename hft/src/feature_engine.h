@@ -22,7 +22,7 @@ namespace common {
 class Logger;
 }
 namespace trading {
-template <class Strategy>
+template <typename Strategy, typename OeTraits>
 class FeatureEngine {
  public:
   explicit FeatureEngine(const common::Logger::Producer& logger)
@@ -35,9 +35,9 @@ class FeatureEngine {
 
   ~FeatureEngine() { logger_.info("[Destructor] FeatureEngine Destroy"); }
   auto on_trade_updated(const MarketData* market_update,
-      MarketOrderBook<Strategy>* book) noexcept -> void;
+      MarketOrderBook<Strategy, OeTraits>* book) noexcept -> void;
   auto on_order_book_updated(common::Price price, common::Side side,
-      MarketOrderBook<Strategy>* book) noexcept -> void;
+      MarketOrderBook<Strategy, OeTraits>* book) noexcept -> void;
   static double vwap_from_levels(const std::vector<LevelView>& level);
   static double orderbook_imbalance_from_levels(
       const std::vector<double>& bid_levels,

@@ -19,9 +19,9 @@
 
 namespace trading {
 
-template <typename Strategy>
-MarketConsumer<Strategy>::MarketConsumer(common::Logger* logger,
-    TradeEngine<Strategy>* trade_engine,
+template <typename Strategy, typename OeTraits>
+MarketConsumer<Strategy, OeTraits>::MarketConsumer(common::Logger* logger,
+    TradeEngine<Strategy, OeTraits>* trade_engine,
     common::MemoryPool<MarketUpdateData>* market_update_data_pool,
     common::MemoryPool<MarketData>* market_data_pool)
     : market_update_data_pool_(market_update_data_pool),
@@ -61,18 +61,18 @@ MarketConsumer<Strategy>::MarketConsumer(common::Logger* logger,
   logger_.info("[Constructor] MarketConsumer Created");
 }
 
-template <typename Strategy>
-MarketConsumer<Strategy>::~MarketConsumer() {
+template <typename Strategy, typename OeTraits>
+MarketConsumer<Strategy, OeTraits>::~MarketConsumer() {
   std::cout << "[Destructor] MarketConsumer Destroy\n";
 }
 
-template <typename Strategy>
-void MarketConsumer<Strategy>::stop() {
+template <typename Strategy, typename OeTraits>
+void MarketConsumer<Strategy, OeTraits>::stop() {
   app_->stop();
 }
 
-template <typename Strategy>
-void MarketConsumer<Strategy>::on_login(WireMessage msg) {
+template <typename Strategy, typename OeTraits>
+void MarketConsumer<Strategy, OeTraits>::on_login(WireMessage msg) {
 #ifdef ENABLE_WEBSOCKET
   ProtocolPolicy::handle_login(*app_, msg, state_, buffered_events_,
       first_buffered_update_id_, logger_, on_instrument_info_fn_);
@@ -84,8 +84,8 @@ void MarketConsumer<Strategy>::on_login(WireMessage msg) {
 #endif
 }
 
-template <typename Strategy>
-void MarketConsumer<Strategy>::on_snapshot(WireMessage msg) {
+template <typename Strategy, typename OeTraits>
+void MarketConsumer<Strategy, OeTraits>::on_snapshot(WireMessage msg) {
   logger_.info("[MarketConsumer]Snapshot making start");
 
   auto* snapshot_data = market_update_data_pool_->allocate(
@@ -230,8 +230,8 @@ void MarketConsumer<Strategy>::on_snapshot(WireMessage msg) {
   logger_.info("[MarketConsumer]Snapshot Done");
 }
 
-template <typename Strategy>
-void MarketConsumer<Strategy>::on_subscribe(WireMessage msg) {
+template <typename Strategy, typename OeTraits>
+void MarketConsumer<Strategy, OeTraits>::on_subscribe(WireMessage msg) {
 #ifdef ENABLE_WEBSOCKET
   ProtocolPolicy::handle_subscribe(*app_, msg, state_, buffered_events_,
       first_buffered_update_id_, update_index_, first_depth_after_snapshot_,
@@ -250,8 +250,8 @@ void MarketConsumer<Strategy>::on_subscribe(WireMessage msg) {
 
 // resubscribe implementation moved to MarketConsumerRecoveryMixin
 
-template <typename Strategy>
-void MarketConsumer<Strategy>::on_reject(WireMessage msg) const {
+template <typename Strategy, typename OeTraits>
+void MarketConsumer<Strategy, OeTraits>::on_reject(WireMessage msg) const {
   const auto rejected_message = app_->create_reject_message(msg);
   logger_.error("[MarketConsumer][Message] {}", rejected_message.toString());
   if (rejected_message.session_reject_reason == "A") {
@@ -259,13 +259,13 @@ void MarketConsumer<Strategy>::on_reject(WireMessage msg) const {
   }
 }
 
-template <typename Strategy>
-void MarketConsumer<Strategy>::on_logout(WireMessage /*msg*/) const {
+template <typename Strategy, typename OeTraits>
+void MarketConsumer<Strategy, OeTraits>::on_logout(WireMessage /*msg*/) const {
   logger_.info("[MarketConsumer][Message] logout");
 }
 
-template <typename Strategy>
-void MarketConsumer<Strategy>::on_instrument_list(WireMessage msg) const {
+template <typename Strategy, typename OeTraits>
+void MarketConsumer<Strategy, OeTraits>::on_instrument_list(WireMessage msg) const {
   const InstrumentInfo instrument_message =
       app_->create_instrument_list_message(msg);
   logger_.info("[MarketConsumer][Message] on_instrument_list :{}",
@@ -273,8 +273,8 @@ void MarketConsumer<Strategy>::on_instrument_list(WireMessage msg) const {
   on_instrument_info_fn_(instrument_message);
 }
 
-template <typename Strategy>
-void MarketConsumer<Strategy>::on_heartbeat(WireMessage msg) const {
+template <typename Strategy, typename OeTraits>
+void MarketConsumer<Strategy, OeTraits>::on_heartbeat(WireMessage msg) const {
   auto message = app_->create_heartbeat_message(msg);
   if (UNLIKELY(!app_->send(message))) {
     logger_.error("[MarketConsumer][Message] failed to send heartbeat");

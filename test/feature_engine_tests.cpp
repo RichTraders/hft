@@ -20,14 +20,23 @@
 #include "strategy_config.hpp"
 #include "trade_engine.h"
 
+#ifdef USE_FUTURES_API
+#include "core/websocket/order_entry/exchanges/binance/futures/binance_futures_oe_traits.h"
+using TestOeTraits = BinanceFuturesOeTraits;
+#else
+#include "core/websocket/order_entry/exchanges/binance/spot/binance_spot_oe_traits.h"
+using TestOeTraits = BinanceSpotOeTraits;
+#endif
+
 using ::testing::_;
 using ::testing::HasSubstr;
 using namespace common;
 using namespace trading;
 
-using TestTradeEngine = TradeEngine<SelectedStrategy>;
-using TestFeatureEngine = FeatureEngine<SelectedStrategy>;
-using TestOrderBook = MarketOrderBook<SelectedStrategy>;
+using TestStrategy = SelectedStrategy<TestOeTraits>;
+using TestTradeEngine = TradeEngine<TestStrategy, TestOeTraits>;
+using TestFeatureEngine = FeatureEngine<TestStrategy, TestOeTraits>;
+using TestOrderBook = MarketOrderBook<TestStrategy, TestOeTraits>;
 
 class FeatureEngineTest : public ::testing::Test {
  public:

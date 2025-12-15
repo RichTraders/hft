@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 #ifdef ENABLE_WEBSOCKET
 #include "core/websocket/order_entry/ws_oe_app.h"
+#include "core/websocket/order_entry/exchanges/binance/futures/binance_futures_oe_traits.h"
 #else
 #include "core/fix/fix_oe_app.h"
 #endif
@@ -25,8 +26,15 @@
 using namespace trading;
 using namespace common;
 
-using TestTradeEngine =
-    trading::TradeEngine<SelectedStrategy>;
+#ifdef USE_FUTURES_API
+using TestOeTraits = BinanceFuturesOeTraits;
+#else
+#include "core/websocket/order_entry/exchanges/binance/spot/binance_spot_oe_traits.h"
+using TestOeTraits = BinanceSpotOeTraits;
+#endif
+
+using TestStrategy = SelectedStrategy<TestOeTraits>;
+using TestTradeEngine = trading::TradeEngine<TestStrategy, TestOeTraits>;
 
 class StrategyIntegrationTest : public ::testing::Test {
  protected:

@@ -286,6 +286,36 @@ constexpr auto sideToValue(common::Side side) noexcept {
   return ret;
 }
 
+enum class PositionSide : int8_t {
+  kLong = 0,
+  kShort = 1,
+  kInvalid = 2,
+};
+
+inline auto toString(const PositionSide side) -> std::string {
+  switch (side) {
+    case PositionSide::kLong:
+      return "LONG";
+    case PositionSide::kShort:
+      return "SHORT";
+    case PositionSide::kInvalid:
+      return "INVALID";
+  }
+  return "UNKNOWN";
+}
+
+inline PositionSide toPositionSide(std::string_view str) noexcept {
+  if (str == "LONG")
+    return PositionSide::kLong;
+  if (str == "SHORT")
+    return PositionSide::kShort;
+  return PositionSide::kInvalid;
+}
+
+constexpr auto positionSideToIndex(PositionSide side) noexcept {
+  return static_cast<size_t>(side);
+}
+
 enum class MarketUpdateType : uint8_t {
   kInvalid = 0,
   kClear = 1,

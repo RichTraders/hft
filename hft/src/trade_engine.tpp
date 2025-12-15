@@ -27,14 +27,14 @@
 
 namespace trading {
 
-template <typename Strategy>
-TradeEngine<Strategy>::TradeEngine(common::Logger* logger,
+template <typename Strategy, typename OeTraits>
+TradeEngine<Strategy, OeTraits>::TradeEngine(common::Logger* logger,
     common::MemoryPool<MarketUpdateData>* market_update_data_pool,
     common::MemoryPool<MarketData>* market_data_pool,
     ResponseManager* response_manager,
     const common::TradeEngineCfgHashMap& ticker_cfg)
-  requires std::is_constructible_v<Strategy, OrderManager<Strategy>*,
-               const FeatureEngine<Strategy>*, const common::Logger::Producer&,
+  requires std::is_constructible_v<Strategy, OrderManager<Strategy, OeTraits>*,
+               const FeatureEngine<Strategy, OeTraits>*, const common::Logger::Producer&,
                const common::TradeEngineCfgHashMap&>
     : logger_(logger->make_producer()),
       market_update_data_pool_(market_update_data_pool),
@@ -42,16 +42,16 @@ TradeEngine<Strategy>::TradeEngine(common::Logger* logger,
       response_manager_(response_manager),
       queue_(std::make_unique<
           common::SPSCQueue<MarketUpdateData*, kMarketDataCapacity>>()),
-      feature_engine_(std::make_unique<FeatureEngine<Strategy>>(logger_)),
+      feature_engine_(std::make_unique<FeatureEngine<Strategy, OeTraits>>(logger_)),
       position_keeper_(std::make_unique<PositionKeeper>(logger_)),
       risk_manager_(std::make_unique<RiskManager>(logger_,
           position_keeper_.get(), ticker_cfg)),
-      order_manager_(std::make_unique<OrderManager<Strategy>>(logger_, this,
+      order_manager_(std::make_unique<OrderManager<Strategy, OeTraits>>(logger_, this,
           *risk_manager_)),
       strategy_(order_manager_.get(), feature_engine_.get(), logger_,
           ticker_cfg) {
   const std::string ticker = INI_CONFIG.get("meta", "ticker");
-  auto orderbook = std::make_unique<MarketOrderBook<Strategy>>(ticker, logger_);
+  auto orderbook = std::make_unique<MarketOrderBook<Strategy, OeTraits>>(ticker, logger_);
   response_queue_ =
       std::make_unique<common::SPSCQueue<ResponseCommon, kResponseQueueSize>>();
   orderbook->set_trade_engine(this);
@@ -61,8 +61,8 @@ TradeEngine<Strategy>::TradeEngine(common::Logger* logger,
   logger_.info("[Constructor] TradeEngine Created");
 }
 
-template <typename Strategy>
-TradeEngine<Strategy>::~TradeEngine() {
+template <typename Strategy, typename OeTraits>
+TradeEngine<Strategy, OeTraits>::~TradeEngine() {
   running_.store(false, std::memory_order_release);
   thread_.join();
   // logger_.info("[Thread] TradeEngine finish");
@@ -71,42 +71,42 @@ TradeEngine<Strategy>::~TradeEngine() {
   std::cout << "[Destructor] TradeEngine Destroy\n";
 }
 
-template <typename Strategy>
-void TradeEngine<Strategy>::init_order_gateway(
-    OrderGateway<Strategy>* order_gateway) {
+template <typename Strategy, typename OeTraits>
+void TradeEngine<Strategy, OeTraits>::init_order_gateway(
+    OrderGateway<Strategy, OeTraits>* order_gateway) {
   order_gateway_ = order_gateway;
 }
 
-template <typename Strategy>
-bool TradeEngine<Strategy>::on_market_data_updated(MarketUpdateData* data) {
+template <typename Strategy, typename OeTraits>
+bool TradeEngine<Strategy, OeTraits>::on_market_data_updated(MarketUpdateData* data) {
   return queue_->enqueue(data);
 }
 
-template <typename Strategy>
-void TradeEngine<Strategy>::stop() {
+template <typename Strategy, typename OeTraits>
+void TradeEngine<Strategy, OeTraits>::stop() {
   running_.store(false, std::memory_order_release);
 }
 
-template <typename Strategy>
-void TradeEngine<Strategy>::on_orderbook_updated(const TickerId& ticker,
-    Price price, Side side, MarketOrderBook<Strategy>* order_book) {
+template <typename Strategy, typename OeTraits>
+void TradeEngine<Strategy, OeTraits>::on_orderbook_updated(const TickerId& ticker,
+    Price price, Side side, MarketOrderBook<Strategy, OeTraits>* order_book) {
   START_MEASURE(ORDERBOOK_UPDATED);
   feature_engine_->on_order_book_updated(price, side, order_book);
   strategy_.on_orderbook_updated(ticker, price, side, order_book);
   END_MEASURE(ORDERBOOK_UPDATED, logger_);
 }
 
-template <typename Strategy>
-void TradeEngine<Strategy>::on_trade_updated(const MarketData* market_data,
-    MarketOrderBook<Strategy>* order_book) {
+template <typename Strategy, typename OeTraits>
+void TradeEngine<Strategy, OeTraits>::on_trade_updated(const MarketData* market_data,
+    MarketOrderBook<Strategy, OeTraits>* order_book) {
   START_MEASURE(TRADE_UPDATED);
   feature_engine_->on_trade_updated(market_data, order_book);
   strategy_.on_trade_updated(market_data, order_book);
   END_MEASURE(TRADE_UPDATED, logger_);
 }
 
-template <typename Strategy>
-void TradeEngine<Strategy>::on_order_updated(
+template <typename Strategy, typename OeTraits>
+void TradeEngine<Strategy, OeTraits>::on_order_updated(
     const ExecutionReport* report) noexcept {
   START_MEASURE(Trading_TradeEngine_on_order_updated);
   position_keeper_->add_fill(report);
@@ -117,18 +117,18 @@ void TradeEngine<Strategy>::on_order_updated(
   //logger_.info("[OrderResult]{}", report->toString());
 }
 
-template <typename Strategy>
-bool TradeEngine<Strategy>::enqueue_response(const ResponseCommon& response) {
+template <typename Strategy, typename OeTraits>
+bool TradeEngine<Strategy, OeTraits>::enqueue_response(const ResponseCommon& response) {
   return response_queue_->enqueue(response);
 }
 
-template <typename Strategy>
-void TradeEngine<Strategy>::send_request(const RequestCommon& request) {
+template <typename Strategy, typename OeTraits>
+void TradeEngine<Strategy, OeTraits>::send_request(const RequestCommon& request) {
   order_gateway_->order_request(request);
 }
 
-template <typename Strategy>
-void TradeEngine<Strategy>::run() {
+template <typename Strategy, typename OeTraits>
+void TradeEngine<Strategy, OeTraits>::run() {
   common::WaitStrategy wait;
   while (running_.load(std::memory_order_acquire)) {
     int md_processed = 0;
@@ -190,22 +190,22 @@ void TradeEngine<Strategy>::run() {
   }
 }
 
-template <typename Strategy>
-void TradeEngine<Strategy>::on_order_cancel_reject(
+template <typename Strategy, typename OeTraits>
+void TradeEngine<Strategy, OeTraits>::on_order_cancel_reject(
     const OrderCancelReject* reject) {
   logger_.info("[OrderResult]Order cancel request is rejected. error :{}",
       reject->toString());
 }
 
-template <typename Strategy>
-void TradeEngine<Strategy>::on_order_mass_cancel_report(
+template <typename Strategy, typename OeTraits>
+void TradeEngine<Strategy, OeTraits>::on_order_mass_cancel_report(
     const OrderMassCancelReport* cancel_report) {
   logger_.info("[OrderResult]Order mass cancel is rejected. error:{}",
       cancel_report->toString());
 }
 
-template <typename Strategy>
-void TradeEngine<Strategy>::on_instrument_info(
+template <typename Strategy, typename OeTraits>
+void TradeEngine<Strategy, OeTraits>::on_instrument_info(
     const InstrumentInfo& instrument_info) {
   if (!instrument_info.symbols.empty()) {
     qty_increment_ = instrument_info.symbols[0].min_qty_increment;

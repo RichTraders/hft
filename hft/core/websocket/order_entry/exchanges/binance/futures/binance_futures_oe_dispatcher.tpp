@@ -54,6 +54,9 @@ void BinanceFuturesOeDispatchRouter::process_message(
     else if constexpr (std::is_same_v<T, typename ExchangeTraits::OutboundAccountPositionEnvelope>) {
       handle_account_updated<ExchangeTraits>(arg, context);
     }
+    else if constexpr (std::is_same_v<T, typename ExchangeTraits::ListenKeyExpiredEvent>) {
+      handle_listen_key_expired<ExchangeTraits>(arg, context);
+    }
     else if constexpr (!std::is_same_v<T, std::monostate>) {
       context.logger->warn("[Dispatcher] Unhandled message type");
     }
@@ -326,6 +329,22 @@ void BinanceFuturesOeDispatchRouter::handle_account_updated(
   // std::ostringstream stream;
   // stream << "AccountUpdated : " << envelope.event;
   // context.logger.debug(stream.str());
+}
+
+template <typename ExchangeTraits>
+void BinanceFuturesOeDispatchRouter::handle_listen_key_expired(
+    const typename ExchangeTraits::ListenKeyExpiredEvent& event,
+    const core::WsOeDispatchContext<ExchangeTraits>& context) {
+  context.logger->warn("[Dispatcher] listenKey expired at event_time={}, requesting new listenKey", event.event_time);
+
+  // Request new listenKey - the dispatcher will handle reconnection via handle_user_subscription
+  const std::string user_stream_msg = context.app->create_user_data_stream_subscribe();
+  if (!user_stream_msg.empty()) {
+    context.app->send(user_stream_msg);
+    context.logger->info("[Dispatcher] Sent userDataStream.start to obtain new listenKey");
+  } else {
+    context.logger->error("[Dispatcher] Failed to create userDataStream.start message");
+  }
 }
 
 #endif  //BINANCE_FUTURES_OE_DISPATCHER_TPP

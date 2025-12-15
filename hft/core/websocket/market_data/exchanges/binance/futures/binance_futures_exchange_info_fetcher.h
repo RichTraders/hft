@@ -15,16 +15,16 @@
 
 #include <glaze/glaze.hpp>
 
+#include "../../../../../http/http_client.h"
 #include "common/logger.h"
-#include "http_client.h"
 #include "market_data.h"
 #include "schema/futures/response/exchange_info_response.h"
 
 namespace core::http {
 
-class FuturesExchangeInfoFetcher {
+class BinanceFuturesExchangeInfoFetcher {
  public:
-  explicit FuturesExchangeInfoFetcher(const common::Logger::Producer& logger)
+  explicit BinanceFuturesExchangeInfoFetcher(const common::Logger::Producer& logger)
       : logger_(logger) {}
 
   std::optional<InstrumentInfo> fetch(const std::string& symbol = "") {
@@ -53,7 +53,7 @@ class FuturesExchangeInfoFetcher {
     schema::futures::ExchangeInfoHttpResponse exchange_info;
     const auto parse_result = glz::read_json(exchange_info, response.body);
     if (parse_result) {
-      logger_.error("[FuturesExchangeInfoFetcher] Failed to parse response: {}",
+      logger_.error("[FuturesExchangeInfoFetcher] Failed to parse response: {} {}",
           glz::format_error(parse_result, response.body));
       return std::nullopt;
     }

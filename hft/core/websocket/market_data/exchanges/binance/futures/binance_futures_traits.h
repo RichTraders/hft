@@ -18,6 +18,7 @@
 #include "binance_futures_encoder.hpp"
 #include "binance_futures_formatter.h"
 #include "binance_futures_md_connection_handler.h"
+#include "core/websocket/market_data/exchange_traits.h"
 #include "schema/futures/response/api_response.h"
 #include "schema/futures/response/depth_stream.h"
 #include "schema/futures/response/exchange_info_response.h"
@@ -96,5 +97,8 @@ struct BinanceFuturesTraits {
     return payload.contains("snapshot");
   }
 };
+
+static_assert(ExchangeTraits<BinanceFuturesTraits>,
+    "BinanceFuturesTraits must satisfy ExchangeTraits concept");
 
 #endif  //BINANCE_FUTURES_TRAITS_H

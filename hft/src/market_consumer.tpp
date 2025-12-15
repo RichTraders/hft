@@ -75,12 +75,12 @@ template <typename Strategy>
 void MarketConsumer<Strategy>::on_login(WireMessage msg) {
 #ifdef ENABLE_WEBSOCKET
   ProtocolPolicy::handle_login(*app_, msg, state_, buffered_events_,
-      first_buffered_update_id_, logger_);
+      first_buffered_update_id_, logger_, on_instrument_info_fn_);
 #else
   std::deque<MarketUpdateData*> dummy_buffered;
   uint64_t dummy_first_buffered = 0;
   ProtocolPolicy::handle_login(*app_, msg, state_, dummy_buffered,
-      dummy_first_buffered, logger_);
+      dummy_first_buffered, logger_, on_instrument_info_fn_);
 #endif
 }
 

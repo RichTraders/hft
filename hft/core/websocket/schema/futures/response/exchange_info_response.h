@@ -43,27 +43,32 @@ struct SymbolFilter {
   std::optional<std::string> multiplier_down;
   std::optional<std::string> multiplier_decimal;
 
+  // POSITION_RISK_CONTROL
+  std::optional<std::string> position_control_side;
+
   // clang-format off
   struct glaze {
     using T = SymbolFilter;
     static constexpr auto value = glz::object(
-      "filterType",        &T::filter_type,
+      "filterType",          &T::filter_type,
 
-      "minPrice",          &T::min_price,
-      "maxPrice",          &T::max_price,
-      "tickSize",          &T::tick_size,
+      "minPrice",            &T::min_price,
+      "maxPrice",            &T::max_price,
+      "tickSize",            &T::tick_size,
 
-      "minQty",            &T::min_qty,
-      "maxQty",            &T::max_qty,
-      "stepSize",          &T::step_size,
+      "minQty",              &T::min_qty,
+      "maxQty",              &T::max_qty,
+      "stepSize",            &T::step_size,
 
-      "limit",             &T::limit,
+      "limit",               &T::limit,
 
-      "notional",          &T::notional,
+      "notional",            &T::notional,
 
-      "multiplierUp",      &T::multiplier_up,
-      "multiplierDown",    &T::multiplier_down,
-      "multiplierDecimal", &T::multiplier_decimal
+      "multiplierUp",        &T::multiplier_up,
+      "multiplierDown",      &T::multiplier_down,
+      "multiplierDecimal",   &T::multiplier_decimal,
+
+      "positionControlSide", &T::position_control_side
     );
   };
   // clang-format on
@@ -112,10 +117,12 @@ struct SymbolInfo {
   std::optional<std::string> trigger_protect;
   std::optional<std::string> liquidation_fee;
   std::optional<std::string> market_take_bound;
+  std::optional<int> max_move_order_limit;
 
   std::vector<SymbolFilter> filters;
   std::vector<std::string> order_types;
   std::vector<std::string> time_in_force;
+  std::optional<std::vector<std::string>> permission_sets;
 
   // clang-format off
   struct glaze {
@@ -146,11 +153,13 @@ struct SymbolInfo {
       "triggerProtect",        &T::trigger_protect,
       "liquidationFee",        &T::liquidation_fee,
       "marketTakeBound",       &T::market_take_bound,
+      "maxMoveOrderLimit",     &T::max_move_order_limit,
 
       "filters",               &T::filters,
       "orderTypes",            &T::order_types,
       "OrderType",             &T::order_types,
-      "timeInForce",           &T::time_in_force
+      "timeInForce",           &T::time_in_force,
+      "permissionSets",        &T::permission_sets
     );
   };
   // clang-format on
@@ -160,7 +169,8 @@ struct SymbolInfo {
 struct ExchangeInfoHttpResponse {
   std::string timezone;
   std::uint64_t server_time{};
-  std::vector<RateLimit> rate_limits;
+  std::optional<std::string> futures_type;
+  std::optional<std::vector<RateLimit>> rate_limits;
   std::vector<AssetInfo> assets;
   std::vector<SymbolInfo> symbols;
 
@@ -170,6 +180,7 @@ struct ExchangeInfoHttpResponse {
     static constexpr auto value = glz::object(
       "timezone",       &T::timezone,
       "serverTime",     &T::server_time,
+      "futuresType",    &T::futures_type,
       "rateLimits",     &T::rate_limits,
       "exchangeFilters",&T::rate_limits,
       "assets",         &T::assets,

@@ -19,6 +19,7 @@
 #include "binance_spot_domain_converter.h"
 #include "binance_spot_encoder.h"
 #include "binance_spot_formatter.h"
+#include "core/websocket/market_data/exchange_traits.h"
 #include "schema/spot/response/api_response.h"
 #include "schema/spot/response/depth_stream.h"
 #include "schema/spot/response/exchange_info_response.h"
@@ -94,5 +95,8 @@ struct BinanceSpotTraits {
     return payload.contains("snapshot");
   }
 };
+
+static_assert(ExchangeTraits<BinanceSpotTraits>,
+    "BinanceSpotTraits must satisfy ExchangeTraits concept");
 
 #endif  //BINANCE_SPOT_TRAITS_H

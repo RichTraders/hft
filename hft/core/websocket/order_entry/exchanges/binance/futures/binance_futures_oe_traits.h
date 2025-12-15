@@ -17,6 +17,7 @@
 #include "binance_futures_oe_dispatcher.h"
 #include "binance_futures_oe_encoder.hpp"
 #include "binance_futures_oe_mapper.h"
+#include "core/websocket/order_entry/oe_exchange_traits.h"
 #include "schema/futures/request/cancel_order.h"
 #include "schema/futures/request/modify_order.h"
 #include "schema/futures/request/new_order.h"
@@ -25,6 +26,7 @@
 #include "schema/futures/response/balance_response.h"
 #include "schema/futures/response/cancel_order_response.h"
 #include "schema/futures/response/execution_report.h"
+#include "schema/futures/response/listen_key_expired.h"
 #include "schema/futures/response/modify_order_response.h"
 #include "schema/futures/response/order.h"
 #include "schema/futures/response/session_response.h"
@@ -54,12 +56,13 @@ struct BinanceFuturesOeTraits {
   using BalanceUpdateEnvelope = schema::futures::AccountBalanceResponse;
   using OutboundAccountPositionEnvelope =
       schema::futures::FuturesAccountInfoResponse;
+  using ListenKeyExpiredEvent = schema::futures::ListenKeyExpiredEvent;
 
   using WireMessage = std::variant<std::monostate, ExecutionReportResponse,
       SessionLogonResponse, CancelOrderResponse,
       SessionUserSubscriptionResponse, SessionUserUnsubscriptionResponse,
       ModifyOrderResponse, PlaceOrderResponse, BalanceUpdateEnvelope,
-      OutboundAccountPositionEnvelope, ApiResponse>;
+      OutboundAccountPositionEnvelope, ApiResponse, ListenKeyExpiredEvent>;
 
   static constexpr std::string_view exchange_name() { return "Binance"; }
   static constexpr std::string_view market_type() { return "Futures"; }
@@ -101,5 +104,8 @@ struct BinanceFuturesOeTraits {
 
   static constexpr int get_stream_port() { return kPort; }
 };
+
+static_assert(OeExchangeTraits<BinanceFuturesOeTraits>,
+    "BinanceFuturesOeTraits must satisfy OeExchangeTraits concept");
 
 #endif  // BINANCE_FUTURES_OE_TRAITS_H

@@ -13,7 +13,7 @@
 #include "ws_md_app.h"
 
 #include "authorization.h"
-#include "core/http/futures_exchange_info_fetcher.h"
+#include "exchanges/binance/futures/binance_futures_exchange_info_fetcher.h"
 #include "performance.h"
 
 namespace core {
@@ -181,7 +181,7 @@ MarketDataReject WsMarketDataApp::create_reject_message(
 std::optional<InstrumentInfo> WsMarketDataApp::fetch_instrument_info_http(
     const std::string& symbol) const {
   if constexpr (ExchangeTraits::uses_http_exchange_info()) {
-    http::FuturesExchangeInfoFetcher fetcher(logger_);
+    http::BinanceFuturesExchangeInfoFetcher fetcher(logger_);
     return fetcher.fetch(symbol);
   } else {
     // For Spot or non-HTTP exchange info, return nullopt

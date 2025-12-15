@@ -42,6 +42,8 @@ concept ExchangeTraits = requires(std::string_view payload) {
   { T::is_depth_message(payload) } -> std::same_as<bool>;
   { T::is_trade_message(payload) } -> std::same_as<bool>;
   { T::is_snapshot_message(payload) } -> std::same_as<bool>;
+
+  { T::uses_http_exchange_info() } -> std::same_as<bool>;
 };
 
 #endif  //EXCHANGE_TRAITS_H

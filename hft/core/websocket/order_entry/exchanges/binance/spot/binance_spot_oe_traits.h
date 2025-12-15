@@ -17,6 +17,7 @@
 #include "binance_spot_oe_dispatcher.h"
 #include "binance_spot_oe_encoder.h"
 #include "binance_spot_oe_mapper.h"
+#include "core/websocket/order_entry/oe_exchange_traits.h"
 #include "schema/spot/request/cancel_all_orders.h"
 #include "schema/spot/request/cancel_and_reorder.h"
 #include "schema/spot/request/order_cancel.h"
@@ -87,5 +88,8 @@ struct BinanceSpotOeTraits {
   static constexpr std::string_view get_stream_endpoint_path() { return ""; }
   static constexpr int get_stream_port() { return 0; }
 };
+
+static_assert(OeExchangeTraits<BinanceSpotOeTraits>,
+    "BinanceSpotOeTraits must satisfy OeExchangeTraits concept");
 
 #endif  // BINANCE_SPOT_OE_TRAITS_H

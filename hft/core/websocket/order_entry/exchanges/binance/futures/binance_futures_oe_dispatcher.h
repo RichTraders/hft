@@ -135,6 +135,11 @@ struct BinanceFuturesOeDispatchRouter {
   static void handle_account_updated(
       const typename ExchangeTraits::OutboundAccountPositionEnvelope& envelope,
       const core::WsOeDispatchContext<ExchangeTraits>& context);
+
+  template <typename ExchangeTraits>
+  static void handle_listen_key_expired(
+      const typename ExchangeTraits::ListenKeyExpiredEvent& event,
+      const core::WsOeDispatchContext<ExchangeTraits>& context);
 };
 
 #include "binance_futures_oe_dispatcher.tpp"

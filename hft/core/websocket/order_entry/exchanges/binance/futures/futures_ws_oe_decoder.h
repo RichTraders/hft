@@ -39,6 +39,11 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
               "[executionReport]">(payload);
     }
 
+    if (payload.contains("listenKeyExpired")) {
+      return this->decode_or_log<BinanceFuturesOeTraits::ListenKeyExpiredEvent,
+          "[listenKeyExpired]">(payload);
+    }
+
     schema::WsHeader header{};
     const auto error_code =
         glz::read<glz::opts{.error_on_unknown_keys = 0, .partial_read = 1}>(

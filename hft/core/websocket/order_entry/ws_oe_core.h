@@ -59,6 +59,8 @@ class WsOeCore {
       const trading::OrderCancelRequest& cancel) const;
   [[nodiscard]] std::string create_cancel_and_reorder_message(
       const trading::OrderCancelAndNewOrderSingle& replace) const;
+  [[nodiscard]] std::string create_modify_order_message(
+      const trading::OrderModifyRequest& modify) const;
   [[nodiscard]] std::string create_order_all_cancel(
       const trading::OrderMassCancelRequest& request) const;
 

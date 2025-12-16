@@ -133,6 +133,11 @@ std::string WsOrderEntryApp::create_cancel_and_reorder_message(
   return ws_oe_core_.create_cancel_and_reorder_message(cancel_and_re_order);
 }
 
+std::string WsOrderEntryApp::create_modify_order_message(
+    const trading::OrderModifyRequest& modify_request) const {
+  return ws_oe_core_.create_modify_order_message(modify_request);
+}
+
 std::string WsOrderEntryApp::create_order_all_cancel(
     const trading::OrderMassCancelRequest& all_order_cancel) const {
   return ws_oe_core_.create_order_all_cancel(all_order_cancel);
@@ -172,6 +177,7 @@ void WsOrderEntryApp::post_new_order(const trading::NewSingleOrderData& data) {
   request.order_qty = data.order_qty;
   request.ord_type = data.ord_type;
   request.time_in_force = data.time_in_force;
+  request.position_side = data.position_side;
   ws_order_manager_.register_pending_request(request);
 }
 
@@ -180,13 +186,12 @@ void WsOrderEntryApp::post_cancel_order(
   PendingOrderRequest request;
   request.client_order_id = data.cl_order_id.value;
   request.symbol = data.symbol;
-  // Cancel requests have minimal info - only clientOrderId and symbol matter
+  request.position_side = data.position_side;
   ws_order_manager_.register_pending_request(request);
 }
 
 void WsOrderEntryApp::post_cancel_and_reorder(
     const trading::OrderCancelAndNewOrderSingle& data) {
-  // Track the NEW order information (not the cancel part)
   PendingOrderRequest request;
   request.client_order_id = data.cl_new_order_id.value;
   request.symbol = data.symbol;
@@ -195,6 +200,21 @@ void WsOrderEntryApp::post_cancel_and_reorder(
   request.order_qty = data.order_qty;
   request.ord_type = data.ord_type;
   request.time_in_force = data.time_in_force;
+  request.position_side = data.position_side;
+  ws_order_manager_.register_pending_request(request);
+}
+
+void WsOrderEntryApp::post_modify_order(
+    const trading::OrderModifyRequest& data) {
+  PendingOrderRequest request;
+  request.client_order_id = data.order_id.value;
+  request.symbol = data.symbol;
+  request.side = trading::to_common_side(data.side);
+  request.price = data.price;
+  request.order_qty = data.order_qty;
+  request.ord_type = trading::OrderType::kLimit;
+  request.time_in_force = trading::TimeInForce::kGoodTillCancel;
+  request.position_side = data.position_side;
   ws_order_manager_.register_pending_request(request);
 }
 
@@ -203,7 +223,6 @@ void WsOrderEntryApp::post_mass_cancel_order(
   PendingOrderRequest request;
   request.client_order_id = data.cl_order_id.value;
   request.symbol = data.symbol;
-  // Mass cancel has minimal info
   ws_order_manager_.register_pending_request(request);
 }
 

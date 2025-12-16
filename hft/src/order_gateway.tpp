@@ -21,32 +21,28 @@ class TradeEngine;
 
 template <typename Strategy, typename OeTraits>
 template <typename Handler>
-void OrderGateway<Strategy, OeTraits>::register_simple_callback(const std::string& type,
-    Handler&& handler) {
+void OrderGateway<Strategy, OeTraits>::register_simple_callback(
+    const std::string& type, Handler&& handler) {
   app_->register_callback(type,
-      [func = std::forward<Handler>(handler)](auto&& msg) {
-        func(MessagePolicy::adapt(msg));
-      });
+      [func = std::forward<Handler>(handler)](
+          auto&& msg) { func(MessagePolicy::adapt(msg)); });
 }
 
 template <typename Strategy, typename OeTraits>
 template <typename TargetType, typename Handler>
-void OrderGateway<Strategy, OeTraits>::register_typed_callback(const std::string& type,
-    Handler&& handler) {
+void OrderGateway<Strategy, OeTraits>::register_typed_callback(
+    const std::string& type, Handler&& handler) {
   app_->register_callback(type,
-      [func = std::forward<Handler>(handler)](auto&& msg) {
-        func(MessagePolicy::extract<TargetType>(msg));
-      });
+      [func = std::forward<Handler>(handler)](
+          auto&& msg) { func(MessagePolicy::extract<TargetType>(msg)); });
 }
 
 template <typename Strategy, typename OeTraits>
 OrderGateway<Strategy, OeTraits>::OrderGateway(common::Logger* logger,
     ResponseManager* response_manager)
-  : logger_(logger->make_producer()),
-    app_(std::make_unique<OeApp>("BMDWATCH",
-        "SPOT",
-        logger,
-        response_manager)) {
+    : logger_(logger->make_producer()),
+      app_(std::make_unique<OeApp>("BMDWATCH", "SPOT", logger,
+          response_manager)) {
 
   register_simple_callback("A", [this](auto msg) { on_login(msg); });
   register_simple_callback("1", [this](auto msg) { on_heartbeat(msg); });
@@ -175,6 +171,9 @@ void OrderGateway<Strategy, OeTraits>::order_request(
     case ReqeustType::kOrderCancelRequestAndNewOrderSingle:
       order_cancel_request_and_new_order_single(request);
       break;
+    case ReqeustType::kOrderModify:
+      order_modify(request);
+      break;
     case ReqeustType::kOrderMassCancelRequest:
       order_mass_cancel_request(request);
       break;
@@ -189,14 +188,14 @@ template <typename Strategy, typename OeTraits>
 void OrderGateway<Strategy, OeTraits>::new_single_order_data(
     const RequestCommon& request) {
   const NewSingleOrderData order_data{.cl_order_id = request.cl_order_id,
-                                      .symbol = request.symbol,
-                                      .side = from_common_side(request.side),
-                                      .order_qty = request.order_qty,
-                                      .ord_type = request.ord_type,
-                                      .price = request.price,
-                                      .time_in_force = request.time_in_force,
-                                      .self_trade_prevention_mode = request.
-                                      self_trade_prevention_mode};
+      .symbol = request.symbol,
+      .side = from_common_side(request.side),
+      .order_qty = request.order_qty,
+      .ord_type = request.ord_type,
+      .price = request.price,
+      .time_in_force = request.time_in_force,
+      .self_trade_prevention_mode = request.self_trade_prevention_mode,
+      .position_side = request.position_side};
 
   const std::string msg = app_->create_order_message(order_data);
   logger_.info("[Message]Send order message:{}", msg);
@@ -213,9 +212,9 @@ template <typename Strategy, typename OeTraits>
 void OrderGateway<Strategy, OeTraits>::order_cancel_request(
     const RequestCommon& request) {
   const OrderCancelRequest cancel_request{.cl_order_id = request.cl_order_id,
-                                          .orig_cl_order_id = request.
-                                          orig_cl_order_id,
-                                          .symbol = request.symbol};
+      .orig_cl_order_id = request.orig_cl_order_id,
+      .symbol = request.symbol,
+      .position_side = request.position_side};
 
   const std::string msg = app_->create_cancel_order_message(cancel_request);
   logger_.debug("[Message]Send cancel order message:{}", msg);
@@ -228,8 +227,8 @@ void OrderGateway<Strategy, OeTraits>::order_cancel_request(
 }
 
 template <typename Strategy, typename OeTraits>
-void OrderGateway<Strategy, OeTraits>::order_cancel_request_and_new_order_single(
-    const RequestCommon& request) {
+void OrderGateway<Strategy, OeTraits>::
+    order_cancel_request_and_new_order_single(const RequestCommon& request) {
   const OrderCancelAndNewOrderSingle cancel_and_reorder{
       .order_cancel_request_and_new_order_single_mode = 1,
       .cancel_new_order_id = request.cl_cancel_order_id,
@@ -241,7 +240,8 @@ void OrderGateway<Strategy, OeTraits>::order_cancel_request_and_new_order_single
       .ord_type = request.ord_type,
       .price = request.price,
       .time_in_force = request.time_in_force,
-      .self_trade_prevention_mode = request.self_trade_prevention_mode};
+      .self_trade_prevention_mode = request.self_trade_prevention_mode,
+      .position_side = request.position_side};
 
   const std::string msg =
       app_->create_cancel_and_reorder_message(cancel_and_reorder);
@@ -251,6 +251,27 @@ void OrderGateway<Strategy, OeTraits>::order_cancel_request_and_new_order_single
     logger_.error("[Message] failed to create_cancel_and_new_order");
   } else {
     app_->post_cancel_and_reorder(cancel_and_reorder);
+  }
+}
+
+template <typename Strategy, typename OeTraits>
+void OrderGateway<Strategy, OeTraits>::order_modify(
+    const RequestCommon& request) {
+  const OrderModifyRequest modify_request{
+      .order_id = request.orig_cl_order_id,  // Reuse existing order ID
+      .symbol = request.symbol,
+      .side = from_common_side(request.side),
+      .price = request.price,
+      .order_qty = request.order_qty,
+      .position_side = request.position_side};
+
+  const std::string msg = app_->create_modify_order_message(modify_request);
+  logger_.debug("[Message]Send modify order message:{}", msg);
+
+  if (UNLIKELY(!app_->send(msg))) {
+    logger_.error("[Message] failed to send order_modify");
+  } else {
+    app_->post_modify_order(modify_request);
   }
 }
 
@@ -269,9 +290,8 @@ void OrderGateway<Strategy, OeTraits>::order_mass_cancel_request(
   } else {
     app_->post_mass_cancel_order(all_cancel_request);
   }
-
 }
 
-} // namespace trading
+}  // namespace trading
 
 #endif  // ORDER_GATEWAY_TPP

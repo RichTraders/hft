@@ -30,6 +30,7 @@ struct PendingOrderRequest {
   common::Qty order_qty{0.0};
   trading::OrderType ord_type{trading::OrderType::kInvalid};
   trading::TimeInForce time_in_force{trading::TimeInForce::kInvalid};
+  std::optional<common::PositionSide> position_side;
 };
 
 template <typename ExchangeTraits>
@@ -110,6 +111,14 @@ class WsOrderManager {
       event.time_in_force = trading::toString(pending.time_in_force);
       event.order_price = pending.price.value;
       event.order_quantity = pending.order_qty.value;
+
+      if constexpr (ExchangeTraits::requires_listen_key()) {
+        if (pending.position_side) {
+          event.position_side = common::toString(*pending.position_side);
+        } else {
+          event.position_side = "BOTH";  // Default for futures
+        }
+      }
     } else {
       event.symbol = "";
       event.side = "UNKNOWN";
@@ -117,6 +126,10 @@ class WsOrderManager {
       event.time_in_force = "UNKNOWN";
       event.order_price = 0.0;
       event.order_quantity = 0.0;
+
+      if constexpr (ExchangeTraits::requires_listen_key()) {
+        event.position_side = "BOTH";
+      }
     }
 
     logger_.info(

@@ -21,6 +21,7 @@ struct CancelOrderParams {
   std::optional<std::uint64_t> order_id{};
   std::string symbol;
   std::optional<std::string> client_order_id;
+  std::optional<std::string> position_side;  // For futures trading
 
   std::uint64_t timestamp;
   std::optional<std::string> api_key;
@@ -36,7 +37,8 @@ struct CancelOrderParams {
       "apiKey",         &T::api_key,
       "signature",      &T::signature,
       "orderId",        &T::order_id,
-      "clientOrderId",  &T::client_order_id
+      "clientOrderId",  &T::client_order_id,
+      "positionSide",   &T::position_side
     );
   };
   // clang-format on
@@ -44,7 +46,7 @@ struct CancelOrderParams {
 
 struct OrderCancelRequest {
   std::string id;
-  std::string method = "order.place";
+  std::string method = "order.cancel";
   CancelOrderParams params;
 
   // clang-format off

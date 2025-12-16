@@ -31,7 +31,7 @@ struct PlaceOrderParams {
   double quantity;
 
   std::optional<std::string> time_in_force;
-  std::optional<std::string> reduce_only{"false"};
+  std::optional<std::string> reduce_only;
   std::optional<std::string> new_client_order_id;
   std::optional<double> stop_price;
 
@@ -54,17 +54,14 @@ struct PlaceOrderParams {
   struct glaze {
     using T = PlaceOrderParams;
     static constexpr auto value = glz::object(
-      // Mandatory
       "symbol",         &T::symbol,
       "side",           &T::side,
       "type",           &T::type,
       "timestamp",      &T::timestamp,
 
-      // Authentication
       "apiKey",         &T::api_key,
       "signature",      &T::signature,
 
-      // Optionals
       "positionSide",   &T::position_side,
       "price",          &T::price,
       "quantity",       &T::quantity,
@@ -89,8 +86,23 @@ struct PlaceOrderParams {
 
 struct OrderPlaceRequest {
   std::string id;
-  std::string method = "order.place"; // 기본값
+  std::string method = "order.place";
   PlaceOrderParams params;
+
+  struct ErrorT {
+    std::string message;
+    int code;
+    // clang-format off
+    struct glaze {
+      using T = ErrorT;
+      static constexpr auto value = glz::object(
+        "msg",  &T::message,
+        "code", &T::code
+      );
+    };
+    // clang-format on
+  };
+  std::optional<ErrorT> error;
 
   // clang-format off
   struct glaze {
@@ -98,12 +110,13 @@ struct OrderPlaceRequest {
     static constexpr auto value = glz::object(
       "id",     &T::id,
       "method", &T::method,
-      "params", &T::params
+      "params", &T::params,
+      "error", &T::error
     );
   };
   // clang-format on
 };
-}
-}
+}  // namespace futures
+}  // namespace schema
 
-#endif //NEW_ORDER_H
+#endif  //NEW_ORDER_H

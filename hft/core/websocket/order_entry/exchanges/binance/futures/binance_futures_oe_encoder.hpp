@@ -120,6 +120,7 @@ class BinanceFuturesOeEncoder {
 
     return request_str;
   }
+
   [[nodiscard]] std::string create_order_message(
       const trading::NewSingleOrderData& order) const {
     schema::futures::OrderPlaceRequest payload;
@@ -139,9 +140,17 @@ class BinanceFuturesOeEncoder {
     payload.params.self_trade_prevention_mode =
         toString(order.self_trade_prevention_mode);
 
+    if (order.position_side) {
+      payload.params.position_side = common::toString(*order.position_side);
+    }
+
     payload.params.timestamp = util::get_timestamp_epoch();
-    return glz::write_json(payload).value_or(std::string{});
+
+    const auto json_str = glz::write_json(payload).value_or(std::string{});
+
+    return json_str;
   }
+
   [[nodiscard]] std::string create_cancel_order_message(
       const trading::OrderCancelRequest& cancel) const {
     schema::futures::OrderCancelRequest payload;
@@ -150,6 +159,10 @@ class BinanceFuturesOeEncoder {
     payload.params.symbol = cancel.symbol;
     payload.params.client_order_id =
         std::to_string(cancel.orig_cl_order_id.value);
+
+    if (cancel.position_side) {
+      payload.params.position_side = common::toString(*cancel.position_side);
+    }
 
     payload.params.timestamp = util::get_timestamp_epoch();
     return glz::write_json(payload).value_or(std::string{});
@@ -170,6 +183,29 @@ class BinanceFuturesOeEncoder {
       payload.params.price = replace.price.value;
     }
 
+    if (replace.position_side) {
+      payload.params.position_side = common::toString(*replace.position_side);
+    }
+
+    return glz::write_json(payload).value_or(std::string{});
+  }
+
+  [[nodiscard]] std::string create_modify_order_message(
+      const trading::OrderModifyRequest& modify) const {
+    schema::futures::OrderModifyRequest payload;
+    payload.id = "ordermodify_" + std::to_string(modify.order_id.value);
+
+    payload.params.symbol = modify.symbol;
+    payload.params.side = toString(modify.side);
+    payload.params.order_id = modify.order_id.value;
+    payload.params.price = modify.price.value;
+    payload.params.quantity = modify.order_qty.value;
+
+    if (modify.position_side) {
+      payload.params.position_side = common::toString(*modify.position_side);
+    }
+
+    payload.params.timestamp = util::get_timestamp_epoch();
     return glz::write_json(payload).value_or(std::string{});
   }
 

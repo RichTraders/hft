@@ -16,8 +16,8 @@
 #include "ini_config.hpp"
 #include "order_entry.h"
 #include "order_manager.h"
-#include "performance.h"
 #include "orders.h"
+#include "performance.h"
 
 namespace trading {
 using common::OrderId;
@@ -30,7 +30,8 @@ using order::LayerBook;
 using order::PendingReplaceInfo;
 
 template <typename Strategy, typename OeTraits>
-OrderManager<Strategy, OeTraits>::OrderManager(const common::Logger::Producer& logger,
+OrderManager<Strategy, OeTraits>::OrderManager(
+    const common::Logger::Producer& logger,
     TradeEngine<Strategy, OeTraits>* trade_engine, RiskManager& risk_manager)
     : layer_book_(INI_CONFIG.get("meta", "ticker")),
       trade_engine_(trade_engine),
@@ -55,7 +56,9 @@ template <typename Strategy, typename OeTraits>
 void OrderManager<Strategy, OeTraits>::on_order_updated(
     const ExecutionReport* response) noexcept {
 
-  auto& side_book = layer_book_.side_book(response->symbol, response->side);
+  auto& side_book = layer_book_.side_book(response->symbol,
+      response->side,
+      response->position_side);
   const auto now = fast_clock_.get_timestamp();
 
   state_manager_.handle_execution_report(response,
@@ -93,8 +96,8 @@ void OrderManager<Strategy, OeTraits>::on_order_updated(
   }
 
   logger_.debug("[OrderUpdated]Order Id:{} reserved_position:{:.6f}",
-          response->cl_order_id.value,
-          position_tracker_.get_reserved().value);
+      response->cl_order_id.value,
+      position_tracker_.get_reserved().value);
 
   dump_all_slots(response->symbol,
       std::format("After {} oid={}",
@@ -104,9 +107,8 @@ void OrderManager<Strategy, OeTraits>::on_order_updated(
 
 template <typename Strategy, typename OeTraits>
 void OrderManager<Strategy, OeTraits>::new_order(const TickerId& ticker_id,
-    const Price price, const Side side, const Qty qty,
-    const OrderId order_id,
-    [[maybe_unused]] std::optional<common::PositionSide> position_side) noexcept {
+    const Price price, const Side side, const Qty qty, const OrderId order_id,
+    std::optional<common::PositionSide> position_side) noexcept {
   const RequestCommon new_request{.req_type = ReqeustType::kNewSingleOrderData,
       .cl_order_id = order_id,
       .symbol = ticker_id,
@@ -114,7 +116,8 @@ void OrderManager<Strategy, OeTraits>::new_order(const TickerId& ticker_id,
       .order_qty = qty,
       .ord_type = OrderType::kLimit,
       .price = price,
-      .time_in_force = TimeInForce::kGoodTillCancel};
+      .time_in_force = TimeInForce::kGoodTillCancel,
+      .position_side = position_side};
   trade_engine_->send_request(new_request);
 
   logger_.info("[OrderRequest]Sent new order {}", new_request.toString());
@@ -123,34 +126,54 @@ void OrderManager<Strategy, OeTraits>::new_order(const TickerId& ticker_id,
 template <typename Strategy, typename OeTraits>
 void OrderManager<Strategy, OeTraits>::modify_order(const TickerId& ticker_id,
     const OrderId& cancel_new_order_id, const OrderId& order_id,
-    const OrderId& original_order_id, Price price, Side side,
-    const Qty qty,
-    [[maybe_unused]] std::optional<common::PositionSide> position_side) noexcept {
-  const RequestCommon new_request{
-      .req_type = ReqeustType::kOrderCancelRequestAndNewOrderSingle,
-      .cl_cancel_order_id = cancel_new_order_id,
-      .cl_order_id = order_id,
-      .orig_cl_order_id = original_order_id,
-      .symbol = ticker_id,
-      .side = side,
-      .order_qty = qty,
-      .ord_type = OrderType::kLimit,
-      .price = price,
-      .time_in_force = TimeInForce::kGoodTillCancel};
-  trade_engine_->send_request(new_request);
+    const OrderId& original_order_id, Price price, Side side, const Qty qty,
+    std::optional<common::PositionSide> position_side) noexcept {
 
-  logger_.info("[OrderRequest]Sent modify order {}",
-      new_request.toString());
+  if constexpr (kSupportsCancelAndReorder) {
+    // Spot: cancel-and-reorder with new IDs
+    const RequestCommon new_request{
+        .req_type = ReqeustType::kOrderCancelRequestAndNewOrderSingle,
+        .cl_cancel_order_id = cancel_new_order_id,
+        .cl_order_id = order_id,
+        .orig_cl_order_id = original_order_id,
+        .symbol = ticker_id,
+        .side = side,
+        .order_qty = qty,
+        .ord_type = OrderType::kLimit,
+        .price = price,
+        .time_in_force = TimeInForce::kGoodTillCancel,
+        .position_side = position_side};
+    trade_engine_->send_request(new_request);
+    logger_.info("[OrderRequest]Sent cancel-and-reorder {}",
+        new_request.toString());
+  } else {
+    // Futures: modify with existing ID reuse
+    const RequestCommon modify_request{.req_type = ReqeustType::kOrderModify,
+        .cl_order_id = order_id,
+        .orig_cl_order_id = original_order_id,
+        .symbol = ticker_id,
+        .side = side,
+        .order_qty = qty,
+        .ord_type = OrderType::kLimit,
+        .price = price,
+        .time_in_force = TimeInForce::kGoodTillCancel,
+        .position_side = position_side};
+    trade_engine_->send_request(modify_request);
+    logger_.info("[OrderRequest]Sent modify order {}",
+        modify_request.toString());
+  }
 }
 
 template <typename Strategy, typename OeTraits>
 void OrderManager<Strategy, OeTraits>::cancel_order(const TickerId& ticker_id,
-    const OrderId& original_order_id, const OrderId& order_id) noexcept {
+    const OrderId& original_order_id,
+    std::optional<common::PositionSide> position_side) noexcept {
   const RequestCommon cancel_request{
       .req_type = ReqeustType::kOrderCancelRequest,
-      .cl_order_id = order_id,
+      .cl_order_id = original_order_id,
       .orig_cl_order_id = original_order_id,
-      .symbol = ticker_id};
+      .symbol = ticker_id,
+      .position_side = position_side};
   trade_engine_->send_request(cancel_request);
 
   logger_.info("[OrderRequest]Sent cancel {}", cancel_request.toString());
@@ -168,56 +191,14 @@ void OrderManager<Strategy, OeTraits>::on_instrument_info(
 }
 
 template <typename Strategy, typename OeTraits>
-void OrderManager<Strategy, OeTraits>::apply(
-    const std::vector<QuoteIntentType>& intents) noexcept {
-  START_MEASURE(Trading_OrderManager_apply);
-
-  auto actions = reconciler_.diff(intents, layer_book_, fast_clock_);
-  const auto now = fast_clock_.get_timestamp();
-
-  if (intents.empty()) {
-    auto expired = expiry_manager_.sweep_expired(now);
-    for (const auto& key : expired) {
-      auto& side_book = layer_book_.side_book(key.symbol, key.side);
-      if (UNLIKELY(key.layer >= side_book.slots.size()))
-        continue;
-
-      auto& slot = side_book.slots[key.layer];
-      if (slot.cl_order_id != key.cl_order_id)
-        continue;
-
-      if (slot.state == OMOrderState::kDead ||
-          slot.state == OMOrderState::kCancelReserved)
-        continue;
-
-      if (slot.state == OMOrderState::kLive ||
-          slot.state == OMOrderState::kReserved) {
-        const auto cancel_id = gen_order_id();
-        slot.state = OMOrderState::kCancelReserved;
-        slot.last_used = now;
-
-        cancel_order(key.symbol, slot.cl_order_id, cancel_id);
-
-        logger_.info("[TTL] Cancel sent (state={}, layer={}, oid={}, "
-                        "cancel_id={}, remaining_ns={})",
-                trading::toString(slot.state),
-                key.layer,
-                common::toString(slot.cl_order_id),
-                common::toString(cancel_id),
-                key.expire_ts - now);
-      }
-    }
-    END_MEASURE(Trading_OrderManager_apply, logger_);
-    return;
-  }
-
-  const auto& ticker = intents.front().ticker;
-
-  venue_policy_.filter_by_venue(ticker, actions, now, layer_book_);
-  filter_by_risk(intents, actions);
+void OrderManager<Strategy, OeTraits>::process_new_orders(
+    const common::TickerId& ticker,
+    order::Actions& actions,
+    uint64_t now) noexcept {
 
   for (auto& action : actions.news) {
-    auto& side_book = layer_book_.side_book(ticker, action.side, action.position_side);
+    auto& side_book =
+        layer_book_.side_book(ticker, action.side, action.position_side);
     auto& [state, price, qty, last_used, cl_order_id] =
         side_book.slots[action.layer];
 
@@ -242,13 +223,14 @@ void OrderManager<Strategy, OeTraits>::apply(
         action.position_side);
     position_tracker_.add_reserved(action.side, action.qty);
 
-    logger_.info("[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}, "
-                    "reserved_position_={}",
-            tick,
-            action.layer,
-            common::toString(action.side),
-            common::toString(action.cl_order_id),
-            position_tracker_.get_reserved().value);
+    logger_.info(
+        "[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}, "
+        "reserved_position_={}",
+        tick,
+        action.layer,
+        common::toString(action.side),
+        common::toString(action.cl_order_id),
+        position_tracker_.get_reserved().value);
 
     expiry_manager_.register_expiry(ticker,
         action.side,
@@ -257,8 +239,16 @@ void OrderManager<Strategy, OeTraits>::apply(
         OMOrderState::kReserved,
         now);
   }
+}
+
+template <typename Strategy, typename OeTraits>
+void OrderManager<Strategy, OeTraits>::process_replace_orders(
+    const common::TickerId& ticker,
+    order::Actions& actions,
+    uint64_t now) noexcept {
   for (auto& action : actions.repls) {
-    auto& side_book = layer_book_.side_book(ticker, action.side, action.position_side);
+    auto& side_book =
+        layer_book_.side_book(ticker, action.side, action.position_side);
     auto& slot = side_book.slots[action.layer];
 
     const uint64_t tick = tick_converter_.to_ticks(action.price.value);
@@ -286,36 +276,60 @@ void OrderManager<Strategy, OeTraits>::apply(
       } else
         ++iter;
     }
-    const auto cancel_new_order_id = OrderId{action.cl_order_id.value - 1};
 
-    side_book.orig_id_to_layer[cancel_new_order_id.value] = action.layer;
-    side_book.new_id_to_layer[action.cl_order_id.value] = action.layer;
-    side_book.pending_repl[action.layer] = PendingReplaceInfo{action.price,
-        action.qty,
-        tick,
-        action.cl_order_id,
-        action.last_qty,
-        action.original_cl_order_id,
-        original_price,
-        original_tick};
-    modify_order(ticker,
-        cancel_new_order_id,
-        action.cl_order_id,
-        action.original_cl_order_id,
-        action.price,
-        action.side,
-        action.qty,
-        action.position_side);
+    if constexpr (kSupportsCancelAndReorder) {
+      // Spot: cancel_and_reorder with NEW ID
+      const auto cancel_new_order_id = OrderId{action.cl_order_id.value - 1};
+
+      side_book.orig_id_to_layer[cancel_new_order_id.value] = action.layer;
+      side_book.new_id_to_layer[action.cl_order_id.value] = action.layer;
+      side_book.pending_repl[action.layer] = PendingReplaceInfo{action.price,
+          action.qty,
+          tick,
+          action.cl_order_id,
+          action.last_qty,
+          action.original_cl_order_id,
+          original_price,
+          original_tick};
+      modify_order(ticker,
+          cancel_new_order_id,
+          action.cl_order_id,
+          action.original_cl_order_id,
+          action.price,
+          action.side,
+          action.qty,
+          action.position_side);
+    } else {
+      // Futures: modify with EXISTING ID reuse
+      side_book.new_id_to_layer[action.original_cl_order_id.value] = action.layer;
+      side_book.pending_repl[action.layer] = PendingReplaceInfo{action.price,
+          action.qty,
+          tick,
+          action.original_cl_order_id,
+          action.last_qty,
+          action.original_cl_order_id,
+          original_price,
+          original_tick};
+      modify_order(ticker,
+          action.original_cl_order_id,
+          action.original_cl_order_id,
+          action.original_cl_order_id,
+          action.price,
+          action.side,
+          action.qty,
+          action.position_side);
+    }
 
     const auto delta_qty = action.qty - action.last_qty;
     position_tracker_.add_reserved(action.side, delta_qty);
-    logger_.info("[Apply][REPLACE] tick:{}/ layer={}, side:{}, order_id={}, "
-                    "reserved_position_={}",
-            tick,
-            action.layer,
-            common::toString(action.side),
-            common::toString(action.cl_order_id),
-            position_tracker_.get_reserved().value);
+    logger_.info(
+        "[Apply][REPLACE] tick:{}/ layer={}, side:{}, order_id={}, "
+        "reserved_position_={}",
+        tick,
+        action.layer,
+        common::toString(action.side),
+        common::toString(action.cl_order_id),
+        position_tracker_.get_reserved().value);
     expiry_manager_.register_expiry(ticker,
         action.side,
         action.layer,
@@ -323,23 +337,33 @@ void OrderManager<Strategy, OeTraits>::apply(
         OMOrderState::kCancelReserved,
         now);
   }
+}
+
+template <typename Strategy, typename OeTraits>
+void OrderManager<Strategy, OeTraits>::process_cancel_orders(
+    const common::TickerId& ticker,
+    order::Actions& actions,
+    uint64_t now) noexcept {
   for (auto& action : actions.cancels) {
-    auto& side_book = layer_book_.side_book(ticker, action.side, action.position_side);
+    auto& side_book =
+        layer_book_.side_book(ticker, action.side, action.position_side);
     auto& slot = side_book.slots[action.layer];
     slot.state = OMOrderState::kCancelReserved;
     slot.last_used = now;
-    cancel_order(ticker, action.original_cl_order_id, action.cl_order_id);
-    logger_.info("[Apply][CANCEL] layer={}, side:{}, order_id={}, "
-                    "reserved_position_={}",
-            "previous order id :{}",
-            action.layer,
-            common::toString(action.side),
-            common::toString(action.cl_order_id),
-            common::toString(action.original_cl_order_id),
-            position_tracker_.get_reserved().value);
+    cancel_order(ticker, action.original_cl_order_id, action.position_side);
+    logger_.info(
+        "[Apply][CANCEL] layer={}, side:{}, order_id={}, "
+        "previous order id :{}",
+        action.layer,
+        common::toString(action.side),
+        common::toString(action.original_cl_order_id),
+        position_tracker_.get_reserved().value);
   }
+}
 
-  // Sweep expired orders
+template <typename Strategy, typename OeTraits>
+void OrderManager<Strategy, OeTraits>::sweep_expired_orders(
+    uint64_t now) noexcept {
   auto expired = expiry_manager_.sweep_expired(now);
   for (const auto& key : expired) {
     auto& side_book = layer_book_.side_book(key.symbol, key.side);
@@ -356,21 +380,46 @@ void OrderManager<Strategy, OeTraits>::apply(
 
     if (slot.state == OMOrderState::kLive ||
         slot.state == OMOrderState::kReserved) {
-      const auto cancel_id = gen_order_id();
       slot.state = OMOrderState::kCancelReserved;
       slot.last_used = now;
 
-      cancel_order(key.symbol, slot.cl_order_id, cancel_id);
+      cancel_order(key.symbol, slot.cl_order_id);
 
-      logger_.info("[TTL] Cancel sent (state={}, layer={}, oid={}, "
-                      "cancel_id={}, remaining_ns={})",
-              trading::toString(slot.state),
-              key.layer,
-              common::toString(slot.cl_order_id),
-              common::toString(cancel_id),
-              key.expire_ts - now);
+      logger_.info(
+          "[TTL] Cancel sent (state={}, layer={}, oid={}, "
+          "remaining_ns={})",
+          trading::toString(slot.state),
+          key.layer,
+          common::toString(slot.cl_order_id),
+          key.expire_ts - now);
     }
   }
+}
+
+template <typename Strategy, typename OeTraits>
+void OrderManager<Strategy, OeTraits>::apply(
+    const std::vector<QuoteIntentType>& intents) noexcept {
+  START_MEASURE(Trading_OrderManager_apply);
+
+  const auto now = fast_clock_.get_timestamp();
+
+  if (intents.empty()) {
+    sweep_expired_orders(now);
+    END_MEASURE(Trading_OrderManager_apply, logger_);
+    return;
+  }
+
+  auto actions = reconciler_.diff(intents, layer_book_, fast_clock_);
+  const auto& ticker = intents.front().ticker;
+
+  venue_policy_.filter_by_venue(ticker, actions, now, layer_book_);
+  filter_by_risk(intents, actions);
+
+  process_new_orders(ticker, actions, now);
+  process_replace_orders(ticker, actions, now);
+  process_cancel_orders(ticker, actions, now);
+  sweep_expired_orders(now);
+
   END_MEASURE(Trading_OrderManager_apply, logger_);
 }
 
@@ -441,14 +490,15 @@ void OrderManager<Strategy, OeTraits>::dump_all_slots(const std::string& symbol,
         continue;
       }
 
-      logger_.debug("[SLOT_DUMP]   Layer[{}]: state={}, tick={}, "
-                      "price={:.2f}, qty={:.6f}, oid={}",
-              layer,
-              trading::toString(slot.state),
-              tick,
-              slot.price.value,
-              slot.qty.value,
-              slot.cl_order_id.value);
+      logger_.debug(
+          "[SLOT_DUMP]   Layer[{}]: state={}, tick={}, "
+          "price={:.2f}, qty={:.6f}, oid={}",
+          layer,
+          trading::toString(slot.state),
+          tick,
+          slot.price.value,
+          slot.qty.value,
+          slot.cl_order_id.value);
     }
   }
 

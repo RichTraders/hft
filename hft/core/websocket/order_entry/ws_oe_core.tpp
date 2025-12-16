@@ -10,7 +10,6 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-//#include "exchanges/binance/futures/futures_ws_oe_decoder.h"
 #include "spot_ws_oe_decoder.h"
 
 namespace core {
@@ -62,6 +61,12 @@ template <OeExchangeTraits Traits, typename DecoderType>
 std::string WsOeCore<Traits, DecoderType>::create_cancel_and_reorder_message(
     const trading::OrderCancelAndNewOrderSingle& replace) const {
   return encoder_.create_cancel_and_reorder_message(replace);
+}
+
+template <OeExchangeTraits Traits, typename DecoderType>
+std::string WsOeCore<Traits, DecoderType>::create_modify_order_message(
+    const trading::OrderModifyRequest& modify) const {
+  return encoder_.create_modify_order_message(modify);
 }
 
 template <OeExchangeTraits Traits, typename DecoderType>

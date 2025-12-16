@@ -59,7 +59,8 @@ class OrderManager {
 
   void cancel_order(const common::TickerId& ticker_id,
       const common::OrderId& original_order_id,
-      const common::OrderId& order_id) noexcept;
+      std::optional<common::PositionSide> position_side =
+          std::nullopt) noexcept;
 
   void apply(const std::vector<QuoteIntentType>& intents) noexcept;
 
@@ -90,6 +91,17 @@ class OrderManager {
 
   void filter_by_risk(const std::vector<QuoteIntentType>& intents,
       order::Actions& acts);
+
+  void process_new_orders(const common::TickerId& ticker,
+      order::Actions& actions, uint64_t now) noexcept;
+
+  void process_replace_orders(const common::TickerId& ticker,
+      order::Actions& actions, uint64_t now) noexcept;
+
+  void process_cancel_orders(const common::TickerId& ticker,
+      order::Actions& actions, uint64_t now) noexcept;
+
+  void sweep_expired_orders(uint64_t now) noexcept;
 
   [[nodiscard]] common::OrderId gen_order_id() noexcept;
 

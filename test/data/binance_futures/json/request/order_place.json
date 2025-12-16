@@ -1,0 +1,1 @@
+{"id":"orderplace_1765798804108450726","method":"order.place","params":{"symbol":"BTCUSDT","side":"SELL","type":"LIMIT","timestamp":1765798804117,"positionSide":"LONG","price":89671.1,"quantity":0.0011200000000000001,"timeInForce":"GTC","reduceOnly":"false","newClientOrderId":"1765798804108450726","selfTradePreventionMode":"EXPIRE_TAKER"}}

@@ -54,9 +54,9 @@ class OrderGateway {
   void new_single_order_data(const RequestCommon& request);
   void order_cancel_request(const RequestCommon& request);
   void order_cancel_request_and_new_order_single(const RequestCommon& request);
+  void order_modify(const RequestCommon& request);  // Futures modify API
   void order_mass_cancel_request(const RequestCommon& request);
 
-  // Callback registration helpers
   template <typename Handler>
   void register_simple_callback(const std::string& type, Handler&& handler);
 

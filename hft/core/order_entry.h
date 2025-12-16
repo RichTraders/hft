@@ -23,7 +23,8 @@ enum class ReqeustType : uint8_t {
   kNewSingleOrderData = 1,
   kOrderCancelRequest = 2,
   kOrderCancelRequestAndNewOrderSingle = 3,
-  kOrderMassCancelRequest = 4,
+  kOrderModify = 4,
+  kOrderMassCancelRequest = 5,
 };
 
 inline auto toString(ReqeustType type) -> std::string {
@@ -32,6 +33,8 @@ inline auto toString(ReqeustType type) -> std::string {
       return "Order";
     case ReqeustType::kOrderCancelRequest:
       return "Cancel";
+    case ReqeustType::kOrderModify:
+      return "Modify";
     default:
       return "Unknown";
   }
@@ -337,6 +340,7 @@ struct RequestCommon {
   TimeInForce time_in_force{TimeInForce::kInvalid};
   SelfTradePreventionMode self_trade_prevention_mode{
       SelfTradePreventionMode::kExpireTaker};
+  std::optional<common::PositionSide> position_side{std::nullopt};
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
@@ -351,7 +355,11 @@ struct RequestCommon {
            << ", price=" << price.value
            << ", time_in_force=" << trading::toString(time_in_force)
            << ", self_trade_prevention_mode="
-           << trading::toString(self_trade_prevention_mode) << "}";
+           << trading::toString(self_trade_prevention_mode);
+    if (position_side) {
+      stream << ", position_side=" << common::toString(*position_side);
+    }
+    stream << "}";
     return stream.str();
   }
 };
@@ -360,6 +368,7 @@ struct OrderCancelRequest {
   common::OrderId cl_order_id;
   common::OrderId orig_cl_order_id;
   std::string symbol;
+  std::optional<common::PositionSide> position_side;
 };
 
 struct OrderCancelAndNewOrderSingle {
@@ -375,13 +384,22 @@ struct OrderCancelAndNewOrderSingle {
   TimeInForce time_in_force;
   SelfTradePreventionMode self_trade_prevention_mode =
       SelfTradePreventionMode::kExpireTaker;
-  std::optional<common::PositionSide> position_side;  // For futures trading
+  std::optional<common::PositionSide> position_side;
 };
 
 struct OrderMassCancelRequest {
   common::OrderId cl_order_id;
   std::string symbol;
   char mass_cancel_request_type = '1';
+};
+
+struct OrderModifyRequest {
+  common::OrderId order_id;
+  std::string symbol;
+  OrderSide side;
+  common::Price price;
+  common::Qty order_qty;
+  std::optional<common::PositionSide> position_side;
 };
 
 struct ExecutionReport {
@@ -396,6 +414,7 @@ struct ExecutionReport {
   common::Price price = common::Price{.0f};
   common::Side side;
   std::string text;
+  std::optional<common::PositionSide> position_side;  // For futures trading
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
@@ -408,7 +427,11 @@ struct ExecutionReport {
            << ", leaves_qty=" << leaves_qty.value
            << ", last_qty=" << last_qty.value << ", error_code=" << error_code
            << ", price=" << price.value << ", side=" << common::toString(side)
-           << ", text=" << text << "}";
+           << ", text=" << text;
+    if (position_side) {
+      stream << ", position_side=" << common::toString(*position_side);
+    }
+    stream << "}";
     return stream.str();
   }
 };

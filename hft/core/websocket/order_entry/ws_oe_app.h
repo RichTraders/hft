@@ -82,6 +82,8 @@ class WsOrderEntryApp {
       const trading::OrderCancelRequest& cancel_request) const;
   [[nodiscard]] std::string create_cancel_and_reorder_message(
       const trading::OrderCancelAndNewOrderSingle& cancel_and_re_order) const;
+  [[nodiscard]] std::string create_modify_order_message(
+      const trading::OrderModifyRequest& modify_request) const;
   [[nodiscard]] std::string create_order_all_cancel(
       const trading::OrderMassCancelRequest& all_order_cancel) const;
 
@@ -101,6 +103,7 @@ class WsOrderEntryApp {
   void post_cancel_order(const trading::OrderCancelRequest& data);
   void post_cancel_and_reorder(
       const trading::OrderCancelAndNewOrderSingle& data);
+  void post_modify_order(const trading::OrderModifyRequest& data);
   void post_mass_cancel_order(const trading::OrderMassCancelRequest& data);
 
   void dispatch(const std::string& type, const WireMessage& message) const;

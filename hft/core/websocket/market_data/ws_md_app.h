@@ -73,6 +73,14 @@ class WsMarketDataApp {
   void register_callback(const MsgType& type,
       std::function<void(const WireMessage&)> callback);
 
+#ifdef REPOSITORY
+  void register_callback(std::function<void(const std::string&,
+          const WireMessage&, const std::string&)>
+          cb) {
+    raw_data_callback_ = std::move(cb);
+  }
+#endif
+
   static std::string create_log_on_message(const std::string& sig_b64,
       const std::string& timestamp);
   static std::string create_log_out_message();
@@ -118,6 +126,12 @@ class WsMarketDataApp {
 
   std::unordered_map<MsgType, std::function<void(const WireMessage&)>>
       callbacks_;
+
+#ifdef REPOSITORY
+  std::function<void(const std::string&, const WireMessage&,
+      const std::string&)>
+      raw_data_callback_;
+#endif
 
   // Message buffering for incomplete fragments (separate buffers per transport)
   std::string read_buffer_;

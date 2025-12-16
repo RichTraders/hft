@@ -110,20 +110,91 @@ target_include_directories(BrokerCommon PRIVATE
         ${CMAKE_SOURCE_DIR}/extern/concurrentqueue)
 ######################################
 
+# WebSocket Core for Repository (with REPOSITORY macro)
+if(ENABLE_WEBSOCKET)
+    if(USE_FUTURES_API)
+        find_package(CURL REQUIRED)
+        set(BROKER_HTTP_SRC
+                ${CMAKE_SOURCE_DIR}/hft/core/http/http_client.cpp
+        )
+        set(BROKER_EXCHANGE_TRAITS_DIR
+                ${CMAKE_SOURCE_DIR}/hft/core/websocket/market_data/exchanges/binance/futures)
+    else()
+        set(BROKER_HTTP_SRC "")
+        set(BROKER_EXCHANGE_TRAITS_DIR
+                ${CMAKE_SOURCE_DIR}/hft/core/websocket/market_data/exchanges/binance/spot)
+    endif()
+
+    set(BROKER_WS_SRC
+            ${CMAKE_SOURCE_DIR}/hft/core/websocket/ws_transport.tpp
+            ${CMAKE_SOURCE_DIR}/hft/core/websocket/market_data/ws_md_app.cpp
+            ${CMAKE_SOURCE_DIR}/hft/core/websocket/order_entry/ws_oe_app.cpp
+            ${CMAKE_SOURCE_DIR}/hft/core/ssl_socket.cpp
+            ${CMAKE_SOURCE_DIR}/hft/core/signature.cpp
+            ${CMAKE_SOURCE_DIR}/hft/core/response_manager.cpp
+            ${BROKER_HTTP_SRC}
+    )
+
+    add_library(BrokerWsSchema STATIC ${BROKER_WS_SRC})
+    target_precompile_headers(BrokerWsSchema PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
+    target_include_directories(BrokerWsSchema PUBLIC
+            ${CMAKE_SOURCE_DIR}/hft/core
+            ${CMAKE_SOURCE_DIR}/hft/core/websocket
+            ${CMAKE_SOURCE_DIR}/hft/core/websocket/market_data
+            ${CMAKE_SOURCE_DIR}/hft/core/websocket/order_entry
+            ${BROKER_EXCHANGE_TRAITS_DIR}
+            ${CMAKE_SOURCE_DIR}/hft
+            ${CMAKE_SOURCE_DIR}/include
+    )
+    target_compile_definitions(BrokerWsSchema PUBLIC REPOSITORY ENABLE_WEBSOCKET)
+    if(USE_FUTURES_API)
+        target_compile_definitions(BrokerWsSchema PUBLIC USE_FUTURES_API TARGET_EXCHANGE_BINANCE_FUTURES)
+        target_link_libraries(BrokerWsSchema PUBLIC CURL::libcurl)
+    else()
+        target_compile_definitions(BrokerWsSchema PUBLIC TARGET_EXCHANGE_BINANCE_SPOT)
+    endif()
+    target_link_libraries(BrokerWsSchema PUBLIC
+            BrokerCommon
+            websockets
+            glaze::glaze
+    )
+endif()
+######################################
+
 set(CMAKE_CXX_STANDARD 20)
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(-march=native)
 endif ()
 
-add_executable(Repository main.cpp broker.cpp)
-target_compile_definitions(Repository PUBLIC LIGHT_LOGGER)
-target_precompile_headers(Repository PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
-target_link_libraries(Repository PRIVATE
-        BrokerFix8Schema
-        BrokerCommon
-)
-
+# Exclusive build: WebSocket OR FIX (not both)
+if (ENABLE_WEBSOCKET)
+    # WebSocket Repository
+    add_executable(Repository main.cpp broker.cpp)
+    target_compile_definitions(Repository PUBLIC LIGHT_LOGGER ENABLE_WEBSOCKET REPOSITORY)
+    target_precompile_headers(Repository PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
+    target_include_directories(Repository PRIVATE
+            ${CMAKE_SOURCE_DIR}/hft/core
+            ${CMAKE_SOURCE_DIR}/hft/core/websocket
+            ${CMAKE_SOURCE_DIR}/hft/core/websocket/market_data
+            ${BROKER_EXCHANGE_TRAITS_DIR}
+            ${CMAKE_SOURCE_DIR}/hft
+            ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(Repository PRIVATE
+            BrokerWsSchema
+            BrokerCommon
+    )
+else()
+    # FIX Protocol Repository
+    add_executable(Repository main.cpp broker.cpp)
+    target_compile_definitions(Repository PUBLIC LIGHT_LOGGER)
+    target_precompile_headers(Repository PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
+    target_link_libraries(Repository PRIVATE
+            BrokerFix8Schema
+            BrokerCommon
+    )
+endif()
 
 set(RESOURCES_DIR "${CMAKE_SOURCE_DIR}/resources")
 file(COPY ${RESOURCES_DIR} DESTINATION ${CMAKE_BINARY_DIR}/repository)

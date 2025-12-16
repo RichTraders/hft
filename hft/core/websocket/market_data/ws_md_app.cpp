@@ -213,8 +213,18 @@ void WsMarketDataApp::handle_stream_payload(std::string_view payload) const {
   END_MEASURE(Convert_Message_Stream, logger_);
 
   using StreamRouter = WsMdCoreImpl::ExchangeTraits::DispatchRouter;
+#ifdef REPOSITORY
+  StreamRouter::template process_message<WsMdCoreImpl::ExchangeTraits>(wire_msg,
+      [this, &wire_msg, &payload](std::string_view type) {
+        dispatch(type, wire_msg);
+        if (raw_data_callback_) {
+          raw_data_callback_(std::string(payload), wire_msg, std::string(type));
+        }
+      });
+#else
   StreamRouter::template process_message<WsMdCoreImpl::ExchangeTraits>(wire_msg,
       [this, &wire_msg](std::string_view type) { dispatch(type, wire_msg); });
+#endif
 }
 
 void WsMarketDataApp::handle_api_payload(std::string_view payload) const {
@@ -240,17 +250,32 @@ void WsMarketDataApp::handle_api_payload(std::string_view payload) const {
   END_MEASURE(Convert_Message_API, logger_);
 
   using ApiRouter = WsMdCoreApiImpl::ExchangeTraits::DispatchRouter;
+#ifdef REPOSITORY
+  ApiRouter::template process_message<WsMdCoreApiImpl::ExchangeTraits>(
+      api_wire_msg,
+      [this, &api_wire_msg, &payload](std::string_view type) {
+        dispatch(type, api_wire_msg);
+        if (raw_data_callback_) {
+          raw_data_callback_(std::string(payload),
+              api_wire_msg,
+              std::string(type));
+        }
+      });
+#else
   ApiRouter::template process_message<WsMdCoreApiImpl::ExchangeTraits>(
       api_wire_msg,
       [this, &api_wire_msg](
           std::string_view type) { dispatch(type, api_wire_msg); });
+#endif
 }
 
 void WsMarketDataApp::dispatch(std::string_view type,
     const WireMessage& message) const {
   const auto callback = callbacks_.find(std::string(type));
   if (callback == callbacks_.end() || !callback->second) {
+#ifndef REPOSITORY
     logger_.warn("No callback registered for message type {}", type);
+#endif
     return;
   }
   callback->second(message);

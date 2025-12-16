@@ -58,6 +58,8 @@ class ObiVwapMomentumStrategy
         exit_threshold_(INI_CONFIG.get_double("strategy", "exit_threshold")),
         obi_level_(
             INI_CONFIG.get_int("strategy", "obi_level", kDefaultOBILevel10)),
+        safety_margin_(INI_CONFIG.get_double("strategy", "safety_margin",
+            kDefaultSafetyMargin)),
         bid_qty_(obi_level_),
         ask_qty_(obi_level_) {}
 
@@ -115,19 +117,19 @@ class ObiVwapMomentumStrategy
         intents.push_back(QuoteIntentType{.ticker = ticker,
             .side = common::Side::kBuy,
             .position_side = common::PositionSide::kLong,
-            .price = best_bid_price - kSafetyMargin,
+            .price = best_bid_price - safety_margin_,
             .qty = Qty{round5(signal * position_variance_)}});
       } else {
         intents.push_back(QuoteIntentType{.ticker = ticker,
             .side = common::Side::kBuy,
-            .price = best_bid_price - kSafetyMargin,
+            .price = best_bid_price - safety_margin_,
             .qty = Qty{round5(signal * position_variance_)}});
       }
 
       this->logger_.trace(
           "[MarketMaker]Order Submitted. price:{}, qty:{}, side:buy, delta:{} "
           "obi:{} signal:{}, mid:{}, vwap:{}, spread:{.3f}",
-          best_bid_price.value - kSafetyMargin,
+          best_bid_price.value - safety_margin_,
           round5(signal * position_variance_),
           delta,
           obi,
@@ -139,20 +141,20 @@ class ObiVwapMomentumStrategy
       const auto best_ask_price = order_book->get_bbo()->ask_price;
       if constexpr (OeTraits::supports_position_side()) {
         intents.push_back(QuoteIntentType{.ticker = ticker,
-            .side = common::Side::kBuy,
+            .side = common::Side::kSell,
             .position_side = common::PositionSide::kShort,
-            .price = best_ask_price + kSafetyMargin,
+            .price = best_ask_price + safety_margin_,
             .qty = Qty{round5(signal * position_variance_ * 1e2)}});
       } else {
         intents.push_back(QuoteIntentType{.ticker = ticker,
             .side = common::Side::kSell,
-            .price = best_ask_price + kSafetyMargin,
+            .price = best_ask_price + safety_margin_,
             .qty = Qty{round5(signal * position_variance_ * 1e2)}});
       }
       this->logger_.trace(
           "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, delta:{} "
           "obi:{} signal:{}, mid:{}, vwap:{}, spread:{.3f}",
-          best_ask_price.value + kSafetyMargin,
+          best_ask_price.value + safety_margin_,
           round5(signal * position_variance_),
           delta,
           obi,
@@ -166,17 +168,41 @@ class ObiVwapMomentumStrategy
         intents.push_back(QuoteIntentType{.ticker = ticker,
             .side = common::Side::kSell,
             .position_side = common::PositionSide::kLong,
-            .price = best_bid_price - kSafetyMargin,
+            .price = best_bid_price - safety_margin_,
             .qty = Qty{round5(signal * position_variance_)}});
+        this->logger_.trace(
+            "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, "
+            "delta:{} "
+            "obi:{} signal:{}, mid:{}, vwap:{}, spread:{.3f}",
+            best_bid_price.value + safety_margin_,
+            round5(signal * position_variance_),
+            delta,
+            obi,
+            signal,
+            mid,
+            vwap,
+            spread);
       }
     } else if (delta * obi > -exit_threshold_) {
       if constexpr (OeTraits::supports_position_side()) {
         const auto best_ask_price = order_book->get_bbo()->ask_price;
         intents.push_back(QuoteIntentType{.ticker = ticker,
-            .side = common::Side::kSell,
+            .side = common::Side::kBuy,
             .position_side = common::PositionSide::kShort,
-            .price = best_ask_price + kSafetyMargin,
+            .price = best_ask_price + safety_margin_,
             .qty = Qty{round5(signal * position_variance_)}});
+        this->logger_.trace(
+            "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, "
+            "delta:{} "
+            "obi:{} signal:{}, mid:{}, vwap:{}, spread:{.3f}",
+            best_ask_price.value + safety_margin_,
+            round5(signal * position_variance_),
+            delta,
+            obi,
+            signal,
+            mid,
+            vwap,
+            spread);
       }
     }
 
@@ -187,12 +213,13 @@ class ObiVwapMomentumStrategy
 
  private:
   static constexpr int kDefaultOBILevel10 = 10;
-  static constexpr int kSafetyMargin = 5;
+  static constexpr double kDefaultSafetyMargin = 5.0;
   const double variance_denominator_;
   const double position_variance_;
   const double enter_threshold_;
   const double exit_threshold_;
   const int obi_level_;
+  const double safety_margin_;
   std::vector<double> bid_qty_;
   std::vector<double> ask_qty_;
 };

@@ -35,8 +35,6 @@ constexpr char kMDEntryTypeBid = '0';
 constexpr char kMDEntryTypeAsk = '1';
 constexpr char kMDEntryTypeTrade = '2';
 
-constexpr std::string kDefaultInstrumentId = "BTCUSDT";
-
 FixMdCore::FixMdCore(SendId sender_comp_id, TargetId target_comp_id,
                      Logger* logger, MemoryPool<MarketData>* pool)
   : logger_(logger->make_producer()),
@@ -226,10 +224,10 @@ std::string FixMdCore::create_instrument_list_request_message(
   populate_standard_header(request);
 
   if (symbol.empty()) {
-    request << new InstrumentReqID(kDefaultInstrumentId)
+    request << new InstrumentReqID(symbol)
             << new InstrumentListRequestType(4);
   } else {
-    request << new InstrumentReqID(kDefaultInstrumentId)
+    request << new InstrumentReqID(symbol)
             << new InstrumentListRequestType(0)
             << new Symbol(symbol);
   }

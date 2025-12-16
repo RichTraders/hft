@@ -18,6 +18,7 @@
 #include "binance_futures_encoder.hpp"
 #include "binance_futures_formatter.h"
 #include "binance_futures_md_connection_handler.h"
+#include "common/ini_config.hpp"
 #include "core/websocket/market_data/exchange_traits.h"
 #include "schema/futures/response/api_response.h"
 #include "schema/futures/response/depth_stream.h"
@@ -42,8 +43,10 @@ struct BinanceFuturesTraits {
   using ModifyOrderResponse = std::monostate;  // Not used in market data
 
   static constexpr bool uses_http_exchange_info() { return true; }
-  static constexpr std::string_view get_exchange_info_url() {
-    return "https://fapi.binance.com/fapi/v1/exchangeInfo";
+  static std::string get_exchange_info_url() {
+    return INI_CONFIG.get("exchange",
+        "exchange_info_url",
+        "https://fapi.binance.com/fapi/v1/exchangeInfo");
   }
 
   using DepthResponse = schema::futures::DepthResponse;
@@ -58,29 +61,39 @@ struct BinanceFuturesTraits {
   static constexpr std::string_view exchange_name() { return "Binance"; }
   static constexpr std::string_view market_type() { return "Futures"; }
 
-  static constexpr std::string_view get_api_host() {
-    return "ws-fapi.binance.com";
+  static std::string get_api_host() {
+    return INI_CONFIG.get("exchange", "md_api_host", "ws-fapi.binance.com");
   }
 
-  static constexpr std::string_view get_stream_host() {
-    return "fstream.binance.com";
+  static std::string get_stream_host() {
+    return INI_CONFIG.get("exchange", "md_stream_host", "fstream.binance.com");
   }
 
-  static constexpr std::string_view get_api_endpoint_path() {
-    return "/ws-fapi/v1?returnRateLimits=false";
+  static std::string get_api_endpoint_path() {
+    return INI_CONFIG.get("exchange",
+        "md_api_endpoint_path",
+        "/ws-fapi/v1?returnRateLimits=false");
   }
 
-  static constexpr std::string_view get_stream_endpoint_path() {
-    return "/stream?streams=btcusdt@depth/btcusdt@aggTrade";
+  static std::string get_stream_endpoint_path() {
+    return INI_CONFIG.get_with_symbol("auth",
+        "md_ws_path",
+        "/stream?streams=btcusdt@depth/btcusdt@aggTrade");
   }
 
-  static constexpr int kPort = 443;
+  static constexpr int kDefaultPort = 443;
 
-  static constexpr int get_api_port() { return kPort; }
+  static int get_api_port() {
+    return INI_CONFIG.get_int("exchange", "md_port", kDefaultPort);
+  }
 
-  static constexpr int get_stream_port() { return kPort; }
+  static int get_stream_port() {
+    return INI_CONFIG.get_int("exchange", "md_port", kDefaultPort);
+  }
 
-  static constexpr bool use_ssl() { return true; }
+  static bool use_ssl() {
+    return INI_CONFIG.get_int("exchange", "md_use_ssl", 1) != 0;
+  }
 
   static constexpr bool supports_json() { return true; }
   static constexpr bool supports_sbe() { return false; }

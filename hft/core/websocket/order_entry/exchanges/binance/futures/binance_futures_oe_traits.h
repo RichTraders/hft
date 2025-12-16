@@ -17,6 +17,7 @@
 #include "binance_futures_oe_dispatcher.h"
 #include "binance_futures_oe_encoder.hpp"
 #include "binance_futures_oe_mapper.h"
+#include "common/ini_config.hpp"
 #include "core/websocket/order_entry/oe_exchange_traits.h"
 #include "schema/futures/request/cancel_order.h"
 #include "schema/futures/request/modify_order.h"
@@ -67,23 +68,28 @@ struct BinanceFuturesOeTraits {
   static constexpr std::string_view exchange_name() { return "Binance"; }
   static constexpr std::string_view market_type() { return "Futures"; }
 
-  static constexpr std::string_view get_api_host() {
-    return "ws-fapi.binance.com";
+  static std::string get_api_host() {
+    return INI_CONFIG.get("exchange", "oe_api_host", "ws-fapi.binance.com");
   }
 
-  static constexpr std::string_view get_api_endpoint_path() {
-    return "/ws-fapi/v1?returnRateLimits=false";
+  static std::string get_api_endpoint_path() {
+    return INI_CONFIG.get("exchange",
+        "oe_api_endpoint_path",
+        "/ws-fapi/v1?returnRateLimits=false");
   }
 
-  static constexpr int kPort = 443;
-  // close to 60min, but smaller than 60 min.
-  static constexpr int kKeepaliveMinutes = 58;
   static constexpr int kSecondsPerMinute = 60;
   static constexpr int kMsPerSecond = 1000;
+  static constexpr int kDefaultPort = 443;
+  static constexpr int kDefaultKeepaliveMinutes = 58;
 
-  static constexpr int get_api_port() { return kPort; }
+  static int get_api_port() {
+    return INI_CONFIG.get_int("exchange", "oe_port", kDefaultPort);
+  }
 
-  static constexpr bool use_ssl() { return true; }
+  static bool use_ssl() {
+    return INI_CONFIG.get_int("exchange", "oe_use_ssl", 1) != 0;
+  }
 
   static constexpr bool supports_position_side() { return true; }
   static constexpr bool supports_reduce_only() { return true; }
@@ -93,17 +99,24 @@ struct BinanceFuturesOeTraits {
   static constexpr bool requires_stream_transport() { return true; }
   static constexpr bool requires_signature_logon() { return true; }
 
-  static constexpr int get_keepalive_interval_ms() {
-    return kKeepaliveMinutes * kSecondsPerMinute * kMsPerSecond;
+  static int get_keepalive_interval_ms() {
+    const int keepalive_minutes = INI_CONFIG.get_int("exchange",
+        "keepalive_minutes",
+        kDefaultKeepaliveMinutes);
+    return keepalive_minutes * kSecondsPerMinute * kMsPerSecond;
   }
 
-  static constexpr std::string_view get_stream_host() {
-    return "fstream.binance.com";
+  static std::string get_stream_host() {
+    return INI_CONFIG.get("exchange", "oe_stream_host", "fstream.binance.com");
   }
 
-  static constexpr std::string_view get_stream_endpoint_path() { return "/ws"; }
+  static std::string get_stream_endpoint_path() {
+    return INI_CONFIG.get("exchange", "oe_stream_endpoint_path", "/ws");
+  }
 
-  static constexpr int get_stream_port() { return kPort; }
+  static int get_stream_port() {
+    return INI_CONFIG.get_int("exchange", "oe_port", kDefaultPort);
+  }
 };
 
 static_assert(OeExchangeTraits<BinanceFuturesOeTraits>,

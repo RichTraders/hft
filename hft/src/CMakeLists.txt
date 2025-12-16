@@ -13,3 +13,10 @@ target_compile_definitions(Src_ws PRIVATE ENABLE_WEBSOCKET)
 add_library(Src_fix STATIC ${LIB_SRC_FILES})
 target_include_directories(Src_fix PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(Src_fix PRIVATE Core_fix)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/strategy")
+  file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/strategy/"
+      DESTINATION "${CMAKE_BINARY_DIR}/resources/strategy"
+      FILES_MATCHING
+      PATTERN "*.ini")
+endif()

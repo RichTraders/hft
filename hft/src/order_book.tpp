@@ -43,11 +43,19 @@ MarketOrderBook<Strategy, OeTraits>::MarketOrderBook(const TickerId& ticker_id,
     const common::Logger::Producer& logger)
     : ticker_id_(std::move(ticker_id)),
       logger_(logger),
+      config_(OrderBookConfig::from_ini()),
+      bidBuckets_(config_.bucket_count, nullptr),
+      askBuckets_(config_.bucket_count, nullptr),
+      bidSummary_(config_.summary_words, 0),
+      askSummary_(config_.summary_words, 0),
       bid_bucket_pool_(
           std::make_unique<common::MemoryPool<Bucket>>(kBucketPoolSize)),
       ask_bucket_pool_(
           std::make_unique<common::MemoryPool<Bucket>>(kBucketPoolSize)) {
-  logger_.info("[Constructor] MarketOrderBook Created");
+  logger_.info("[Constructor] MarketOrderBook Created - min_price: {}, max_price: {}, "
+               "tick_mult: {}, bucket_count: {}, summary_words: {}",
+      config_.min_price_int, config_.max_price_int, config_.tick_multiplier_int,
+      config_.bucket_count, config_.summary_words);
 }
 
 template <typename Strategy, typename OeTraits>
@@ -129,7 +137,7 @@ void MarketOrderBook<Strategy, OeTraits>::update_ask(const int idx, const Qty qt
 
 template <typename Strategy, typename OeTraits>
 int MarketOrderBook<Strategy, OeTraits>::best_bid_idx() const noexcept {
-  for (int sw = kSummaryWords - 1; sw >= 0; --sw) {
+  for (int sw = config_.summary_words - 1; sw >= 0; --sw) {
     const uint64_t word = bidSummary_[sw];
     if (!word)
       continue;
@@ -153,7 +161,7 @@ int MarketOrderBook<Strategy, OeTraits>::best_bid_idx() const noexcept {
 
 template <typename Strategy, typename OeTraits>
 int MarketOrderBook<Strategy, OeTraits>::best_ask_idx() const noexcept {
-  for (int sw = 0; sw < kSummaryWords; ++sw) {
+  for (int sw = 0; sw < config_.summary_words; ++sw) {
     const uint64_t word = askSummary_[sw];
     if (!word)
       continue;
@@ -178,13 +186,13 @@ int MarketOrderBook<Strategy, OeTraits>::best_ask_idx() const noexcept {
 template <typename Strategy, typename OeTraits>
 Price MarketOrderBook<Strategy, OeTraits>::best_bid_price() const noexcept {
   const int idx = best_bid_idx();
-  return (idx >= 0) ? indexToPrice(idx) : Price{common::kPriceInvalid};
+  return (idx >= 0) ? config_.index_to_price(idx) : Price{common::kPriceInvalid};
 }
 
 template <typename Strategy, typename OeTraits>
 Price MarketOrderBook<Strategy, OeTraits>::best_ask_price() const noexcept {
   const int idx = best_ask_idx();
-  return (idx >= 0) ? indexToPrice(idx) : Price{common::kPriceInvalid};
+  return (idx >= 0) ? config_.index_to_price(idx) : Price{common::kPriceInvalid};
 }
 
 template <typename Strategy, typename OeTraits>
@@ -270,15 +278,16 @@ void MarketOrderBook<Strategy, OeTraits>::add_order(const MarketData* market_upd
 template <typename Strategy, typename OeTraits>
 auto MarketOrderBook<Strategy, OeTraits>::on_market_data_updated(
     const MarketData* market_update) noexcept -> void {
-  if (static_cast<double>(kMaxPriceInt) / kTickMultiplierInt <
-          market_update->price.value ||
-      market_update->price.value <
-          (static_cast<double>(kMinPriceInt) / kTickMultiplierInt)) {
-    logger_.error("Price[{}] is invalid", market_update->price.value);
+  const double max_price = static_cast<double>(config_.max_price_int) / config_.tick_multiplier_int;
+  const double min_price = static_cast<double>(config_.min_price_int) / config_.tick_multiplier_int;
+
+  if (market_update->price.value > max_price || market_update->price.value < min_price) {
+    logger_.error("Price[{}] is invalid (range: {} ~ {})",
+        market_update->price.value, min_price, max_price);
     return;
   }
 
-  const int idx = priceToIndex(market_update->price);
+  const int idx = config_.price_to_index(market_update->price);
   const Qty qty = market_update->qty;
 
   switch (market_update->type) {
@@ -300,7 +309,7 @@ auto MarketOrderBook<Strategy, OeTraits>::on_market_data_updated(
       return;
     }
     case MarketUpdateType::kClear: {
-      for (int i = 0; i < kBucketCount; ++i) {
+      for (int i = 0; i < config_.bucket_count; ++i) {
         if (bidBuckets_[i]) {
           bid_bucket_pool_->deallocate(bidBuckets_[i]);
           bidBuckets_[i] = nullptr;
@@ -310,8 +319,8 @@ auto MarketOrderBook<Strategy, OeTraits>::on_market_data_updated(
           askBuckets_[i] = nullptr;
         }
       }
-      bidSummary_.fill(0);
-      askSummary_.fill(0);
+      std::fill(bidSummary_.begin(), bidSummary_.end(), 0);
+      std::fill(askSummary_.begin(), askSummary_.end(), 0);
       bbo_ = {.bid_price = Price{common::kPriceInvalid},
           .ask_price = Price{common::kPriceInvalid},
           .bid_qty = Qty{common::kQtyInvalid},
@@ -343,7 +352,7 @@ std::string MarketOrderBook<Strategy, OeTraits>::print_active_levels(
   std::ostringstream stream;
   const auto& buckets = is_bid ? bidBuckets_ : askBuckets_;
 
-  for (int bucket_idx = 0; bucket_idx < kBucketCount; ++bucket_idx) {
+  for (int bucket_idx = 0; bucket_idx < config_.bucket_count; ++bucket_idx) {
     const Bucket* bucket = buckets[bucket_idx];
     if (!bucket)
       continue;
@@ -352,7 +361,7 @@ std::string MarketOrderBook<Strategy, OeTraits>::print_active_levels(
       const MarketOrder& order = bucket->orders[off];
       if (order.active && order.qty.value > 0.) {
         const int global_idx = bucket_idx * kBucketSize + off;
-        const Price price = indexToPrice(global_idx);
+        const Price price = config_.index_to_price(global_idx);
         stream << (is_bid ? "[BID]" : "[ASK]") << " idx:" << global_idx
                << " price:" << common::toString(price)
                << " qty:" << common::toString(order.qty) << "\n";
@@ -459,7 +468,7 @@ int MarketOrderBook<Strategy, OeTraits>::next_active_ask(
     return next_bucket_index * kBucketSize + off_in_bucket;
   }
 
-  for (int iter = summary_word_index + 1; iter < kSummaryWords; ++iter) {
+  for (int iter = summary_word_index + 1; iter < config_.summary_words; ++iter) {
     if (const uint64_t summary_word = summary_bitmap[iter]) {
       const int bit = __builtin_ctzll(summary_word);
       const int next_bucket_index = (iter << kWordShift) + bit;
@@ -527,23 +536,17 @@ int MarketOrderBook<Strategy, OeTraits>::peek_levels_with_qty(bool is_bid, int l
   int bucket_idx = bucket_of(idx);
   int off = offset_of(idx);
 
-  auto price_of = [&](int gidx) -> Price {
-    return indexToPrice(gidx);
+  auto price_of = [this](int gidx) -> Price {
+    return config_.index_to_price(gidx);
   };
 
-  while (bucket_idx >= 0 && bucket_idx < kBucketCount &&
+  while (bucket_idx >= 0 && bucket_idx < config_.bucket_count &&
          static_cast<int>(out.size()) < level) {
     const Bucket* bucket = buckets[bucket_idx];
 
     if (!bucket) {
-      bucket_idx = is_bid ? jump_next_bucket_impl<true>(summary,
-                                bucket_idx,
-                                kWordShift,
-                                kWordMask)
-                          : jump_next_bucket_impl<false>(summary,
-                                bucket_idx,
-                                kWordShift,
-                                kWordMask);
+      bucket_idx = is_bid ? jump_next_bucket_impl<true>(summary, bucket_idx)
+                          : jump_next_bucket_impl<false>(summary, bucket_idx);
       if (bucket_idx < 0)
         break;
       off = is_bid ? (kBucketSize - 1) : 0;
@@ -554,10 +557,6 @@ int MarketOrderBook<Strategy, OeTraits>::peek_levels_with_qty(bool is_bid, int l
       consume_levels_in_bucket<true>(bucket,
           bucket_idx,
           off,
-          kWordShift,
-          kWordMask,
-          kBucketBitmapWords,
-          kBucketSize,
           price_of,
           out,
           level);
@@ -565,10 +564,6 @@ int MarketOrderBook<Strategy, OeTraits>::peek_levels_with_qty(bool is_bid, int l
       consume_levels_in_bucket<false>(bucket,
           bucket_idx,
           off,
-          kWordShift,
-          kWordMask,
-          kBucketBitmapWords,
-          kBucketSize,
           price_of,
           out,
           level);
@@ -576,14 +571,8 @@ int MarketOrderBook<Strategy, OeTraits>::peek_levels_with_qty(bool is_bid, int l
     if (static_cast<int>(out.size()) >= level)
       break;
 
-    bucket_idx = is_bid ? jump_next_bucket_impl<true>(summary,
-                              bucket_idx,
-                              kWordShift,
-                              kWordMask)
-                        : jump_next_bucket_impl<false>(summary,
-                              bucket_idx,
-                              kWordShift,
-                              kWordMask);
+    bucket_idx = is_bid ? jump_next_bucket_impl<true>(summary, bucket_idx)
+                        : jump_next_bucket_impl<false>(summary, bucket_idx);
     if (bucket_idx < 0)
       break;
     off = is_bid ? (kBucketSize - 1) : 0;
@@ -613,10 +602,6 @@ int MarketOrderBook<Strategy, OeTraits>::peek_qty(bool is_bid, int level,
       return consume_bucket_side<Side::kBuy>(bucket,
           bidx,
           start_off,
-          kWordShift,
-          kWordMask,
-          kBucketSize,
-          kBucketBitmapWords,
           qty_out,
           idx_out,
           filled,
@@ -625,10 +610,6 @@ int MarketOrderBook<Strategy, OeTraits>::peek_qty(bool is_bid, int level,
     return consume_bucket_side<Side::kSell>(bucket,
         bidx,
         start_off,
-        kWordShift,
-        kWordMask,
-        kBucketSize,
-        kBucketBitmapWords,
         qty_out,
         idx_out,
         filled,
@@ -637,15 +618,9 @@ int MarketOrderBook<Strategy, OeTraits>::peek_qty(bool is_bid, int level,
 
   auto jump_next_bucket = [&](int bidx) -> int {
     if (is_bid) {
-      return jump_next_bucket_impl<true /*Bid*/>(summary,
-          bidx,
-          kWordShift,
-          kWordMask);
+      return jump_next_bucket_impl<true /*Bid*/>(summary, bidx);
     }
-    return jump_next_bucket_impl<false /*Ask*/>(summary,
-        bidx,
-        kWordShift,
-        kWordMask);
+    return jump_next_bucket_impl<false /*Ask*/>(summary, bidx);
   };
 
   const int idx = is_bid ? best_bid_idx() : best_ask_idx();

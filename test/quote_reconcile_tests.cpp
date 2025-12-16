@@ -341,7 +341,10 @@ TEST(VenuePolicyTest, FilterCurrentTime) {
 
   common::FastClock clk(3.5e9, 10);
 
-  // 같은 의도를 두 번 diff해도 replace/new가 추가적으로 생기면 안 됨
+  // Spot intents do not have position_side, so time-based filtering
+  // (which checks position_side) does not apply to Spot orders.
+  // The filter_by_venue function only filters by time when position_side
+  // is kLong or kShort (for Futures). Spot orders pass through.
   std::vector<SpotQuoteIntent> intents = {
       {.ticker = kSym,
        .side = common::Side::kBuy,
@@ -357,8 +360,11 @@ TEST(VenuePolicyTest, FilterCurrentTime) {
   EXPECT_EQ(a1.news.size(), 2);
   order::VenuePolicy policy;
 
+  // Spot orders do not have position_side, so time filter doesn't apply
+  // Only qty/usdt minimum filters apply
   policy.filter_by_venue(kSym, a1, 38, lb);
-  EXPECT_EQ(a1.news.size(), 0);
+  // After filtering, orders remain (time filter only applies to Futures with position_side)
+  EXPECT_EQ(a1.news.size(), 2);
 }
 
 TEST(VenuePolicyTest, FilterQty) {

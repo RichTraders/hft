@@ -13,7 +13,8 @@
 #ifndef PCH_H
 #define PCH_H
 
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || \
+    defined(_M_IX86)
 #include <emmintrin.h>
 #endif
 
@@ -37,6 +38,7 @@
 #include <optional>
 #include <queue>
 #include <random>
+#include <ranges>
 #include <sstream>
 #include <stack>
 #include <stdexcept>

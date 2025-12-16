@@ -124,14 +124,15 @@ TEST_F(SpotOeConnectionHandlerTest, OnSessionLogon_Failure_NoAction) {
   EXPECT_TRUE(app_.sent_messages.empty());
 }
 
-TEST_F(FuturesOeConnectionHandlerTest, OnConnected_Api_InitiatesLogonAndSubscribe) {
+TEST_F(FuturesOeConnectionHandlerTest, OnConnected_Api_InitiatesLogon) {
   core::ConnectionContext ctx(&app_, core::TransportId::kApi);
 
   BinanceFuturesOeConnectionHandler::on_connected(ctx, core::TransportId::kApi);
 
+  // Futures handler only initiates logon on API connect
+  // User data stream subscription happens via separate callback after logon
   EXPECT_TRUE(app_.logon_initiated);
-  ASSERT_EQ(app_.sent_messages.size(), 1);
-  EXPECT_EQ(app_.sent_messages[0], "user_data_stream_subscribe");
+  EXPECT_TRUE(app_.sent_messages.empty());
 }
 
 TEST_F(FuturesOeConnectionHandlerTest, OnConnected_Stream_StartsKeepalive) {

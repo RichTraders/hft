@@ -351,7 +351,7 @@ void WsOrderEntryApp::keepalive_loop() {
     return;
   }
 
-  constexpr int kKeepaliveIntervalMs =
+  const int keepalive_interval_ms =
       WsOeCoreImpl::ExchangeTraits::get_keepalive_interval_ms();
   constexpr int kSleepIntervalMs = 1000;
 
@@ -361,7 +361,7 @@ void WsOrderEntryApp::keepalive_loop() {
     std::this_thread::sleep_for(std::chrono::milliseconds(kSleepIntervalMs));
     elapsed_ms += kSleepIntervalMs;
 
-    if (elapsed_ms >= kKeepaliveIntervalMs) {
+    if (elapsed_ms >= keepalive_interval_ms) {
       elapsed_ms = 0;
 
       if (!api_transport_) {

@@ -66,7 +66,9 @@ struct BinanceFuturesMdMessageConverter {
   struct MarketDataVisitor {
     explicit MarketDataVisitor(
         const BinanceFuturesMdMessageConverter& converter)
-        : logger_(converter.logger_), pool_(converter.pool_) {}
+        : logger_(converter.logger_), pool_(converter.pool_) {
+      symbol_ = INI_CONFIG.get("meta", "ticker");
+    }
     [[nodiscard]] MarketUpdateData operator()(std::monostate) const {
       logger_.debug("");
       return MarketUpdateData{};
@@ -131,7 +133,7 @@ struct BinanceFuturesMdMessageConverter {
       entries.reserve(msg.result.bids.size() + msg.result.asks.size() + 1);
 
       // TODO(JB): Remove Hardcoding
-      const auto& symbol = "BTCUSDT";
+      const auto& symbol = symbol_;
 
       // Clear data
       entries.push_back(pool_->allocate(common::MarketUpdateType::kClear,
@@ -180,6 +182,7 @@ struct BinanceFuturesMdMessageConverter {
    private:
     const common::Logger::Producer& logger_;
     common::MemoryPool<MarketData>* pool_;
+    std::string symbol_;
   };
   struct SnapshotVisitor {
     explicit SnapshotVisitor(const BinanceFuturesMdMessageConverter& converter)

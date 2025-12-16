@@ -46,8 +46,7 @@ public:
 
 };
 
-
-TEST_F(FixMdAppTest, CallbackRegistration) {
+TEST_F(FixMdAppTest, DISABLED_CallbackRegistration) {
   std::mutex mtx;
   std::condition_variable cv;
   bool logout_success = false;

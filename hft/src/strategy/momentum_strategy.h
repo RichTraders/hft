@@ -14,30 +14,27 @@
 #define MOMENTUM_STRATEGY_H
 #include "base_strategy.hpp"
 #include "common/ini_config.hpp"
-#include "feature_engine.h"
-#include "order_book.h"
-#include "order_manager.h"
+#include "feature_engine.hpp"
+#include "oe_traits_config.hpp"
+#include "order_book.hpp"
+#include "order_manager.hpp"
 
 struct MarketData;
 
 namespace trading {
-template <typename Strategy, typename OeTraits>
+template <typename Strategy>
 class FeatureEngine;
-template <typename Strategy, typename OeTraits>
+template <typename Strategy>
 class MarketOrderBook;
 
-template <typename OeTraits>
-class ObiVwapMomentumStrategy
-    : public BaseStrategy<ObiVwapMomentumStrategy<OeTraits>, OeTraits> {
+class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
  public:
-  using QuoteIntentType = std::conditional_t<OeTraits::supports_position_side(),
-      FuturesQuoteIntent, SpotQuoteIntent>;
-  using OrderManagerT =
-      OrderManager<ObiVwapMomentumStrategy<OeTraits>, OeTraits>;
-  using FeatureEngineT =
-      FeatureEngine<ObiVwapMomentumStrategy<OeTraits>, OeTraits>;
-  using MarketOrderBookT =
-      MarketOrderBook<ObiVwapMomentumStrategy<OeTraits>, OeTraits>;
+  using QuoteIntentType =
+      std::conditional_t<SelectedOeTraits::supports_position_side(),
+          FuturesQuoteIntent, SpotQuoteIntent>;
+  using OrderManagerT = OrderManager<ObiVwapMomentumStrategy>;
+  using FeatureEngineT = FeatureEngine<ObiVwapMomentumStrategy>;
+  using MarketOrderBookT = MarketOrderBook<ObiVwapMomentumStrategy>;
   double round5(double value) {
     constexpr double kFactor = 100000.0;
     return std::round(value * kFactor) / kFactor;
@@ -47,8 +44,8 @@ class ObiVwapMomentumStrategy
       const FeatureEngineT* feature_engine,
       const common::Logger::Producer& logger,
       const common::TradeEngineCfgHashMap&)
-      : BaseStrategy<ObiVwapMomentumStrategy<OeTraits>, OeTraits>(order_manager,
-            feature_engine, logger),
+      : BaseStrategy<ObiVwapMomentumStrategy>(order_manager, feature_engine,
+            logger),
         variance_denominator_(
             INI_CONFIG.get_double("strategy", "variance_denominator")),
         position_variance_(
@@ -113,18 +110,14 @@ class ObiVwapMomentumStrategy
 
     if (delta * obi > enter_threshold_) {
       const auto best_bid_price = order_book->get_bbo()->bid_price;
-      if constexpr (OeTraits::supports_position_side()) {
-        intents.push_back(QuoteIntentType{.ticker = ticker,
-            .side = common::Side::kBuy,
-            .position_side = common::PositionSide::kLong,
-            .price = best_bid_price - safety_margin_,
-            .qty = Qty{round5(signal * position_variance_)}});
-      } else {
-        intents.push_back(QuoteIntentType{.ticker = ticker,
-            .side = common::Side::kBuy,
-            .price = best_bid_price - safety_margin_,
-            .qty = Qty{round5(signal * position_variance_)}});
+      auto intent = make_quote_intent(ticker,
+          common::Side::kBuy,
+          best_bid_price - safety_margin_,
+          Qty{round5(signal * position_variance_)});
+      if constexpr (SelectedOeTraits::supports_position_side()) {
+        intent.position_side = common::PositionSide::kLong;
       }
+      intents.push_back(intent);
 
       this->logger_.trace(
           "[MarketMaker]Order Submitted. price:{}, qty:{}, side:buy, delta:{} "
@@ -139,18 +132,14 @@ class ObiVwapMomentumStrategy
           spread);
     } else if (delta * obi < -enter_threshold_) {
       const auto best_ask_price = order_book->get_bbo()->ask_price;
-      if constexpr (OeTraits::supports_position_side()) {
-        intents.push_back(QuoteIntentType{.ticker = ticker,
-            .side = common::Side::kSell,
-            .position_side = common::PositionSide::kShort,
-            .price = best_ask_price + safety_margin_,
-            .qty = Qty{round5(signal * position_variance_ * 1e2)}});
-      } else {
-        intents.push_back(QuoteIntentType{.ticker = ticker,
-            .side = common::Side::kSell,
-            .price = best_ask_price + safety_margin_,
-            .qty = Qty{round5(signal * position_variance_ * 1e2)}});
+      auto intent = make_quote_intent(ticker,
+          common::Side::kSell,
+          best_ask_price + safety_margin_,
+          Qty{round5(signal * position_variance_ * 1e2)});
+      if constexpr (SelectedOeTraits::supports_position_side()) {
+        intent.position_side = common::PositionSide::kShort;
       }
+      intents.push_back(intent);
       this->logger_.trace(
           "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, delta:{} "
           "obi:{} signal:{}, mid:{}, vwap:{}, spread:{.3f}",
@@ -163,13 +152,14 @@ class ObiVwapMomentumStrategy
           vwap,
           spread);
     } else if (delta * obi < exit_threshold_) {
-      if constexpr (OeTraits::supports_position_side()) {
+      if constexpr (SelectedOeTraits::supports_position_side()) {
         const auto best_bid_price = order_book->get_bbo()->bid_price;
-        intents.push_back(QuoteIntentType{.ticker = ticker,
-            .side = common::Side::kSell,
-            .position_side = common::PositionSide::kLong,
-            .price = best_bid_price - safety_margin_,
-            .qty = Qty{round5(signal * position_variance_)}});
+        auto intent = make_quote_intent(ticker,
+            common::Side::kSell,
+            best_bid_price - safety_margin_,
+            Qty{round5(signal * position_variance_)});
+        intent.position_side = common::PositionSide::kLong;
+        intents.push_back(intent);
         this->logger_.trace(
             "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, "
             "delta:{} "
@@ -184,13 +174,14 @@ class ObiVwapMomentumStrategy
             spread);
       }
     } else if (delta * obi > -exit_threshold_) {
-      if constexpr (OeTraits::supports_position_side()) {
+      if constexpr (SelectedOeTraits::supports_position_side()) {
         const auto best_ask_price = order_book->get_bbo()->ask_price;
-        intents.push_back(QuoteIntentType{.ticker = ticker,
-            .side = common::Side::kBuy,
-            .position_side = common::PositionSide::kShort,
-            .price = best_ask_price + safety_margin_,
-            .qty = Qty{round5(signal * position_variance_)}});
+        auto intent = make_quote_intent(ticker,
+            common::Side::kBuy,
+            best_ask_price + safety_margin_,
+            Qty{round5(signal * position_variance_)});
+        intent.position_side = common::PositionSide::kShort;
+        intents.push_back(intent);
         this->logger_.trace(
             "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, "
             "delta:{} "
@@ -212,6 +203,16 @@ class ObiVwapMomentumStrategy
   void on_order_updated(const ExecutionReport*) noexcept {}
 
  private:
+  static QuoteIntentType make_quote_intent(const common::TickerId& ticker,
+      common::Side side, common::Price price, Qty qty) {
+    QuoteIntentType intent{};
+    intent.ticker = ticker;
+    intent.side = side;
+    intent.price = price;
+    intent.qty = qty;
+    return intent;
+  }
+
   static constexpr int kDefaultOBILevel10 = 10;
   static constexpr double kDefaultSafetyMargin = 5.0;
   const double variance_denominator_;

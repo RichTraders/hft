@@ -21,20 +21,13 @@
 #include "logger.h"
 #include "response_manager.h"
 #include "strategy_config.hpp"
-#include "trade_engine.h"
+#include "trade_engine.hpp"
 
 using namespace trading;
 using namespace common;
 
-#ifdef USE_FUTURES_API
-using TestOeTraits = BinanceFuturesOeTraits;
-#else
-#include "core/websocket/order_entry/exchanges/binance/spot/binance_spot_oe_traits.h"
-using TestOeTraits = BinanceSpotOeTraits;
-#endif
-
-using TestStrategy = SelectedStrategy<TestOeTraits>;
-using TestTradeEngine = trading::TradeEngine<TestStrategy, TestOeTraits>;
+using TestStrategy = SelectedStrategy;
+using TestTradeEngine = trading::TradeEngine<TestStrategy>;
 
 class StrategyIntegrationTest : public ::testing::Test {
  protected:

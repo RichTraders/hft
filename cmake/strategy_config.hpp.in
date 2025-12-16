@@ -1,8 +1,9 @@
 #pragma once
 
+#include "oe_traits_config.hpp"
+
 #include "strategy/momentum_strategy.h"
 #include "strategy/liquid_taker.h"
 
-template <typename OeTraits>
-using SelectedStrategy = @STRATEGY_TYPE@<OeTraits>;
+using SelectedStrategy = @STRATEGY_TYPE@;
 inline constexpr std::string_view kSelectedStrategyName = "@STRATEGY_NAME@";

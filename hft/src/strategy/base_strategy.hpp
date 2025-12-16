@@ -15,27 +15,27 @@
 
 #include "common/logger.h"
 
-#include "feature_engine.tpp"
-#include "market_consumer.tpp"
-#include "order_book.tpp"
-#include "order_gateway.tpp"
-#include "order_manager.tpp"
-#include "trade_engine.tpp"
+#include "feature_engine.hpp"
+#include "market_consumer.hpp"
+#include "order_book.hpp"
+#include "order_gateway.hpp"
+#include "order_manager.hpp"
+#include "trade_engine.hpp"
 
 namespace trading {
-template <typename Strategy, typename OeTraits>
+template <typename Strategy>
 class MarketOrderBook;
-template <typename Strategy, typename OeTraits>
+template <typename Strategy>
 class FeatureEngine;
-template <typename Strategy, typename OeTraits>
+template <typename Strategy>
 class OrderManager;
 struct ExecutionReport;
 
-template <typename Strategy, typename OeTraits>
+template <typename Strategy>
 class BaseStrategy {
  public:
-  BaseStrategy(OrderManager<Strategy, OeTraits>* const order_manager,
-      const FeatureEngine<Strategy, OeTraits>* const feature_engine,
+  BaseStrategy(OrderManager<Strategy>* const order_manager,
+      const FeatureEngine<Strategy>* const feature_engine,
       const common::Logger::Producer& logger)
       : order_manager_(order_manager),
         feature_engine_(feature_engine),
@@ -44,8 +44,8 @@ class BaseStrategy {
   ~BaseStrategy() = default;
 
  protected:
-  OrderManager<Strategy, OeTraits>* order_manager_;
-  const FeatureEngine<Strategy, OeTraits>* feature_engine_;
+  OrderManager<Strategy>* order_manager_;
+  const FeatureEngine<Strategy>* feature_engine_;
   const common::Logger::Producer& logger_;
 };
 }  // namespace trading

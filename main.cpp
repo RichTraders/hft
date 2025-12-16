@@ -15,22 +15,9 @@
 #include <csignal>
 #include "strategy_config.hpp"
 
-#ifdef USE_FUTURES_API
-#include "core/websocket/order_entry/exchanges/binance/futures/binance_futures_oe_traits.h"
-using SelectedOeTraits = BinanceFuturesOeTraits;
-using SelectedStrategyType = SelectedStrategy<SelectedOeTraits>;
-#else
-#include "core/websocket/order_entry/exchanges/binance/spot/binance_spot_oe_traits.h"
-using SelectedOeTraits = BinanceSpotOeTraits;
-using SelectedStrategyType = SelectedStrategy<SelectedOeTraits>;
-#endif
-
-using SelectedOrderGateway =
-    trading::OrderGateway<SelectedStrategyType, SelectedOeTraits>;
-using SelectedTradeEngine =
-    trading::TradeEngine<SelectedStrategyType, SelectedOeTraits>;
-using SelectedMarketConsumer =
-    trading::MarketConsumer<SelectedStrategyType, SelectedOeTraits>;
+using SelectedOrderGateway = trading::OrderGateway<SelectedStrategy>;
+using SelectedTradeEngine = trading::TradeEngine<SelectedStrategy>;
+using SelectedMarketConsumer = trading::MarketConsumer<SelectedStrategy>;
 
 void block_all_signals(sigset_t& set) {
   sigfillset(&set);

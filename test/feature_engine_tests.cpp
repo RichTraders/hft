@@ -13,30 +13,22 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "feature_engine.h"
+#include "feature_engine.hpp"
 #include "ini_config.hpp"
 #include "logger.h"
-#include "order_book.h"
+#include "order_book.hpp"
 #include "strategy_config.hpp"
-#include "trade_engine.h"
-
-#ifdef USE_FUTURES_API
-#include "core/websocket/order_entry/exchanges/binance/futures/binance_futures_oe_traits.h"
-using TestOeTraits = BinanceFuturesOeTraits;
-#else
-#include "core/websocket/order_entry/exchanges/binance/spot/binance_spot_oe_traits.h"
-using TestOeTraits = BinanceSpotOeTraits;
-#endif
+#include "trade_engine.hpp"
 
 using ::testing::_;
 using ::testing::HasSubstr;
 using namespace common;
 using namespace trading;
 
-using TestStrategy = SelectedStrategy<TestOeTraits>;
-using TestTradeEngine = TradeEngine<TestStrategy, TestOeTraits>;
-using TestFeatureEngine = FeatureEngine<TestStrategy, TestOeTraits>;
-using TestOrderBook = MarketOrderBook<TestStrategy, TestOeTraits>;
+using TestStrategy = SelectedStrategy;
+using TestTradeEngine = TradeEngine<TestStrategy>;
+using TestFeatureEngine = FeatureEngine<TestStrategy>;
+using TestOrderBook = MarketOrderBook<TestStrategy>;
 
 class FeatureEngineTest : public ::testing::Test {
  public:

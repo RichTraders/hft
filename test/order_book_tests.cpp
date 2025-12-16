@@ -12,23 +12,15 @@
 #include "core/response_manager.h"
 #include "gtest/gtest.h"
 #include "ini_config.hpp"
-#include "order_book.h"
+#include "order_book.hpp"
 #include "strategy_config.hpp"
-#include "trade_engine.h"
-
-#ifdef USE_FUTURES_API
-#include "core/websocket/order_entry/exchanges/binance/futures/binance_futures_oe_traits.h"
-using TestOeTraits = BinanceFuturesOeTraits;
-#else
-#include "core/websocket/order_entry/exchanges/binance/spot/binance_spot_oe_traits.h"
-using TestOeTraits = BinanceSpotOeTraits;
-#endif
+#include "trade_engine.hpp"
 
 using namespace trading;
 using namespace common;
-using TestStrategy = SelectedStrategy<TestOeTraits>;
-using TestTradeEngine = trading::TradeEngine<TestStrategy, TestOeTraits>;
-using TestOrderBook = trading::MarketOrderBook<TestStrategy, TestOeTraits>;
+using TestStrategy = SelectedStrategy;
+using TestTradeEngine = trading::TradeEngine<TestStrategy>;
+using TestOrderBook = trading::MarketOrderBook<TestStrategy>;
 
 class MarketOrderBookTest : public ::testing::Test {
 public:

@@ -13,30 +13,30 @@
 #ifndef LIQUID_TAKER_H
 #define LIQUID_TAKER_H
 #include "base_strategy.hpp"
+#include "oe_traits_config.hpp"
 
 struct MarketData;
 
 namespace trading {
-template <typename Strategy, typename OeTraits>
+template <typename Strategy>
 class FeatureEngine;
-template <typename Strategy, typename OeTraits>
+template <typename Strategy>
 class MarketOrderBook;
 
-template <typename OeTraits>
-class LiquidTaker : public BaseStrategy<LiquidTaker<OeTraits>, OeTraits> {
+class LiquidTaker : public BaseStrategy<LiquidTaker> {
  public:
-  using QuoteIntentType = std::conditional_t<OeTraits::supports_position_side(),
-      FuturesQuoteIntent, SpotQuoteIntent>;
-  using OrderManagerT = OrderManager<LiquidTaker<OeTraits>, OeTraits>;
-  using FeatureEngineT = FeatureEngine<LiquidTaker<OeTraits>, OeTraits>;
-  using MarketOrderBookT = MarketOrderBook<LiquidTaker<OeTraits>, OeTraits>;
+  using QuoteIntentType =
+      std::conditional_t<SelectedOeTraits::supports_position_side(),
+          FuturesQuoteIntent, SpotQuoteIntent>;
+  using OrderManagerT = OrderManager<LiquidTaker>;
+  using FeatureEngineT = FeatureEngine<LiquidTaker>;
+  using MarketOrderBookT = MarketOrderBook<LiquidTaker>;
 
   LiquidTaker(OrderManagerT* order_manager,
       const FeatureEngineT* feature_engine,
       const common::Logger::Producer& logger,
       const common::TradeEngineCfgHashMap&)
-      : BaseStrategy<LiquidTaker<OeTraits>, OeTraits>(order_manager,
-            feature_engine, logger) {}
+      : BaseStrategy<LiquidTaker>(order_manager, feature_engine, logger) {}
 
   void on_orderbook_updated(const common::TickerId&, common::Price,
       common::Side, const MarketOrderBookT*) const noexcept {}

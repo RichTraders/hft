@@ -16,7 +16,7 @@
 #include "position_keeper.h"
 
 #include "ini_config.hpp"
-#include "order_book.h"
+#include "order_book.hpp"
 #include "order_entry.h"
 
 using namespace trading;

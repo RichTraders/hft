@@ -234,7 +234,7 @@ class OrderGateway {
 
   void order_modify(const RequestCommon& request) {
     const OrderModifyRequest modify_request{
-        .order_id = request.orig_cl_order_id,
+        .orig_client_order_id = request.orig_cl_order_id,
         .symbol = request.symbol,
         .side = from_common_side(request.side),
         .price = request.price,

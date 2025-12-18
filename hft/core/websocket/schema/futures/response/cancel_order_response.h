@@ -32,6 +32,7 @@ struct CancelOrderResult {
   std::string self_trade_prevention_mode;
 
   double price{};
+  double avg_price{};
   double stop_price{};
   double activate_price{};
   double price_rate{};
@@ -66,6 +67,7 @@ struct CancelOrderResult {
             "selfTradePreventionMode",  &T::self_trade_prevention_mode,
 
             "price",                    glz::quoted_num<&T::price>,
+            "avgPrice",                 glz::quoted_num<&T::avg_price>,
             "stopPrice",                glz::quoted_num<&T::stop_price>,
             "activatePrice",            glz::quoted_num<&T::activate_price>,
             "priceRate",                glz::quoted_num<&T::price_rate>,

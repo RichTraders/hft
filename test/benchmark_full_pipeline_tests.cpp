@@ -121,7 +121,7 @@ class MockOrderGateway {
       }
       case trading::ReqeustType::kOrderModify: {
         const trading::OrderModifyRequest modify{
-            .order_id = request.orig_cl_order_id,
+            .orig_client_order_id = request.orig_cl_order_id,
             .symbol = request.symbol,
             .side = trading::from_common_side(request.side),
             .price = request.price,

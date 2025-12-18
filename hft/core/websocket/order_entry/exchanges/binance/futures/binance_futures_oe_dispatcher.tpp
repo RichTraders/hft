@@ -45,6 +45,9 @@ void BinanceFuturesOeDispatchRouter::process_message(
     else if constexpr (std::is_same_v<T, typename ExchangeTraits::PlaceOrderResponse>) {
       handle_place_order_response<ExchangeTraits>(arg, context, message);
     }
+    else if constexpr (std::is_same_v<T, typename ExchangeTraits::CancelOrderResponse>) {
+      handle_cancel_order_response<ExchangeTraits>(arg, context, message);
+    }
     else if constexpr (std::is_same_v<T, typename ExchangeTraits::ApiResponse>) {
       handle_api_response<ExchangeTraits>(arg, context, message);
     }
@@ -73,7 +76,7 @@ void BinanceFuturesOeDispatchRouter::handle_execution_report(
   const auto& event = report.event;
 
   std::string_view dispatch_type = "8";  // Default: execution report
-  if (event.execution_type == "CANCELED" && event.reject_reason != "NONE") {
+  if (event.execution_type == "CANCELED" && event.reject_reason != "0") {
     dispatch_type = "9";  // Cancel reject
   }
 
@@ -308,6 +311,30 @@ void BinanceFuturesOeDispatchRouter::handle_place_order_response(
     if (synthetic_report.has_value()) {
       context.app->dispatch("8", synthetic_report.value());
     }
+  }
+}
+
+template <typename ExchangeTraits>
+void BinanceFuturesOeDispatchRouter::handle_cancel_order_response(
+    const typename ExchangeTraits::CancelOrderResponse& response,
+    const core::WsOeDispatchContext<ExchangeTraits>& context,
+    const typename ExchangeTraits::WireMessage&) {
+
+  if (response.status == kHttpOK) {
+    context.logger->debug("[Dispatcher] CancelOrder success: id={}, orderId={}, status={}",
+                        response.id,
+                        response.result.order_id,
+                        response.result.status);
+  } else {
+    context.logger->warn("[Dispatcher] CancelOrder failed: id={}, status={}",
+                        response.id,
+                        response.status);
+  }
+
+  const auto client_order_id_opt =
+      core::WsOrderManager<ExchangeTraits>::extract_client_order_id(response.id);
+  if (client_order_id_opt.has_value()) {
+    context.order_manager->remove_pending_request(client_order_id_opt.value());
   }
 }
 

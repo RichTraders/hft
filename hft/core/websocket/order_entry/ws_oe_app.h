@@ -147,7 +147,7 @@ class WsOrderEntryApp {
         std::string(WsOeCoreImpl::ExchangeTraits::get_stream_host());
     const std::string stream_path =
         std::string(WsOeCoreImpl::ExchangeTraits::get_stream_endpoint_path()) +
-        "?listenKey=" + listen_key_;
+        "/" + listen_key_;
     const int stream_port = WsOeCoreImpl::ExchangeTraits::get_stream_port();
 
     transport->register_message_callback([this](std::string_view payload) {

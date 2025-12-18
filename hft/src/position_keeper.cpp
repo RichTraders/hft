@@ -30,12 +30,19 @@ std::string PositionInfo::toString() const {
       (position_ != 0.0)
           ? open_vwap_[sideToIndex(Side::kSell)] / std::abs(position_)
           : 0.0;
+  const double long_vwap =
+      (long_position_ > 0) ? long_cost_ / long_position_ : 0.0;
+  const double short_vwap =
+      (short_position_ > 0) ? short_cost_ / short_position_ : 0.0;
 
-  stream << "Position{" << "pos:" << position_ << " u-pnl:" << unreal_pnl_
+  stream << "Position{" << "pos:" << position_ << " L[qty:" << long_position_
+         << " vwap:" << long_vwap << " u:" << long_unreal_pnl_
+         << " r:" << long_real_pnl_ << "]" << " S[qty:" << short_position_
+         << " vwap:" << short_vwap << " u:" << short_unreal_pnl_
+         << " r:" << short_real_pnl_ << "]" << " u-pnl:" << unreal_pnl_
          << " r-pnl:" << real_pnl_ << " t-pnl:" << total_pnl_
-         << " vol:" << common::toString(volume_) << " vwaps:[" << " vwaps:["
-         << vwap_buy << "X" << vwap_sell << "] "
-         << (bbo_ ? bbo_->toString() : "") << "}";
+         << " vol:" << common::toString(volume_) << " vwaps:[" << vwap_buy
+         << "X" << vwap_sell << "] " << (bbo_ ? bbo_->toString() : "") << "}";
 
   return stream.str();
 }
@@ -49,14 +56,58 @@ void PositionInfo::add_fill(const ExecutionReport* report,
   position_ += report->last_qty.value * static_cast<double>(sgn);
   volume_.value += report->last_qty.value;
 
+  if (const auto* pos_side =
+          report->position_side ? &(*report->position_side) : nullptr) {
+    if (*pos_side == common::PositionSide::kLong) {
+      if (report->side == Side::kBuy) {
+        long_cost_ += report->price.value * report->last_qty.value;
+        long_position_ += report->last_qty.value;
+      } else {
+        const double close_qty =
+            std::min(report->last_qty.value, long_position_);
+        if (long_position_ > 0 && close_qty > 0) {
+          const double long_vwap = long_cost_ / long_position_;
+          long_real_pnl_ += (report->price.value - long_vwap) * close_qty;
+          long_cost_ -= long_vwap * close_qty;
+        }
+        long_position_ -= report->last_qty.value;
+        if (long_position_ < 0) {
+          long_position_ = 0;
+          long_cost_ = 0;
+        }
+      }
+    } else if (*pos_side == common::PositionSide::kShort) {
+      if (report->side == Side::kSell) {
+        short_cost_ += report->price.value * report->last_qty.value;
+        short_position_ += report->last_qty.value;
+      } else {
+        const double close_qty =
+            std::min(report->last_qty.value, short_position_);
+        if (short_position_ > 0 && close_qty > 0) {
+          const double short_vwap = short_cost_ / short_position_;
+          short_real_pnl_ += (short_vwap - report->price.value) * close_qty;
+          short_cost_ -= short_vwap * close_qty;
+        }
+        short_position_ -= report->last_qty.value;
+        if (short_position_ < 0) {
+          short_position_ = 0;
+          short_cost_ = 0;
+        }
+      }
+    }
+  }
+
+  // Net position tracking (for Spot or One-Way Mode without position_side)
+  double net_real_pnl_delta = 0;
   if (old_position * sgn >= 0) {
     open_vwap_[idx] += report->price.value * report->last_qty.value;
   } else {
     const auto opp_side_vwap =
         open_vwap_[opp_side_index] / std::abs(old_position);
     open_vwap_[opp_side_index] = opp_side_vwap * std::abs(position_);
-    real_pnl_ += std::min(report->last_qty.value, std::abs(old_position)) *
-                 (opp_side_vwap - report->price.value) * sgn;
+    net_real_pnl_delta =
+        std::min(report->last_qty.value, std::abs(old_position)) *
+        (opp_side_vwap - report->price.value) * sgn;
     if (position_ * old_position < 0) {
       open_vwap_[idx] = (report->price.value * std::abs(position_));
       open_vwap_[opp_side_index] = 0;
@@ -78,6 +129,26 @@ void PositionInfo::add_fill(const ExecutionReport* report,
           std::abs(position_);
   }
 
+  // Long/Short unrealized PnL
+  if (long_position_ > 0) {
+    const double long_vwap = long_cost_ / long_position_;
+    long_unreal_pnl_ = (report->price.value - long_vwap) * long_position_;
+  } else {
+    long_unreal_pnl_ = 0;
+  }
+  if (short_position_ > 0) {
+    const double short_vwap = short_cost_ / short_position_;
+    short_unreal_pnl_ = (short_vwap - report->price.value) * short_position_;
+  } else {
+    short_unreal_pnl_ = 0;
+  }
+
+  // Use Long/Short PnL if position_side is present, otherwise use net PnL
+  if (report->position_side) {
+    real_pnl_ = long_real_pnl_ + short_real_pnl_;
+  } else {
+    real_pnl_ += net_real_pnl_delta;
+  }
   total_pnl_ = unreal_pnl_ + real_pnl_;
 
   logger.info(std::format("[PositionInfo][Fill] {}", toString()));
@@ -87,9 +158,15 @@ void PositionInfo::update_bbo(const BBO* bbo,
     const common::Logger::Producer& logger) noexcept {
   bbo_ = bbo;
 
-  if (position_ != 0 && bbo->bid_price != common::kPriceInvalid &&
-      bbo->ask_price != common::kPriceInvalid) {
-    const auto mid_price = (bbo->bid_price.value + bbo->ask_price.value) * 0.5;
+  if (bbo->bid_price == common::kPriceInvalid ||
+      bbo->ask_price == common::kPriceInvalid) {
+    return;
+  }
+
+  const auto mid_price = (bbo->bid_price.value + bbo->ask_price.value) * 0.5;
+
+  // Net position unrealized PnL
+  if (position_ != 0) {
     if (position_ > 0)
       unreal_pnl_ = (mid_price - open_vwap_[sideToIndex(Side::kBuy)] /
                                      std::abs(position_)) *
@@ -99,15 +176,27 @@ void PositionInfo::update_bbo(const BBO* bbo,
           (open_vwap_[sideToIndex(Side::kSell)] / std::abs(position_) -
               mid_price) *
           std::abs(position_);
-
-    const auto old_total_pnl = total_pnl_;
-    total_pnl_ = unreal_pnl_ + real_pnl_;
-
-    if (total_pnl_ != old_total_pnl)
-      logger.info("[PositionInfo][Updated] {} {}",
-          toString(),
-          bbo_->toString());
   }
+
+  // Long/Short unrealized PnL
+  if (long_position_ > 0) {
+    const double long_vwap = long_cost_ / long_position_;
+    long_unreal_pnl_ = (mid_price - long_vwap) * long_position_;
+  } else {
+    long_unreal_pnl_ = 0;
+  }
+  if (short_position_ > 0) {
+    const double short_vwap = short_cost_ / short_position_;
+    short_unreal_pnl_ = (short_vwap - mid_price) * short_position_;
+  } else {
+    short_unreal_pnl_ = 0;
+  }
+
+  const auto old_total_pnl = total_pnl_;
+  total_pnl_ = unreal_pnl_ + real_pnl_;
+
+  if (total_pnl_ != old_total_pnl)
+    logger.info("[PositionInfo][Updated] {} {}", toString(), bbo_->toString());
 }
 
 void PositionKeeper::add_fill(const ExecutionReport* report) noexcept {

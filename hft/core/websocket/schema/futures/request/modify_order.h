@@ -20,7 +20,7 @@ struct ModifyOrderParams {
   std::string symbol;
   std::string side;
 
-  std::uint64_t order_id{};
+  std::uint64_t origin_client_order_id{};
   std::uint64_t timestamp{};
 
   std::optional<std::string> api_key;
@@ -37,10 +37,10 @@ struct ModifyOrderParams {
   struct glaze {
     using T = ModifyOrderParams;
     static constexpr auto value = glz::object(
-      "symbol",       &T::symbol,
-      "side",         &T::side,
-      "orderId",      &T::order_id,
-      "timestamp",    &T::timestamp,
+      "symbol",                 &T::symbol,
+      "side",                   &T::side,
+      "origClientOrderId",      &T::origin_client_order_id,
+      "timestamp",              &T::timestamp,
 
       "apiKey",       &T::api_key,
       "origType",     &T::orig_type,

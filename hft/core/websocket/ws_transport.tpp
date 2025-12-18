@@ -152,7 +152,7 @@ void WebSocketTransport<ThreadName>::initialize(std::string host, int port,
               << "\n";
     throw std::runtime_error("WebSocketTransport: connection failed");
   }
-  ready_.store(false,std::memory_order_release);
+  ready_.store(true,std::memory_order_release);
 
   std::cout << "WebSocketTransport initialized\n";
 }

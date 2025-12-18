@@ -13,6 +13,7 @@
 #ifndef POSITION_KEEPER_H
 #define POSITION_KEEPER_H
 
+#include "absl/container/flat_hash_map.h"
 #include "common/ini_config.hpp"
 #include "common/logger.h"
 #include "common/types.h"
@@ -23,6 +24,14 @@ struct ExecutionReport;
 
 struct PositionInfo {
   double position_ = 0;
+  double long_position_ = 0;
+  double short_position_ = 0;
+  double long_cost_ = 0;
+  double short_cost_ = 0;
+  double long_real_pnl_ = 0;
+  double long_unreal_pnl_ = 0;
+  double short_real_pnl_ = 0;
+  double short_unreal_pnl_ = 0;
   double real_pnl_ = 0;
   double unreal_pnl_ = 0;
   double total_pnl_ = 0;
@@ -72,7 +81,7 @@ class PositionKeeper {
  private:
   const common::Logger::Producer& logger_;
 
-  std::unordered_map<std::string, PositionInfo> ticker_position_;
+  absl::flat_hash_map<std::string, PositionInfo> ticker_position_;
 };
 }  // namespace trading
 

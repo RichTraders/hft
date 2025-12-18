@@ -23,6 +23,7 @@
 #include "schema/futures/request/modify_order.h"
 #include "schema/futures/request/new_order.h"
 #include "schema/futures/response/account.h"
+#include "schema/futures/response/account_update.h"
 #include "schema/futures/response/api_response.h"
 #include "schema/futures/response/balance_response.h"
 #include "schema/futures/response/cancel_order_response.h"
@@ -54,7 +55,7 @@ struct BinanceFuturesOeTraits {
       schema::futures::UserDataStreamStartResponse;
   using SessionUserUnsubscriptionResponse =
       schema::futures::UserDataStreamStopResponse;
-  using BalanceUpdateEnvelope = schema::futures::AccountBalanceResponse;
+  using BalanceUpdateEnvelope = schema::futures::AccountUpdateResponse;
   using OutboundAccountPositionEnvelope =
       schema::futures::FuturesAccountInfoResponse;
   using ListenKeyExpiredEvent = schema::futures::ListenKeyExpiredEvent;

@@ -39,6 +39,11 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
               "[executionReport]">(payload);
     }
 
+    if (payload.contains("ACCOUNT_UPDATE")) {
+      return this->decode_or_log<BinanceFuturesOeTraits::BalanceUpdateEnvelope,
+          "[accountUpdate]">(payload);
+    }
+
     if (payload.contains("listenKeyExpired")) {
       return this->decode_or_log<BinanceFuturesOeTraits::ListenKeyExpiredEvent,
           "[listenKeyExpired]">(payload);

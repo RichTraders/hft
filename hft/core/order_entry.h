@@ -394,7 +394,7 @@ struct OrderMassCancelRequest {
 };
 
 struct OrderModifyRequest {
-  common::OrderId order_id;
+  common::OrderId orig_client_order_id;
   std::string symbol;
   OrderSide side;
   common::Price price;

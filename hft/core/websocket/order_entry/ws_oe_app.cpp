@@ -209,7 +209,7 @@ void WsOrderEntryApp::post_cancel_and_reorder(
 void WsOrderEntryApp::post_modify_order(
     const trading::OrderModifyRequest& data) {
   PendingOrderRequest request;
-  request.client_order_id = data.order_id.value;
+  request.client_order_id = data.orig_client_order_id.value;
   request.symbol = data.symbol;
   request.side = trading::to_common_side(data.side);
   request.price = data.price;

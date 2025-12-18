@@ -226,7 +226,7 @@ TEST_F(WsOeFuturesEncoderTest, CreateCancelOrderMessage_PositionSideIncluded) {
 TEST_F(WsOeFuturesEncoderTest, CreateModifyOrderMessage_ValidRequest_ContainsAllParams) {
   OrderModifyRequest modify;
   modify.symbol = "BTCUSDT";
-  modify.order_id = OrderId{1111111111};
+  modify.orig_client_order_id = OrderId{1111111111};
   modify.side = OrderSide::kBuy;
   modify.order_qty = Qty{0.75};
   modify.price = Price{51000.00};
@@ -329,7 +329,7 @@ TEST_F(WsOeFuturesEncoderTest, AllOrderMessages_ProduceValidJson_NoParsingErrors
 
   OrderModifyRequest modify;
   modify.symbol = "BTCUSDT";
-  modify.order_id = OrderId{789};
+  modify.orig_client_order_id = OrderId{789};
   modify.side = OrderSide::kBuy;
   modify.order_qty = Qty{1.0};
   modify.price = Price{50000.00};

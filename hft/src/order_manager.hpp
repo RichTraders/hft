@@ -91,6 +91,7 @@ class OrderManager {
       if (layer >= 0) {
         expiry_manager_.register_expiry(response->symbol,
             response->side,
+            response->position_side,
             layer,
             response->cl_order_id,
             OMOrderState::kLive,
@@ -101,6 +102,7 @@ class OrderManager {
       if (layer >= 0 && side_book.slots[layer].state == OMOrderState::kLive) {
         expiry_manager_.register_expiry(response->symbol,
             response->side,
+            response->position_side,
             layer,
             response->cl_order_id,
             OMOrderState::kLive,
@@ -331,6 +333,7 @@ class OrderManager {
 
       expiry_manager_.register_expiry(ticker,
           action.side,
+          action.position_side,
           action.layer,
           action.cl_order_id,
           OMOrderState::kReserved,
@@ -425,6 +428,7 @@ class OrderManager {
           position_tracker_.get_reserved().value);
       expiry_manager_.register_expiry(ticker,
           action.side,
+          action.position_side,
           action.layer,
           action.cl_order_id,
           OMOrderState::kCancelReserved,
@@ -454,7 +458,8 @@ class OrderManager {
   void sweep_expired_orders(uint64_t now) noexcept {
     auto expired = expiry_manager_.sweep_expired(now);
     for (const auto& key : expired) {
-      auto& side_book = layer_book_.side_book(key.symbol, key.side);
+      auto& side_book =
+          layer_book_.side_book(key.symbol, key.side, key.position_side);
       if (UNLIKELY(key.layer >= side_book.slots.size()))
         continue;
 

@@ -177,7 +177,7 @@ class BinanceFuturesOeEncoder {
 
     payload.params.symbol = replace.symbol;
     payload.params.side = toString(replace.side);
-    payload.params.order_id = replace.cl_origin_order_id.value;
+    payload.params.origin_client_order_id = replace.cl_origin_order_id.value;
     payload.params.timestamp = util::get_timestamp_epoch();
 
     payload.params.quantity =
@@ -198,13 +198,16 @@ class BinanceFuturesOeEncoder {
   [[nodiscard]] std::string create_modify_order_message(
       const trading::OrderModifyRequest& modify) const {
     schema::futures::OrderModifyRequest payload;
-    payload.id = "ordermodify_" + std::to_string(modify.order_id.value);
+    payload.id =
+        "ordermodify_" + std::to_string(modify.orig_client_order_id.value);
 
     payload.params.symbol = modify.symbol;
     payload.params.side = toString(modify.side);
-    payload.params.order_id = modify.order_id.value;
-    payload.params.price = modify.price.value;
-    payload.params.quantity = modify.order_qty.value;
+    payload.params.origin_client_order_id = modify.orig_client_order_id.value;
+    payload.params.price = std::stod(common::to_fixed(modify.price.value,
+        PRECISION_CONFIG.price_precision()));
+    payload.params.quantity = std::stod(common::to_fixed(modify.order_qty.value,
+        PRECISION_CONFIG.qty_precision()));
 
     if (modify.position_side) {
       payload.params.position_side = common::toString(*modify.position_side);

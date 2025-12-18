@@ -23,6 +23,7 @@
 #include "core/response_manager.h"
 #include "feature_engine.hpp"
 #include "ini_config.hpp"
+#include "inventory_manager.h"
 #include "market_data.h"
 #include "order_book.hpp"
 #include "order_entry.h"
@@ -63,8 +64,8 @@ class TradeEngine {
       ResponseManager* response_manager,
       const common::TradeEngineCfgHashMap& ticker_cfg)
     requires std::is_constructible_v<Strategy, OrderManager<Strategy>*,
-                 const FeatureEngine<Strategy>*,
-                 const common::Logger::Producer&,
+                 const FeatureEngine<Strategy>*, const InventoryManager*,
+                 PositionKeeper*, const common::Logger::Producer&,
                  const common::TradeEngineCfgHashMap&>
       : logger_(logger),
         market_update_data_pool_(market_update_data_pool),
@@ -76,9 +77,12 @@ class TradeEngine {
         position_keeper_(std::make_unique<PositionKeeper>(logger_)),
         risk_manager_(std::make_unique<RiskManager>(logger_,
             position_keeper_.get(), ticker_cfg)),
+        inventory_manager_(std::make_unique<InventoryManager>(logger,
+            position_keeper_.get(), ticker_cfg)),
         order_manager_(std::make_unique<OrderManager<Strategy>>(logger_, this,
             *risk_manager_)),
-        strategy_(order_manager_.get(), feature_engine_.get(), logger_,
+        strategy_(order_manager_.get(), feature_engine_.get(),
+            inventory_manager_.get(), position_keeper_.get(), logger_,
             ticker_cfg) {
     const std::string ticker = INI_CONFIG.get("meta", "ticker");
     auto orderbook =
@@ -198,6 +202,7 @@ class TradeEngine {
   std::unique_ptr<FeatureEngine<Strategy>> feature_engine_;
   std::unique_ptr<PositionKeeper> position_keeper_;
   std::unique_ptr<RiskManager> risk_manager_;
+  std::unique_ptr<InventoryManager> inventory_manager_;
   std::unique_ptr<OrderManager<Strategy>> order_manager_;
 
   Strategy strategy_;

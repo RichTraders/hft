@@ -44,10 +44,15 @@ struct MockOeApp {
     keepalive_started = true;
   }
 
+  void set_session_ready() {
+    session_ready = true;
+  }
+
   std::vector<std::string> sent_messages;
   bool logon_initiated = false;
   std::string listen_key;
   bool keepalive_started = false;
+  bool session_ready = false;
 };
 
 struct MockMdApp {

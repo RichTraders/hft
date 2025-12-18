@@ -77,8 +77,13 @@ class MarketConsumer
     register_handler("3", [this](auto&& msg) { on_reject(msg); });
     register_handler("5", [this](auto&& msg) { on_logout(msg); });
 
-    app_->start();
     logger_.info("[Constructor] MarketConsumer Created");
+  }
+
+  void start() {
+    if (!app_->start()) {
+      logger_.info("[MarketConsumer] Market Data Start");
+    }
   }
 
   ~MarketConsumer() { std::cout << "[Destructor] MarketConsumer Destroy\n"; }

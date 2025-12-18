@@ -117,6 +117,14 @@ class WsOrderEntryApp {
   void initiate_session_logon();
   void start_listen_key_keepalive() { start_keepalive_impl(keepalive_thread_); }
 
+  [[nodiscard]] bool is_session_ready() const noexcept {
+    return session_ready_.load(std::memory_order_acquire);
+  }
+  void set_session_ready() noexcept {
+    session_ready_.store(true, std::memory_order_release);
+    logger_.info("[WsOeApp] Session ready");
+  }
+
  private:
   void handle_api_payload(std::string_view payload);
   static std::string get_signature_base64(const std::string& payload);
@@ -185,6 +193,7 @@ class WsOrderEntryApp {
 
   [[no_unique_address]] OptionalKeepaliveThread keepalive_thread_;
   std::atomic<bool> keepalive_running_{false};
+  std::atomic<bool> session_ready_{false};
 
   void start_keepalive_impl(
       std::unique_ptr<common::Thread<"ListenKeyOE">>& thread);

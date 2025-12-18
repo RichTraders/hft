@@ -26,6 +26,7 @@ struct BinanceFuturesOeConnectionHandler {
       ctx.app->initiate_session_logon();
     } else if (tid == core::TransportId::kStream) {
       ctx.app->start_listen_key_keepalive();
+      ctx.app->set_session_ready();
     }
   }
 

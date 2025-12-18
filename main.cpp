@@ -90,6 +90,23 @@ int main() {
         market_update_data_pool.get(),
         market_data_pool.get());
 
+    constexpr int kOeReadyTimeoutMs = 10000;
+    constexpr int kPollIntervalMs = 100;
+    int waited_ms = 0;
+    while (!order_gateway->is_ready() && waited_ms < kOeReadyTimeoutMs) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(kPollIntervalMs));
+      waited_ms += kPollIntervalMs;
+    }
+
+    if (!order_gateway->is_ready()) {
+      log.error("[Main] OE failed to become ready within {}ms timeout",
+          kOeReadyTimeoutMs);
+      return 1;
+    }
+
+    log.info("[Main] OE ready, starting MD");
+    consumer->start();
+
     const auto cpu_manager = std::make_unique<common::CpuManager>(log);
     std::string cpu_init_result;
     if (cpu_manager->init_cpu_group(cpu_init_result)) {

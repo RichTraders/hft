@@ -71,8 +71,13 @@ class OrderGateway {
 
   void stop() const { app_->stop(); }
 
+  [[nodiscard]] bool is_ready() const noexcept {
+    return app_->is_session_ready();
+  }
+
   void on_login(const WireMessage& /*msg*/) {
     logger_.info("[OrderGateway][Message] login successful");
+    app_->set_session_ready();
   }
 
   void on_execution_report(const WireExecutionReport& msg) {

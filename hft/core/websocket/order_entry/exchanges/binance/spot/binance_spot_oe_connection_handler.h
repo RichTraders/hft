@@ -36,8 +36,13 @@ struct BinanceSpotOeConnectionHandler {
   }
 
   template <typename App, typename Response>
-  [[gnu::always_inline]] static void on_user_subscription(Context<App>& /*ctx*/,
-      const Response& /*response*/) {}
+
+  [[gnu::always_inline]] static void on_user_subscription(Context<App>& ctx,
+      const Response& response) {
+    if (response.status == kHttpOK) {
+      ctx.app->set_session_ready();
+    }
+  }
 
  private:
   static constexpr int kHttpOK = 200;

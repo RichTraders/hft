@@ -45,6 +45,7 @@ if(ENABLE_WEBSOCKET)
       "${CMAKE_CURRENT_SOURCE_DIR}/websocket/order_entry/*.tpp"
       ${EXCHANGE_TRAITS_DIR}
   )
+  find_package(TBB REQUIRED)
   add_library(Core_ws STATIC ${CORE_COMMON_SRC} ${CORE_WS_SRC} ${CORE_HTTP_SRC})
   target_precompile_headers(Core_ws PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
   target_include_directories(Core_ws PUBLIC
@@ -54,7 +55,7 @@ if(ENABLE_WEBSOCKET)
       ${CMAKE_CURRENT_SOURCE_DIR}/websocket
       ${EXCHANGE_TRAITS_DIR}
   )
-  target_link_libraries(Core_ws PUBLIC Common websockets glaze::glaze)
+  target_link_libraries(Core_ws PUBLIC Common websockets glaze::glaze TBB::tbb)
   if(USE_FUTURES_API)
     target_link_libraries(Core_ws PUBLIC CURL::libcurl)
   endif()

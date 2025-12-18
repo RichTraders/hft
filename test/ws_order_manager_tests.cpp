@@ -817,3 +817,342 @@ TEST_F(WsOrderManagerTest, CancelAndReorder_MemoryLeakPrevention_AllScenarios) {
   ASSERT_TRUE(synthetic2.has_value());
   EXPECT_EQ(synthetic2->event.symbol, "");  // Minimal data
 }
+
+// ============================================================================
+// TBB Concurrent Hash Map - Thread Safety Tests
+// ============================================================================
+
+class WsOrderManagerConcurrencyTest : public ::testing::Test {
+ protected:
+  static void SetUpTestSuite() {
+    logger_ = std::make_unique<Logger>();
+    logger_->setLevel(LogLevel::kWarn);
+    logger_->clearSink();
+    producer_ = std::make_unique<Logger::Producer>(logger_->make_producer());
+    order_manager_ = std::make_unique<TestWsOrderManager>(*producer_);
+  }
+
+  static void TearDownTestSuite() {
+    order_manager_.reset();
+    producer_.reset();
+    logger_->shutdown();
+    logger_.reset();
+  }
+
+  static std::unique_ptr<Logger> logger_;
+  static std::unique_ptr<Logger::Producer> producer_;
+  static std::unique_ptr<TestWsOrderManager> order_manager_;
+};
+
+std::unique_ptr<Logger> WsOrderManagerConcurrencyTest::logger_;
+std::unique_ptr<Logger::Producer> WsOrderManagerConcurrencyTest::producer_;
+std::unique_ptr<TestWsOrderManager> WsOrderManagerConcurrencyTest::order_manager_;
+
+TEST_F(WsOrderManagerConcurrencyTest, ConcurrentRegisterAndRemove_NoDeadlock) {
+  // Simulates TradeEngine (register) and OEStream (remove) concurrent access
+  constexpr int kNumOperations = 10000;
+  std::atomic<int> register_count{0};
+  std::atomic<int> remove_count{0};
+
+  // Producer thread (TradeEngine) - registers pending requests
+  std::thread producer([&]() {
+    for (int i = 0; i < kNumOperations; ++i) {
+      PendingOrderRequest request;
+      request.client_order_id = static_cast<uint64_t>(i);
+      request.symbol = "BTCUSDT";
+      request.side = Side::kBuy;
+      request.ord_type = OrderType::kLimit;
+      request.order_qty = Qty{1.0};
+      request.price = Price{50000.0};
+      request.time_in_force = TimeInForce::kGoodTillCancel;
+
+      order_manager_->register_pending_request(request);
+      register_count.fetch_add(1, std::memory_order_relaxed);
+    }
+  });
+
+  // Consumer thread (OEStream) - removes pending requests
+  std::thread consumer([&]() {
+    int removed = 0;
+    while (removed < kNumOperations) {
+      for (int i = 0; i < kNumOperations; ++i) {
+        order_manager_->remove_pending_request(static_cast<uint64_t>(i));
+      }
+      removed = remove_count.load(std::memory_order_relaxed);
+      // Count actual removals by checking current register count
+      int current_registered = register_count.load(std::memory_order_relaxed);
+      if (current_registered >= kNumOperations) {
+        // All registered, do one final pass
+        for (int i = 0; i < kNumOperations; ++i) {
+          order_manager_->remove_pending_request(static_cast<uint64_t>(i));
+        }
+        break;
+      }
+      std::this_thread::yield();
+    }
+  });
+
+  producer.join();
+  consumer.join();
+
+  EXPECT_EQ(register_count.load(), kNumOperations);
+}
+
+TEST_F(WsOrderManagerConcurrencyTest, ConcurrentRegisterAndSyntheticReport_NoDeadlock) {
+  // Simulates TradeEngine (register) and OEApi (create_synthetic) concurrent access
+  constexpr int kNumOperations = 5000;
+  std::atomic<int> completed{0};
+  std::atomic<bool> producer_done{false};
+
+  // Producer thread (TradeEngine)
+  std::thread producer([&]() {
+    for (int i = 0; i < kNumOperations; ++i) {
+      PendingOrderRequest request;
+      request.client_order_id = static_cast<uint64_t>(i + 100000);
+      request.symbol = "ETHUSDT";
+      request.side = Side::kSell;
+      request.ord_type = OrderType::kMarket;
+      request.order_qty = Qty{2.0};
+      request.time_in_force = TimeInForce::kImmediateOrCancel;
+
+      order_manager_->register_pending_request(request);
+    }
+    producer_done.store(true, std::memory_order_release);
+  });
+
+  // Consumer thread (OEApi/OEStream)
+  std::thread consumer([&]() {
+    int processed = 0;
+    while (!producer_done.load(std::memory_order_acquire) || processed < kNumOperations) {
+      for (int i = 0; i < kNumOperations && processed < kNumOperations; ++i) {
+        std::string request_id = "orderplace_" + std::to_string(i + 100000);
+        auto result = order_manager_->create_synthetic_execution_report(
+            request_id, -2010, "Test error");
+        if (result.has_value()) {
+          processed++;
+        }
+      }
+      if (processed < kNumOperations) {
+        std::this_thread::yield();
+      }
+    }
+    completed.store(processed, std::memory_order_relaxed);
+  });
+
+  producer.join();
+  consumer.join();
+
+  // All operations should complete without deadlock
+  EXPECT_EQ(completed.load(), kNumOperations);
+}
+
+TEST_F(WsOrderManagerConcurrencyTest, ConcurrentCancelReorderPairOperations_NoDeadlock) {
+  // Test concurrent access to cancel_reorder_pairs map
+  constexpr int kNumOperations = 5000;
+  std::atomic<int> register_done{0};
+  std::atomic<int> lookup_done{0};
+  std::atomic<int> remove_done{0};
+
+  // Thread 1: Register pairs
+  std::thread registerer([&]() {
+    for (int i = 0; i < kNumOperations; ++i) {
+      order_manager_->register_cancel_and_reorder_pair(
+          static_cast<uint64_t>(i + 200000),
+          static_cast<uint64_t>(i + 300000));
+      register_done.fetch_add(1, std::memory_order_relaxed);
+    }
+  });
+
+  // Thread 2: Lookup pairs
+  std::thread looker([&]() {
+    int found = 0;
+    while (found < kNumOperations) {
+      for (int i = 0; i < kNumOperations; ++i) {
+        auto result = order_manager_->get_original_order_id(
+            static_cast<uint64_t>(i + 200000));
+        if (result.has_value()) {
+          found++;
+          lookup_done.fetch_add(1, std::memory_order_relaxed);
+        }
+      }
+      if (register_done.load(std::memory_order_relaxed) >= kNumOperations) {
+        break;
+      }
+      std::this_thread::yield();
+    }
+  });
+
+  // Thread 3: Remove pairs (starts after some registrations)
+  std::thread remover([&]() {
+    // Wait for some registrations
+    while (register_done.load(std::memory_order_relaxed) < kNumOperations / 2) {
+      std::this_thread::yield();
+    }
+
+    for (int i = 0; i < kNumOperations; ++i) {
+      order_manager_->remove_cancel_and_reorder_pair(
+          static_cast<uint64_t>(i + 200000));
+      remove_done.fetch_add(1, std::memory_order_relaxed);
+    }
+  });
+
+  registerer.join();
+  looker.join();
+  remover.join();
+
+  EXPECT_EQ(register_done.load(), kNumOperations);
+  EXPECT_EQ(remove_done.load(), kNumOperations);
+}
+
+TEST_F(WsOrderManagerConcurrencyTest, MultipleProducersMultipleConsumers_NoDeadlock) {
+  // Stress test with multiple producers and consumers
+  constexpr int kNumProducers = 4;
+  constexpr int kNumConsumers = 4;
+  constexpr int kOpsPerThread = 2000;
+
+  std::atomic<int> total_registered{0};
+  std::atomic<int> total_removed{0};
+  std::vector<std::thread> threads;
+
+  // Producers
+  for (int p = 0; p < kNumProducers; ++p) {
+    threads.emplace_back([&, p]() {
+      for (int i = 0; i < kOpsPerThread; ++i) {
+        uint64_t id = static_cast<uint64_t>(p * kOpsPerThread + i + 400000);
+
+        PendingOrderRequest request;
+        request.client_order_id = id;
+        request.symbol = "BTCUSDT";
+        request.side = (i % 2 == 0) ? Side::kBuy : Side::kSell;
+        request.ord_type = OrderType::kLimit;
+        request.order_qty = Qty{1.0};
+        request.price = Price{50000.0};
+        request.time_in_force = TimeInForce::kGoodTillCancel;
+
+        order_manager_->register_pending_request(request);
+        total_registered.fetch_add(1, std::memory_order_relaxed);
+      }
+    });
+  }
+
+  // Consumers
+  for (int c = 0; c < kNumConsumers; ++c) {
+    threads.emplace_back([&, c]() {
+      // Each consumer handles a portion of the IDs
+      for (int i = 0; i < kOpsPerThread * kNumProducers / kNumConsumers; ++i) {
+        uint64_t id = static_cast<uint64_t>(c * kOpsPerThread + i + 400000);
+        order_manager_->remove_pending_request(id);
+        total_removed.fetch_add(1, std::memory_order_relaxed);
+      }
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  EXPECT_EQ(total_registered.load(), kNumProducers * kOpsPerThread);
+}
+
+TEST_F(WsOrderManagerConcurrencyTest, RapidRegisterRemoveSameKey_NoDeadlock) {
+  // Test rapid register/remove of same key - potential deadlock scenario
+  constexpr int kIterations = 10000;
+  constexpr uint64_t kTestId = 999999;
+
+  std::atomic<bool> stop{false};
+  std::atomic<int> register_ops{0};
+  std::atomic<int> remove_ops{0};
+
+  std::thread producer([&]() {
+    for (int i = 0; i < kIterations && !stop.load(std::memory_order_relaxed); ++i) {
+      PendingOrderRequest request;
+      request.client_order_id = kTestId;
+      request.symbol = "BTCUSDT";
+      request.side = Side::kBuy;
+      request.ord_type = OrderType::kLimit;
+      request.order_qty = Qty{1.0};
+      request.price = Price{50000.0};
+      request.time_in_force = TimeInForce::kGoodTillCancel;
+
+      order_manager_->register_pending_request(request);
+      register_ops.fetch_add(1, std::memory_order_relaxed);
+    }
+  });
+
+  std::thread consumer([&]() {
+    for (int i = 0; i < kIterations && !stop.load(std::memory_order_relaxed); ++i) {
+      order_manager_->remove_pending_request(kTestId);
+      remove_ops.fetch_add(1, std::memory_order_relaxed);
+    }
+  });
+
+  // Timeout detection
+  auto start = std::chrono::steady_clock::now();
+  while (register_ops.load() < kIterations || remove_ops.load() < kIterations) {
+    auto elapsed = std::chrono::steady_clock::now() - start;
+    if (elapsed > std::chrono::seconds(10)) {
+      stop.store(true, std::memory_order_relaxed);
+      FAIL() << "Deadlock detected - operations did not complete in 10 seconds";
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+
+  producer.join();
+  consumer.join();
+
+  EXPECT_EQ(register_ops.load(), kIterations);
+  EXPECT_EQ(remove_ops.load(), kIterations);
+}
+
+TEST_F(WsOrderManagerConcurrencyTest, ConcurrentSyntheticReportCreation_DataIntegrity) {
+  // Verify data integrity under concurrent access
+  constexpr int kNumOrders = 1000;
+
+  // Pre-register all pending requests
+  for (int i = 0; i < kNumOrders; ++i) {
+    PendingOrderRequest request;
+    request.client_order_id = static_cast<uint64_t>(i + 600000);
+    request.symbol = "BTCUSDT_" + std::to_string(i);  // Unique symbol per order
+    request.side = Side::kBuy;
+    request.ord_type = OrderType::kLimit;
+    request.order_qty = Qty{static_cast<double>(i)};
+    request.price = Price{static_cast<double>(i * 100)};
+    request.time_in_force = TimeInForce::kGoodTillCancel;
+
+    order_manager_->register_pending_request(request);
+  }
+
+  std::atomic<int> integrity_errors{0};
+  std::vector<std::thread> threads;
+
+  // Multiple threads creating synthetic reports
+  for (int t = 0; t < 4; ++t) {
+    threads.emplace_back([&, t]() {
+      for (int i = t * (kNumOrders / 4); i < (t + 1) * (kNumOrders / 4); ++i) {
+        std::string request_id = "orderplace_" + std::to_string(i + 600000);
+        auto result = order_manager_->create_synthetic_execution_report(
+            request_id, -2010, "Test error");
+
+        if (result.has_value()) {
+          // Verify data integrity
+          std::string expected_symbol = "BTCUSDT_" + std::to_string(i);
+          if (result->event.symbol != expected_symbol) {
+            integrity_errors.fetch_add(1, std::memory_order_relaxed);
+          }
+          if (result->event.order_quantity != static_cast<double>(i)) {
+            integrity_errors.fetch_add(1, std::memory_order_relaxed);
+          }
+          if (result->event.order_price != static_cast<double>(i * 100)) {
+            integrity_errors.fetch_add(1, std::memory_order_relaxed);
+          }
+        }
+      }
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  EXPECT_EQ(integrity_errors.load(), 0) << "Data integrity errors detected";
+}

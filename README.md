@@ -1,4 +1,11 @@
 # Prerequisite
+
+## System Dependencies
+Install required system packages:
+```bash
+sudo apt install -y libtbb-dev libcurl4-openssl-dev
+```
+
 ## Linux Account Setting
 To allow to change cpu schduler policy([scheduler](https://linux.die.net/man/2/sched_getscheduler)) and nice([nice](https://linux.die.net/man/2/nice)), you need PAM
 ```shell

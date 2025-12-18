@@ -58,10 +58,10 @@ public:
     auto order_mass_cancel_report_pool =
         std::make_unique<MemoryPool<OrderMassCancelReport>>(1024);
     response_manager_ = new ResponseManager(
-        logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
+        *producer, execution_report_pool.get(), order_cancel_reject_pool.get(),
         order_mass_cancel_report_pool.get());
 
-    trade_engine_ = new TestTradeEngine(logger.get(), pool.get(),
+    trade_engine_ = new TestTradeEngine(*producer, pool.get(),
                                         pool2.get(), response_manager_, temp);
     // trade_engine_ 주입
     book_ = new TestOrderBook{INI_CONFIG.get("meta", "ticker"), *producer};
@@ -627,10 +627,10 @@ public:
     auto order_mass_cancel_report_pool =
         std::make_unique<MemoryPool<OrderMassCancelReport>>(1024);
     response_manager_ = new ResponseManager(
-        logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
+        *producer, execution_report_pool.get(), order_cancel_reject_pool.get(),
         order_mass_cancel_report_pool.get());
 
-    trade_engine_ = new TestTradeEngine(logger.get(), pool.get(),
+    trade_engine_ = new TestTradeEngine(*producer, pool.get(),
                                         pool2.get(), response_manager_, temp);
     book_ = new TestOrderBook{INI_CONFIG.get("meta", "ticker"), *producer};
     book_->set_trade_engine(trade_engine_);

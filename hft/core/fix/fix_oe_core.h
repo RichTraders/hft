@@ -52,7 +52,8 @@ class FixOeCore {
   using SymbolId = std::string;
 
   FixOeCore(SendId sender_comp_id, TargetId target_comp_id,
-      common::Logger* logger, trading::ResponseManager* response_manager);
+      const common::Logger::Producer& logger,
+      trading::ResponseManager* response_manager);
 
   ~FixOeCore();
 
@@ -81,7 +82,7 @@ class FixOeCore {
   int64_t sequence_{1};
   const std::string sender_comp_id_;
   const std::string target_comp_id_;
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   trading::ResponseManager* response_manager_;
   const int qty_precision_;
   const int price_precision_;

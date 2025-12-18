@@ -33,11 +33,13 @@ constexpr int cl_order_id = 2075;
 class OrderGatewayTest : public ::testing::Test {
  public:
   static std::unique_ptr<Logger> logger;
+  static std::unique_ptr<Logger::Producer> producer;
 
  protected:
   static void SetUpTestSuite() {
     INI_CONFIG.load("resources/config.ini");
     logger = std::make_unique<Logger>();
+    producer = std::make_unique<Logger::Producer>(logger->make_producer());
     TradeEngineCfgHashMap temp;
     TradeEngineCfg tempcfg;
     temp.emplace(INI_CONFIG.get("meta", "ticker"), tempcfg);
@@ -52,14 +54,14 @@ class OrderGatewayTest : public ::testing::Test {
     order_mass_cancel_report_pool_ =
         std::make_unique<MemoryPool<OrderMassCancelReport>>(1024);
 
-    response_manager_ = std::make_unique<ResponseManager>(logger.get(),
+    response_manager_ = std::make_unique<ResponseManager>(*producer,
         execution_report_pool_.get(),
         order_cancel_reject_pool_.get(),
         order_mass_cancel_report_pool_.get());
 
-    order_gateway_ = std::make_unique<TestOrderGateway>(logger.get(),
+    order_gateway_ = std::make_unique<TestOrderGateway>(*producer,
         response_manager_.get());
-    trade_engine_ = std::make_unique<TestTradeEngine>(logger.get(),
+    trade_engine_ = std::make_unique<TestTradeEngine>(*producer,
         market_update_data_pool_.get(),
         market_data_pool_.get(),
         response_manager_.get(),
@@ -88,6 +90,7 @@ class OrderGatewayTest : public ::testing::Test {
   static std::unique_ptr<TestOrderGateway> order_gateway_;
 };
 std::unique_ptr<Logger> OrderGatewayTest::logger;
+std::unique_ptr<Logger::Producer> OrderGatewayTest::producer;
 
 TEST_F(OrderGatewayTest, NewOrderSingle) {
   RequestCommon request;
@@ -122,7 +125,8 @@ TEST_F(OrderGatewayTest, OrderCancel) {
 }
 
 TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
-  auto logger = std::make_unique<Logger>();
+  auto local_logger = std::make_unique<Logger>();
+  auto local_producer = std::make_unique<Logger::Producer>(local_logger->make_producer());
 
   TradeEngineCfgHashMap temp;
   TradeEngineCfg tempcfg;
@@ -137,12 +141,12 @@ TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
   auto order_mass_cancel_report_pool =
       std::make_unique<MemoryPool<OrderMassCancelReport>>(1024);
 
-  auto response_manager = std::make_unique<ResponseManager>(logger.get(),
+  auto response_manager = std::make_unique<ResponseManager>(*local_producer,
       execution_report_pool.get(),
       order_cancel_reject_pool.get(),
       order_mass_cancel_report_pool.get());
-  TestOrderGateway og(logger.get(), response_manager.get());
-  auto trade_engine = new TestTradeEngine(logger.get(),
+  TestOrderGateway og(*local_producer, response_manager.get());
+  auto trade_engine = new TestTradeEngine(*local_producer,
       pool.get(),
       pool2.get(),
       response_manager.get(),

@@ -63,7 +63,8 @@ protected:
    INI_CONFIG.load("resources/config.ini");
    pool_ = std::make_unique<common::MemoryPool<MarketData>>(1024);
    logger_ = std::make_unique<common::Logger>();
-   fix = std::make_unique<FixMdCore>("SENDER", "TARGET", logger_.get(),
+   producer_ = std::make_unique<common::Logger::Producer>(logger_->make_producer());
+   fix = std::make_unique<FixMdCore>("SENDER", "TARGET", *producer_,
                                      pool_.get());
  }
   void TearDown() override {
@@ -71,6 +72,7 @@ protected:
   }
 
  std::unique_ptr<common::Logger> logger_;
+ std::unique_ptr<common::Logger::Producer> producer_;
  std::unique_ptr<FixMdCore> fix;
  std::unique_ptr<common::MemoryPool<MarketData>> pool_;
 };

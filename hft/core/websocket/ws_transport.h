@@ -24,10 +24,15 @@ class WebSocketTransport {
  public:
   using MessageCallback = std::function<void(std::string_view)>;
 
+  WebSocketTransport();
   WebSocketTransport(std::string host, int port, std::string path = "/",
       bool use_ssl = true, bool notify_connected = false,
       std::string_view api_key = "");
   ~WebSocketTransport();
+
+  void initialize(std::string host, int port, std::string path = "/",
+      bool use_ssl = true, bool notify_connected = false,
+      std::string_view api_key = "");
 
   WebSocketTransport(const WebSocketTransport&) = delete;
   WebSocketTransport& operator=(const WebSocketTransport&) = delete;
@@ -52,7 +57,7 @@ class WebSocketTransport {
   int port_;
   bool use_ssl_;
   bool notify_connected_;
-  const std::string api_key_;
+  std::string api_key_;
 
   lws_context* context_{nullptr};
   lws* wsi_{nullptr};
@@ -61,6 +66,7 @@ class WebSocketTransport {
   std::atomic<bool> running_{false};
   std::atomic<bool> connected_{false};
   std::atomic<bool> interrupted_{false};
+  std::atomic<bool> ready_{false};
 
   MessageCallback message_callback_;
   mutable std::unique_ptr<common::SPSCQueue<std::string, kQueueSize>> queue_;

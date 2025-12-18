@@ -31,24 +31,28 @@ class WsMdCoreTest : public ::testing::Test {
     logger_ = std::make_unique<Logger>();
     logger_->setLevel(LogLevel::kDebug);
     logger_->clearSink();
+    producer_ = std::make_unique<Logger::Producer>(logger_->make_producer());
 
     pool_ = std::make_unique<MemoryPool<MarketData>>(1024);
-    core_ = std::make_unique<TestWsMdCore>(logger_.get(), pool_.get());
+    core_ = std::make_unique<TestWsMdCore>(*producer_, pool_.get());
   }
 
   static void TearDownTestSuite() {
     core_.reset();
     pool_.reset();
+    producer_.reset();
     logger_->shutdown();
     logger_.reset();
   }
 
   static std::unique_ptr<Logger> logger_;
+  static std::unique_ptr<Logger::Producer> producer_;
   static std::unique_ptr<MemoryPool<MarketData>> pool_;
   static std::unique_ptr<TestWsMdCore> core_;
 };
 
 std::unique_ptr<Logger> WsMdCoreTest::logger_;
+std::unique_ptr<Logger::Producer> WsMdCoreTest::producer_;
 std::unique_ptr<MemoryPool<MarketData>> WsMdCoreTest::pool_;
 std::unique_ptr<TestWsMdCore> WsMdCoreTest::core_;
 

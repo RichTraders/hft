@@ -44,16 +44,18 @@ std::string get_signature_base64(std::string_view timestamp_ms,
 namespace core {
 
 WsOrderEntryApp::WsOrderEntryApp(const std::string& /*sender_comp_id*/,
-    const std::string& /*target_comp_id*/, common::Logger* logger,
+    const std::string& /*target_comp_id*/,
+    const common::Logger::Producer& logger,
     trading::ResponseManager* response_manager)
-    : logger_(logger->make_producer()),
+    : logger_(logger),
       ws_oe_core_(logger_, response_manager),
       ws_order_manager_(logger_),
       dispatch_context_(&logger_, &ws_order_manager_, this),
       host_(std::string(WsOeCoreImpl::ExchangeTraits::get_api_host())),
       path_(std::string(WsOeCoreImpl::ExchangeTraits::get_api_endpoint_path())),
       port_(WsOeCoreImpl::ExchangeTraits::get_api_port()),
-      use_ssl_(WsOeCoreImpl::ExchangeTraits::use_ssl()) {}
+      use_ssl_(WsOeCoreImpl::ExchangeTraits::use_ssl()),
+      stream_transport_(std::make_unique<WebSocketTransport<"OEStream">>()) {}
 
 WsOrderEntryApp::~WsOrderEntryApp() {
   stop();
@@ -248,7 +250,7 @@ void WsOrderEntryApp::handle_api_payload(std::string_view payload) {
   }
 
   constexpr int kDefaultLogLen = 200;
-  logger_.info("[WsOrderEntryApp]Received payload (size: {}): {}...",
+  logger_.debug("[WsOrderEntryApp]Received payload (size: {}): {}...",
       payload.size(),
       payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size())));
 
@@ -297,7 +299,7 @@ void WsOrderEntryApp::handle_stream_payload(std::string_view payload) {
     }
 
     constexpr int kDefaultLogLen = 200;
-    logger_.info("[WsOrderEntryApp]Received stream payload (size: {}): {}...",
+    logger_.debug("[WsOrderEntryApp]Received stream payload (size: {}): {}...",
         payload.size(),
         payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size())));
 

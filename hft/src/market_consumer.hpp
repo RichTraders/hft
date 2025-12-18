@@ -40,19 +40,20 @@ class MarketConsumer
   using ProtocolPolicy = typename MarketDataProtocolPolicySelector<MdApp>::type;
   using WireMessage = MdApp::WireMessage;
 
-  MarketConsumer(common::Logger* logger, TradeEngine<Strategy>* trade_engine,
+  MarketConsumer(const common::Logger::Producer& logger,
+      TradeEngine<Strategy>* trade_engine,
       common::MemoryPool<MarketUpdateData>* market_update_data_pool,
       common::MemoryPool<MarketData>* market_data_pool)
       : market_update_data_pool_(market_update_data_pool),
         market_data_pool_(market_data_pool),
-        logger_(logger->make_producer()),
+        logger_(logger),
         on_market_data_fn_([trade_engine](MarketUpdateData* data) {
           return trade_engine->on_market_data_updated(data);
         }),
         on_instrument_info_fn_([trade_engine](const InstrumentInfo& info) {
           trade_engine->on_instrument_info(info);
         }),
-        app_(std::make_unique<MdApp>("BMDWATCH", "SPOT", logger,
+        app_(std::make_unique<MdApp>("BMDWATCH", "SPOT", logger_,
             market_data_pool_)) {
 
     using WireMessage = MdApp::WireMessage;
@@ -328,7 +329,7 @@ class MarketConsumer
  private:
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   std::function<bool(MarketUpdateData*)> on_market_data_fn_;
   std::function<void(const InstrumentInfo&)> on_instrument_info_fn_;
   std::unique_ptr<MdApp> app_;

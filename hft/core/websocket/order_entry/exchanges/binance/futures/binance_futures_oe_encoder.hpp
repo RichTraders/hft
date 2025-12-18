@@ -131,11 +131,13 @@ class BinanceFuturesOeEncoder {
         std::to_string(order.cl_order_id.value);
     payload.params.side = std::string(toString(order.side));
     payload.params.type = std::string(toString(order.ord_type));
-    payload.params.quantity = order.order_qty.value;
+    payload.params.quantity = std::stod(common::to_fixed(order.order_qty.value,
+        PRECISION_CONFIG.qty_precision()));
 
     if (order.ord_type == trading::OrderType::kLimit) {
       payload.params.time_in_force = std::string(toString(order.time_in_force));
-      payload.params.price = order.price.value;
+      payload.params.price = std::stod(common::to_fixed(order.price.value,
+          PRECISION_CONFIG.price_precision()));
     }
     payload.params.self_trade_prevention_mode =
         toString(order.self_trade_prevention_mode);
@@ -178,9 +180,12 @@ class BinanceFuturesOeEncoder {
     payload.params.order_id = replace.cl_origin_order_id.value;
     payload.params.timestamp = util::get_timestamp_epoch();
 
-    payload.params.quantity = replace.order_qty.value;
+    payload.params.quantity =
+        std::stod(common::to_fixed(replace.order_qty.value,
+            PRECISION_CONFIG.qty_precision()));
     if (replace.ord_type == trading::OrderType::kLimit) {
-      payload.params.price = replace.price.value;
+      payload.params.price = std::stod(common::to_fixed(replace.price.value,
+          PRECISION_CONFIG.price_precision()));
     }
 
     if (replace.position_side) {

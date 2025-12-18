@@ -13,6 +13,8 @@
 #ifndef TRADE_ENGINE_HPP
 #define TRADE_ENGINE_HPP
 
+#include <functional>
+
 #include "common/logger.h"
 #include "common/memory_pool.hpp"
 #include "common/spsc_queue.h"
@@ -55,7 +57,7 @@ constexpr int kResponseQueueSize = 64;
 template <typename Strategy>
 class TradeEngine {
  public:
-  explicit TradeEngine(common::Logger* logger,
+  explicit TradeEngine(const common::Logger::Producer& logger,
       common::MemoryPool<MarketUpdateData>* market_update_data_pool,
       common::MemoryPool<MarketData>* market_data_pool,
       ResponseManager* response_manager,
@@ -64,7 +66,7 @@ class TradeEngine {
                  const FeatureEngine<Strategy>*,
                  const common::Logger::Producer&,
                  const common::TradeEngineCfgHashMap&>
-      : logger_(logger->make_producer()),
+      : logger_(logger),
         market_update_data_pool_(market_update_data_pool),
         market_data_pool_(market_data_pool),
         response_manager_(response_manager),
@@ -99,6 +101,17 @@ class TradeEngine {
 
   void init_order_gateway(OrderGateway<Strategy>* order_gateway) {
     order_gateway_ = order_gateway;
+    order_request_handler_ = [this](const RequestCommon& req) {
+      order_gateway_->order_request(req);
+    };
+  }
+
+  // For testing with mock order gateways
+  template <typename MockGateway>
+  void init_order_gateway_mock(MockGateway* mock_gateway) {
+    order_request_handler_ = [mock_gateway](const RequestCommon& req) {
+      mock_gateway->order_request(req);
+    };
   }
 
   void stop() { running_.store(false, std::memory_order_release); }
@@ -125,7 +138,9 @@ class TradeEngine {
 
   void on_order_updated(const ExecutionReport* report) noexcept {
     START_MEASURE(Trading_TradeEngine_on_order_updated);
-    position_keeper_->add_fill(report);
+    if (report->exec_type == ExecType::kTrade) {
+      position_keeper_->add_fill(report);
+    }
     strategy_.on_order_updated(report);
     order_manager_->on_order_updated(report);
     END_MEASURE(Trading_TradeEngine_on_order_updated, logger_);
@@ -136,12 +151,23 @@ class TradeEngine {
   }
 
   void send_request(const RequestCommon& request) {
-    order_gateway_->order_request(request);
+    if (order_request_handler_) {
+      order_request_handler_(request);
+    }
   }
 
   void on_instrument_info(const InstrumentInfo& instrument_info) {
     if (!instrument_info.symbols.empty()) {
-      qty_increment_ = instrument_info.symbols[0].min_qty_increment;
+      const std::string target_ticker = INI_CONFIG.get("meta", "ticker");
+      auto sym = std::find_if(instrument_info.symbols.begin(),
+          instrument_info.symbols.end(),
+          [&target_ticker](
+              auto symbol) { return symbol.symbol == target_ticker; });
+
+      if (sym != instrument_info.symbols.end()) {
+        qty_increment_ = sym->min_qty_increment;
+      }
+
       logger_.info("[TradeEngine] Updated qty_increment to {}", qty_increment_);
 
       order_manager_->on_instrument_info(instrument_info);
@@ -155,11 +181,12 @@ class TradeEngine {
   static constexpr int kMarketDataBatchLimit = 128;
   static constexpr int kResponseBatchLimit = 64;
   static constexpr double kQtyDefault = 0.00001;
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
   ResponseManager* response_manager_;
-  OrderGateway<Strategy>* order_gateway_;
+  OrderGateway<Strategy>* order_gateway_ = nullptr;
+  std::function<void(const RequestCommon&)> order_request_handler_;
   std::unique_ptr<common::SPSCQueue<MarketUpdateData*, kMarketDataCapacity>>
       queue_;
   common::Thread<"TradeEngine"> thread_;

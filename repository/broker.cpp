@@ -35,7 +35,7 @@ Broker::Broker()
 
   app_ = std::make_unique<SelectedMarketApp>("BMDWATCH",
       "SPOT",
-      log_.get(),
+      log_producer_,
       market_data_pool_.get());
 
   log_->setLevel(LogLevel::kInfo);

@@ -36,8 +36,8 @@ constexpr char kMDEntryTypeAsk = '1';
 constexpr char kMDEntryTypeTrade = '2';
 
 FixMdCore::FixMdCore(SendId sender_comp_id, TargetId target_comp_id,
-                     Logger* logger, MemoryPool<MarketData>* pool)
-  : logger_(logger->make_producer()),
+                     const Logger::Producer& logger, MemoryPool<MarketData>* pool)
+  : logger_(logger),
     sender_comp_id_(std::move(sender_comp_id)),
     target_comp_id_(std::move(target_comp_id)),
     market_data_pool_(pool) {

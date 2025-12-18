@@ -404,5 +404,16 @@ std::string to_fixed(T data, int precision) {
   return std::string(buffer.data());
 }
 
+inline double to_double(std::string_view view) {
+  double result;
+  auto [ptr, ec] =
+      std::from_chars(view.data(), view.data() + view.size(), result);
+
+  if (ec == std::errc()) {
+    return result;
+  }
+  return 0.0;
+}
+
 }  // namespace common
 #endif  //TYPES_H

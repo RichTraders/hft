@@ -92,7 +92,7 @@ class WsOrderManager {
       response.transaction_time = 0;
     } else {
       // Spot: Set subscription_id
-      response.subscription_id = 1;
+      response.subscription_id = 0;
     }
 
     auto& event = response.event;
@@ -120,7 +120,7 @@ class WsOrderManager {
         }
       }
     } else {
-      event.symbol = "";
+      event.symbol = INI_CONFIG.get("meta", "ticker");
       event.side = "UNKNOWN";
       event.order_type = "UNKNOWN";
       event.time_in_force = "UNKNOWN";

@@ -37,7 +37,8 @@ class FixOrderEntryApp : public FixApp<FixOrderEntryApp, "OERead", "OEWrite"> {
   using WireReject = FixOeCore::WireReject;
 
   FixOrderEntryApp(const std::string& sender_comp_id,
-      const std::string& target_comp_id, common::Logger* logger,
+      const std::string& target_comp_id,
+      const common::Logger::Producer& logger,
       trading::ResponseManager* response_manager);
   ~FixOrderEntryApp();
   std::string create_log_on_message(const std::string& sig_b64,

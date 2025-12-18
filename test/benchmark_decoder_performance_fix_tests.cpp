@@ -27,26 +27,29 @@ static std::string load_file(const std::string& path) {
 
 class FixBenchmark : public benchmark::Fixture {
 public:
-    void SetUp(const ::benchmark::State& state) override {
+    void SetUp(const ::benchmark::State& /*state*/) override {
         if (!fix) {
             INI_CONFIG.load("resources/config.ini");
             pool_ = std::make_unique<common::MemoryPool<MarketData>>(1024);
             logger_ = std::make_unique<common::Logger>();
             logger_->clearSink();
-            fix = std::make_unique<core::FixMdCore>("SENDER", "TARGET", logger_.get(), pool_.get());
+            producer_ = std::make_unique<common::Logger::Producer>(logger_->make_producer());
+            fix = std::make_unique<core::FixMdCore>("SENDER", "TARGET", *producer_, pool_.get());
         }
     }
 
-    void TearDown(const ::benchmark::State& state) override {
+    void TearDown(const ::benchmark::State& /*state*/) override {
         // No need to reset unique_ptr, it will be cleaned up
     }
 
     static std::unique_ptr<common::Logger> logger_;
+    static std::unique_ptr<common::Logger::Producer> producer_;
     static std::unique_ptr<core::FixMdCore> fix;
     static std::unique_ptr<common::MemoryPool<MarketData>> pool_;
 };
 
 std::unique_ptr<common::Logger> FixBenchmark::logger_;
+std::unique_ptr<common::Logger::Producer> FixBenchmark::producer_;
 std::unique_ptr<core::FixMdCore> FixBenchmark::fix;
 std::unique_ptr<common::MemoryPool<MarketData>> FixBenchmark::pool_;
 

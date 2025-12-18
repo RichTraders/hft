@@ -57,6 +57,8 @@ class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
             INI_CONFIG.get_int("strategy", "obi_level", kDefaultOBILevel10)),
         safety_margin_(INI_CONFIG.get_double("strategy", "safety_margin",
             kDefaultSafetyMargin)),
+        minimum_spread_(
+            1 / std::pow(kDenominatorBase, PRECISION_CONFIG.price_precision())),
         bid_qty_(obi_level_),
         ask_qty_(obi_level_) {}
 
@@ -87,7 +89,7 @@ class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
     const auto mid = (order_book->get_bbo()->bid_price.value +
                          order_book->get_bbo()->ask_price.value) *
                      0.5;
-    const double denom = std::max({spread, 0.01});
+    const double denom = std::max({spread, minimum_spread_});
     const auto delta = (mid - vwap) / denom;
     if (!std::isfinite(spread) || spread <= 0.0) {
       this->logger_.trace("Non-positive spread ({}). Using denom={}",
@@ -99,8 +101,8 @@ class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
     std::vector<QuoteIntentType> intents;
     intents.reserve(4);
 
-    this->logger_.trace(
-        "[Updated] delta:{} obi:{} signal:{} mid:{}, vwap:{}, spread:{}",
+    this->logger_.debug(
+        "[Updated] delta:{} obi:{} signal:{} mid:{}, vwap:{}, spread:{:.4f}",
         delta,
         obi,
         signal,
@@ -121,7 +123,7 @@ class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
 
       this->logger_.trace(
           "[MarketMaker]Order Submitted. price:{}, qty:{}, side:buy, delta:{} "
-          "obi:{} signal:{}, mid:{}, vwap:{}, spread:{.3f}",
+          "obi:{} signal:{}, mid:{}, vwap:{}, spread:{:.4f}",
           best_bid_price.value - safety_margin_,
           round5(signal * position_variance_),
           delta,
@@ -142,7 +144,7 @@ class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
       intents.push_back(intent);
       this->logger_.trace(
           "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, delta:{} "
-          "obi:{} signal:{}, mid:{}, vwap:{}, spread:{.3f}",
+          "obi:{} signal:{}, mid:{}, vwap:{}, spread:{:.4f}",
           best_ask_price.value + safety_margin_,
           round5(signal * position_variance_),
           delta,
@@ -163,7 +165,7 @@ class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
         this->logger_.trace(
             "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, "
             "delta:{} "
-            "obi:{} signal:{}, mid:{}, vwap:{}, spread:{.3f}",
+            "obi:{} signal:{}, mid:{}, vwap:{}, spread:{:.4f}",
             best_bid_price.value + safety_margin_,
             round5(signal * position_variance_),
             delta,
@@ -185,7 +187,7 @@ class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
         this->logger_.trace(
             "[MarketMaker]Order Submitted. price:{}, qty:{}, side:sell, "
             "delta:{} "
-            "obi:{} signal:{}, mid:{}, vwap:{}, spread:{.3f}",
+            "obi:{} signal:{}, mid:{}, vwap:{}, spread:{:.4f}",
             best_ask_price.value + safety_margin_,
             round5(signal * position_variance_),
             delta,
@@ -215,12 +217,14 @@ class ObiVwapMomentumStrategy : public BaseStrategy<ObiVwapMomentumStrategy> {
 
   static constexpr int kDefaultOBILevel10 = 10;
   static constexpr double kDefaultSafetyMargin = 5.0;
+  static constexpr int kDenominatorBase = 10;
   const double variance_denominator_;
   const double position_variance_;
   const double enter_threshold_;
   const double exit_threshold_;
   const int obi_level_;
   const double safety_margin_;
+  const double minimum_spread_;
   std::vector<double> bid_qty_;
   std::vector<double> ask_qty_;
 };

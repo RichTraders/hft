@@ -19,11 +19,12 @@
 namespace core {
 
 WsMarketDataApp::WsMarketDataApp(const std::string& /*sender_comp_id*/,
-    const std::string& /*target_comp_id*/, common::Logger* logger,
+    const std::string& /*target_comp_id*/,
+    const common::Logger::Producer& logger,
     common::MemoryPool<MarketData>* market_data_pool)
-    : logger_(logger->make_producer()),
-      stream_core_(logger, market_data_pool),
-      api_core_(logger, market_data_pool),
+    : logger_(logger),
+      stream_core_(logger_, market_data_pool),
+      api_core_(logger_, market_data_pool),
       host_(WsMdCoreImpl::ExchangeTraits::get_stream_host()),
       path_(WsMdCoreImpl::ExchangeTraits::get_stream_endpoint_path()),
       port_(WsMdCoreImpl::ExchangeTraits::get_stream_port()),

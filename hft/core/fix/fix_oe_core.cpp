@@ -24,11 +24,11 @@ namespace core {
 using namespace FIX8::NewOroFix44OE;
 
 FixOeCore::FixOeCore(SendId sender_comp_id, TargetId target_comp_id,
-                     common::Logger* logger,
+                     const common::Logger::Producer& logger,
                      trading::ResponseManager* response_manager)
     : sender_comp_id_(std::move(sender_comp_id)),
       target_comp_id_(std::move(target_comp_id)),
-      logger_(logger->make_producer()),
+      logger_(logger),
       response_manager_(response_manager),
       qty_precision_(INI_CONFIG.get_int("meta", "qty_precision")),
       price_precision_(INI_CONFIG.get_int("meta", "price_precision")) {

@@ -34,9 +34,10 @@ class OrderGateway {
   using WireMassCancelReport = typename OeApp::WireMassCancelReport;
   using WireReject = typename OeApp::WireReject;
 
-  OrderGateway(common::Logger* logger, ResponseManager* response_manager)
-      : logger_(logger->make_producer()),
-        app_(std::make_unique<OeApp>("BMDWATCH", "SPOT", logger,
+  OrderGateway(const common::Logger::Producer& logger,
+      ResponseManager* response_manager)
+      : logger_(logger),
+        app_(std::make_unique<OeApp>("BMDWATCH", "SPOT", logger_,
             response_manager)) {
 
     register_simple_callback("A", [this](auto msg) { on_login(msg); });
@@ -275,7 +276,7 @@ class OrderGateway {
             auto&& msg) { func(MessagePolicy::extract<TargetType>(msg)); });
   }
 
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   TradeEngine<Strategy>* trade_engine_;
 
   std::unique_ptr<OeApp> app_;

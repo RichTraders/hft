@@ -64,22 +64,28 @@ std::string timestamp() {
 class FixTest : public ::testing::Test {
 public:
   static std::unique_ptr<Logger> logger;
+  static std::unique_ptr<Logger::Producer> producer;
+  static std::unique_ptr<MemoryPool<trading::ExecutionReport>> execution_report_pool;
+  static std::unique_ptr<MemoryPool<trading::OrderCancelReject>> order_cancel_reject_pool;
+  static std::unique_ptr<MemoryPool<trading::OrderMassCancelReport>> order_mass_cancel_report_pool;
+  static std::unique_ptr<ResponseManager> response_manager;
 protected:
   void SetUp() override {
     INI_CONFIG.load("resources/config.ini");
-    auto execution_report_pool = std::make_unique<MemoryPool<
+    execution_report_pool = std::make_unique<MemoryPool<
           trading::ExecutionReport>>(1024);
-    auto order_cancel_reject_pool = std::make_unique<MemoryPool<
+    order_cancel_reject_pool = std::make_unique<MemoryPool<
       trading::OrderCancelReject>>(1024);
-    auto order_mass_cancel_report_pool = std::make_unique<MemoryPool<
+    order_mass_cancel_report_pool = std::make_unique<MemoryPool<
       trading::OrderMassCancelReport>>(1024);
     auto pool = std::make_unique<common::MemoryPool<OrderData>>(1024);
     logger = std::make_unique<Logger>();
-    std::unique_ptr<ResponseManager> response_manager = std::make_unique<ResponseManager>(
-       logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
+    producer = std::make_unique<Logger::Producer>(logger->make_producer());
+    response_manager = std::make_unique<ResponseManager>(
+       *producer, execution_report_pool.get(), order_cancel_reject_pool.get(),
        order_mass_cancel_report_pool.get());
 
-    fix = std::make_unique<FixOeCore>("SENDER", "TARGET", logger.get(), response_manager.get());
+    fix = std::make_unique<FixOeCore>("SENDER", "TARGET", *producer, response_manager.get());
   }
   void TearDown() override {
     fix.reset();
@@ -88,6 +94,11 @@ protected:
   std::unique_ptr<FixOeCore> fix;
 };
 std::unique_ptr<Logger> FixTest::logger;
+std::unique_ptr<Logger::Producer> FixTest::producer;
+std::unique_ptr<MemoryPool<trading::ExecutionReport>> FixTest::execution_report_pool;
+std::unique_ptr<MemoryPool<trading::OrderCancelReject>> FixTest::order_cancel_reject_pool;
+std::unique_ptr<MemoryPool<trading::OrderMassCancelReport>> FixTest::order_mass_cancel_report_pool;
+std::unique_ptr<ResponseManager> FixTest::response_manager;
 
 TEST_F(FixTest, CreateLogOnMessageProducesValidFixMessage) {
   std::string sig = timestamp();

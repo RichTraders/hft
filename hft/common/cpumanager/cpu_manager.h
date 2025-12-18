@@ -65,7 +65,7 @@ enum class SchedPolicy : uint8_t {
 class Logger;
 class CpuManager {
  public:
-  explicit CpuManager(Logger* logger);
+  explicit CpuManager(const Logger::Producer& logger);
   ~CpuManager();
 
   int init_cpu_group(std::string& result) const;
@@ -78,7 +78,7 @@ class CpuManager {
   ThreadId get_tid_by_thread_name(const std::string& target_name);
 #if defined(__linux__)
   static int sched_setattr_syscall(ThreadId tid, const struct sched_attr* attr,
-                                   unsigned int flags);
+      unsigned int flags);
 #endif
   int set_affinity(const AffinityInfo& info);
   int set_cpu_fifo(uint8_t cpu_id, ThreadId tid, int prio);
@@ -92,7 +92,7 @@ class CpuManager {
   int set_cpu_to_tid(uint8_t cpu_id, ThreadId tid);
   int set_scheduler(ThreadId tid, int priority, int scheduler_policy);
 
-  Logger::Producer logger_;
+  const Logger::Producer& logger_;
   std::string set_cpu_file_path_;
   std::map<uint8_t, CpuInfo> cpu_info_list_;
   std::map<std::string, ThreadInfo> thread_info_list_;

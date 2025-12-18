@@ -61,7 +61,7 @@ class WsMarketDataApp {
   using SymbolId = std::string_view;
 
   WsMarketDataApp(const std::string& sender_comp_id,
-      const std::string& target_comp_id, common::Logger* logger,
+      const std::string& target_comp_id, const common::Logger::Producer& logger,
       common::MemoryPool<MarketData>* market_data_pool);
   ~WsMarketDataApp();
 
@@ -115,7 +115,7 @@ class WsMarketDataApp {
   void handle_stream_payload(std::string_view payload) const;
   void handle_api_payload(std::string_view payload) const;
 
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   WsMdCoreImpl stream_core_;
   WsMdCoreApiImpl api_core_;
   std::unique_ptr<WebSocketTransport<"MDRead">> stream_transport_;

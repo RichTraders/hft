@@ -60,7 +60,7 @@ class WsOrderEntryApp {
   using MsgType = std::string;
 
   WsOrderEntryApp(const std::string& sender_comp_id,
-      const std::string& target_comp_id, common::Logger* logger,
+      const std::string& target_comp_id, const common::Logger::Producer& logger,
       trading::ResponseManager* response_manager);
   ~WsOrderEntryApp();
 
@@ -125,7 +125,6 @@ class WsOrderEntryApp {
       std::unique_ptr<WebSocketTransport<"OEStream">>& transport) {
     if (transport) {
       transport->interrupt();
-      transport.reset();
     }
   }
   void stop_stream_transport_impl(std::monostate&) {}
@@ -143,15 +142,15 @@ class WsOrderEntryApp {
         "?listenKey=" + listen_key_;
     const int stream_port = WsOeCoreImpl::ExchangeTraits::get_stream_port();
 
-    transport = std::make_unique<WebSocketTransport<"OEStream">>(stream_host,
+    transport->register_message_callback([this](std::string_view payload) {
+      this->handle_stream_payload(payload);
+    });
+
+    transport->initialize(stream_host,
         stream_port,
         stream_path,
         use_ssl_,
         false);
-
-    transport->register_message_callback([this](std::string_view payload) {
-      this->handle_stream_payload(payload);
-    });
 
     logger_.info("[WsOeApp] Stream transport connected");
   }
@@ -162,7 +161,7 @@ class WsOrderEntryApp {
       WsOeCoreImpl::ExchangeTraits::requires_stream_transport(),
       std::unique_ptr<WebSocketTransport<"OEStream">>, std::monostate>;
 
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   WsOeCoreImpl ws_oe_core_;
   WsOrderManager<WsOeCoreImpl::ExchangeTraits> ws_order_manager_;
   WsOeDispatchContext<WsOeCoreImpl::ExchangeTraits> dispatch_context_;
@@ -194,6 +193,14 @@ class WsOrderEntryApp {
       std::unique_ptr<common::Thread<"ListenKeyOE">>& thread);
   void stop_keepalive_impl(std::monostate&) {}
   void keepalive_loop();
+
+  // static OptionalStreamTransport create_stream_transport() {
+  //   if constexpr (WsOeCoreImpl::ExchangeTraits::requires_stream_transport()) {
+  //     return std::make_unique<WebSocketTransport<"OEStream">>();
+  //   } else {
+  //     return std::monostate{};
+  //   }
+  // }
 };
 
 }  // namespace core

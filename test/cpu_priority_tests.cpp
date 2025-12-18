@@ -40,7 +40,8 @@ TEST(CpuPriorityTest, CpuSetting) {
   test_thread_4.start(&run);
 
   auto logger = std::make_unique<Logger>();
-  CpuManager cpu(logger.get());
+  auto producer = logger->make_producer();
+  CpuManager cpu(producer);
 
   EXPECT_FALSE(cpu.init_cpu_to_tid());
 

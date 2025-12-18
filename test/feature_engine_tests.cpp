@@ -33,6 +33,7 @@ using TestOrderBook = MarketOrderBook<TestStrategy>;
 class FeatureEngineTest : public ::testing::Test {
  public:
   static Logger logger;
+  static std::unique_ptr<Logger::Producer> producer;
 
  protected:
   void SetUp() override {
@@ -48,7 +49,10 @@ class FeatureEngineTest : public ::testing::Test {
     ticker_cfg =
         new TradeEngineCfgHashMap{{INI_CONFIG.get("meta", "ticker"), cfg}};
 
-    trade_engine = new TestTradeEngine(&logger,
+    if (!producer) {
+      producer = std::make_unique<Logger::Producer>(logger.make_producer());
+    }
+    trade_engine = new TestTradeEngine(*producer,
         market_update_pool,
         market_pool,
         nullptr,
@@ -69,6 +73,7 @@ class FeatureEngineTest : public ::testing::Test {
   TradeEngineCfgHashMap* ticker_cfg;
 };
 Logger FeatureEngineTest::logger;
+std::unique_ptr<Logger::Producer> FeatureEngineTest::producer;
 
 TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
   auto producer = logger.make_producer();

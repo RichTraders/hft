@@ -67,16 +67,14 @@ struct Logger::Impl {
   ConcurrentQueue<LogMessage> queue;
 
   std::atomic<bool> stopping{false};
-  std::atomic<size_t> next_sid{0};
 };
 
 struct Logger::Producer::Impl {
   Logger::Impl* logger;
   std::atomic<LogLevel>* level;
-  size_t sid;
 
-  explicit Impl(Logger::Impl* impl, std::atomic<LogLevel>* lvl, size_t sid_)
-      : logger(impl), level(lvl), sid(sid_) {}
+  explicit Impl(Logger::Impl* impl, std::atomic<LogLevel>* lvl)
+      : logger(impl), level(lvl) {}
 
   ~Impl() = default;
 };
@@ -101,8 +99,7 @@ Logger::~Logger() noexcept {
 }
 
 Logger::Producer Logger::make_producer() {
-  const auto sid = impl_->next_sid.fetch_add(1, std::memory_order_relaxed);
-  auto* pip = new Producer::Impl(impl_.get(), &level_, sid);
+  auto* pip = new Producer::Impl(impl_.get(), &level_);
   Producer producer;
   producer.impl_ = pip;
   return producer;
@@ -253,21 +250,14 @@ void Logger::Producer::log(LogLevel lvl, std::string_view text,
   if (impl_->level->load(std::memory_order_relaxed) > lvl)
     return;
 
-  //Allow multiple logger
-  thread_local std::unordered_map<const void*,
-      std::vector<std::unique_ptr<ProducerToken>>>
+  thread_local std::unordered_map<const void*, std::unique_ptr<ProducerToken>>
       tls;
-  auto& slots = tls[impl_->logger];
-  if (slots.size() <= impl_->sid)
-    slots.resize(impl_->sid + 1);
-  if (!slots[impl_->sid])
-    slots[impl_->sid] = std::make_unique<ProducerToken>(impl_->logger->queue);
+  auto& token = tls[impl_->logger];
+  if (!token)
+    token = std::make_unique<ProducerToken>(impl_->logger->queue);
 
   LogMessage msg;
   msg.level = lvl;
-  // msg.line = loc.line();
-  // msg.func = loc.function_name();
-  // msg.thread_id = std::this_thread::get_id();
 
   timespec time;
   clock_gettime(CLOCK_REALTIME, &time);
@@ -277,6 +267,6 @@ void Logger::Producer::log(LogLevel lvl, std::string_view text,
   msg.ts_ns = ts_ns;
   msg.text = text;
 
-  impl_->logger->queue.enqueue(*slots[impl_->sid], std::move(msg));
+  impl_->logger->queue.enqueue(*token, std::move(msg));
 }
 }  // namespace common

@@ -120,8 +120,16 @@ class OrderManager {
 
   void on_instrument_info(const InstrumentInfo& instrument_info) noexcept {
     if (!instrument_info.symbols.empty()) {
-      venue_policy_.set_qty_increment(
-          instrument_info.symbols[0].min_qty_increment);
+      const std::string target_ticker = INI_CONFIG.get("meta", "ticker");
+      auto sym = std::find_if(instrument_info.symbols.begin(),
+          instrument_info.symbols.end(),
+          [&target_ticker](
+              auto symbol) { return symbol.symbol == target_ticker; });
+
+      if (sym != instrument_info.symbols.end()) {
+        venue_policy_.set_qty_increment(sym->min_qty_increment);
+      }
+
       logger_.info("[OrderManager] Updated qty_increment to {}",
           instrument_info.symbols[0].min_qty_increment);
     }

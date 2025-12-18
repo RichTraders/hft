@@ -35,7 +35,8 @@ class FixMdCore {
   using SymbolId = std::string;
 
   FixMdCore(SendId sender_comp_id, TargetId target_comp_id,
-      common::Logger* logger, common::MemoryPool<MarketData>* pool);
+      const common::Logger::Producer& logger,
+      common::MemoryPool<MarketData>* pool);
   ~FixMdCore();
 
   std::string create_log_on_message(const std::string& sig_b64,
@@ -61,7 +62,7 @@ class FixMdCore {
 
  private:
   int64_t sequence_{1};
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   const std::string sender_comp_id_;
   const std::string target_comp_id_;
   common::MemoryPool<MarketData>* market_data_pool_;

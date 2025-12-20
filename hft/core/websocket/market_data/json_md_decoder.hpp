@@ -52,6 +52,13 @@ class JsonMdDecoder : public WsMdDecoderBase<JsonMdDecoder<Exchange>> {
           "[TradeStream]">(payload);
     }
 
+    if constexpr (requires { Exchange::is_book_ticker_message(payload); }) {
+      if (Exchange::is_book_ticker_message(payload)) {
+        return this->template decode_or_log<typename Exchange::BookTickerEvent,
+            "[BookTicker]">(payload);
+      }
+    }
+
     if constexpr (requires { typename Exchange::DepthSnapshot; }) {
       if (Exchange::is_snapshot_message(payload)) {
         return this->template decode_or_log<typename Exchange::DepthSnapshot,

@@ -450,6 +450,12 @@ class MarketOrderBook final {
         trade_order(market_update, idx);
         return;
       }
+      case common::MarketUpdateType::kBookTicker: {
+        if (LIKELY(trade_engine_)) {
+          trade_engine_->on_book_ticker_updated(market_update);
+        }
+        return;
+      }
       case common::MarketUpdateType::kClear: {
         for (int i = 0; i < config_.bucket_count; ++i) {
           if (bidBuckets_[i]) {

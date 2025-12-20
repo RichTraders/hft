@@ -65,6 +65,17 @@ class FeatureEngine {
         agg_trade_qty_ratio_);
   }
 
+  auto on_book_ticker_updated(
+      const MarketData* market_update) noexcept -> void {
+    if (market_update->side == common::Side::kBuy) {
+      book_ticker_.bid_price = market_update->price.value;
+      book_ticker_.bid_qty = market_update->qty.value;
+    } else {
+      book_ticker_.ask_price = market_update->price.value;
+      book_ticker_.ask_qty = market_update->qty.value;
+    }
+  }
+
   auto on_order_book_updated(common::Price price, common::Side side,
       MarketOrderBook<Strategy>* book) noexcept -> void {
     const auto* bbo = book->get_bbo();
@@ -145,7 +156,10 @@ class FeatureEngine {
     return result;
   }
 
-  [[nodiscard]] auto get_mid_price() const noexcept { return mkt_price_; }
+  [[nodiscard]] auto get_market_price() const noexcept { return mkt_price_; }
+  [[nodiscard]] auto get_mid_price() const noexcept {
+    return (book_ticker_.bid_price + book_ticker_.ask_price) * kMidPriceFactor;
+  }
   [[nodiscard]] auto get_spread() const noexcept { return spread_; }
   [[nodiscard]] auto get_vwap() const noexcept { return vwap_; }
 
@@ -166,6 +180,7 @@ class FeatureEngine {
  private:
   static constexpr int kLevel10 = 10;
   static constexpr int kVwapSize = 64;
+  static constexpr double kMidPriceFactor = 0.5;
   const common::Logger::Producer& logger_;
   double mkt_price_ = common::kPriceInvalid;
   double agg_trade_qty_ratio_ = common::kQtyInvalid;
@@ -177,6 +192,12 @@ class FeatureEngine {
   std::vector<double> vwap_qty_;
   std::vector<double> vwap_price_;
   uint32_t vwap_index_ = 0;
+  struct BookTicker {
+    double bid_price;
+    double bid_qty;
+    double ask_price;
+    double ask_qty;
+  } book_ticker_;
 };
 }  // namespace trading
 

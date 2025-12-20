@@ -21,6 +21,7 @@
 #include "common/ini_config.hpp"
 #include "core/websocket/market_data/exchange_traits.h"
 #include "schema/futures/response/api_response.h"
+#include "schema/futures/response/book_ticker.h"
 #include "schema/futures/response/depth_stream.h"
 #include "schema/futures/response/exchange_info_response.h"
 #include "schema/futures/response/session_response.h"
@@ -51,12 +52,13 @@ struct BinanceFuturesTraits {
 
   using DepthResponse = schema::futures::DepthResponse;
   using TradeEvent = schema::futures::TradeEvent;
+  using BookTickerEvent = schema::futures::BookTickerEvent;
   using ApiResponse = schema::futures::ApiResponse;
   using DepthSnapshot = schema::futures::DepthSnapshot;
   using SessionLogOnResponse = std::monostate;  // Not used
 
   using WireMessage = std::variant<std::monostate, DepthResponse, TradeEvent,
-      DepthSnapshot, ApiResponse, ExchangeInfoResponse>;
+      BookTickerEvent, DepthSnapshot, ApiResponse, ExchangeInfoResponse>;
 
   static constexpr std::string_view exchange_name() { return "Binance"; }
   static constexpr std::string_view market_type() { return "Futures"; }
@@ -104,6 +106,10 @@ struct BinanceFuturesTraits {
 
   static bool is_trade_message(std::string_view payload) {
     return payload.contains("@aggTrade");
+  }
+
+  static bool is_book_ticker_message(std::string_view payload) {
+    return payload.contains("@bookTicker");
   }
 
   static bool is_snapshot_message(std::string_view payload) {

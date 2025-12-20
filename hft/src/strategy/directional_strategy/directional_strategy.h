@@ -27,7 +27,8 @@ class FeatureEngine;
 template <typename Strategy>
 class MarketOrderBook;
 
-class ObiVwapDirectionalStrategy : public BaseStrategy<ObiVwapDirectionalStrategy> {
+class ObiVwapDirectionalStrategy
+    : public BaseStrategy<ObiVwapDirectionalStrategy> {
  public:
   using QuoteIntentType =
       std::conditional_t<SelectedOeTraits::supports_position_side(),
@@ -87,9 +88,7 @@ class ObiVwapDirectionalStrategy : public BaseStrategy<ObiVwapDirectionalStrateg
 
     const double obi =
         FeatureEngineT::orderbook_imbalance_from_levels(bid_qty_, ask_qty_);
-    const auto mid = (order_book->get_bbo()->bid_price.value +
-                         order_book->get_bbo()->ask_price.value) *
-                     0.5;
+    const auto mid = this->feature_engine_->get_mid_price();
     const double denom = std::max({spread, minimum_spread_});
     const auto delta = (mid - vwap) / denom;
     if (!std::isfinite(spread) || spread <= 0.0) {

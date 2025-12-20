@@ -257,6 +257,71 @@ TEST_F(WsFuturesMdDecoderTest, Decode_InvalidJson_ReturnsMonostate) {
 }
 
 // ============================================================================
+// BookTicker Tests
+// ============================================================================
+
+TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_RealData_ParsesCorrectly) {
+  std::string json = futures_test_utils::load_test_data("book_ticker.json");
+
+  if (json.empty()) {
+    GTEST_SKIP() << "futures book_ticker.json not available";
+  }
+
+  EXPECT_TRUE(futures_test_utils::is_valid_json(json));
+
+  auto wire_msg = decoder_->decode(json);
+
+  ASSERT_TRUE(futures_test_utils::holds_type<schema::futures::BookTickerEvent>(wire_msg))
+      << "Expected BookTickerEvent variant type";
+
+  const auto& book_ticker = futures_test_utils::get_or_fail<schema::futures::BookTickerEvent>(
+      wire_msg, "FuturesDecodeBookTicker_RealData");
+
+  EXPECT_EQ(book_ticker.stream, "btcusdt@bookTicker");
+  EXPECT_EQ(book_ticker.data.event_type, "bookTicker");
+  EXPECT_EQ(book_ticker.data.symbol, "BTCUSDT");
+  EXPECT_EQ(book_ticker.data.update_id, 400900217);
+  EXPECT_EQ(book_ticker.data.event_time, 1568014460893);
+  EXPECT_EQ(book_ticker.data.transaction_time, 1568014460891);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_price, 25.3519);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_qty, 31.21);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_price, 25.3652);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_qty, 40.66);
+}
+
+TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_InlineData_ParsesCorrectly) {
+  std::string json = R"({
+    "stream":"ethusdt@bookTicker",
+    "data":{
+      "e":"bookTicker",
+      "u":123456789,
+      "E":1700000000000,
+      "T":1700000000001,
+      "s":"ETHUSDT",
+      "b":"2000.50",
+      "B":"100.5",
+      "a":"2001.00",
+      "A":"50.25"
+    }
+  })";
+
+  auto wire_msg = decoder_->decode(json);
+
+  ASSERT_TRUE(futures_test_utils::holds_type<schema::futures::BookTickerEvent>(wire_msg));
+
+  const auto& book_ticker = futures_test_utils::get_or_fail<schema::futures::BookTickerEvent>(
+      wire_msg, "DecodeBookTicker_InlineData");
+
+  EXPECT_EQ(book_ticker.stream, "ethusdt@bookTicker");
+  EXPECT_EQ(book_ticker.data.symbol, "ETHUSDT");
+  EXPECT_EQ(book_ticker.data.update_id, 123456789);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_price, 2000.50);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_qty, 100.5);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_price, 2001.00);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_qty, 50.25);
+}
+
+// ============================================================================
 // ExchangeInfoResponse Tests
 // ============================================================================
 

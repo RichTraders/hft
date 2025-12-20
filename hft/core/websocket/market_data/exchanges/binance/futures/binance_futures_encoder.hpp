@@ -21,6 +21,7 @@ struct BinanceFuturesEncoder {
   using SymbolId = std::string_view;
   static constexpr std::string_view kDepthSuffix = "@depth@100ms";
   static constexpr std::string_view kTradeSuffix = "@trade";
+  static constexpr std::string_view kBookTickerSuffix = "@bookTicker";
   static constexpr std::string_view kSubscribe = "SUBSCRIBE";
   static constexpr std::string_view kUnsubscribe = "UNSUBSCRIBE";
 
@@ -72,6 +73,25 @@ struct BinanceFuturesEncoder {
       return static_cast<char>(std::tolower(chr));
     });
     stream.append(kTradeSuffix);
+    const std::string method =
+        subscribe ? std::string(kSubscribe) : std::string(kUnsubscribe);
+    return std::format(R"({{"method":"{}","params":["{}"],"id":{}}})",
+        method,
+        stream,
+        request_sequence_++);
+  }
+
+  std::string create_book_ticker_subscription_message(
+      const RequestId& /*request_id*/, const MarketDepthLevel& /*level*/,
+      const SymbolId& symbol, bool subscribe) const {
+    if (symbol.empty()) {
+      return {};
+    }
+    std::string stream = symbol.data();
+    std::ranges::transform(stream, stream.begin(), [](const unsigned char chr) {
+      return static_cast<char>(std::tolower(chr));
+    });
+    stream.append(kBookTickerSuffix);
     const std::string method =
         subscribe ? std::string(kSubscribe) : std::string(kUnsubscribe);
     return std::format(R"({{"method":"{}","params":["{}"],"id":{}}})",

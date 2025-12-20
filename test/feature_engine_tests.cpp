@@ -112,7 +112,7 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
 
   engine.on_order_book_updated(price, side, &book);
 
-  EXPECT_DOUBLE_EQ(engine.get_mid_price(), expected_mid);
+  EXPECT_DOUBLE_EQ(engine.get_market_price(), expected_mid);
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {

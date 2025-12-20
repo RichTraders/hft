@@ -75,7 +75,7 @@ struct WebSocketMarketDataPolicy {
         market_update_data_pool->allocate(app.create_market_data_message(msg));
 
     if (state == StreamState::kBuffering) {
-      if (data->type == kTrade) {
+      if (data->type != kMarket) {
         for (auto* market_data : data->data)
           market_data_pool->deallocate(market_data);
         market_update_data_pool->deallocate(data);
@@ -104,8 +104,7 @@ struct WebSocketMarketDataPolicy {
       return;
     }
 
-    // Skip gap check for trade events (they don't have sequence numbers)
-    if (data->type != kTrade) {
+    if (data->type == kMarket) {
       logger.trace("current update index:{}, data start :{}, data end:{}",
           update_index,
           data->start_idx,

@@ -140,6 +140,12 @@ class TradeEngine {
     END_MEASURE(TRADE_UPDATED, logger_);
   }
 
+  void on_book_ticker_updated(const MarketData* market_data) {
+    START_MEASURE(BOOK_TICKER_UPDATED);
+    feature_engine_->on_book_ticker_updated(market_data);
+    END_MEASURE(BOOK_TICKER_UPDATED, logger_);
+  }
+
   void on_order_updated(const ExecutionReport* report) noexcept {
     START_MEASURE(Trading_TradeEngine_on_order_updated);
     if (report->exec_type == ExecType::kTrade) {

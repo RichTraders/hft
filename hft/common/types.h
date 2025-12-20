@@ -323,6 +323,7 @@ enum class MarketUpdateType : uint8_t {
   kModify = 3,
   kCancel = 4,
   kTrade = 5,
+  kBookTicker = 6,
 };
 
 inline MarketUpdateType charToMarketUpdateType(const char character) noexcept {
@@ -340,6 +341,8 @@ inline MarketUpdateType charToMarketUpdateType(const char character) noexcept {
 
 inline std::string toString(MarketUpdateType type) noexcept {
   switch (type) {
+    case MarketUpdateType::kInvalid:
+      return "INVALID";
     case MarketUpdateType::kClear:
       return "CLEAR";
     case MarketUpdateType::kAdd:
@@ -350,8 +353,8 @@ inline std::string toString(MarketUpdateType type) noexcept {
       return "CANCEL";
     case MarketUpdateType::kTrade:
       return "TRADE";
-    case MarketUpdateType::kInvalid:
-      return "INVALID";
+    case MarketUpdateType::kBookTicker:
+      return "BOOK_TICKER";
   }
   return "UNKNOWN";
 }

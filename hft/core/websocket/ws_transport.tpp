@@ -37,6 +37,14 @@ struct Protocols {
 };
 
 }  // namespace
+
+template <FixedString ThreadName>
+WebSocketTransport<ThreadName>::WebSocketTransport() {
+  running_.store(true, std::memory_order_release);
+  service_thread_.start(&WebSocketTransport::service_loop, this);
+  std::cout << "WebSocketTransport thread started (uninitialized)\n";
+}
+
 template <FixedString ThreadName>
 WebSocketTransport<ThreadName>::WebSocketTransport(std::string host, int port,
     std::string path, bool use_ssl, bool notify_connected,
@@ -89,8 +97,64 @@ WebSocketTransport<ThreadName>::WebSocketTransport(std::string host, int port,
   }
 
   running_.store(true, std::memory_order_release);
+  ready_.store(true,std::memory_order_release);
   service_thread_.start(&WebSocketTransport::service_loop, this);
   std::cout << "WebSocketTransport Created\n";
+}
+
+template <FixedString ThreadName>
+void WebSocketTransport<ThreadName>::initialize(std::string host, int port,
+    std::string path, bool use_ssl, bool notify_connected,
+    std::string_view api_key) {
+  host_ = std::move(host);
+  path_ = std::move(path);
+  port_ = port;
+  use_ssl_ = use_ssl;
+  notify_connected_ = notify_connected;
+  api_key_ = std::string(api_key.data());
+  queue_ = std::make_unique<common::SPSCQueue<std::string, kQueueSize>>();
+
+  static Protocols<ThreadName> protocols;
+  lws_context_creation_info info{};
+  info.port = CONTEXT_PORT_NO_LISTEN;
+  info.protocols = protocols.entries.data();
+  if (use_ssl_) {
+    info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+    info.client_ssl_ca_filepath = "/etc/ssl/certs/ca-certificates.crt";
+  }
+
+  info.user = this;
+
+  context_ = lws_create_context(&info);
+  if (!context_) {
+    throw std::runtime_error("WebSocketTransport: context creation failed");
+  }
+
+  lws_client_connect_info ccinfo{};
+  ccinfo.context = context_;
+  ccinfo.address = host_.c_str();
+  ccinfo.port = port_;
+  ccinfo.path = path_.c_str();
+  ccinfo.host = host_.c_str();
+  ccinfo.origin = host_.c_str();
+  ccinfo.protocol = protocols.entries[0].name;
+  ccinfo.userdata = this;
+  ccinfo.ssl_connection = use_ssl_ ? LCCSCF_USE_SSL : 0;
+
+  std::cout << "[WS] Connecting to " << host_ << ":" << port_ << path_
+            << " (SSL: " << (use_ssl_ ? "yes" : "no") << ")\n";
+
+  wsi_ = lws_client_connect_via_info(&ccinfo);
+  if (!wsi_) {
+    lws_context_destroy(context_);
+    context_ = nullptr;
+    std::cerr << "[WS] Connection failed: " << host_ << ":" << port_ << path_
+              << "\n";
+    throw std::runtime_error("WebSocketTransport: connection failed");
+  }
+  ready_.store(true,std::memory_order_release);
+
+  std::cout << "WebSocketTransport initialized\n";
 }
 
 template <FixedString ThreadName>
@@ -272,8 +336,10 @@ int WebSocketTransport<ThreadName>::handle_callback(struct lws* wsi,
 template <FixedString ThreadName>
 void WebSocketTransport<ThreadName>::service_loop() {
   while (running_.load(std::memory_order_acquire)) {
-    if (context_) {
+    if (ready_.load(std::memory_order_acquire) && context_) {
       lws_service(context_, kServiceIntervalMs);
+    } else {
+      std::this_thread::sleep_for(std::chrono::milliseconds(kServiceIntervalMs));
     }
   }
 }

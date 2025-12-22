@@ -20,18 +20,19 @@
 #include "ws_md_encoder.hpp"
 
 namespace core {
-template <ExchangeTraits Exchange, template <typename> class DecoderTemplate>
+template <ExchangeTraits Exchange, typename DecoderType>
 class WsMdCore {
  public:
   using ExchangeTraits = Exchange;
-  using Decoder = DecoderTemplate<Exchange>;
+  using Decoder = DecoderType;
   using WireMessage = typename Decoder::WireMessage;
   using RequestId = std::string_view;
   using MarketDepthLevel = std::string_view;
   using SymbolId = std::string_view;
 
-  WsMdCore(common::Logger* logger, common::MemoryPool<MarketData>* pool)
-      : logger_(logger->make_producer()),
+  WsMdCore(const common::Logger::Producer& logger,
+      common::MemoryPool<MarketData>* pool)
+      : logger_(logger),
         decoder_(logger_),
         mapper_(logger_, pool),
         encoder_(logger_) {}
@@ -89,7 +90,7 @@ class WsMdCore {
   }
 
  private:
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   Decoder decoder_;
   WsMdDomainMapper<Exchange, Decoder> mapper_;
   WsMdEncoder<Exchange> encoder_;

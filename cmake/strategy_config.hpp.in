@@ -1,7 +1,9 @@
 #pragma once
 
-#include "strategy/momentum_strategy.h"
-#include "strategy/liquid_taker.h"
+#include "oe_traits_config.hpp"
+
+#include "strategy/directional_strategy/directional_strategy.h"
+#include "strategy/liquid_taker/liquid_taker.h"
 
 using SelectedStrategy = @STRATEGY_TYPE@;
 inline constexpr std::string_view kSelectedStrategyName = "@STRATEGY_NAME@";

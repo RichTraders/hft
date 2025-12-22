@@ -14,7 +14,7 @@
 #define EXCHANGE_TRAITS_H
 
 template <typename T>
-concept ExchangeTraits = requires(std::string_view payload) {
+concept ExchangeTraits = requires {
   { T::exchange_name() } -> std::convertible_to<std::string_view>;
   { T::market_type() } -> std::convertible_to<std::string_view>;
 
@@ -30,6 +30,7 @@ concept ExchangeTraits = requires(std::string_view payload) {
   typename T::DepthSnapshot;
   typename T::ApiResponse;
   typename T::ExchangeInfoResponse;
+  typename T::Decoder;
 
   typename T::SbeOps;
   typename T::Formatter;
@@ -39,9 +40,7 @@ concept ExchangeTraits = requires(std::string_view payload) {
   { T::supports_json() } -> std::same_as<bool>;
   { T::supports_sbe() } -> std::same_as<bool>;
 
-  { T::is_depth_message(payload) } -> std::same_as<bool>;
-  { T::is_trade_message(payload) } -> std::same_as<bool>;
-  { T::is_snapshot_message(payload) } -> std::same_as<bool>;
+  { T::uses_http_exchange_info() } -> std::same_as<bool>;
 };
 
 #endif  //EXCHANGE_TRAITS_H

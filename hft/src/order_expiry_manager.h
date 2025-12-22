@@ -24,6 +24,7 @@ class OrderExpiryManager {
     uint64_t expire_ts{0};
     common::TickerId symbol;
     common::Side side{};
+    std::optional<common::PositionSide> position_side;
     uint32_t layer{0};
     common::OrderId cl_order_id;
 
@@ -34,7 +35,9 @@ class OrderExpiryManager {
     friend std::ostream& operator<<(std::ostream& stream,
         const ExpiryKey& key) {
       stream << "expire_ts: " << key.expire_ts << ", symbol: " << key.symbol
-             << ", side: " << common::toString(key.side)
+             << ", side: " << common::toString(key.side) << ", position_side: "
+             << (key.position_side ? common::toString(*key.position_side)
+                                   : "none")
              << ", layer: " << key.layer
              << ", cl_order_id: " << key.cl_order_id.value;
       return stream;
@@ -47,7 +50,8 @@ class OrderExpiryManager {
   ~OrderExpiryManager() = default;
 
   void register_expiry(const common::TickerId& ticker, common::Side side,
-      uint32_t layer, const common::OrderId& order_id, OMOrderState state,
+      std::optional<common::PositionSide> position_side, uint32_t layer,
+      const common::OrderId& order_id, OMOrderState state,
       uint64_t now_ns) noexcept {
     const auto ttl = (state == OMOrderState::kReserved ||
                          state == OMOrderState::kCancelReserved)
@@ -56,6 +60,7 @@ class OrderExpiryManager {
     expiry_pq_.push(ExpiryKey{.expire_ts = now_ns + ttl,
         .symbol = ticker,
         .side = side,
+        .position_side = position_side,
         .layer = layer,
         .cl_order_id = order_id});
   }

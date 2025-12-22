@@ -20,7 +20,7 @@
 namespace trading {
 class ResponseManager {
  public:
-  ResponseManager(common::Logger* logger,
+  ResponseManager(const common::Logger::Producer& logger,
       common::MemoryPool<ExecutionReport>* execution_report_pool,
       common::MemoryPool<OrderCancelReject>* order_cancel_reject_pool,
       common::MemoryPool<OrderMassCancelReport>* order_mass_cancel_report_pool);
@@ -36,7 +36,7 @@ class ResponseManager {
       OrderMassCancelReport* order_mass_cancel_report);
 
  private:
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   common::MemoryPool<ExecutionReport>* execution_report_pool_;
   common::MemoryPool<OrderCancelReject>* order_cancel_reject_pool_;
   common::MemoryPool<OrderMassCancelReport>* order_mass_cancel_report_pool_;

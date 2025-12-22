@@ -110,6 +110,7 @@ struct MarketData {
 enum MarketDataType : uint8_t {
   kTrade = 0,
   kMarket,
+  kBookTicker,
   kNone,
 };
 

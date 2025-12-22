@@ -15,7 +15,8 @@
 namespace core {
 
 FixOrderEntryApp::FixOrderEntryApp(const std::string& sender_comp_id,
-    const std::string& target_comp_id, common::Logger* logger,
+    const std::string& target_comp_id,
+    const common::Logger::Producer& logger,
     trading::ResponseManager* response_manager)
     : FixApp(AUTHORIZATION.get_od_address(), AUTHORIZATION.get_port(),
           sender_comp_id, target_comp_id, logger) {

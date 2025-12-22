@@ -13,17 +13,18 @@
 #include "ws_md_app.h"
 
 #include "authorization.h"
-#include "core/http/futures_exchange_info_fetcher.h"
+#include "exchanges/binance/futures/binance_futures_exchange_info_fetcher.h"
 #include "performance.h"
 
 namespace core {
 
 WsMarketDataApp::WsMarketDataApp(const std::string& /*sender_comp_id*/,
-    const std::string& /*target_comp_id*/, common::Logger* logger,
+    const std::string& /*target_comp_id*/,
+    const common::Logger::Producer& logger,
     common::MemoryPool<MarketData>* market_data_pool)
-    : logger_(logger->make_producer()),
-      stream_core_(logger, market_data_pool),
-      api_core_(logger, market_data_pool),
+    : logger_(logger),
+      stream_core_(logger_, market_data_pool),
+      api_core_(logger_, market_data_pool),
       host_(WsMdCoreImpl::ExchangeTraits::get_stream_host()),
       path_(WsMdCoreImpl::ExchangeTraits::get_stream_endpoint_path()),
       port_(WsMdCoreImpl::ExchangeTraits::get_stream_port()),
@@ -181,7 +182,7 @@ MarketDataReject WsMarketDataApp::create_reject_message(
 std::optional<InstrumentInfo> WsMarketDataApp::fetch_instrument_info_http(
     const std::string& symbol) const {
   if constexpr (ExchangeTraits::uses_http_exchange_info()) {
-    http::FuturesExchangeInfoFetcher fetcher(logger_);
+    http::BinanceFuturesExchangeInfoFetcher fetcher(logger_);
     return fetcher.fetch(symbol);
   } else {
     // For Spot or non-HTTP exchange info, return nullopt
@@ -213,8 +214,18 @@ void WsMarketDataApp::handle_stream_payload(std::string_view payload) const {
   END_MEASURE(Convert_Message_Stream, logger_);
 
   using StreamRouter = WsMdCoreImpl::ExchangeTraits::DispatchRouter;
+#ifdef REPOSITORY
+  StreamRouter::template process_message<WsMdCoreImpl::ExchangeTraits>(wire_msg,
+      [this, &wire_msg, &payload](std::string_view type) {
+        dispatch(type, wire_msg);
+        if (raw_data_callback_) {
+          raw_data_callback_(std::string(payload), wire_msg, std::string(type));
+        }
+      });
+#else
   StreamRouter::template process_message<WsMdCoreImpl::ExchangeTraits>(wire_msg,
       [this, &wire_msg](std::string_view type) { dispatch(type, wire_msg); });
+#endif
 }
 
 void WsMarketDataApp::handle_api_payload(std::string_view payload) const {
@@ -240,17 +251,32 @@ void WsMarketDataApp::handle_api_payload(std::string_view payload) const {
   END_MEASURE(Convert_Message_API, logger_);
 
   using ApiRouter = WsMdCoreApiImpl::ExchangeTraits::DispatchRouter;
+#ifdef REPOSITORY
+  ApiRouter::template process_message<WsMdCoreApiImpl::ExchangeTraits>(
+      api_wire_msg,
+      [this, &api_wire_msg, &payload](std::string_view type) {
+        dispatch(type, api_wire_msg);
+        if (raw_data_callback_) {
+          raw_data_callback_(std::string(payload),
+              api_wire_msg,
+              std::string(type));
+        }
+      });
+#else
   ApiRouter::template process_message<WsMdCoreApiImpl::ExchangeTraits>(
       api_wire_msg,
       [this, &api_wire_msg](
           std::string_view type) { dispatch(type, api_wire_msg); });
+#endif
 }
 
 void WsMarketDataApp::dispatch(std::string_view type,
     const WireMessage& message) const {
   const auto callback = callbacks_.find(std::string(type));
   if (callback == callbacks_.end() || !callback->second) {
+#ifndef REPOSITORY
     logger_.warn("No callback registered for message type {}", type);
+#endif
     return;
   }
   callback->second(message);

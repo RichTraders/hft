@@ -60,7 +60,7 @@ class WsOrderEntryApp {
   using MsgType = std::string;
 
   WsOrderEntryApp(const std::string& sender_comp_id,
-      const std::string& target_comp_id, common::Logger* logger,
+      const std::string& target_comp_id, const common::Logger::Producer& logger,
       trading::ResponseManager* response_manager);
   ~WsOrderEntryApp();
 
@@ -82,6 +82,8 @@ class WsOrderEntryApp {
       const trading::OrderCancelRequest& cancel_request) const;
   [[nodiscard]] std::string create_cancel_and_reorder_message(
       const trading::OrderCancelAndNewOrderSingle& cancel_and_re_order) const;
+  [[nodiscard]] std::string create_modify_order_message(
+      const trading::OrderModifyRequest& modify_request) const;
   [[nodiscard]] std::string create_order_all_cancel(
       const trading::OrderMassCancelRequest& all_order_cancel) const;
 
@@ -101,6 +103,7 @@ class WsOrderEntryApp {
   void post_cancel_order(const trading::OrderCancelRequest& data);
   void post_cancel_and_reorder(
       const trading::OrderCancelAndNewOrderSingle& data);
+  void post_modify_order(const trading::OrderModifyRequest& data);
   void post_mass_cancel_order(const trading::OrderMassCancelRequest& data);
 
   void dispatch(const std::string& type, const WireMessage& message) const;
@@ -114,6 +117,14 @@ class WsOrderEntryApp {
   void initiate_session_logon();
   void start_listen_key_keepalive() { start_keepalive_impl(keepalive_thread_); }
 
+  [[nodiscard]] bool is_session_ready() const noexcept {
+    return session_ready_.load(std::memory_order_acquire);
+  }
+  void set_session_ready() noexcept {
+    session_ready_.store(true, std::memory_order_release);
+    logger_.info("[WsOeApp] Session ready");
+  }
+
  private:
   void handle_api_payload(std::string_view payload);
   static std::string get_signature_base64(const std::string& payload);
@@ -122,7 +133,6 @@ class WsOrderEntryApp {
       std::unique_ptr<WebSocketTransport<"OEStream">>& transport) {
     if (transport) {
       transport->interrupt();
-      transport.reset();
     }
   }
   void stop_stream_transport_impl(std::monostate&) {}
@@ -137,18 +147,18 @@ class WsOrderEntryApp {
         std::string(WsOeCoreImpl::ExchangeTraits::get_stream_host());
     const std::string stream_path =
         std::string(WsOeCoreImpl::ExchangeTraits::get_stream_endpoint_path()) +
-        "?listenKey=" + listen_key_;
+        "/" + listen_key_;
     const int stream_port = WsOeCoreImpl::ExchangeTraits::get_stream_port();
-
-    transport = std::make_unique<WebSocketTransport<"OEStream">>(stream_host,
-        stream_port,
-        stream_path,
-        use_ssl_,
-        false);
 
     transport->register_message_callback([this](std::string_view payload) {
       this->handle_stream_payload(payload);
     });
+
+    transport->initialize(stream_host,
+        stream_port,
+        stream_path,
+        use_ssl_,
+        false);
 
     logger_.info("[WsOeApp] Stream transport connected");
   }
@@ -159,7 +169,7 @@ class WsOrderEntryApp {
       WsOeCoreImpl::ExchangeTraits::requires_stream_transport(),
       std::unique_ptr<WebSocketTransport<"OEStream">>, std::monostate>;
 
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   WsOeCoreImpl ws_oe_core_;
   WsOrderManager<WsOeCoreImpl::ExchangeTraits> ws_order_manager_;
   WsOeDispatchContext<WsOeCoreImpl::ExchangeTraits> dispatch_context_;
@@ -183,6 +193,7 @@ class WsOrderEntryApp {
 
   [[no_unique_address]] OptionalKeepaliveThread keepalive_thread_;
   std::atomic<bool> keepalive_running_{false};
+  std::atomic<bool> session_ready_{false};
 
   void start_keepalive_impl(
       std::unique_ptr<common::Thread<"ListenKeyOE">>& thread);
@@ -191,6 +202,14 @@ class WsOrderEntryApp {
       std::unique_ptr<common::Thread<"ListenKeyOE">>& thread);
   void stop_keepalive_impl(std::monostate&) {}
   void keepalive_loop();
+
+  // static OptionalStreamTransport create_stream_transport() {
+  //   if constexpr (WsOeCoreImpl::ExchangeTraits::requires_stream_transport()) {
+  //     return std::make_unique<WebSocketTransport<"OEStream">>();
+  //   } else {
+  //     return std::monostate{};
+  //   }
+  // }
 };
 
 }  // namespace core

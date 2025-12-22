@@ -69,7 +69,8 @@ TEST(CpuCgroupIntegrationTest, FullCpuManagementInIsoSlice) {
   test_thread_4.start(&run);
 
   auto logger = std::make_unique<Logger>();
-  CpuManager cpu(logger.get());
+  auto producer = logger->make_producer();
+  CpuManager cpu(producer);
 
   // Verify cgroup validation succeeds in iso.slice
   std::string cgroup_result;

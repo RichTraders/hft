@@ -18,11 +18,11 @@
 #include "core/response_manager.h"
 #include "ini_config.hpp"
 #include "logger.h"
-#include "market_consumer.h"
+#include "market_consumer.hpp"
 #include "order_entry.h"
-#include "order_gateway.h"
+#include "order_gateway.hpp"
 #include "risk_manager.h"
-#include "trade_engine.h"
+#include "trade_engine.hpp"
 
 #ifdef ENABLE_WEBSOCKET
 #include "core/websocket/market_data/ws_md_app.h"

@@ -13,6 +13,7 @@
 #ifndef BINANCE_FUTURES_OE_DISPATCHER_H
 #define BINANCE_FUTURES_OE_DISPATCHER_H
 
+#include "schema/futures/response/account_update.h"
 #include "schema/futures/response/api_response.h"
 #include "schema/futures/response/execution_report.h"
 #include "schema/futures/response/order.h"
@@ -56,25 +57,18 @@ struct BinanceFuturesOeDispatchRouter {
       return std::nullopt;
     }
 
-    // Not decided to support these API.
-    // if constexpr (std::is_same_v<MsgType, schema::futures::BalanceUpdateEnvelope> ||
-    //                    std::is_same_v<MsgType, schema::futures::OutboundAccountPositionEnvelope>) {
-    //   return std::nullopt;
-    // }
+    if constexpr (std::is_same_v<MsgType,
+                      schema::futures::AccountUpdateResponse>) {
+      return std::nullopt;
+    }
 
     // Unknown → no dispatch
     return std::nullopt;
   }
-
-  // NEW: Main entry point for message processing
   template <typename ExchangeTraits>
   static void process_message(
       const typename ExchangeTraits::WireMessage& message,
       const core::WsOeDispatchContext<ExchangeTraits>& context);
-
-  // Deprecated: Use process_message with Context instead
-  // template <typename WireMessage>
-  // static void process_api_message(const WireMessage& message);
 
  private:
   // Handler methods (all static template methods)
@@ -126,6 +120,12 @@ struct BinanceFuturesOeDispatchRouter {
       const core::WsOeDispatchContext<ExchangeTraits>& context,
       const typename ExchangeTraits::WireMessage& message);
 
+  template <class ExchangeTraits>
+  static void handle_cancel_order_response(
+      const typename ExchangeTraits::CancelOrderResponse& response,
+      const core::WsOeDispatchContext<ExchangeTraits>& context,
+      const typename ExchangeTraits::WireMessage&);
+
   template <typename ExchangeTraits>
   static void handle_balance_update(
       const typename ExchangeTraits::BalanceUpdateEnvelope& envelope,
@@ -134,6 +134,11 @@ struct BinanceFuturesOeDispatchRouter {
   template <typename ExchangeTraits>
   static void handle_account_updated(
       const typename ExchangeTraits::OutboundAccountPositionEnvelope& envelope,
+      const core::WsOeDispatchContext<ExchangeTraits>& context);
+
+  template <typename ExchangeTraits>
+  static void handle_listen_key_expired(
+      const typename ExchangeTraits::ListenKeyExpiredEvent& event,
       const core::WsOeDispatchContext<ExchangeTraits>& context);
 };
 

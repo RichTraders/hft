@@ -13,25 +13,27 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "feature_engine.h"
+#include "feature_engine.hpp"
 #include "ini_config.hpp"
 #include "logger.h"
-#include "order_book.h"
+#include "order_book.hpp"
 #include "strategy_config.hpp"
-#include "trade_engine.h"
+#include "trade_engine.hpp"
 
 using ::testing::_;
 using ::testing::HasSubstr;
 using namespace common;
 using namespace trading;
 
-using TestTradeEngine = TradeEngine<SelectedStrategy>;
-using TestFeatureEngine = FeatureEngine<SelectedStrategy>;
-using TestOrderBook = MarketOrderBook<SelectedStrategy>;
+using TestStrategy = SelectedStrategy;
+using TestTradeEngine = TradeEngine<TestStrategy>;
+using TestFeatureEngine = FeatureEngine<TestStrategy>;
+using TestOrderBook = MarketOrderBook<TestStrategy>;
 
 class FeatureEngineTest : public ::testing::Test {
  public:
   static Logger logger;
+  static std::unique_ptr<Logger::Producer> producer;
 
  protected:
   void SetUp() override {
@@ -47,7 +49,10 @@ class FeatureEngineTest : public ::testing::Test {
     ticker_cfg =
         new TradeEngineCfgHashMap{{INI_CONFIG.get("meta", "ticker"), cfg}};
 
-    trade_engine = new TestTradeEngine(&logger,
+    if (!producer) {
+      producer = std::make_unique<Logger::Producer>(logger.make_producer());
+    }
+    trade_engine = new TestTradeEngine(*producer,
         market_update_pool,
         market_pool,
         nullptr,
@@ -68,6 +73,7 @@ class FeatureEngineTest : public ::testing::Test {
   TradeEngineCfgHashMap* ticker_cfg;
 };
 Logger FeatureEngineTest::logger;
+std::unique_ptr<Logger::Producer> FeatureEngineTest::producer;
 
 TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
   auto producer = logger.make_producer();
@@ -106,7 +112,7 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
 
   engine.on_order_book_updated(price, side, &book);
 
-  EXPECT_DOUBLE_EQ(engine.get_mid_price(), expected_mid);
+  EXPECT_DOUBLE_EQ(engine.get_market_price(), expected_mid);
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {

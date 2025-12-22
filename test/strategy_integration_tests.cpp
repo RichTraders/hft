@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 #ifdef ENABLE_WEBSOCKET
 #include "core/websocket/order_entry/ws_oe_app.h"
+#include "core/websocket/order_entry/exchanges/binance/futures/binance_futures_oe_traits.h"
 #else
 #include "core/fix/fix_oe_app.h"
 #endif
@@ -20,23 +21,26 @@
 #include "logger.h"
 #include "response_manager.h"
 #include "strategy_config.hpp"
-#include "trade_engine.h"
+#include "trade_engine.hpp"
 
 using namespace trading;
 using namespace common;
 
-using TestTradeEngine =
-    trading::TradeEngine<SelectedStrategy>;
+using TestStrategy = SelectedStrategy;
+using TestTradeEngine = trading::TradeEngine<TestStrategy>;
 
 class StrategyIntegrationTest : public ::testing::Test {
  protected:
   static std::unique_ptr<Logger> logger;
+  static std::unique_ptr<Logger::Producer> producer;
   static void SetUpTestSuite() {
-    logger =std::make_unique<Logger>();
+    logger = std::make_unique<Logger>();
+    producer = std::make_unique<Logger::Producer>(logger->make_producer());
   }
   void SetUp() override { INI_CONFIG.load("resources/config.ini"); }
 };
 std::unique_ptr<Logger> StrategyIntegrationTest::logger;
+std::unique_ptr<Logger::Producer> StrategyIntegrationTest::producer;
 
 TEST_F(StrategyIntegrationTest, TradeEngineConstructsWithSelectedStrategy) {
   TradeEngineCfgHashMap cfg;
@@ -60,12 +64,12 @@ TEST_F(StrategyIntegrationTest, TradeEngineConstructsWithSelectedStrategy) {
         std::make_unique<MemoryPool<OrderMassCancelReport>>(1024);
 
     auto response_manager = std::make_unique<ResponseManager>(
-        logger.get(), execution_report_pool.get(), order_cancel_reject_pool.get(),
+        *producer, execution_report_pool.get(), order_cancel_reject_pool.get(),
         order_mass_cancel_report_pool.get());
 
     EXPECT_NO_THROW({
       auto trade_engine = std::make_unique<TestTradeEngine>(
-          logger.get(), market_update_pool.get(), market_data_pool.get(),
+          *producer, market_update_pool.get(), market_data_pool.get(),
           response_manager.get(), cfg);
       trade_engine->stop();
     });

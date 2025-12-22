@@ -16,7 +16,6 @@
 #include "common/logger.h"
 #include "common/spsc_queue.h"
 #include "core/market_data.h"
-#include "json_md_decoder.hpp"
 #include "sbe_md_decoder.hpp"
 #include "websocket/connection_handler.h"
 #include "ws_md_core.h"
@@ -34,20 +33,25 @@ namespace core {
 #ifdef USE_FUTURES_API
 static_assert(BinanceFuturesTraits::supports_sbe(),
     "SBE is not supported for Binance Futures.");
-using WsMdCoreImpl = WsMdCore<BinanceFuturesTraits, JsonMdDecoder>;
-using WsMdCoreApiImpl = WsMdCore<BinanceFuturesTraits, JsonMdDecoder>;
+using WsMdCoreImpl =
+    WsMdCore<BinanceFuturesTraits, BinanceFuturesTraits::Decoder>;
+using WsMdCoreApiImpl =
+    WsMdCore<BinanceFuturesTraits, BinanceFuturesTraits::Decoder>;
 #else
-using WsMdCoreImpl = WsMdCore<BinanceSpotTraits, SbeMdDecoder>;
-using WsMdCoreApiImpl = WsMdCore<BinanceSpotTraits, JsonMdDecoder>;
+using WsMdCoreImpl =
+    WsMdCore<BinanceSpotTraits, SbeMdDecoder<BinanceSpotTraits>>;
+using WsMdCoreApiImpl = WsMdCore<BinanceSpotTraits, BinanceSpotTraits::Decoder>;
 #endif
 #else
 
 #ifdef USE_FUTURES_API
-using WsMdCoreImpl = WsMdCore<BinanceFuturesTraits, JsonMdDecoder>;
-using WsMdCoreApiImpl = WsMdCore<BinanceFuturesTraits, JsonMdDecoder>;
+using WsMdCoreImpl =
+    WsMdCore<BinanceFuturesTraits, BinanceFuturesTraits::Decoder>;
+using WsMdCoreApiImpl =
+    WsMdCore<BinanceFuturesTraits, BinanceFuturesTraits::Decoder>;
 #else
-using WsMdCoreImpl = WsMdCore<BinanceSpotTraits, JsonMdDecoder>;
-using WsMdCoreApiImpl = WsMdCore<BinanceSpotTraits, JsonMdDecoder>;
+using WsMdCoreImpl = WsMdCore<BinanceSpotTraits, BinanceSpotTraits::Decoder>;
+using WsMdCoreApiImpl = WsMdCore<BinanceSpotTraits, BinanceSpotTraits::Decoder>;
 #endif
 #endif
 
@@ -61,7 +65,7 @@ class WsMarketDataApp {
   using SymbolId = std::string_view;
 
   WsMarketDataApp(const std::string& sender_comp_id,
-      const std::string& target_comp_id, common::Logger* logger,
+      const std::string& target_comp_id, const common::Logger::Producer& logger,
       common::MemoryPool<MarketData>* market_data_pool);
   ~WsMarketDataApp();
 
@@ -72,6 +76,14 @@ class WsMarketDataApp {
   bool send_to_stream(const std::string& msg) const;  //to stream
   void register_callback(const MsgType& type,
       std::function<void(const WireMessage&)> callback);
+
+#ifdef REPOSITORY
+  void register_callback(std::function<void(const std::string&,
+          const WireMessage&, const std::string&)>
+          cb) {
+    raw_data_callback_ = std::move(cb);
+  }
+#endif
 
   static std::string create_log_on_message(const std::string& sig_b64,
       const std::string& timestamp);
@@ -107,7 +119,7 @@ class WsMarketDataApp {
   void handle_stream_payload(std::string_view payload) const;
   void handle_api_payload(std::string_view payload) const;
 
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   WsMdCoreImpl stream_core_;
   WsMdCoreApiImpl api_core_;
   std::unique_ptr<WebSocketTransport<"MDRead">> stream_transport_;
@@ -118,6 +130,12 @@ class WsMarketDataApp {
 
   std::unordered_map<MsgType, std::function<void(const WireMessage&)>>
       callbacks_;
+
+#ifdef REPOSITORY
+  std::function<void(const std::string&, const WireMessage&,
+      const std::string&)>
+      raw_data_callback_;
+#endif
 
   // Message buffering for incomplete fragments (separate buffers per transport)
   std::string read_buffer_;

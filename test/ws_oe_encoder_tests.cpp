@@ -15,6 +15,7 @@
 #include "websocket/order_entry/exchanges/binance/spot/binance_spot_oe_encoder.h"
 #include "order_entry.h"
 #include "logger.h"
+#include "common/precision_config.hpp"
 
 using namespace core;
 using namespace trading;
@@ -39,6 +40,10 @@ bool is_valid_json(std::string_view json) {
 class WsOeEncoderTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
+    // Initialize precision config for tests
+    PRECISION_CONFIG.set_price_precision(2);
+    PRECISION_CONFIG.set_qty_precision(5);
+
     logger_ = std::make_unique<Logger>();
     logger_->setLevel(LogLevel::kDebug);
     logger_->clearSink();

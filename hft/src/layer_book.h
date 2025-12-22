@@ -69,6 +69,10 @@ struct SideBook {
   SideBook() { layer_ticks.fill(kTicksInvalid); }
 };
 
+struct PositionBook {
+  std::array<SideBook, 2> sides;
+};
+
 struct AssignPlan {
   int layer{-1};
   std::optional<int> victim_live_layer;
@@ -79,19 +83,24 @@ class LayerBook {
  public:
   explicit LayerBook(const common::TickerId& ticker) {
     books_.reserve(1);
-    books_.try_emplace(ticker, TwoSide{});
+    books_.try_emplace(ticker, FourWay{});
   }
   LayerBook(LayerBook&&) = delete;
   LayerBook& operator=(LayerBook&&) = delete;
   LayerBook(LayerBook const&) = delete;
   LayerBook& operator=(LayerBook const&) = delete;
 
-  SideBook& side_book(const common::TickerId& ticker, common::Side side) {
+  SideBook& side_book(const common::TickerId& ticker, common::Side side,
+      std::optional<common::PositionSide> position_side = std::nullopt) {
     auto book = books_.find(ticker);
     if (book == books_.end()) {
-      book = books_.try_emplace(ticker, TwoSide{}).first;
+      book = books_.try_emplace(ticker, FourWay{}).first;
     }
-    return book->second[common::sideToIndex(side)];
+
+    const size_t pos_idx =
+        position_side ? common::positionSideToIndex(*position_side) : 0;
+    const size_t side_idx = common::sideToIndex(side);
+    return book->second[pos_idx].sides[side_idx];
   }
 
   static int find_layer_by_ticks(const SideBook& side_book,
@@ -171,33 +180,32 @@ class LayerBook {
     return {.layer = vidx, .victim_live_layer = victim, .tick = tick};
   }
 
-  std::pair<uint64_t, uint64_t> get_last_time(const std::string& symbol) {
+  std::array<uint64_t, 4> get_last_time(const std::string& symbol) {
     auto is_active = [](const auto& slot) {
       return slot.state == OMOrderState::kLive ||
              slot.state == OMOrderState::kReserved;
     };
 
-    auto last_time_for = [&](common::Side side_enum) -> uint64_t {
-      const auto& side = books_[symbol][common::sideToIndex(side_enum)];
-      const auto& slots = side.slots;
+    std::array<uint64_t, 4> result{};
 
-      uint64_t last = 0;
-      for (const auto& slot : slots | std::ranges::views::filter(is_active)) {
-        last = std::max(last, slot.last_used);
+    for (size_t pos_idx = 0; pos_idx < 2; ++pos_idx) {
+      for (size_t side_idx = 0; side_idx < 2; ++side_idx) {
+        const auto& side = books_[symbol][pos_idx].sides[side_idx];
+        uint64_t last = 0;
+        for (const auto& slot :
+            side.slots | std::ranges::views::filter(is_active)) {
+          last = std::max(last, slot.last_used);
+        }
+        result[(pos_idx * 2) + side_idx] = last;
       }
+    }
 
-      return last;
-    };
-
-    const uint64_t buy_last_time = last_time_for(common::Side::kBuy);
-    const uint64_t sell_last_time = last_time_for(common::Side::kSell);
-
-    return {buy_last_time, sell_last_time};
+    return result;
   }
 
  private:
-  using TwoSide = std::array<SideBook, 2>;
-  absl::flat_hash_map<std::string, TwoSide> books_;
+  using FourWay = std::array<PositionBook, 2>;
+  absl::flat_hash_map<std::string, FourWay> books_;
 };
 }  // namespace trading::order
 #endif  //LAYER_BOOK_H

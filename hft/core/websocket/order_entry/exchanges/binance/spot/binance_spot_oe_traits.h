@@ -17,6 +17,8 @@
 #include "binance_spot_oe_dispatcher.h"
 #include "binance_spot_oe_encoder.h"
 #include "binance_spot_oe_mapper.h"
+#include "common/ini_config.hpp"
+#include "core/websocket/order_entry/oe_exchange_traits.h"
 #include "schema/spot/request/cancel_all_orders.h"
 #include "schema/spot/request/cancel_and_reorder.h"
 #include "schema/spot/request/order_cancel.h"
@@ -61,18 +63,25 @@ struct BinanceSpotOeTraits {
   static constexpr std::string_view exchange_name() { return "Binance"; }
   static constexpr std::string_view market_type() { return "Spot"; }
 
-  static constexpr std::string_view get_api_host() {
-    return "ws-api.binance.com";
+  static std::string get_api_host() {
+    return INI_CONFIG.get("exchange", "oe_api_host", "ws-api.binance.com");
   }
 
-  static constexpr std::string_view get_api_endpoint_path() {
-    return "/ws-api/v3?returnRateLimits=false";
+  static std::string get_api_endpoint_path() {
+    return INI_CONFIG.get("exchange",
+        "oe_api_endpoint_path",
+        "/ws-api/v3?returnRateLimits=false");
   }
 
-  static constexpr int kPort = 9443;
-  static constexpr int get_api_port() { return kPort; }
+  static constexpr int kDefaultPort = 9443;
 
-  static constexpr bool use_ssl() { return true; }
+  static int get_api_port() {
+    return INI_CONFIG.get_int("exchange", "oe_port", kDefaultPort);
+  }
+
+  static bool use_ssl() {
+    return INI_CONFIG.get_int("exchange", "oe_use_ssl", 1) != 0;
+  }
 
   static constexpr bool supports_position_side() { return false; }
   static constexpr bool supports_reduce_only() { return false; }
@@ -81,11 +90,14 @@ struct BinanceSpotOeTraits {
   static constexpr bool requires_listen_key() { return false; }
   static constexpr bool requires_stream_transport() { return false; }
   static constexpr bool requires_signature_logon() { return true; }
-  static constexpr int get_keepalive_interval_ms() { return 0; }
+  static int get_keepalive_interval_ms() { return 0; }
 
-  static constexpr std::string_view get_stream_host() { return ""; }
-  static constexpr std::string_view get_stream_endpoint_path() { return ""; }
-  static constexpr int get_stream_port() { return 0; }
+  static std::string get_stream_host() { return ""; }
+  static std::string get_stream_endpoint_path() { return ""; }
+  static int get_stream_port() { return 0; }
 };
+
+static_assert(OeExchangeTraits<BinanceSpotOeTraits>,
+    "BinanceSpotOeTraits must satisfy OeExchangeTraits concept");
 
 #endif  // BINANCE_SPOT_OE_TRAITS_H

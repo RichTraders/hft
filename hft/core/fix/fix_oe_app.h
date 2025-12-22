@@ -37,7 +37,8 @@ class FixOrderEntryApp : public FixApp<FixOrderEntryApp, "OERead", "OEWrite"> {
   using WireReject = FixOeCore::WireReject;
 
   FixOrderEntryApp(const std::string& sender_comp_id,
-      const std::string& target_comp_id, common::Logger* logger,
+      const std::string& target_comp_id,
+      const common::Logger::Producer& logger,
       trading::ResponseManager* response_manager);
   ~FixOrderEntryApp();
   std::string create_log_on_message(const std::string& sig_b64,
@@ -67,7 +68,15 @@ class FixOrderEntryApp : public FixApp<FixOrderEntryApp, "OERead", "OEWrite"> {
   void post_cancel_and_reorder(const trading::OrderCancelAndNewOrderSingle &);
   void post_mass_cancel_order(const trading::OrderMassCancelRequest&);
 
+  [[nodiscard]] bool is_session_ready() const noexcept {
+    return session_ready_.load(std::memory_order_acquire);
+  }
+  void set_session_ready() noexcept {
+    session_ready_.store(true, std::memory_order_release);
+  }
+
  private:
+  std::atomic<bool> session_ready_{false};
   std::unique_ptr<FixOeCore> fix_oe_core_;
 };
 

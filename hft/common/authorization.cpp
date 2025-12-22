@@ -20,7 +20,7 @@ Authorization::Authorization() {
   port_ = INI_CONFIG.get_int("auth", "port");
   md_ws_address_ = INI_CONFIG.get("auth", "md_ws_address", md_address_);
   md_ws_port_ = INI_CONFIG.get_int("auth", "md_ws_port", port_);
-  md_ws_path_ = INI_CONFIG.get("auth", "md_ws_path", "/");
+  md_ws_path_ = INI_CONFIG.get_with_symbol("auth", "md_ws_path", "/");
   md_ws_use_ssl_ = INI_CONFIG.get_int("auth", "md_ws_use_ssl", 1) != 0;
   md_ws_write_address_ =
       INI_CONFIG.get("auth", "md_ws_write_address", md_address_);

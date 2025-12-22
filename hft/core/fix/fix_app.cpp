@@ -26,8 +26,8 @@ template <typename Derived, FixedString ReadThreadName,
           FixedString WriteThreadName>
 FixApp<Derived, ReadThreadName, WriteThreadName>::FixApp(
     const std::string& address, int port, std::string sender_comp_id,
-    std::string target_comp_id, common::Logger* logger)
-    : logger_(logger->make_producer()),
+    std::string target_comp_id, const common::Logger::Producer& logger)
+    : logger_(logger),
       transport_(address, port),
       fix_write_queue_(std::make_unique<common::SPSCQueue<std::string, kQueueSize>>()),
       sender_id_(std::move(sender_comp_id)),

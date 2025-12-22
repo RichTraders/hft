@@ -44,16 +44,18 @@ std::string get_signature_base64(std::string_view timestamp_ms,
 namespace core {
 
 WsOrderEntryApp::WsOrderEntryApp(const std::string& /*sender_comp_id*/,
-    const std::string& /*target_comp_id*/, common::Logger* logger,
+    const std::string& /*target_comp_id*/,
+    const common::Logger::Producer& logger,
     trading::ResponseManager* response_manager)
-    : logger_(logger->make_producer()),
+    : logger_(logger),
       ws_oe_core_(logger_, response_manager),
       ws_order_manager_(logger_),
       dispatch_context_(&logger_, &ws_order_manager_, this),
       host_(std::string(WsOeCoreImpl::ExchangeTraits::get_api_host())),
       path_(std::string(WsOeCoreImpl::ExchangeTraits::get_api_endpoint_path())),
       port_(WsOeCoreImpl::ExchangeTraits::get_api_port()),
-      use_ssl_(WsOeCoreImpl::ExchangeTraits::use_ssl()) {}
+      use_ssl_(WsOeCoreImpl::ExchangeTraits::use_ssl()),
+      stream_transport_(std::make_unique<WebSocketTransport<"OEStream">>()) {}
 
 WsOrderEntryApp::~WsOrderEntryApp() {
   stop();
@@ -133,6 +135,11 @@ std::string WsOrderEntryApp::create_cancel_and_reorder_message(
   return ws_oe_core_.create_cancel_and_reorder_message(cancel_and_re_order);
 }
 
+std::string WsOrderEntryApp::create_modify_order_message(
+    const trading::OrderModifyRequest& modify_request) const {
+  return ws_oe_core_.create_modify_order_message(modify_request);
+}
+
 std::string WsOrderEntryApp::create_order_all_cancel(
     const trading::OrderMassCancelRequest& all_order_cancel) const {
   return ws_oe_core_.create_order_all_cancel(all_order_cancel);
@@ -172,6 +179,7 @@ void WsOrderEntryApp::post_new_order(const trading::NewSingleOrderData& data) {
   request.order_qty = data.order_qty;
   request.ord_type = data.ord_type;
   request.time_in_force = data.time_in_force;
+  request.position_side = data.position_side;
   ws_order_manager_.register_pending_request(request);
 }
 
@@ -180,13 +188,12 @@ void WsOrderEntryApp::post_cancel_order(
   PendingOrderRequest request;
   request.client_order_id = data.cl_order_id.value;
   request.symbol = data.symbol;
-  // Cancel requests have minimal info - only clientOrderId and symbol matter
+  request.position_side = data.position_side;
   ws_order_manager_.register_pending_request(request);
 }
 
 void WsOrderEntryApp::post_cancel_and_reorder(
     const trading::OrderCancelAndNewOrderSingle& data) {
-  // Track the NEW order information (not the cancel part)
   PendingOrderRequest request;
   request.client_order_id = data.cl_new_order_id.value;
   request.symbol = data.symbol;
@@ -195,6 +202,21 @@ void WsOrderEntryApp::post_cancel_and_reorder(
   request.order_qty = data.order_qty;
   request.ord_type = data.ord_type;
   request.time_in_force = data.time_in_force;
+  request.position_side = data.position_side;
+  ws_order_manager_.register_pending_request(request);
+}
+
+void WsOrderEntryApp::post_modify_order(
+    const trading::OrderModifyRequest& data) {
+  PendingOrderRequest request;
+  request.client_order_id = data.orig_client_order_id.value;
+  request.symbol = data.symbol;
+  request.side = trading::to_common_side(data.side);
+  request.price = data.price;
+  request.order_qty = data.order_qty;
+  request.ord_type = trading::OrderType::kLimit;
+  request.time_in_force = trading::TimeInForce::kGoodTillCancel;
+  request.position_side = data.position_side;
   ws_order_manager_.register_pending_request(request);
 }
 
@@ -203,7 +225,6 @@ void WsOrderEntryApp::post_mass_cancel_order(
   PendingOrderRequest request;
   request.client_order_id = data.cl_order_id.value;
   request.symbol = data.symbol;
-  // Mass cancel has minimal info
   ws_order_manager_.register_pending_request(request);
 }
 
@@ -229,7 +250,7 @@ void WsOrderEntryApp::handle_api_payload(std::string_view payload) {
   }
 
   constexpr int kDefaultLogLen = 200;
-  logger_.info("[WsOrderEntryApp]Received payload (size: {}): {}...",
+  logger_.debug("[WsOrderEntryApp]Received payload (size: {}): {}...",
       payload.size(),
       payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size())));
 
@@ -278,7 +299,7 @@ void WsOrderEntryApp::handle_stream_payload(std::string_view payload) {
     }
 
     constexpr int kDefaultLogLen = 200;
-    logger_.info("[WsOrderEntryApp]Received stream payload (size: {}): {}...",
+    logger_.debug("[WsOrderEntryApp]Received stream payload (size: {}): {}...",
         payload.size(),
         payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size())));
 
@@ -332,7 +353,7 @@ void WsOrderEntryApp::keepalive_loop() {
     return;
   }
 
-  constexpr int kKeepaliveIntervalMs =
+  const int keepalive_interval_ms =
       WsOeCoreImpl::ExchangeTraits::get_keepalive_interval_ms();
   constexpr int kSleepIntervalMs = 1000;
 
@@ -342,7 +363,7 @@ void WsOrderEntryApp::keepalive_loop() {
     std::this_thread::sleep_for(std::chrono::milliseconds(kSleepIntervalMs));
     elapsed_ms += kSleepIntervalMs;
 
-    if (elapsed_ms >= kKeepaliveIntervalMs) {
+    if (elapsed_ms >= keepalive_interval_ms) {
       elapsed_ms = 0;
 
       if (!api_transport_) {

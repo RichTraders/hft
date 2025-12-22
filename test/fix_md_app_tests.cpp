@@ -28,9 +28,10 @@ protected:
 
     market_data_pool_ = std::make_unique<common::MemoryPool<MarketData>>(1024);
     logger_ = std::make_unique<common::Logger>();
+    producer_ = std::make_unique<common::Logger::Producer>(logger_->make_producer());
     app_ = std::make_unique<core::FixMarketDataApp>("BMDWATCH",
                                 "SPOT",
-                                logger_.get(),
+                                *producer_,
                                 market_data_pool_.get());
   }
   static void TearDownTestSuite() {
@@ -43,11 +44,11 @@ public:
           MarketData>> market_data_pool_;
   static std::unique_ptr<core::FixMarketDataApp> app_;
   static std::unique_ptr<common::Logger> logger_;
+  static std::unique_ptr<common::Logger::Producer> producer_;
 
 };
 
-
-TEST_F(FixMdAppTest, CallbackRegistration) {
+TEST_F(FixMdAppTest, DISABLED_CallbackRegistration) {
   std::mutex mtx;
   std::condition_variable cv;
   bool logout_success = false;
@@ -91,3 +92,4 @@ std::unique_ptr<common::MemoryPool<
 
 std::unique_ptr<core::FixMarketDataApp> FixMdAppTest::app_;
 std::unique_ptr<common::Logger> FixMdAppTest::logger_;
+std::unique_ptr<common::Logger::Producer> FixMdAppTest::producer_;

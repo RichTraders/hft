@@ -14,11 +14,11 @@
 #include "common/logger.h"
 
 namespace trading {
-ResponseManager::ResponseManager(common::Logger* logger,
+ResponseManager::ResponseManager(const common::Logger::Producer& logger,
     common::MemoryPool<ExecutionReport>* execution_report_pool,
     common::MemoryPool<OrderCancelReject>* order_cancel_reject_pool,
     common::MemoryPool<OrderMassCancelReport>* order_mass_cancel_report_pool)
-    : logger_(logger->make_producer()),
+    : logger_(logger),
       execution_report_pool_(execution_report_pool),
       order_cancel_reject_pool_(order_cancel_reject_pool),
       order_mass_cancel_report_pool_(order_mass_cancel_report_pool) {

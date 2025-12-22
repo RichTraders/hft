@@ -119,7 +119,7 @@ class LogFormatter {
 #else
     out.reserve(msg.text.size());
 #endif
-    std::format_to(std::back_inserter(out), "{}", msg.text);
+    out.append(msg.text);
     return out;
   }
 
@@ -144,7 +144,8 @@ class LogFormatter {
   }
 
   static void format_iso8601_utc(char* out, size_t& len, uint64_t ts_ns) {
-    auto time_p = std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>(std::chrono::nanoseconds(ts_ns));
+    auto time_p = std::chrono::time_point<std::chrono::system_clock,
+        std::chrono::nanoseconds>(std::chrono::nanoseconds(ts_ns));
     const auto sec = std::chrono::time_point_cast<std::chrono::seconds>(time_p);
     const auto nano =
         std::chrono::duration_cast<std::chrono::nanoseconds>(time_p - sec)
@@ -289,7 +290,7 @@ class Logger {
   void process() const;
   void dispatch(const LogMessage& msg) const;
 
-  std::atomic<LogLevel> level_;
+  std::atomic<LogLevel> level_{LogLevel::kInfo};
   std::vector<std::unique_ptr<LogSink>> sinks_;
 
   struct Impl;

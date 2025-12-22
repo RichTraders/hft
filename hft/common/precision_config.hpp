@@ -34,6 +34,16 @@ class PrecisionConfig : public Singleton<PrecisionConfig> {
     return initialized_ ? price_precision_ : 2;
   }
 
+  void set_qty_precision(int precision) {
+    qty_precision_ = precision;
+    initialized_ = true;
+  }
+
+  void set_price_precision(int precision) {
+    price_precision_ = precision;
+    initialized_ = true;
+  }
+
  private:
   int qty_precision_{3};
   int price_precision_{2};

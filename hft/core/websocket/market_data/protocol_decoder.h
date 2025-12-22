@@ -16,7 +16,6 @@
 template <typename T>
 concept ProtocolDecoder = requires(const T& decoder, std::string_view payload) {
   typename T::WireMessage;
-  typename T::ExchangeTraits;
 
   { decoder.decode(payload) } -> std::convertible_to<typename T::WireMessage>;
   { T::requires_api_key() } -> std::same_as<bool>;

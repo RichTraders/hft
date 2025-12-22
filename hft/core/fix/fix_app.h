@@ -33,7 +33,7 @@ template <typename Derived, FixedString ReadThreadName,
 class FixApp {
  public:
   FixApp(const std::string& address, int port, std::string sender_comp_id,
-         std::string target_comp_id, common::Logger* logger);
+         std::string target_comp_id, const common::Logger::Producer& logger);
 
   ~FixApp();
 
@@ -90,7 +90,7 @@ class FixApp {
 
   void process_message(const std::string& raw_msg);
 
-  common::Logger::Producer logger_;
+  const common::Logger::Producer& logger_;
   FixSslTransport transport_;
   std::map<std::string, std::function<void(FIX8::Message*)>> callbacks_;
 

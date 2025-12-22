@@ -14,8 +14,7 @@
 #include <fstream>
 #include <sstream>
 #include <glaze/glaze.hpp>
-#include "websocket/market_data/json_md_decoder.hpp"
-#include "websocket/market_data/exchanges/binance/futures/binance_futures_traits.h"
+#include "websocket/market_data/json_binance_futures_md_decoder.hpp"
 #include "logger.h"
 
 using namespace core;
@@ -24,13 +23,17 @@ using namespace common;
 namespace futures_test_utils {
 
 std::string load_test_data(const std::string& filename) {
-  std::string path = "data/binance_futures/json/request/" + filename;
+  std::string path = "data/binance_futures/json/response/" + filename;
   std::ifstream file(path);
   if (!file.is_open()) {
     return "";
   }
-  return std::string(std::istreambuf_iterator<char>(file),
-                     std::istreambuf_iterator<char>());
+  std::string content{std::istreambuf_iterator<char>(file),
+                      std::istreambuf_iterator<char>()};
+  // glaze minify로 공백/개행 제거
+  std::string minified;
+  glz::minify_json(content, minified);
+  return minified;
 }
 
 bool is_valid_json(std::string_view json) {
@@ -62,7 +65,7 @@ const T& get_or_fail(const VariantT& var, const std::string& context) {
 
 }  // namespace futures_test_utils
 
-using TestFuturesMdDecoder = JsonMdDecoder<BinanceFuturesTraits>;
+using TestFuturesMdDecoder = JsonBinanceFuturesMdDecoder;
 
 class WsFuturesMdDecoderTest : public ::testing::Test {
  protected:
@@ -209,20 +212,7 @@ TEST_F(WsFuturesMdDecoderTest, DecodeDepthUpdate_VerifyPuField) {
 }
 
 TEST_F(WsFuturesMdDecoderTest, DecodeDepthUpdate_InlineData_ParsesCorrectly) {
-  std::string json = R"({
-    "stream":"btcusdt@depth",
-    "data":{
-      "e":"depthUpdate",
-      "E":1234567890000,
-      "T":1234567890000,
-      "s":"BTCUSDT",
-      "U":100,
-      "u":110,
-      "pu":99,
-      "b":[["90000.50","1.5"],["90000.00","2.0"]],
-      "a":[["90001.00","1.0"],["90001.50","0.5"]]
-    }
-  })";
+  std::string json = R"({"stream":"btcusdt@depth","data":{"e":"depthUpdate","E":1234567890000,"T":1234567890000,"s":"BTCUSDT","U":100,"u":110,"pu":99,"b":[["90000.50","1.5"],["90000.00","2.0"]],"a":[["90001.00","1.0"],["90001.50","0.5"]]}})";
 
   auto wire_msg = decoder_->decode(json);
 
@@ -254,4 +244,96 @@ TEST_F(WsFuturesMdDecoderTest, Decode_InvalidJson_ReturnsMonostate) {
   auto wire_msg = decoder_->decode(json);
 
   EXPECT_TRUE(futures_test_utils::holds_type<std::monostate>(wire_msg));
+}
+
+// ============================================================================
+// BookTicker Tests
+// ============================================================================
+
+TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_RealData_ParsesCorrectly) {
+  std::string json = futures_test_utils::load_test_data("book_ticker.json");
+
+  if (json.empty()) {
+    GTEST_SKIP() << "futures book_ticker.json not available";
+  }
+
+  EXPECT_TRUE(futures_test_utils::is_valid_json(json));
+
+  auto wire_msg = decoder_->decode(json);
+
+  ASSERT_TRUE(futures_test_utils::holds_type<schema::futures::BookTickerEvent>(wire_msg))
+      << "Expected BookTickerEvent variant type";
+
+  const auto& book_ticker = futures_test_utils::get_or_fail<schema::futures::BookTickerEvent>(
+      wire_msg, "FuturesDecodeBookTicker_RealData");
+
+  EXPECT_EQ(book_ticker.stream, "btcusdt@bookTicker");
+  EXPECT_EQ(book_ticker.data.event_type, "bookTicker");
+  EXPECT_EQ(book_ticker.data.symbol, "BTCUSDT");
+  EXPECT_EQ(book_ticker.data.update_id, 400900217);
+  EXPECT_EQ(book_ticker.data.event_time, 1568014460893);
+  EXPECT_EQ(book_ticker.data.transaction_time, 1568014460891);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_price, 25.3519);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_qty, 31.21);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_price, 25.3652);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_qty, 40.66);
+}
+
+TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_InlineData_ParsesCorrectly) {
+  std::string json = R"({"stream":"ethusdt@bookTicker","data":{"e":"bookTicker","u":123456789,"E":1700000000000,"T":1700000000001,"s":"ETHUSDT","b":"2000.50","B":"100.5","a":"2001.00","A":"50.25"}})";
+
+  auto wire_msg = decoder_->decode(json);
+
+  ASSERT_TRUE(futures_test_utils::holds_type<schema::futures::BookTickerEvent>(wire_msg));
+
+  const auto& book_ticker = futures_test_utils::get_or_fail<schema::futures::BookTickerEvent>(
+      wire_msg, "DecodeBookTicker_InlineData");
+
+  EXPECT_EQ(book_ticker.stream, "ethusdt@bookTicker");
+  EXPECT_EQ(book_ticker.data.symbol, "ETHUSDT");
+  EXPECT_EQ(book_ticker.data.update_id, 123456789);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_price, 2000.50);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_qty, 100.5);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_price, 2001.00);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_qty, 50.25);
+}
+
+// ============================================================================
+// ExchangeInfoResponse Tests
+// ============================================================================
+
+TEST_F(WsFuturesMdDecoderTest, DecodeExchangeInfo_RealData_ParsesCorrectly) {
+  // Load from response directory
+  std::string path = "data/binance_futures/json/response/exchange_info.json";
+  std::ifstream file(path);
+  if (!file.is_open()) {
+    GTEST_SKIP() << "exchange_info.json not available";
+  }
+
+  std::string json{std::istreambuf_iterator<char>(file),
+                   std::istreambuf_iterator<char>()};
+
+  EXPECT_TRUE(futures_test_utils::is_valid_json(json));
+
+  // Parse directly with glaze since the JSON file contains raw ExchangeInfo data
+  schema::futures::ExchangeInfoHttpResponse exchange_info;
+  auto error = glz::read_json(exchange_info, json);
+  ASSERT_FALSE(error) << "Failed to parse exchange_info.json: "
+                      << glz::format_error(error, json);
+
+  // Verify exchange info data
+  EXPECT_EQ(exchange_info.timezone, "UTC");
+  EXPECT_FALSE(exchange_info.symbols.empty());
+
+  // Verify BTCUSDT exists
+  auto it = std::find_if(exchange_info.symbols.begin(),
+                          exchange_info.symbols.end(),
+                          [](const auto& sym) { return sym.symbol == "BTCUSDT"; });
+  ASSERT_NE(it, exchange_info.symbols.end()) << "BTCUSDT not found in symbols";
+
+  const auto& btc_symbol = *it;
+  EXPECT_EQ(btc_symbol.status, "TRADING");
+  EXPECT_EQ(btc_symbol.base_asset, "BTC");
+  EXPECT_EQ(btc_symbol.quote_asset, "USDT");
+  EXPECT_EQ(btc_symbol.contract_type, "PERPETUAL");
 }

@@ -53,6 +53,11 @@ class BinanceFuturesOeMapper {
     report->text = event.reject_reason;
     report->error_code = 0;
 
+    // Parse position_side from wire response
+    if (!event.position_side.empty()) {
+      report->position_side = common::toPositionSide(event.position_side);
+    }
+
     return report;
   }
 

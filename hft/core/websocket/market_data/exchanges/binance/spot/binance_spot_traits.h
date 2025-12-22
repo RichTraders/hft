@@ -19,6 +19,9 @@
 #include "binance_spot_domain_converter.h"
 #include "binance_spot_encoder.h"
 #include "binance_spot_formatter.h"
+#include "common/ini_config.hpp"
+#include "core/websocket/market_data/exchange_traits.h"
+#include "core/websocket/market_data/json_binance_spot_md_decoder.hpp"
 #include "schema/spot/response/api_response.h"
 #include "schema/spot/response/depth_stream.h"
 #include "schema/spot/response/exchange_info_response.h"
@@ -36,6 +39,7 @@ struct BinanceSpotTraits {
   using Encoder = BinanceSpotEncoder;
   using MdDomainConverter = BinanceSpotMdMessageConverter;
   using DispatchRouter = BinanceDispatchRouter;
+  using Decoder = core::JsonBinanceSpotMdDecoder;
 
   using DepthResponse = schema::DepthResponse;
   using DepthSnapshot = schema::DepthSnapshot;
@@ -56,43 +60,45 @@ struct BinanceSpotTraits {
   static constexpr std::string_view exchange_name() { return "Binance"; }
   static constexpr std::string_view market_type() { return "Spot"; }
 
-  static constexpr std::string_view get_api_host() {
-    return "ws-api.binance.com";
+  static std::string get_api_host() {
+    return INI_CONFIG.get("exchange", "md_api_host", "ws-api.binance.com");
   }
 
-  static constexpr std::string_view get_stream_host() {
-    return "stream.binance.com";
+  static std::string get_stream_host() {
+    return INI_CONFIG.get("exchange", "md_stream_host", "stream.binance.com");
   }
 
-  static constexpr std::string_view get_api_endpoint_path() {
-    return "/ws-api/v3?returnRateLimits=false";
+  static std::string get_api_endpoint_path() {
+    return INI_CONFIG.get("exchange",
+        "md_api_endpoint_path",
+        "/ws-api/v3?returnRateLimits=false");
   }
 
-  static constexpr std::string_view get_stream_endpoint_path() {
-    return "/stream?streams=btcusdt@depth@100ms/btcusdt@trade";
+  static std::string get_stream_endpoint_path() {
+    return INI_CONFIG.get("auth",
+        "md_ws_path",
+        "/stream?streams=btcusdt@depth@100ms/btcusdt@trade");
   }
 
-  static constexpr int kPort = 9443;
+  static constexpr int kDefaultPort = 9443;
 
-  static constexpr int get_api_port() { return kPort; }
-  static constexpr int get_stream_port() { return kPort; }
+  static int get_api_port() {
+    return INI_CONFIG.get_int("exchange", "md_port", kDefaultPort);
+  }
 
-  static constexpr bool use_ssl() { return true; }
+  static int get_stream_port() {
+    return INI_CONFIG.get_int("exchange", "md_port", kDefaultPort);
+  }
+
+  static bool use_ssl() {
+    return INI_CONFIG.get_int("exchange", "md_use_ssl", 1) != 0;
+  }
 
   static constexpr bool supports_json() { return true; }
   static constexpr bool supports_sbe() { return true; }
-
-  static bool is_depth_message(std::string_view payload) {
-    return payload.contains("@depth");
-  }
-
-  static bool is_trade_message(std::string_view payload) {
-    return payload.contains("@trade");
-  }
-
-  static bool is_snapshot_message(std::string_view payload) {
-    return payload.contains("snapshot");
-  }
 };
+
+static_assert(ExchangeTraits<BinanceSpotTraits>,
+    "BinanceSpotTraits must satisfy ExchangeTraits concept");
 
 #endif  //BINANCE_SPOT_TRAITS_H

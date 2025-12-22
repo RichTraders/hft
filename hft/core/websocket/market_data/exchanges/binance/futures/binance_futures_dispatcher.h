@@ -12,6 +12,7 @@
 
 #ifndef BINANCE_FUTURES_DISPATCHER_H
 #define BINANCE_FUTURES_DISPATCHER_H
+#include "schema/futures/response/book_ticker.h"
 #include "schema/futures/response/depth_stream.h"
 //#include "schema/futures/response/exchange_info_response.h"
 #include "schema/futures/response/snapshot.h"
@@ -30,7 +31,9 @@ struct BinanceDispatchRouter {
     // Market data updates → "X"
     else if constexpr (std::is_same_v<MsgType,
                            schema::futures::DepthResponse> ||
-                       std::is_same_v<MsgType, schema::futures::TradeEvent>) {
+                       std::is_same_v<MsgType, schema::futures::TradeEvent> ||
+                       std::is_same_v<MsgType,
+                           schema::futures::BookTickerEvent>) {
       return "X";
     }
     // Exchange info → "y"

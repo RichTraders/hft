@@ -93,7 +93,8 @@ struct PlaceOrderResponse {
   struct glaze {
     using T = PlaceOrderResponse;
     static constexpr auto value = glz::object("id", &T::id, "status",
-        &T::status, "result", &T::result, "rateLimits", &T::rate_limits);
+        &T::status, "result", &T::result, "rateLimits", &T::rate_limits,
+        "error", &T::error);
   };
 };
 }  // namespace futures

@@ -27,6 +27,7 @@ struct ActionNew {
   common::Qty qty;
   common::Side side;
   common::OrderId cl_order_id;
+  std::optional<common::PositionSide> position_side;
 };
 
 struct ActionReplace {
@@ -37,6 +38,7 @@ struct ActionReplace {
   common::OrderId cl_order_id;
   common::OrderId original_cl_order_id;
   common::Qty last_qty;
+  std::optional<common::PositionSide> position_side;
 };
 
 struct ActionCancel {
@@ -44,6 +46,7 @@ struct ActionCancel {
   common::Side side;
   common::OrderId cl_order_id;
   common::OrderId original_cl_order_id;
+  std::optional<common::PositionSide> position_side;
 };
 
 inline std::string toString(const ActionNew& action) {
@@ -52,7 +55,11 @@ inline std::string toString(const ActionNew& action) {
   stream << "ActionNew{" << "layer=" << action.layer << ", "
          << "price=" << action.price.value << ", " << "qty=" << action.qty.value
          << ", " << "side=" << common::toString(action.side) << ", "
-         << "cl_order_id=" << common::toString(action.cl_order_id) << "}";
+         << "cl_order_id=" << common::toString(action.cl_order_id);
+  if (action.position_side) {
+    stream << ", position_side=" << common::toString(*action.position_side);
+  }
+  stream << "}";
   return stream.str();
 }
 
@@ -65,7 +72,11 @@ inline std::string toString(const ActionReplace& action) {
          << "cl_order_id=" << common::toString(action.cl_order_id) << ", "
          << "original_cl_order_id="
          << common::toString(action.original_cl_order_id) << ", "
-         << "last_qty=" << common::toString(action.last_qty) << "}";
+         << "last_qty=" << common::toString(action.last_qty);
+  if (action.position_side) {
+    stream << ", position_side=" << common::toString(*action.position_side);
+  }
+  stream << "}";
   return stream.str();
 }
 
@@ -75,7 +86,11 @@ inline std::string toString(const ActionCancel& action) {
          << "side=" << common::toString(action.side) << ", "
          << "cl_order_id=" << common::toString(action.cl_order_id) << ", "
          << "original_cl_order_id="
-         << common::toString(action.original_cl_order_id) << "}";
+         << common::toString(action.original_cl_order_id);
+  if (action.position_side) {
+    stream << ", position_side=" << common::toString(*action.position_side);
+  }
+  stream << "}";
   return stream.str();
 }
 
@@ -111,29 +126,77 @@ class VenuePolicy {
 
   void filter_by_venue(const std::string& symbol, Actions& actions,
       uint64_t current_time, LayerBook& layer_book) {
-    uint64_t buy_last_used = 0;
-    uint64_t sell_last_used = 0;
-    std::tie(buy_last_used, sell_last_used) = layer_book.get_last_time(symbol);
+    auto last_times = layer_book.get_last_time(symbol);
+    // [LONG_BUY, LONG_SELL, SHORT_BUY, SHORT_SELL]
 
-    auto erase_side = [](auto& vec, common::Side side) {
-      for (size_t i = 0; i < vec.size();) {
-        if (vec[i].side == side) {
-          vec[i] = std::move(vec.back());
-          vec.pop_back();
-        } else {
-          ++i;
+    auto erase_if_too_recent = [&](auto& vec,
+                                   common::Side side,
+                                   std::optional<common::PositionSide>
+                                       pos_side,
+                                   size_t time_idx) {
+      if (current_time - last_times[time_idx] < minimum_time_gap_) {
+        for (size_t i = 0; i < vec.size();) {
+          if (vec[i].side == side && vec[i].position_side == pos_side) {
+            vec[i] = std::move(vec.back());
+            vec.pop_back();
+          } else {
+            ++i;
+          }
         }
       }
     };
-    if (current_time - buy_last_used < minimum_time_gap_) {
-      erase_side(actions.news, common::Side::kBuy);
-      erase_side(actions.repls, common::Side::kBuy);
-    }
 
-    if (current_time - sell_last_used < minimum_time_gap_) {
-      erase_side(actions.news, common::Side::kSell);
-      erase_side(actions.repls, common::Side::kSell);
-    }
+    // 4-way filtering: LONG_BUY, LONG_SELL, SHORT_BUY, SHORT_SELL
+    erase_if_too_recent(actions.news,
+        common::Side::kBuy,
+        common::PositionSide::kLong,
+        0);
+    erase_if_too_recent(actions.news,
+        common::Side::kSell,
+        common::PositionSide::kLong,
+        1);
+    erase_if_too_recent(actions.news,
+        common::Side::kBuy,
+        common::PositionSide::kShort,
+        2);
+    erase_if_too_recent(actions.news,
+        common::Side::kSell,
+        common::PositionSide::kShort,
+        3);
+
+    erase_if_too_recent(actions.repls,
+        common::Side::kBuy,
+        common::PositionSide::kLong,
+        0);
+    erase_if_too_recent(actions.repls,
+        common::Side::kSell,
+        common::PositionSide::kLong,
+        1);
+    erase_if_too_recent(actions.repls,
+        common::Side::kBuy,
+        common::PositionSide::kShort,
+        2);
+    erase_if_too_recent(actions.repls,
+        common::Side::kSell,
+        common::PositionSide::kShort,
+        3);
+
+    erase_if_too_recent(actions.cancels,
+        common::Side::kBuy,
+        common::PositionSide::kLong,
+        0);
+    erase_if_too_recent(actions.cancels,
+        common::Side::kSell,
+        common::PositionSide::kLong,
+        1);
+    erase_if_too_recent(actions.cancels,
+        common::Side::kBuy,
+        common::PositionSide::kShort,
+        2);
+    erase_if_too_recent(actions.cancels,
+        common::Side::kSell,
+        common::PositionSide::kShort,
+        3);
 
     for (auto& action : actions.news) {
       action.qty.value =
@@ -201,6 +264,7 @@ struct TickConverter {
   }
 };
 
+template <typename QuoteIntentType>
 class QuoteReconciler {
  public:
   explicit QuoteReconciler(double tick_size)
@@ -210,8 +274,8 @@ class QuoteReconciler {
             INI_CONFIG.get_uint64_t("orders", "min_replace_tick_delta")),
         tick_converter_(tick_size) {}
 
-  Actions diff(const std::vector<QuoteIntent>& intents, LayerBook& layer_book,
-      common::FastClock& clock) const {
+  Actions diff(const std::vector<QuoteIntentType>& intents,
+      LayerBook& layer_book, common::FastClock& clock) const {
     Actions acts;
     if (intents.empty()) {
       // TODO(SoftPull) Implement soft-pull
@@ -238,17 +302,20 @@ class QuoteReconciler {
     for (int side_index = 0; side_index < 2; ++side_index) {
       const common::Side side =
           (side_index == 0 ? common::Side::kBuy : common::Side::kSell);
-      auto& side_book = layer_book.side_book(ticker_id, side);
 
       std::unordered_set<uint64_t> want_ticks;
       want_ticks.reserve(kSlotsPerSide);
 
-      // bool did_victim_this_side = false;
-      // bool active_intent = false;
-
       for (const auto& intent : intents) {
         if (intent.side != side)
           continue;
+
+        std::optional<common::PositionSide> pos_side;
+        if constexpr (requires { intent.position_side; }) {
+          pos_side = intent.position_side;
+        }
+
+        auto& side_book = layer_book.side_book(ticker_id, side, pos_side);
         const bool active =
             intent.price && intent.price->isValid() && intent.qty.value > 0;
         if (!active)
@@ -269,7 +336,8 @@ class QuoteReconciler {
               .side = side,
               .cl_order_id = common::OrderId{now},
               .original_cl_order_id = vslot.cl_order_id,
-              .last_qty = vslot.qty});
+              .last_qty = vslot.qty,
+              .position_side = pos_side});
           //did_victim_this_side = true;
           continue;
         }
@@ -280,7 +348,8 @@ class QuoteReconciler {
               .price = *intent.price,
               .qty = intent.qty,
               .side = side,
-              .cl_order_id = common::OrderId{now}});
+              .cl_order_id = common::OrderId{now},
+              .position_side = pos_side});
         } else if (slot.state == OMOrderState::kLive) {
           const auto slot_tick = tick_converter_.to_ticks(slot.price.value);
           const auto intent_tick =
@@ -298,7 +367,8 @@ class QuoteReconciler {
                 .side = side,
                 .cl_order_id = common::OrderId{now},
                 .original_cl_order_id = slot.cl_order_id,
-                .last_qty = slot.qty});
+                .last_qty = slot.qty,
+                .position_side = pos_side});
           }
         }
       }

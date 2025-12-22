@@ -45,6 +45,9 @@ void BinanceFuturesOeDispatchRouter::process_message(
     else if constexpr (std::is_same_v<T, typename ExchangeTraits::PlaceOrderResponse>) {
       handle_place_order_response<ExchangeTraits>(arg, context, message);
     }
+    else if constexpr (std::is_same_v<T, typename ExchangeTraits::CancelOrderResponse>) {
+      handle_cancel_order_response<ExchangeTraits>(arg, context, message);
+    }
     else if constexpr (std::is_same_v<T, typename ExchangeTraits::ApiResponse>) {
       handle_api_response<ExchangeTraits>(arg, context, message);
     }
@@ -53,6 +56,9 @@ void BinanceFuturesOeDispatchRouter::process_message(
     }
     else if constexpr (std::is_same_v<T, typename ExchangeTraits::OutboundAccountPositionEnvelope>) {
       handle_account_updated<ExchangeTraits>(arg, context);
+    }
+    else if constexpr (std::is_same_v<T, typename ExchangeTraits::ListenKeyExpiredEvent>) {
+      handle_listen_key_expired<ExchangeTraits>(arg, context);
     }
     else if constexpr (!std::is_same_v<T, std::monostate>) {
       context.logger->warn("[Dispatcher] Unhandled message type");
@@ -70,7 +76,7 @@ void BinanceFuturesOeDispatchRouter::handle_execution_report(
   const auto& event = report.event;
 
   std::string_view dispatch_type = "8";  // Default: execution report
-  if (event.execution_type == "CANCELED" && event.reject_reason != "NONE") {
+  if (event.execution_type == "CANCELED" && event.reject_reason != "0") {
     dispatch_type = "9";  // Cancel reject
   }
 
@@ -309,6 +315,30 @@ void BinanceFuturesOeDispatchRouter::handle_place_order_response(
 }
 
 template <typename ExchangeTraits>
+void BinanceFuturesOeDispatchRouter::handle_cancel_order_response(
+    const typename ExchangeTraits::CancelOrderResponse& response,
+    const core::WsOeDispatchContext<ExchangeTraits>& context,
+    const typename ExchangeTraits::WireMessage&) {
+
+  if (response.status == kHttpOK) {
+    context.logger->debug("[Dispatcher] CancelOrder success: id={}, orderId={}, status={}",
+                        response.id,
+                        response.result.order_id,
+                        response.result.status);
+  } else {
+    context.logger->warn("[Dispatcher] CancelOrder failed: id={}, status={}",
+                        response.id,
+                        response.status);
+  }
+
+  const auto client_order_id_opt =
+      core::WsOrderManager<ExchangeTraits>::extract_client_order_id(response.id);
+  if (client_order_id_opt.has_value()) {
+    context.order_manager->remove_pending_request(client_order_id_opt.value());
+  }
+}
+
+template <typename ExchangeTraits>
 void BinanceFuturesOeDispatchRouter::handle_balance_update(
     const typename ExchangeTraits::BalanceUpdateEnvelope& /*envelope*/,
     const core::WsOeDispatchContext<ExchangeTraits>& /*context*/) {
@@ -326,6 +356,22 @@ void BinanceFuturesOeDispatchRouter::handle_account_updated(
   // std::ostringstream stream;
   // stream << "AccountUpdated : " << envelope.event;
   // context.logger.debug(stream.str());
+}
+
+template <typename ExchangeTraits>
+void BinanceFuturesOeDispatchRouter::handle_listen_key_expired(
+    const typename ExchangeTraits::ListenKeyExpiredEvent& event,
+    const core::WsOeDispatchContext<ExchangeTraits>& context) {
+  context.logger->warn("[Dispatcher] listenKey expired at event_time={}, requesting new listenKey", event.event_time);
+
+  // Request new listenKey - the dispatcher will handle reconnection via handle_user_subscription
+  const std::string user_stream_msg = context.app->create_user_data_stream_subscribe();
+  if (!user_stream_msg.empty()) {
+    context.app->send(user_stream_msg);
+    context.logger->info("[Dispatcher] Sent userDataStream.start to obtain new listenKey");
+  } else {
+    context.logger->error("[Dispatcher] Failed to create userDataStream.start message");
+  }
 }
 
 #endif  //BINANCE_FUTURES_OE_DISPATCHER_TPP

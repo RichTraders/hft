@@ -31,7 +31,8 @@ class FixMarketDataApp : public FixApp<FixMarketDataApp, "MDRead", "MDWrite"> {
   using WireMessage = FixMdCore::WireMessage;
 
   FixMarketDataApp(const std::string& sender_comp_id,
-      const std::string& target_comp_id, common::Logger* logger,
+      const std::string& target_comp_id,
+      const common::Logger::Producer& logger,
       common::MemoryPool<MarketData>* market_data_pool);
 
   ~FixMarketDataApp();

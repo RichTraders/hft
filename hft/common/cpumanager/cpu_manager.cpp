@@ -30,10 +30,11 @@
 #endif
 
 namespace common {
+namespace {
+constexpr int kDecimalBase = 10;
+}
 // NOLINTBEGIN(unused-parameter)
-CpuManager::CpuManager(Logger* logger) {
-  logger_ = logger->make_producer();
-
+CpuManager::CpuManager(const Logger::Producer& logger) : logger_(logger) {
   const int cpu_use_count = INI_CONFIG.get_int("cpu_id", "count");
   use_cpu_group_ =
       static_cast<bool>(INI_CONFIG.get_int("cpu_id", "use_cpu_group"));
@@ -133,7 +134,7 @@ ThreadId CpuManager::get_tid_by_thread_name(const std::string& target_name) {
       auto res = std::from_chars(tid_str.data(),
           tid_str.data() + tid_str.size(),
           val,
-          10);
+          kDecimalBase);
       if (res.ec == std::errc{}) {
         return static_cast<ThreadId>(val);
       }

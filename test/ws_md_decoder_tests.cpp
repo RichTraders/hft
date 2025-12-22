@@ -14,8 +14,7 @@
 #include <fstream>
 #include <sstream>
 #include <glaze/glaze.hpp>
-#include "websocket/market_data/json_md_decoder.hpp"
-#include "websocket/market_data/exchanges/binance/spot/binance_spot_traits.h"
+#include "websocket/market_data/json_binance_spot_md_decoder.hpp"
 #include "logger.h"
 
 using namespace core;
@@ -65,7 +64,7 @@ const T& get_or_fail(const VariantT& var, const std::string& context) {
 
 }  // namespace test_utils
 
-using TestMdDecoder = JsonMdDecoder<BinanceSpotTraits>;
+using TestMdDecoder = JsonBinanceSpotMdDecoder;
 
 class WsMdDecoderTest : public ::testing::Test {
  protected:

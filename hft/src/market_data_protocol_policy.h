@@ -21,10 +21,11 @@
 namespace trading {
 
 struct WebSocketMarketDataPolicy {
-  template <typename App, typename Logger>
+  template <typename App, typename Logger, typename OnInstrumentInfoFn>
   static void handle_login(App& app, typename App::WireMessage /*msg*/,
       StreamState& state, std::deque<MarketUpdateData*>& buffered_events,
-      uint64_t& first_buffered_update_id, Logger& logger) {
+      uint64_t& first_buffered_update_id, Logger& logger,
+      OnInstrumentInfoFn& on_instrument_info_fn) {
     logger.info("[MarketConsumer][Login] Market consumer successful");
 
     const std::string message =
@@ -38,10 +39,27 @@ struct WebSocketMarketDataPolicy {
     buffered_events.clear();
     first_buffered_update_id = 0;
 
-    const std::string instrument_message =
-        app.request_instrument_list_message(INI_CONFIG.get("meta", "ticker"));
-    if (UNLIKELY(!app.send(instrument_message))) {
-      logger.error("[MarketConsumer][Message] failed to send instrument list");
+    if constexpr (App::ExchangeTraits::uses_http_exchange_info()) {
+      std::thread([&app,
+                      &on_instrument_info_fn,
+                      &logger,
+                      symbol = INI_CONFIG.get("meta", "ticker")]() {
+        auto instrument_info = app.fetch_instrument_info_http(symbol);
+        if (instrument_info) {
+          on_instrument_info_fn(*instrument_info);
+        } else {
+          logger.error(
+              "[MarketConsumer][Message] failed to fetch instrument info via "
+              "HTTP");
+        }
+      }).detach();
+    } else {
+      const std::string instrument_message =
+          app.request_instrument_list_message(INI_CONFIG.get("meta", "ticker"));
+      if (UNLIKELY(!app.send(instrument_message))) {
+        logger.error(
+            "[MarketConsumer][Message] failed to send instrument list");
+      }
     }
   }
 
@@ -57,7 +75,7 @@ struct WebSocketMarketDataPolicy {
         market_update_data_pool->allocate(app.create_market_data_message(msg));
 
     if (state == StreamState::kBuffering) {
-      if (data->type == kTrade) {
+      if (data->type != kMarket) {
         for (auto* market_data : data->data)
           market_data_pool->deallocate(market_data);
         market_update_data_pool->deallocate(data);
@@ -86,9 +104,8 @@ struct WebSocketMarketDataPolicy {
       return;
     }
 
-    // Skip gap check for trade events (they don't have sequence numbers)
-    if (data->type != kTrade) {
-      logger.debug("current update index:{}, data start :{}, data end:{}",
+    if (data->type == kMarket) {
+      logger.trace("current update index:{}, data start :{}, data end:{}",
           update_index,
           data->start_idx,
           data->end_idx);
@@ -129,11 +146,12 @@ struct WebSocketMarketDataPolicy {
 };
 
 struct FixMarketDataPolicy {
-  template <typename App, typename Logger>
+  template <typename App, typename Logger, typename OnInstrumentInfoFn>
   static void handle_login(App& app, typename App::WireMessage /*msg*/,
       StreamState& /*state*/,
       std::deque<MarketUpdateData*>& /*buffered_events*/,
-      uint64_t& /*first_buffered_update_id*/, Logger& logger) {
+      uint64_t& /*first_buffered_update_id*/, Logger& logger,
+      OnInstrumentInfoFn& on_instrument_info_fn) {
     logger.info("[MarketConsumer][Login] Market consumer successful");
 
     const std::string message =
@@ -146,10 +164,27 @@ struct FixMarketDataPolicy {
       logger.error("[MarketConsumer][Message] failed to send login");
     }
 
-    const std::string instrument_message =
-        app.request_instrument_list_message(INI_CONFIG.get("meta", "ticker"));
-    if (UNLIKELY(!app.send(instrument_message))) {
-      logger.error("[MarketConsumer][Message] failed to send instrument list");
+    if constexpr (App::ExchangeTraits::uses_http_exchange_info()) {
+      std::thread([&app,
+                      &on_instrument_info_fn,
+                      &logger,
+                      symbol = INI_CONFIG.get("meta", "ticker")]() {
+        auto instrument_info = app.fetch_instrument_info_http(symbol);
+        if (instrument_info) {
+          on_instrument_info_fn(*instrument_info);
+        } else {
+          logger.error(
+              "[MarketConsumer][Message] failed to fetch instrument info via "
+              "HTTP");
+        }
+      }).detach();
+    } else {
+      const std::string instrument_message =
+          app.request_instrument_list_message(INI_CONFIG.get("meta", "ticker"));
+      if (UNLIKELY(!app.send(instrument_message))) {
+        logger.error(
+            "[MarketConsumer][Message] failed to send instrument list");
+      }
     }
   }
 

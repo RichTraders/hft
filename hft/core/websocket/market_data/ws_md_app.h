@@ -16,7 +16,6 @@
 #include "common/logger.h"
 #include "common/spsc_queue.h"
 #include "core/market_data.h"
-#include "json_md_decoder.hpp"
 #include "sbe_md_decoder.hpp"
 #include "websocket/connection_handler.h"
 #include "ws_md_core.h"
@@ -34,20 +33,25 @@ namespace core {
 #ifdef USE_FUTURES_API
 static_assert(BinanceFuturesTraits::supports_sbe(),
     "SBE is not supported for Binance Futures.");
-using WsMdCoreImpl = WsMdCore<BinanceFuturesTraits, JsonMdDecoder>;
-using WsMdCoreApiImpl = WsMdCore<BinanceFuturesTraits, JsonMdDecoder>;
+using WsMdCoreImpl =
+    WsMdCore<BinanceFuturesTraits, BinanceFuturesTraits::Decoder>;
+using WsMdCoreApiImpl =
+    WsMdCore<BinanceFuturesTraits, BinanceFuturesTraits::Decoder>;
 #else
-using WsMdCoreImpl = WsMdCore<BinanceSpotTraits, SbeMdDecoder>;
-using WsMdCoreApiImpl = WsMdCore<BinanceSpotTraits, JsonMdDecoder>;
+using WsMdCoreImpl =
+    WsMdCore<BinanceSpotTraits, SbeMdDecoder<BinanceSpotTraits>>;
+using WsMdCoreApiImpl = WsMdCore<BinanceSpotTraits, BinanceSpotTraits::Decoder>;
 #endif
 #else
 
 #ifdef USE_FUTURES_API
-using WsMdCoreImpl = WsMdCore<BinanceFuturesTraits, JsonMdDecoder>;
-using WsMdCoreApiImpl = WsMdCore<BinanceFuturesTraits, JsonMdDecoder>;
+using WsMdCoreImpl =
+    WsMdCore<BinanceFuturesTraits, BinanceFuturesTraits::Decoder>;
+using WsMdCoreApiImpl =
+    WsMdCore<BinanceFuturesTraits, BinanceFuturesTraits::Decoder>;
 #else
-using WsMdCoreImpl = WsMdCore<BinanceSpotTraits, JsonMdDecoder>;
-using WsMdCoreApiImpl = WsMdCore<BinanceSpotTraits, JsonMdDecoder>;
+using WsMdCoreImpl = WsMdCore<BinanceSpotTraits, BinanceSpotTraits::Decoder>;
+using WsMdCoreApiImpl = WsMdCore<BinanceSpotTraits, BinanceSpotTraits::Decoder>;
 #endif
 #endif
 

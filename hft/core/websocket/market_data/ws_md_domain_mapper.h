@@ -26,7 +26,7 @@ class WsMdDomainMapper {
  public:
   using WireMessage = Decoder::WireMessage;
   using DecodeType = Decoder;
-  using Converter = typename Decoder::ExchangeTraits::MdDomainConverter;
+  using Converter = typename Exchange::MdDomainConverter;
 
   WsMdDomainMapper(const common::Logger::Producer& logger,
       common::MemoryPool<MarketData>* pool)

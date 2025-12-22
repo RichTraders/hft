@@ -157,7 +157,7 @@ struct BinanceFuturesMdMessageConverter {
 
       return MarketUpdateData(static_cast<std::int64_t>(msg.data.update_id),
           static_cast<std::int64_t>(msg.data.update_id),
-          MarketDataType::kMarket,
+          MarketDataType::kBookTicker,
           std::move(entries));
     }
 

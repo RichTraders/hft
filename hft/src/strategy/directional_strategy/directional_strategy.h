@@ -84,12 +84,12 @@ class ObiVwapDirectionalStrategy
     (void)order_book->peek_qty(false, obi_level_, ask_qty_, {});
 
     const auto vwap = this->feature_engine_->get_vwap();
-    const auto spread = this->feature_engine_->get_spread();
 
     const double obi =
         FeatureEngineT::orderbook_imbalance_from_levels(bid_qty_, ask_qty_);
     const auto mid = this->feature_engine_->get_mid_price();
-    const double denom = std::max({spread, minimum_spread_});
+    const double spread = this->feature_engine_->get_spread_fast();
+    double denom = std::max({spread, minimum_spread_});
     const auto delta = (mid - vwap) / denom;
     if (!std::isfinite(spread) || spread <= 0.0) {
       this->logger_.trace("Non-positive spread ({}). Using denom={}",

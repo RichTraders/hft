@@ -20,6 +20,7 @@
 #include "binance_futures_md_connection_handler.h"
 #include "common/ini_config.hpp"
 #include "core/websocket/market_data/exchange_traits.h"
+#include "core/websocket/market_data/json_binance_futures_md_decoder.hpp"
 #include "schema/futures/response/api_response.h"
 #include "schema/futures/response/book_ticker.h"
 #include "schema/futures/response/depth_stream.h"
@@ -35,13 +36,14 @@ struct BinanceFuturesTraits {
   using Encoder = BinanceFuturesEncoder;
   using MdDomainConverter = BinanceFuturesMdMessageConverter;
   using DispatchRouter = BinanceDispatchRouter;
+  using Decoder = core::JsonBinanceFuturesMdDecoder;
 
   using SbeDepthResponse = std::monostate;
   using SbeTradeEvent = std::monostate;
   using SbeDepthSnapshot = std::monostate;
   using SbeBestBidAsk = std::monostate;
   using ExchangeInfoResponse = schema::futures::ExchangeInfoHttpResponse;
-  using ModifyOrderResponse = std::monostate;  // Not used in market data
+  using ModifyOrderResponse = std::monostate;
 
   static constexpr bool uses_http_exchange_info() { return true; }
   static std::string get_exchange_info_url() {
@@ -55,7 +57,7 @@ struct BinanceFuturesTraits {
   using BookTickerEvent = schema::futures::BookTickerEvent;
   using ApiResponse = schema::futures::ApiResponse;
   using DepthSnapshot = schema::futures::DepthSnapshot;
-  using SessionLogOnResponse = std::monostate;  // Not used
+  using SessionLogOnResponse = std::monostate;
 
   using WireMessage = std::variant<std::monostate, DepthResponse, TradeEvent,
       BookTickerEvent, DepthSnapshot, ApiResponse, ExchangeInfoResponse>;
@@ -99,22 +101,6 @@ struct BinanceFuturesTraits {
 
   static constexpr bool supports_json() { return true; }
   static constexpr bool supports_sbe() { return false; }
-
-  static bool is_depth_message(std::string_view payload) {
-    return payload.contains("@depth");
-  }
-
-  static bool is_trade_message(std::string_view payload) {
-    return payload.contains("@aggTrade");
-  }
-
-  static bool is_book_ticker_message(std::string_view payload) {
-    return payload.contains("@bookTicker");
-  }
-
-  static bool is_snapshot_message(std::string_view payload) {
-    return payload.contains("snapshot");
-  }
 };
 
 static_assert(ExchangeTraits<BinanceFuturesTraits>,

@@ -161,6 +161,9 @@ class FeatureEngine {
     return (book_ticker_.bid_price + book_ticker_.ask_price) * kMidPriceFactor;
   }
   [[nodiscard]] auto get_spread() const noexcept { return spread_; }
+  [[nodiscard]] auto get_spread_fast() const noexcept {
+    return book_ticker_.ask_price - book_ticker_.bid_price;
+  }
   [[nodiscard]] auto get_vwap() const noexcept { return vwap_; }
 
   [[nodiscard]] auto get_agg_trade_qty_ratio() const noexcept {

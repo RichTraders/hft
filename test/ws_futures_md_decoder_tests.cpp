@@ -14,8 +14,7 @@
 #include <fstream>
 #include <sstream>
 #include <glaze/glaze.hpp>
-#include "websocket/market_data/json_md_decoder.hpp"
-#include "websocket/market_data/exchanges/binance/futures/binance_futures_traits.h"
+#include "websocket/market_data/json_binance_futures_md_decoder.hpp"
 #include "logger.h"
 
 using namespace core;
@@ -24,13 +23,17 @@ using namespace common;
 namespace futures_test_utils {
 
 std::string load_test_data(const std::string& filename) {
-  std::string path = "data/binance_futures/json/request/" + filename;
+  std::string path = "data/binance_futures/json/response/" + filename;
   std::ifstream file(path);
   if (!file.is_open()) {
     return "";
   }
-  return std::string(std::istreambuf_iterator<char>(file),
-                     std::istreambuf_iterator<char>());
+  std::string content{std::istreambuf_iterator<char>(file),
+                      std::istreambuf_iterator<char>()};
+  // glaze minify로 공백/개행 제거
+  std::string minified;
+  glz::minify_json(content, minified);
+  return minified;
 }
 
 bool is_valid_json(std::string_view json) {
@@ -62,7 +65,7 @@ const T& get_or_fail(const VariantT& var, const std::string& context) {
 
 }  // namespace futures_test_utils
 
-using TestFuturesMdDecoder = JsonMdDecoder<BinanceFuturesTraits>;
+using TestFuturesMdDecoder = JsonBinanceFuturesMdDecoder;
 
 class WsFuturesMdDecoderTest : public ::testing::Test {
  protected:
@@ -209,20 +212,7 @@ TEST_F(WsFuturesMdDecoderTest, DecodeDepthUpdate_VerifyPuField) {
 }
 
 TEST_F(WsFuturesMdDecoderTest, DecodeDepthUpdate_InlineData_ParsesCorrectly) {
-  std::string json = R"({
-    "stream":"btcusdt@depth",
-    "data":{
-      "e":"depthUpdate",
-      "E":1234567890000,
-      "T":1234567890000,
-      "s":"BTCUSDT",
-      "U":100,
-      "u":110,
-      "pu":99,
-      "b":[["90000.50","1.5"],["90000.00","2.0"]],
-      "a":[["90001.00","1.0"],["90001.50","0.5"]]
-    }
-  })";
+  std::string json = R"({"stream":"btcusdt@depth","data":{"e":"depthUpdate","E":1234567890000,"T":1234567890000,"s":"BTCUSDT","U":100,"u":110,"pu":99,"b":[["90000.50","1.5"],["90000.00","2.0"]],"a":[["90001.00","1.0"],["90001.50","0.5"]]}})";
 
   auto wire_msg = decoder_->decode(json);
 
@@ -290,20 +280,7 @@ TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_RealData_ParsesCorrectly) {
 }
 
 TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_InlineData_ParsesCorrectly) {
-  std::string json = R"({
-    "stream":"ethusdt@bookTicker",
-    "data":{
-      "e":"bookTicker",
-      "u":123456789,
-      "E":1700000000000,
-      "T":1700000000001,
-      "s":"ETHUSDT",
-      "b":"2000.50",
-      "B":"100.5",
-      "a":"2001.00",
-      "A":"50.25"
-    }
-  })";
+  std::string json = R"({"stream":"ethusdt@bookTicker","data":{"e":"bookTicker","u":123456789,"E":1700000000000,"T":1700000000001,"s":"ETHUSDT","b":"2000.50","B":"100.5","a":"2001.00","A":"50.25"}})";
 
   auto wire_msg = decoder_->decode(json);
 

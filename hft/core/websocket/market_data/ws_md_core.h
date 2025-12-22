@@ -20,11 +20,11 @@
 #include "ws_md_encoder.hpp"
 
 namespace core {
-template <ExchangeTraits Exchange, template <typename> class DecoderTemplate>
+template <ExchangeTraits Exchange, typename DecoderType>
 class WsMdCore {
  public:
   using ExchangeTraits = Exchange;
-  using Decoder = DecoderTemplate<Exchange>;
+  using Decoder = DecoderType;
   using WireMessage = typename Decoder::WireMessage;
   using RequestId = std::string_view;
   using MarketDepthLevel = std::string_view;

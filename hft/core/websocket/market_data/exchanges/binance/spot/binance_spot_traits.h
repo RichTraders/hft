@@ -21,6 +21,7 @@
 #include "binance_spot_formatter.h"
 #include "common/ini_config.hpp"
 #include "core/websocket/market_data/exchange_traits.h"
+#include "core/websocket/market_data/json_binance_spot_md_decoder.hpp"
 #include "schema/spot/response/api_response.h"
 #include "schema/spot/response/depth_stream.h"
 #include "schema/spot/response/exchange_info_response.h"
@@ -38,6 +39,7 @@ struct BinanceSpotTraits {
   using Encoder = BinanceSpotEncoder;
   using MdDomainConverter = BinanceSpotMdMessageConverter;
   using DispatchRouter = BinanceDispatchRouter;
+  using Decoder = core::JsonBinanceSpotMdDecoder;
 
   using DepthResponse = schema::DepthResponse;
   using DepthSnapshot = schema::DepthSnapshot;
@@ -94,18 +96,6 @@ struct BinanceSpotTraits {
 
   static constexpr bool supports_json() { return true; }
   static constexpr bool supports_sbe() { return true; }
-
-  static bool is_depth_message(std::string_view payload) {
-    return payload.contains("@depth");
-  }
-
-  static bool is_trade_message(std::string_view payload) {
-    return payload.contains("@trade");
-  }
-
-  static bool is_snapshot_message(std::string_view payload) {
-    return payload.contains("snapshot");
-  }
 };
 
 static_assert(ExchangeTraits<BinanceSpotTraits>,

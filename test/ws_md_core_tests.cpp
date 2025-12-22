@@ -17,13 +17,13 @@
 #include "common/memory_pool.hpp"
 #include "core/market_data.h"
 #include "websocket/market_data/ws_md_core.h"
-#include "websocket/market_data/json_md_decoder.hpp"
+#include "websocket/market_data/json_binance_spot_md_decoder.hpp"
 #include "websocket/market_data/exchanges/binance/spot/binance_spot_traits.h"
 
 using namespace core;
 using namespace common;
 
-using TestWsMdCore = WsMdCore<BinanceSpotTraits, JsonMdDecoder>;
+using TestWsMdCore = WsMdCore<BinanceSpotTraits, JsonBinanceSpotMdDecoder>;
 
 class WsMdCoreTest : public ::testing::Test {
  protected:

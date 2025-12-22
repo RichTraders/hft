@@ -20,6 +20,11 @@
 #include <sched.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+
+namespace {
+constexpr int kDecimalBase = 10;
+}
+
 #elif defined(__APPLE__)
 #include <mach/thread_act.h>
 #include <mach/thread_policy.h>
@@ -30,9 +35,7 @@
 #endif
 
 namespace common {
-namespace {
-constexpr int kDecimalBase = 10;
-}
+
 // NOLINTBEGIN(unused-parameter)
 CpuManager::CpuManager(const Logger::Producer& logger) : logger_(logger) {
   const int cpu_use_count = INI_CONFIG.get_int("cpu_id", "count");

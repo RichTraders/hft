@@ -299,7 +299,7 @@ void BinanceFuturesOeDispatchRouter::handle_place_order_response(
     const typename ExchangeTraits::WireMessage& /*message*/) {
 
   if (response.status != kHttpOK && response.error.has_value()) {
-    context.logger->warn("[Dispatcher] PlaceOrder failed: id={}, status={}, error={}",
+    context.logger->debug("[Dispatcher] PlaceOrder failed: id={}, status={}, error={}",
                         response.id,
                         response.status,
                         response.error.value().message);

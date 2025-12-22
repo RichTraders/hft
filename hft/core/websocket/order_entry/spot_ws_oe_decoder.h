@@ -32,7 +32,7 @@ class SpotWsOeDecoder : public WsOeDecoderBase<SpotWsOeDecoder> {
     if (payload.empty()) {
       return WireMessage{};
     }
-    logger_.info("[WsOeCore]payload :{}", payload);
+    logger_.debug("[WsOeCore]payload :{}", payload);
 
     if (payload.contains("executionReport")) {
       return this->decode_or_log<BinanceSpotOeTraits::ExecutionReportResponse,

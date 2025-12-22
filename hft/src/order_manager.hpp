@@ -478,7 +478,7 @@ class OrderManager {
 
         cancel_order(key.symbol, slot.cl_order_id);
 
-        logger_.info(
+        logger_.debug(
             "[TTL] Cancel sent (state={}, layer={}, oid={}, "
             "remaining_ns={})",
             trading::toString(slot.state),

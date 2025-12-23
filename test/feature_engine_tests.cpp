@@ -47,7 +47,7 @@ class FeatureEngineTest : public ::testing::Test {
     cfg.risk_cfg_.max_loss_ = -1000;
 
     ticker_cfg =
-        new TradeEngineCfgHashMap{{INI_CONFIG.get("meta", "ticker"), cfg}};
+        new TradeEngineCfgHashMap{{INI_CONFIG.get("profile", "symbol"), cfg}};
 
     if (!producer) {
       producer = std::make_unique<Logger::Producer>(logger.make_producer());
@@ -78,9 +78,9 @@ std::unique_ptr<Logger::Producer> FeatureEngineTest::producer;
 TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
   auto producer = logger.make_producer();
   TestFeatureEngine engine(producer);
-  std::string symbol = "ETHUSDT";
+  std::string symbol = "BTCUSDT";
   // BBO 세팅
-  TestOrderBook book("ETHUSDT", producer);
+  TestOrderBook book("BTCUSDT", producer);
   book.set_trade_engine(trade_engine);
   {
     const Price p = Price{100'000.};
@@ -118,12 +118,12 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
 TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
   auto producer = logger.make_producer();
   TestFeatureEngine engine(producer);
-  std::string symbol = "ETHUSDT";
+  std::string symbol = "BTCUSDT";
   // BBO 세팅
   TestOrderBook book(symbol, producer);
   book.set_trade_engine(trade_engine);
   {
-    std::string symbol = "ETHUSDT";
+    std::string symbol = "BTCUSDT";
     const Price p = Price{100'000.};
     const Qty q{20.0};
     const MarketData md{MarketUpdateType::kAdd,
@@ -135,7 +135,7 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
     book.on_market_data_updated(&md);
   }
   {
-    std::string symbol = "ETHUSDT";
+    std::string symbol = "BTCUSDT";
     const Price p = Price{200'000.};
     const Qty q{80.0};
     const MarketData md{MarketUpdateType::kAdd,
@@ -147,7 +147,7 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
     book.on_market_data_updated(&md);
   }
 
-  symbol = "ETHUSDT";
+  symbol = "BTCUSDT";
   const MarketData md{MarketUpdateType::kTrade,
       OrderId{kOrderIdInvalid},
       symbol,
@@ -167,7 +167,7 @@ TEST_F(FeatureEngineTest, OnTradeUpdate) {
   auto producer = logger.make_producer();
   TestFeatureEngine engine(producer);
 
-  std::string symbol = "ETHUSDT";
+  std::string symbol = "BTCUSDT";
   // BBO 세팅
   TestOrderBook book(symbol, producer);
   book.set_trade_engine(trade_engine);
@@ -186,7 +186,7 @@ TEST_F(FeatureEngineTest, OnTradeUpdate) {
 
   double sum_pq = 0.0, sum_q = 0.0;
   for (auto& t : ticks) {
-    std::string symbol = "ETHUSDT";
+    std::string symbol = "BTCUSDT";
     MarketData md(common::MarketUpdateType::kTrade,
         common::OrderId{0L},
         symbol,
@@ -205,7 +205,7 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction) {
   auto producer = logger.make_producer();
   TestFeatureEngine engine(producer);
 
-  std::string symbol = "ETHUSDT";
+  std::string symbol = "BTCUSDT";
   TestOrderBook book(symbol, producer);
 
   const size_t W = 64;
@@ -216,7 +216,7 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction) {
   for (size_t i = 0; i < N; ++i) {
     const double px = 100.0 + static_cast<double>(i);
     const double qty = 1.0 + static_cast<double>(i % 5);
-    std::string symbol = "ETHUSDT";
+    std::string symbol = "BTCUSDT";
 
     MarketData md(common::MarketUpdateType::kTrade,
         common::OrderId{0},
@@ -251,7 +251,7 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_MultiWraps) {
   auto producer = logger.make_producer();
   TestFeatureEngine engine(producer);
 
-  std::string symbol = "ETHUSDT";
+  std::string symbol = "BTCUSDT";
   TestOrderBook book(symbol, producer);
 
   const size_t W = 64;
@@ -263,7 +263,7 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_MultiWraps) {
   for (size_t i = 0; i < N; ++i) {
     const double px = 200.0 + 0.25 * static_cast<double>(i);
     const double qty = (i % 7 == 0) ? 10.0 : (1.0 + static_cast<double>(i % 3));
-    std::string symbol = "ETHUSDT";
+    std::string symbol = "BTCUSDT";
 
     MarketData md(common::MarketUpdateType::kTrade,
         common::OrderId{42},

@@ -85,7 +85,7 @@ class JsonBinanceSpotMdDecoder {
 
     const auto& stream = header_val.stream;
 
-    if (stream.ends_with("@depth")) {
+    if (stream.ends_with("@depth@100ms")) {
       return decode_or_log<DepthResponse, "[DepthStream]">(payload);
     }
 

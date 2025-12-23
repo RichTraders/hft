@@ -113,7 +113,7 @@ TEST_F(WsOeFuturesDecoderTest, DecodeCancelOrderResponse_Success_AllFieldsPresen
       test_utils::get_or_fail<BinanceFuturesOeTraits::CancelOrderResponse>(wire_msg,
           "DecodeCancelOrderResponse_Success");
 
-  EXPECT_EQ(response.id, "ordercancel_1766047413582315740");
+  EXPECT_EQ(response.id, "c1766047413582315740");
   EXPECT_EQ(response.status, 200);
 
   // Verify result fields
@@ -143,36 +143,7 @@ TEST_F(WsOeFuturesDecoderTest, DecodeCancelOrderResponse_Success_AllFieldsPresen
 }
 
 TEST_F(WsOeFuturesDecoderTest, DecodeCancelOrderResponse_InlineJson_Success) {
-  std::string json = R"({
-    "id": "ordercancel_1234567890",
-    "status": 200,
-    "result": {
-      "orderId": 12345,
-      "symbol": "BTCUSDT",
-      "status": "CANCELED",
-      "clientOrderId": "1234567890",
-      "price": "50000.00",
-      "avgPrice": "0.00",
-      "origQty": "0.001",
-      "executedQty": "0.0",
-      "cumQty": "0.0",
-      "cumQuote": "0.00",
-      "timeInForce": "GTC",
-      "type": "LIMIT",
-      "reduceOnly": false,
-      "closePosition": false,
-      "side": "BUY",
-      "positionSide": "LONG",
-      "stopPrice": "0.0",
-      "workingType": "CONTRACT_PRICE",
-      "priceProtect": false,
-      "origType": "LIMIT",
-      "priceMatch": "NONE",
-      "selfTradePreventionMode": "NONE",
-      "goodTillDate": 0,
-      "updateTime": 1699564800000
-    }
-  })";
+  std::string json = R"({"id":"c1234567890","status":200,"result":{"orderId":12345,"symbol":"BTCUSDT","status":"CANCELED","clientOrderId":"1234567890","price":"50000.00","avgPrice":"0.00","origQty":"0.001","executedQty":"0.0","cumQty":"0.0","cumQuote":"0.00","timeInForce":"GTC","type":"LIMIT","reduceOnly":false,"closePosition":false,"side":"BUY","positionSide":"LONG","stopPrice":"0.0","workingType":"CONTRACT_PRICE","priceProtect":false,"origType":"LIMIT","priceMatch":"NONE","selfTradePreventionMode":"NONE","goodTillDate":0,"updateTime":1699564800000}})";
 
   auto wire_msg = decoder_->decode(json);
 
@@ -231,7 +202,7 @@ TEST_F(WsOeFuturesDecoderTest, DecodePlaceOrderResponse_FromFile_Success) {
       test_utils::get_or_fail<BinanceFuturesOeTraits::PlaceOrderResponse>(wire_msg,
           "DecodePlaceOrderResponse_FromFile_Success");
 
-  EXPECT_EQ(response.id, "orderplace_1766038741004077931");
+  EXPECT_EQ(response.id, "p1766038741004077931");
   EXPECT_EQ(response.status, 200);
 
   // Verify result fields
@@ -263,36 +234,7 @@ TEST_F(WsOeFuturesDecoderTest, DecodePlaceOrderResponse_FromFile_Success) {
 }
 
 TEST_F(WsOeFuturesDecoderTest, DecodePlaceOrderResponse_InlineJson_Success) {
-  std::string json = R"({
-    "id": "orderplace_1234567890",
-    "status": 200,
-    "result": {
-      "orderId": 12345,
-      "symbol": "BTCUSDT",
-      "status": "NEW",
-      "clientOrderId": "1234567890",
-      "price": "50000.00",
-      "avgPrice": "0.00",
-      "origQty": "0.001",
-      "executedQty": "0.0",
-      "cumQty": "0.0",
-      "cumQuote": "0.00",
-      "timeInForce": "GTC",
-      "type": "LIMIT",
-      "reduceOnly": false,
-      "closePosition": false,
-      "side": "BUY",
-      "positionSide": "LONG",
-      "stopPrice": "0.0",
-      "workingType": "CONTRACT_PRICE",
-      "priceProtect": false,
-      "origType": "LIMIT",
-      "priceMatch": "NONE",
-      "selfTradePreventionMode": "NONE",
-      "goodTillDate": 0,
-      "updateTime": 1699564800000
-    }
-  })";
+  std::string json = R"({"id":"p1234567890","status":200,"result":{"orderId":12345,"symbol":"BTCUSDT","status":"NEW","clientOrderId":"1234567890","price":"50000.00","avgPrice":"0.00","origQty":"0.001","executedQty":"0.0","cumQty":"0.0","cumQuote":"0.00","timeInForce":"GTC","type":"LIMIT","reduceOnly":false,"closePosition":false,"side":"BUY","positionSide":"LONG","stopPrice":"0.0","workingType":"CONTRACT_PRICE","priceProtect":false,"origType":"LIMIT","priceMatch":"NONE","selfTradePreventionMode":"NONE","goodTillDate":0,"updateTime":1699564800000}})";
 
   auto wire_msg = decoder_->decode(json);
 
@@ -314,17 +256,7 @@ TEST_F(WsOeFuturesDecoderTest, DecodePlaceOrderResponse_InlineJson_Success) {
 // ============================================================================
 
 TEST_F(WsOeFuturesDecoderTest, DecodeSessionLogon_Success) {
-  std::string json = R"({
-    "id": "login_1699564800000",
-    "status": 200,
-    "result": {
-      "apiKey": "test_api_key",
-      "authorizedSince": 1699564800000,
-      "connectedSince": 1699564799000,
-      "returnRateLimits": true,
-      "serverTime": 1699564800000
-    }
-  })";
+  std::string json = R"({"id":"l1699564800000","status":200,"result":{"apiKey":"test_api_key","authorizedSince":1699564800000,"connectedSince":1699564799000,"returnRateLimits":true,"serverTime":1699564800000}})";
 
   auto wire_msg = decoder_->decode(json);
 
@@ -335,7 +267,7 @@ TEST_F(WsOeFuturesDecoderTest, DecodeSessionLogon_Success) {
       test_utils::get_or_fail<BinanceFuturesOeTraits::SessionLogonResponse>(wire_msg,
           "DecodeSessionLogon_Success");
 
-  EXPECT_EQ(response.id, "login_1699564800000");
+  EXPECT_EQ(response.id, "l1699564800000");
   EXPECT_EQ(response.status, 200);
 }
 
@@ -402,48 +334,7 @@ TEST_F(WsOeFuturesDecoderTest, DecodeExecutionReport_FromFile_Success) {
 }
 
 TEST_F(WsOeFuturesDecoderTest, DecodeExecutionReport_InlineJson_Success) {
-  std::string json = R"({
-    "e": "ORDER_TRADE_UPDATE",
-    "T": 1699564800000,
-    "E": 1699564800001,
-    "o": {
-      "s": "BTCUSDT",
-      "c": "1234567890",
-      "S": "SELL",
-      "o": "MARKET",
-      "f": "GTC",
-      "q": "0.01",
-      "p": "0",
-      "ap": "45000.0",
-      "sp": "0",
-      "x": "TRADE",
-      "X": "FILLED",
-      "i": 123456789,
-      "l": "0.01",
-      "z": "0.01",
-      "L": "45000.0",
-      "n": "0.00045",
-      "N": "USDT",
-      "T": 1699564800000,
-      "t": 987654321,
-      "b": "0",
-      "a": "0",
-      "m": false,
-      "R": false,
-      "wt": "CONTRACT_PRICE",
-      "ot": "MARKET",
-      "ps": "BOTH",
-      "cp": false,
-      "rp": "10.5",
-      "pP": false,
-      "si": 0,
-      "ss": 0,
-      "V": "NONE",
-      "pm": "NONE",
-      "gtd": 0,
-      "er": "0"
-    }
-  })";
+  std::string json = R"({"e":"ORDER_TRADE_UPDATE","T":1699564800000,"E":1699564800001,"o":{"s":"BTCUSDT","c":"1234567890","S":"SELL","o":"MARKET","f":"GTC","q":"0.01","p":"0","ap":"45000.0","sp":"0","x":"TRADE","X":"FILLED","i":123456789,"l":"0.01","z":"0.01","L":"45000.0","n":"0.00045","N":"USDT","T":1699564800000,"t":987654321,"b":"0","a":"0","m":false,"R":false,"wt":"CONTRACT_PRICE","ot":"MARKET","ps":"BOTH","cp":false,"rp":"10.5","pP":false,"si":0,"ss":0,"V":"NONE","pm":"NONE","gtd":0,"er":"0"}})";
 
   auto wire_msg = decoder_->decode(json);
 
@@ -510,36 +401,7 @@ TEST_F(WsOeFuturesDecoderTest, DecodeAccountUpdate_FromFile_Success) {
 }
 
 TEST_F(WsOeFuturesDecoderTest, DecodeAccountUpdate_InlineJson_Success) {
-  std::string json = R"({
-    "e": "ACCOUNT_UPDATE",
-    "T": 1699564800000,
-    "E": 1699564800001,
-    "a": {
-      "B": [
-        {
-          "a": "USDT",
-          "wb": "1000.50",
-          "cw": "950.25",
-          "bc": "-50.25"
-        }
-      ],
-      "P": [
-        {
-          "s": "BTCUSDT",
-          "pa": "0.01",
-          "ep": "45000.0",
-          "cr": "100.0",
-          "up": "50.0",
-          "mt": "isolated",
-          "iw": "500.0",
-          "ps": "LONG",
-          "ma": "USDT",
-          "bep": "44500.0"
-        }
-      ],
-      "m": "DEPOSIT"
-    }
-  })";
+  std::string json = R"({"e":"ACCOUNT_UPDATE","T":1699564800000,"E":1699564800001,"a":{"B":[{"a":"USDT","wb":"1000.50","cw":"950.25","bc":"-50.25"}],"P":[{"s":"BTCUSDT","pa":"0.01","ep":"45000.0","cr":"100.0","up":"50.0","mt":"isolated","iw":"500.0","ps":"LONG","ma":"USDT","bep":"44500.0"}],"m":"DEPOSIT"}})";
 
   auto wire_msg = decoder_->decode(json);
 

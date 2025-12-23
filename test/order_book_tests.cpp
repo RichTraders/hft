@@ -39,7 +39,7 @@ public:
 
   void SetUp() override {
     // Load BTCUSDT config before creating order book
-    INI_CONFIG.load("resources/config.ini");
+    INI_CONFIG.load("resources/config-BTCUSDT.ini");
 
     TradeEngineCfgHashMap temp;
     RiskCfg risk = {.max_order_size_ = Qty{1000.},

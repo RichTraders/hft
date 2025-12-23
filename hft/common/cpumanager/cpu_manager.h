@@ -10,24 +10,25 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#pragma once
+#ifndef CPU_MANAGER_H
+#define CPU_MANAGER_H
 
-#include <sys/types.h>
 #include "../logger.h"
 
-#if defined(__linux__)
+#if __linux__
 #include <sched.h>
+#include <sys/types.h>
 #endif
 
 namespace common {
 
-#if defined(__linux__)
+#ifdef __linux__
 using ThreadId = pid_t;
 #else
 using ThreadId = int;
 #endif
 
-#if defined(__linux__)
+#if __linux__
 struct sched_attr;
 #endif
 
@@ -76,7 +77,7 @@ class CpuManager {
   static void trim_newline(std::string& str);
 
   ThreadId get_tid_by_thread_name(const std::string& target_name);
-#if defined(__linux__)
+#if __linux__
   static int sched_setattr_syscall(ThreadId tid, const struct sched_attr* attr,
       unsigned int flags);
 #endif
@@ -100,3 +101,5 @@ class CpuManager {
   bool use_cpu_to_tid_ = false;
 };
 }  // namespace common
+
+#endif

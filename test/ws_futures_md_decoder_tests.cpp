@@ -12,10 +12,9 @@
 
 #include <gtest/gtest.h>
 #include <fstream>
-#include <sstream>
 #include <glaze/glaze.hpp>
-#include "websocket/market_data/json_binance_futures_md_decoder.hpp"
 #include "logger.h"
+#include "market_data/json_binance_futures_md_decoder.hpp"
 
 using namespace core;
 using namespace common;
@@ -267,16 +266,16 @@ TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_RealData_ParsesCorrectly) {
   const auto& book_ticker = futures_test_utils::get_or_fail<schema::futures::BookTickerEvent>(
       wire_msg, "FuturesDecodeBookTicker_RealData");
 
-  EXPECT_EQ(book_ticker.stream, "btcusdt@bookTicker");
+  EXPECT_EQ(book_ticker.stream, "xrpusdc@bookTicker");
   EXPECT_EQ(book_ticker.data.event_type, "bookTicker");
-  EXPECT_EQ(book_ticker.data.symbol, "BTCUSDT");
-  EXPECT_EQ(book_ticker.data.update_id, 400900217);
-  EXPECT_EQ(book_ticker.data.event_time, 1568014460893);
-  EXPECT_EQ(book_ticker.data.transaction_time, 1568014460891);
-  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_price, 25.3519);
-  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_qty, 31.21);
-  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_price, 25.3652);
-  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_qty, 40.66);
+  EXPECT_EQ(book_ticker.data.symbol, "XRPUSDC");
+  EXPECT_EQ(book_ticker.data.update_id, 9519725001721);
+  EXPECT_EQ(book_ticker.data.event_time, 1766452642241);
+  EXPECT_EQ(book_ticker.data.transaction_time, 1766452642240);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_price, 1.9022);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_qty, 7.3);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_price, 1.9023);
+  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_qty, 2108.3);
 }
 
 TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_InlineData_ParsesCorrectly) {

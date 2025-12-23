@@ -20,6 +20,7 @@
 
 #include <glaze/glaze.hpp>
 
+#include "oe_id_constants.h"
 #include "schema/futures/request/cancel_order.h"
 #include "schema/futures/request/modify_order.h"
 #include "schema/futures/request/new_order.h"
@@ -50,7 +51,8 @@ class BinanceFuturesOeEncoder {
     }
 
     const std::string request = std::format(
-        R"({{"id":"login_{}","method":"session.logon","params":{{"apiKey":"{}","signature":"{}","timestamp":{}}}}})",
+        R"({{"id":"{}{}","method":"session.logon","params":{{"apiKey":"{}","signature":"{}","timestamp":{}}}}})",
+        oe_id::kLogin,
         ts_value,
         AUTHORIZATION.get_api_key(),
         signature,
@@ -62,9 +64,9 @@ class BinanceFuturesOeEncoder {
   [[nodiscard]] std::string create_log_out_message() const {
     const auto timestamp = util::get_timestamp_epoch();
 
-    const std::string request = std::format(
-        R"({{"id":"logout_{}","method":"session.logout","params":{{}}}})",
-        timestamp);
+    const std::string request =
+        std::format(R"({{"id":"o{}","method":"session.logout","params":{{}}}})",
+            timestamp);
 
     logger_.info("[WsOeCore] session.logout 요청 생성");
     return request;
@@ -78,7 +80,7 @@ class BinanceFuturesOeEncoder {
   [[nodiscard]] std::string create_user_data_stream_subscribe() const {
     const auto timestamp = std::to_string(util::get_timestamp_epoch());
     schema::futures::UserDataStreamStartRequest request;
-    request.id = "subscribe_" + timestamp;
+    request.id = std::string(1, oe_id::kSubscribe) + timestamp;
     request.params.apiKey = AUTHORIZATION.get_api_key();
 
     const auto request_str = glz::write_json(request).value_or("error");
@@ -93,7 +95,7 @@ class BinanceFuturesOeEncoder {
   [[nodiscard]] std::string create_user_data_stream_unsubscribe() const {
     const auto timestamp = std::to_string(util::get_timestamp_epoch());
     schema::futures::UserDataStreamStopRequest request;
-    request.id = "unsubscribe_" + timestamp;
+    request.id = std::string(1, oe_id::kUnsubscribe) + timestamp;
     request.params.apiKey = AUTHORIZATION.get_api_key();
 
     const auto request_str = glz::write_json(request).value_or("error");
@@ -108,7 +110,7 @@ class BinanceFuturesOeEncoder {
   [[nodiscard]] std::string create_user_data_stream_ping() const {
     const auto timestamp = std::to_string(util::get_timestamp_epoch());
     schema::futures::UserDataStreamPingRequest request;
-    request.id = "userDataStreamPing_" + timestamp;
+    request.id = std::string(1, oe_id::kPing) + timestamp;
     request.params.apiKey = AUTHORIZATION.get_api_key();
 
     const auto request_str = glz::write_json(request).value_or("error");
@@ -124,7 +126,8 @@ class BinanceFuturesOeEncoder {
   [[nodiscard]] std::string create_order_message(
       const trading::NewSingleOrderData& order) const {
     schema::futures::OrderPlaceRequest payload;
-    payload.id = "orderplace_" + std::to_string(order.cl_order_id.value);
+    payload.id = std::string(1, oe_id::kOrderPlace) +
+                 std::to_string(order.cl_order_id.value);
 
     payload.params.symbol = order.symbol;
     payload.params.new_client_order_id =
@@ -156,7 +159,8 @@ class BinanceFuturesOeEncoder {
   [[nodiscard]] std::string create_cancel_order_message(
       const trading::OrderCancelRequest& cancel) const {
     schema::futures::OrderCancelRequest payload;
-    payload.id = "ordercancel_" + std::to_string(cancel.cl_order_id.value);
+    payload.id = std::string(1, oe_id::kOrderCancel) +
+                 std::to_string(cancel.cl_order_id.value);
 
     payload.params.symbol = cancel.symbol;
     payload.params.client_order_id =
@@ -172,8 +176,8 @@ class BinanceFuturesOeEncoder {
   [[nodiscard]] std::string create_cancel_and_reorder_message(
       const trading::OrderCancelAndNewOrderSingle& replace) const {
     schema::futures::OrderModifyRequest payload;
-    payload.id =
-        "orderreplace_" + std::to_string(replace.cl_new_order_id.value);
+    payload.id = std::string(1, oe_id::kOrderReplace) +
+                 std::to_string(replace.cl_new_order_id.value);
 
     payload.params.symbol = replace.symbol;
     payload.params.side = toString(replace.side);
@@ -198,8 +202,8 @@ class BinanceFuturesOeEncoder {
   [[nodiscard]] std::string create_modify_order_message(
       const trading::OrderModifyRequest& modify) const {
     schema::futures::OrderModifyRequest payload;
-    payload.id =
-        "ordermodify_" + std::to_string(modify.orig_client_order_id.value);
+    payload.id = std::string(1, oe_id::kOrderModify) +
+                 std::to_string(modify.orig_client_order_id.value);
 
     payload.params.symbol = modify.symbol;
     payload.params.side = toString(modify.side);

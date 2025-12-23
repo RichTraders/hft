@@ -63,7 +63,11 @@ WebSocketTransport<ThreadName>::WebSocketTransport(std::string host, int port,
   info.protocols = protocols.entries.data();
   if (use_ssl_) {
     info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+#ifdef __APPLE__
+    info.client_ssl_ca_filepath = "/opt/homebrew/etc/openssl@3/cert.pem";
+#else
     info.client_ssl_ca_filepath = "/etc/ssl/certs/ca-certificates.crt";
+#endif
   }
 
   info.user = this;
@@ -120,7 +124,11 @@ void WebSocketTransport<ThreadName>::initialize(std::string host, int port,
   info.protocols = protocols.entries.data();
   if (use_ssl_) {
     info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+#ifdef __APPLE__
+    info.client_ssl_ca_filepath = "/opt/homebrew/etc/openssl@3/cert.pem";
+#else
     info.client_ssl_ca_filepath = "/etc/ssl/certs/ca-certificates.crt";
+#endif
   }
 
   info.user = this;

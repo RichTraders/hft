@@ -10,7 +10,13 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#pragma once
+#ifndef HFT_GLOBAL_H
+#define HFT_GLOBAL_H
+
+#include <algorithm>
+#include <cstddef>
+#include <string>
+#include <string_view>
 
 template <std::size_t Size>
 struct FixedString {
@@ -39,7 +45,7 @@ struct FixedString {
 
 template <std::size_t Size>
 inline std::string operator+(const std::string& lhs,
-                             const FixedString<Size>& rhs) {
+    const FixedString<Size>& rhs) {
   std::string out;
   out.reserve(lhs.size() + rhs.size());
   out += lhs;
@@ -49,7 +55,7 @@ inline std::string operator+(const std::string& lhs,
 
 template <std::size_t Size>
 inline std::string operator+(const FixedString<Size>& lhs,
-                             const std::string& rhs) {
+    const std::string& rhs) {
   std::string out;
   out.reserve(lhs.size() + rhs.size());
   out.append(lhs.c_str(), lhs.size());
@@ -73,7 +79,7 @@ inline std::string operator+(const FixedString<Size>& lhs, const char* rhs) {
 
 template <std::size_t First, std::size_t Second>
 inline std::string operator+(const FixedString<First>& lhs,
-                             const FixedString<Second>& rhs) {
+    const FixedString<Second>& rhs) {
   std::string out;
   out.reserve(lhs.size() + rhs.size());
   out.append(lhs.c_str(), lhs.size());
@@ -83,7 +89,9 @@ inline std::string operator+(const FixedString<First>& lhs,
 
 template <std::size_t Size>
 inline std::ostream& operator<<(std::ostream& ost,
-                                const FixedString<Size>& fix_str) {
+    const FixedString<Size>& fix_str) {
   return ost.write(fix_str.c_str(),
-                   static_cast<std::streamsize>(fix_str.size()));
+      static_cast<std::streamsize>(fix_str.size()));
 }
+
+#endif  // HFT_GLOBAL_H

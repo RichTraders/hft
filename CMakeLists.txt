@@ -77,7 +77,7 @@ endfunction()
 add_strategy_target(HFT_maker "trading::ObiVwapDirectionalStrategy" "ObiVwapDirectionalStrategy")
 add_strategy_target(HFT_taker "trading::LiquidTaker" "LiquidTaker")
 # Default target for backward compatibility (uses obi vwap directional strategy)
-add_strategy_target(HFT "trading::ObiVwapDirectionalStrategy" "ObiVwapDirectionalStrategy")
+add_strategy_target(HFTMain "trading::ObiVwapDirectionalStrategy" "ObiVwapDirectionalStrategy")
 
 add_subdirectory(repository)
 if (ENABLE_TESTS)

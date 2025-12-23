@@ -13,8 +13,6 @@
 #ifndef COMMON_LOGGER_H
 #define COMMON_LOGGER_H
 
-#include <format>
-#include <source_location>
 #include "thread.hpp"
 
 namespace common {

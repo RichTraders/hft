@@ -15,9 +15,77 @@
 
 #include <format>
 #include <source_location>
+#include "performance.h"
 #include "thread.hpp"
 
 namespace common {
+#ifdef LOGGER_PERF_TRACE
+
+struct LogPerfSample {
+  uint64_t format_cycles;   // vformat
+  uint64_t enqueue_cycles;  // clock_gettime + enqueue
+  uint64_t total_cycles;    // 전체 hot path
+};
+
+struct LogPerfStats {
+  static constexpr size_t kMaxSamples = 100'000;
+  std::array<LogPerfSample, kMaxSamples> samples;
+  std::atomic<size_t> count{0};
+
+  void record(uint64_t format, uint64_t enqueue, uint64_t total) noexcept {
+    const size_t idx = count.fetch_add(1, std::memory_order_relaxed);
+    if (idx < kMaxSamples) {
+      samples[idx] = {format, enqueue, total};
+    }
+  }
+
+  void dump(const char* filename = "logger_perf.csv") const {
+    const size_t size =
+        std::min(count.load(std::memory_order_relaxed), kMaxSamples);
+    FILE* file = fopen(filename, "w");
+    if (!file)
+      return;
+    fprintf(file, "format_cycles,enqueue_cycles,total_cycles\n");
+    for (size_t i = 0; i < size; ++i) {
+      fprintf(file,
+          "%lu,%lu,%lu\n",
+          samples[i].format_cycles,
+          samples[i].enqueue_cycles,
+          samples[i].total_cycles);
+    }
+    fclose(file);
+    printf("[LogPerfStats] dumped %zu samples to %s\n", size, filename);
+  }
+
+  void summary() const {
+    const size_t size =
+        std::min(count.load(std::memory_order_relaxed), kMaxSamples);
+    if (size == 0)
+      return;
+    uint64_t fmt_sum = 0;
+    uint64_t enq_sum = 0;
+    uint64_t tot_sum = 0;
+    uint64_t fmt_max = 0;
+    uint64_t enq_max = 0;
+    uint64_t tot_max = 0;
+    for (size_t i = 0; i < size; ++i) {
+      fmt_sum += samples[i].format_cycles;
+      enq_sum += samples[i].enqueue_cycles;
+      tot_sum += samples[i].total_cycles;
+      fmt_max = std::max(fmt_max, samples[i].format_cycles);
+      enq_max = std::max(enq_max, samples[i].enqueue_cycles);
+      tot_max = std::max(tot_max, samples[i].total_cycles);
+    }
+    printf("[LogPerfStats] samples=%zu\n", size);
+    printf("  format:  avg=%lu, max=%lu cycles\n", fmt_sum / size, fmt_max);
+    printf("  enqueue: avg=%lu, max=%lu cycles\n", enq_sum / size, enq_max);
+    printf("  total:   avg=%lu, max=%lu cycles\n", tot_sum / size, tot_max);
+  }
+};
+
+inline LogPerfStats g_log_perf_stats;
+
+#endif  // LOGGER_PERF_TRACE
 
 enum class LogLevel : uint8_t {
   kTrace,
@@ -207,10 +275,25 @@ class Logger {
       if (!is_enabled(lvl))
         return;
 
+#ifdef LOGGER_PERF_TRACE
+      const auto time0 = rdtsc();
+#endif
+
       try {
         const std::string formatted =
             std::vformat(fmt, std::make_format_args(args...));
+
+#ifdef LOGGER_PERF_TRACE
+        const auto time1 = rdtsc();
+#endif
+
         log(lvl, formatted);
+
+#ifdef LOGGER_PERF_TRACE
+        const auto time2 = rdtsc();
+        g_log_perf_stats.record(time1 - time0, time2 - time1, time2 - time0);
+#endif
+
       } catch (const std::format_error&) {
         std::cout << "[Critical]Parser error\n";
       } catch (const std::bad_alloc&) {

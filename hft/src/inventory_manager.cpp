@@ -25,10 +25,10 @@ InventoryManager::InventoryManager(const common::Logger::Producer& logger,
       target_position_(
           INI_CONFIG.get_double("inventory", "target_position", 0.0)) {
   logger_.info(
-      std::format("InventoryManager initialized with skew_coefficient={}, "
-                  "target_position={}",
-          model_.get_skew_coefficient(),
-          target_position_));
+      "InventoryManager initialized with skew_coefficient={}, "
+      "target_position={}",
+      model_.get_skew_coefficient(),
+      target_position_);
 }
 
 InventoryManager::~InventoryManager() {
@@ -50,9 +50,9 @@ auto InventoryManager::get_skew_coefficient() const noexcept -> double {
 }
 
 void InventoryManager::set_skew_coefficient(double coefficient) noexcept {
-  logger_.info(std::format("Updating skew_coefficient from {} to {}",
+  logger_.info("Updating skew_coefficient from {} to {}",
       model_.get_skew_coefficient(),
-      coefficient));
+      coefficient);
   model_.set_skew_coefficient(coefficient);
 }
 

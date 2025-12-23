@@ -21,6 +21,7 @@ option(ENABLE_SBE_DECODER "Use SBE decoder for WebSocket market data" OFF)
 option(ENABLE_SBE_DECODER_ORDER_ENTRY "Use SBE decoder for WebSocket order entry" OFF)
 option(USE_FUTURES_API "Use Binance Futures API instead of Spot API" ON)
 option(ENABLE_TESTS "Build and fetch test dependencies" ON)
+option(LOGGER_PERF_TRACE "Enable logger performance tracing with RDTSC" OFF)
 
 if (ENABLE_WEBSOCKET)
     include(${CMAKE_SOURCE_DIR}/cmake/libwebsockets.cmake)
@@ -44,6 +45,11 @@ if (USE_FUTURES_API)
     message(STATUS "Using Binance Futures API")
 else ()
     message(STATUS "Using Binance Spot API (default)")
+endif ()
+
+if (LOGGER_PERF_TRACE)
+    add_compile_definitions(LOGGER_PERF_TRACE)
+    message(STATUS "Logger performance tracing enabled (RDTSC)")
 endif ()
 
 include_directories(

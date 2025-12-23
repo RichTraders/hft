@@ -59,9 +59,9 @@ class JsonBinanceSpotMdDecoder {
 
       if (error_code != glz::error_code::none) {
         auto msg = glz::format_error(error_code, payload);
-        logger_.error(std::format("Failed to [ExchangeInfo] payload:{}. msg:{}",
+        logger_.error("Failed to [ExchangeInfo] payload:{}. msg:{}",
             payload,
-            msg));
+            msg);
         return WireMessage{};
       }
       return WireMessage{std::in_place_type<ExchangeInfoResponse>, exchange};
@@ -77,9 +77,9 @@ class JsonBinanceSpotMdDecoder {
       }
 
       constexpr int kDefaultMinMessageLen = 100;
-      logger_.warn(std::format("Unhandled websocket payload: {}",
+      logger_.warn("Unhandled websocket payload: {}",
           payload.substr(0,
-              std::min<size_t>(payload.size(), kDefaultMinMessageLen))));
+              std::min<size_t>(payload.size(), kDefaultMinMessageLen)));
       return WireMessage{};
     }
 
@@ -99,10 +99,10 @@ class JsonBinanceSpotMdDecoder {
     }
 
     constexpr int kDefaultMinMessageLen = 100;
-    logger_.warn(std::format("Unknown stream type '{}' payload: {}",
+    logger_.warn("Unknown stream type '{}' payload: {}",
         stream,
         payload.substr(0,
-            std::min<size_t>(payload.size(), kDefaultMinMessageLen))));
+            std::min<size_t>(payload.size(), kDefaultMinMessageLen)));
     return WireMessage{};
   }
 

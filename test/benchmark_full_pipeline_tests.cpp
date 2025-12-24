@@ -50,7 +50,9 @@ struct BenchmarkStats {
     uint64_t sum = std::accumulate(sorted.begin(), sorted.end(), 0ULL);
     size_t n = sorted.size();
 
-    printf("%-20s n=%-6zu avg=%-8llu p50=%-8llu p99=%-8llu min=%-8llu max=%-8llu\n",
+    printf(
+        "%-20s n=%-6zu avg=%-8llu p50=%-8llu p99=%-8llu min=%-8llu "
+        "max=%-8llu\n",
         name,
         n,
         static_cast<unsigned long long>(sum / n),
@@ -62,15 +64,13 @@ struct BenchmarkStats {
 };
 
 // MockOrderGateway - encodes orders without network send
-template <typename Strategy>
 class MockOrderGateway {
  public:
   explicit MockOrderGateway(const common::Logger::Producer& logger)
       : logger_(logger), encoder_(logger_) {}
 
-  void init_trade_engine(trading::TradeEngine<Strategy>* trade_engine) {
-    trade_engine_ = trade_engine;
-  }
+  template <typename Engine>
+  void init_trade_engine(Engine* /*trade_engine*/) {}
 
   void order_request(const trading::RequestCommon& request) {
     const auto start = common::rdtsc();
@@ -139,17 +139,24 @@ class MockOrderGateway {
   }
 
   void report() const {
-    size_t total = new_order_count_ + cancel_count_ + replace_count_ + modify_count_;
+    size_t total =
+        new_order_count_ + cancel_count_ + replace_count_ + modify_count_;
     printf("\n=== Order Encoding Stats ===\n");
     printf("Orders: new=%zu, cancel=%zu, replace=%zu, modify=%zu (total=%zu)\n",
-        new_order_count_, cancel_count_, replace_count_, modify_count_, total);
+        new_order_count_,
+        cancel_count_,
+        replace_count_,
+        modify_count_,
+        total);
 
     if (!encode_cycles_.empty()) {
       auto sorted = encode_cycles_;
       std::sort(sorted.begin(), sorted.end());
       size_t n = sorted.size();
       uint64_t sum = std::accumulate(sorted.begin(), sorted.end(), 0ULL);
-      printf("ENCODE               n=%-6zu avg=%-8llu p50=%-8llu p99=%-8llu min=%-8llu max=%-8llu\n",
+      printf(
+          "ENCODE               n=%-6zu avg=%-8llu p50=%-8llu p99=%-8llu "
+          "min=%-8llu max=%-8llu\n",
           n,
           static_cast<unsigned long long>(sum / n),
           static_cast<unsigned long long>(sorted[n / 2]),
@@ -162,7 +169,6 @@ class MockOrderGateway {
  private:
   const common::Logger::Producer& logger_;
   core::BinanceFuturesOeEncoder encoder_;
-  trading::TradeEngine<Strategy>* trade_engine_ = nullptr;
 
   std::string encoded_message_;
   mutable std::vector<uint64_t> encode_cycles_;
@@ -193,7 +199,7 @@ std::vector<std::string> read_all_lines(const std::string& filename) {
 using TestStrategy = SelectedStrategy;
 using TestTradeEngine = trading::TradeEngine<TestStrategy>;
 using TestOrderBook = trading::MarketOrderBook<TestStrategy>;
-using TestMockOrderGateway = MockOrderGateway<TestStrategy>;
+using TestMockOrderGateway = MockOrderGateway;
 
 void benchmark_full_pipeline(const std::vector<std::string>& lines,
     common::Logger* logger) {
@@ -201,20 +207,24 @@ void benchmark_full_pipeline(const std::vector<std::string>& lines,
   using WireMessage = MdCore::WireMessage;
 
   // Setup pools
-  auto market_update_pool = std::make_unique<common::MemoryPool<MarketUpdateData>>(4096);
-  auto market_data_pool = std::make_unique<common::MemoryPool<MarketData>>(65536);
-  auto execution_report_pool = std::make_unique<common::MemoryPool<trading::ExecutionReport>>(1024);
-  auto order_cancel_reject_pool = std::make_unique<common::MemoryPool<trading::OrderCancelReject>>(1024);
-  auto order_mass_cancel_report_pool = std::make_unique<common::MemoryPool<trading::OrderMassCancelReport>>(1024);
+  auto market_update_pool =
+      std::make_unique<common::MemoryPool<MarketUpdateData>>(4096);
+  auto market_data_pool =
+      std::make_unique<common::MemoryPool<MarketData>>(65536);
+  auto execution_report_pool =
+      std::make_unique<common::MemoryPool<trading::ExecutionReport>>(1024);
+  auto order_cancel_reject_pool =
+      std::make_unique<common::MemoryPool<trading::OrderCancelReject>>(1024);
+  auto order_mass_cancel_report_pool =
+      std::make_unique<common::MemoryPool<trading::OrderMassCancelReport>>(
+          1024);
 
   // Setup config
   common::TradeEngineCfgHashMap cfg;
-  common::RiskCfg risk = {
-      .max_order_size_ = common::Qty{1000.},
+  common::RiskCfg risk = {.max_order_size_ = common::Qty{1000.},
       .max_position_ = common::Qty{5000.},
       .max_loss_ = 1000.};
-  common::TradeEngineCfg tempcfg = {
-      .clip_ = common::Qty{100000},
+  common::TradeEngineCfg tempcfg = {.clip_ = common::Qty{100000},
       .threshold_ = 0.001,  // Very low threshold to trigger orders
       .risk_cfg_ = risk};
   cfg.emplace(INI_CONFIG.get("meta", "ticker"), tempcfg);
@@ -223,13 +233,16 @@ void benchmark_full_pipeline(const std::vector<std::string>& lines,
   auto producer = logger->make_producer();
 
   // Setup ResponseManager and TradeEngine
-  auto response_manager = std::make_unique<trading::ResponseManager>(
-      producer, execution_report_pool.get(), order_cancel_reject_pool.get(),
+  auto response_manager = std::make_unique<trading::ResponseManager>(producer,
+      execution_report_pool.get(),
+      order_cancel_reject_pool.get(),
       order_mass_cancel_report_pool.get());
 
-  auto trade_engine = std::make_unique<TestTradeEngine>(
-      producer, market_update_pool.get(), market_data_pool.get(),
-      response_manager.get(), cfg);
+  auto trade_engine = std::make_unique<TestTradeEngine>(producer,
+      market_update_pool.get(),
+      market_data_pool.get(),
+      response_manager.get(),
+      cfg);
 
   // Setup MockOrderGateway and connect to TradeEngine
   auto mock_gateway = std::make_unique<TestMockOrderGateway>(producer);
@@ -266,7 +279,8 @@ void benchmark_full_pipeline(const std::vector<std::string>& lines,
     const auto orderbook_start = common::rdtsc();
     if (msg_type == "X") {
       // Market data update
-      MarketUpdateData update_data = md_core.create_market_data_message(wire_msg);
+      MarketUpdateData update_data =
+          md_core.create_market_data_message(wire_msg);
       for (const auto* md : update_data.data) {
         if (md) {
           order_book.on_market_data_updated(md);
@@ -279,7 +293,8 @@ void benchmark_full_pipeline(const std::vector<std::string>& lines,
       }
     } else if (msg_type == "W") {
       // Snapshot
-      MarketUpdateData update_data = md_core.create_snapshot_data_message(wire_msg);
+      MarketUpdateData update_data =
+          md_core.create_snapshot_data_message(wire_msg);
       for (const auto* md : update_data.data) {
         if (md) {
           order_book.on_market_data_updated(md);
@@ -295,9 +310,14 @@ void benchmark_full_pipeline(const std::vector<std::string>& lines,
   // Stop trade engine before destruction
   trade_engine->stop();
 
-  printf("\n=== Full Pipeline (Decode → OrderBook → Feature → Strategy → Encoder) ===\n");
+  printf(
+      "\n=== Full Pipeline (Decode → OrderBook → Feature → Strategy → Encoder) "
+      "===\n");
   printf("Processed: %zu depth, %zu trade, %zu snapshot (total: %zu lines)\n",
-      depth_count, trade_count, snapshot_count, lines.size());
+      depth_count,
+      trade_count,
+      snapshot_count,
+      lines.size());
   decode_stats.report("DECODE");
   orderbook_stats.report("OB+FE+STRAT");
   e2e_stats.report("E2E");
@@ -306,8 +326,10 @@ void benchmark_full_pipeline(const std::vector<std::string>& lines,
   const auto* bbo = order_book.get_bbo();
   if (bbo) {
     printf("Final BBO: bid=%.4f (%.1f), ask=%.4f (%.1f)\n",
-        bbo->bid_price.value, bbo->bid_qty.value,
-        bbo->ask_price.value, bbo->ask_qty.value);
+        bbo->bid_price.value,
+        bbo->bid_qty.value,
+        bbo->ask_price.value,
+        bbo->ask_qty.value);
   }
 
   // Report order encoding stats from strategy
@@ -323,12 +345,14 @@ void benchmark_full_pipeline(const std::vector<std::string>& lines,
     trading::NewSingleOrderData order_data{
         .cl_order_id = common::OrderId{static_cast<uint64_t>(i + 1)},
         .symbol = INI_CONFIG.get("meta", "ticker"),
-        .side = (i % 2 == 0) ? trading::OrderSide::kBuy : trading::OrderSide::kSell,
+        .side =
+            (i % 2 == 0) ? trading::OrderSide::kBuy : trading::OrderSide::kSell,
         .order_qty = common::Qty{100.0},
         .ord_type = trading::OrderType::kLimit,
         .price = common::Price{1.9230 + (i % 10) * 0.0001},
         .time_in_force = trading::TimeInForce::kGoodTillCancel,
-        .self_trade_prevention_mode = trading::SelfTradePreventionMode::kExpireTaker,
+        .self_trade_prevention_mode =
+            trading::SelfTradePreventionMode::kExpireTaker,
         .position_side = common::PositionSide::kLong};
 
     const auto start = common::rdtsc();

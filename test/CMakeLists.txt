@@ -10,8 +10,6 @@ set(TEST_RUNTIME_DIR "${CMAKE_BINARY_DIR}/test")
 
 file(MAKE_DIRECTORY "${TEST_RUNTIME_DIR}")
 
-option(ENABLE_ASAN "Build with AddressSanitizer" OFF)
-
 macro(add_unit_test _TEST_NAME)
     if (NOT TEST_STRATEGY_INCLUDE_DIR)
         message(FATAL_ERROR "TEST_STRATEGY_INCLUDE_DIR is not defined. Enable tests via top-level option.")
@@ -64,16 +62,14 @@ macro(add_unit_test _TEST_NAME)
             -Wno-error=unused-function
             -Wno-error=return-type-c-linkage)
 
+    # ASan flags are now set globally in root CMakeLists.txt
     if (ENABLE_ASAN)
-        message(STATUS "Building with AddressSanitizer")
-        target_compile_options(${TARGET_NAME} PRIVATE -fsanitize=address -fno-omit-frame-pointer -g)
         # GCC uses -Wno-maybe-uninitialized, Clang uses -Wno-uninitialized
         if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
             target_compile_options(${TARGET_NAME} PRIVATE -Wno-error=maybe-uninitialized -Wno-maybe-uninitialized)
         elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             target_compile_options(${TARGET_NAME} PRIVATE -Wno-error=uninitialized -Wno-uninitialized)
         endif()
-        target_link_options(${TARGET_NAME} PRIVATE -fsanitize=address)
     endif ()
 
     #list(APPEND TEST_TARGETS ${TARGET_NAME})
@@ -86,7 +82,10 @@ endmacro()
 
 add_definitions(-DGOOGLEMOCK_INCLUDE_GMOCK_INTERNAL_GMOCK_GENERATED_FUNCTION_MOCKER_H_)
 
-# Auto-discover unit tests (exclude integration tests)
+# Include mock utilities directory
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/mock)
+
+# Auto-discover unit tests (exclude integration tests and pipeline tests)
 file(GLOB TEST_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/*_tests.cpp")
 list(FILTER TEST_SOURCES EXCLUDE REGEX ".*cpu_cgroup_integration_tests\\.cpp$")

@@ -22,6 +22,13 @@ option(ENABLE_SBE_DECODER_ORDER_ENTRY "Use SBE decoder for WebSocket order entry
 option(USE_FUTURES_API "Use Binance Futures API instead of Spot API" ON)
 option(ENABLE_TESTS "Build and fetch test dependencies" ON)
 option(LOGGER_PERF_TRACE "Enable logger performance tracing with RDTSC" OFF)
+option(ENABLE_ASAN "Build with AddressSanitizer" OFF)
+
+if (ENABLE_ASAN)
+    message(STATUS "Building with AddressSanitizer (global)")
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=address)
+endif ()
 
 if (ENABLE_WEBSOCKET)
     include(${CMAKE_SOURCE_DIR}/cmake/libwebsockets.cmake)

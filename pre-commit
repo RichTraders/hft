@@ -16,7 +16,7 @@ if ! command -v "$CLANG_TIDY" > /dev/null; then
   exit 1
 fi
 
-EXTENSIONS="h cpp cc cxx c hpp"
+EXTENSIONS="cpp cc cxx c"
 FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -Ev "test|NewOroFix44MD_|NewOroFix44OE_|fix_[?:app|md_app|oe_app]|fix_*_[core]|schema|pch\.h" | grep -E "\.(${EXTENSIONS// /|})$")
 
 if [ -z "$FILES" ]; then
@@ -43,7 +43,7 @@ if [ ! -e "${BUILD_DIR}/compile_commands.json" ]; then
     -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3
     cmake --build ${BUILD_DIR} --target websockets || exit 1
   elif [[ "${OS_NAME}" == "Linux" ]]; then
-    cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DENABLE_WEBSOCKET=ON ; cmake --build build --target websockets || exit 1
+    cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DENABLE_WEBSOCKET=ON -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON ; cmake --build ${BUILD_DIR} --target websockets || exit 1
   fi
 
 fi

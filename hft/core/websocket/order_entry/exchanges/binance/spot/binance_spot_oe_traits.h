@@ -14,7 +14,7 @@
 #define BINANCE_SPOT_OE_TRAITS_H
 
 #include "binance_spot_oe_connection_handler.h"
-#include "binance_spot_oe_dispatcher.h"
+#include "binance_spot_oe_dispatcher.hpp"
 #include "binance_spot_oe_encoder.h"
 #include "binance_spot_oe_mapper.h"
 #include "common/ini_config.hpp"

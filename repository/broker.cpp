@@ -126,7 +126,7 @@ void Broker::on_snapshot(const WireMessage& msg) {
     const std::string snapshot_req =
         app_->create_snapshot_request_message(INI_CONFIG.get("meta", "ticker"),
             INI_CONFIG.get("meta", "level"));
-    app_->send(snapshot_req);
+    std::ignore = app_->send(snapshot_req);
 #endif
     return;
   }
@@ -151,7 +151,7 @@ void Broker::on_snapshot(const WireMessage& msg) {
       const std::string snapshot_req = app_->create_snapshot_request_message(
           INI_CONFIG.get("meta", "ticker"),
           INI_CONFIG.get("meta", "level"));
-      app_->send(snapshot_req);
+      std::ignore = app_->send(snapshot_req);
       return;
     }
 
@@ -329,7 +329,7 @@ void Broker::on_market_request_reject(
 
 void Broker::on_heartbeat(const WireMessage& msg) const {
   auto message = app_->create_heartbeat_message(msg);
-  app_->send(message);
+  std::ignore = app_->send(message);
 }
 
 void Broker::recover_from_gap() {

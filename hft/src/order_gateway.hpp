@@ -18,14 +18,11 @@
 #include "protocol_impl.h"
 
 namespace trading {
-template <typename Strategy>
-class TradeEngine;
 class ResponseManager;
 
-template <typename Strategy>
+template <typename OeApp = protocol_impl::OrderEntryApp>
 class OrderGateway {
  public:
-  using OeApp = protocol_impl::OrderEntryApp;
   using AppType = OeApp;
   using MessagePolicy = typename MessagePolicySelector<OeApp>::type;
   using WireMessage = typename OeApp::WireMessage;
@@ -65,8 +62,11 @@ class OrderGateway {
 
   ~OrderGateway() { std::cout << "[Destructor] OrderGateway Destroy\n"; }
 
-  void init_trade_engine(TradeEngine<Strategy>* trade_engine) {
-    trade_engine_ = trade_engine;
+  template <typename Engine>
+  void init_trade_engine(Engine* trade_engine) {
+    enqueue_response_fn_ = [trade_engine](const ResponseCommon& res) {
+      return trade_engine->enqueue_response(res);
+    };
   }
 
   void stop() const { app_->stop(); }
@@ -85,7 +85,7 @@ class OrderGateway {
     res.res_type = ResponseType::kExecutionReport;
     res.execution_report = app_->create_execution_report_message(msg);
 
-    if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
+    if (UNLIKELY(!enqueue_response_fn_(res))) {
       logger_.error("[OrderGateway][Message] failed to send execution_report");
     }
   }
@@ -95,7 +95,7 @@ class OrderGateway {
     res.res_type = ResponseType::kOrderCancelReject;
     res.order_cancel_reject = app_->create_order_cancel_reject_message(msg);
 
-    if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
+    if (UNLIKELY(!enqueue_response_fn_(res))) {
       logger_.error(
           "[OrderGateway][Message] failed to send order_cancel_reject");
     }
@@ -107,7 +107,7 @@ class OrderGateway {
     res.order_mass_cancel_report =
         app_->create_order_mass_cancel_report_message(msg);
 
-    if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
+    if (UNLIKELY(!enqueue_response_fn_(res))) {
       logger_.error("[OrderGateway][Message] failed to send order_mass_cancel");
     }
   }
@@ -139,6 +139,9 @@ class OrderGateway {
       logger_.error("[OrderGateway][Message] failed to send heartbeat");
     }
   }
+
+  OeApp& app() { return *app_; }
+  const OeApp& app() const { return *app_; }
 
   void order_request(const RequestCommon& request) {
     switch (request.req_type) {
@@ -277,13 +280,13 @@ class OrderGateway {
   template <typename TargetType, typename Handler>
   void register_typed_callback(const std::string& type, Handler&& handler) {
     app_->register_callback(type,
-        [func = std::forward<Handler>(handler)](
-            auto&& msg) { func(MessagePolicy::extract<TargetType>(msg)); });
+        [func = std::forward<Handler>(handler)](auto&& msg) {
+          func(MessagePolicy::template extract<TargetType>(msg));
+        });
   }
 
   const common::Logger::Producer& logger_;
-  TradeEngine<Strategy>* trade_engine_;
-
+  std::function<bool(const ResponseCommon&)> enqueue_response_fn_;
   std::unique_ptr<OeApp> app_;
 };
 

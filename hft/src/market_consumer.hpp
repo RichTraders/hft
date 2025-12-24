@@ -29,13 +29,12 @@ class TradeEngine;
 template <typename Derived>
 class MarketConsumerRecoveryMixin;
 
-template <typename Strategy>
+template <typename Strategy, typename MdApp = protocol_impl::MarketDataApp>
 class MarketConsumer
-    : public MarketConsumerRecoveryMixin<MarketConsumer<Strategy>> {
+    : public MarketConsumerRecoveryMixin<MarketConsumer<Strategy, MdApp>> {
   friend class MarketConsumerRecoveryMixin<MarketConsumer>;
 
  public:
-  using MdApp = protocol_impl::MarketDataApp;
   using AppType = MdApp;
   using ProtocolPolicy = typename MarketDataProtocolPolicySelector<MdApp>::type;
   using WireMessage = MdApp::WireMessage;
@@ -86,7 +85,18 @@ class MarketConsumer
     }
   }
 
-  ~MarketConsumer() { std::cout << "[Destructor] MarketConsumer Destroy\n"; }
+  ~MarketConsumer() {
+#ifdef ENABLE_WEBSOCKET
+    for (auto* buffered : buffered_events_) {
+      for (auto* market_data : buffered->data) {
+        market_data_pool_->deallocate(market_data);
+      }
+      market_update_data_pool_->deallocate(buffered);
+    }
+    buffered_events_.clear();
+#endif
+    std::cout << "[Destructor] MarketConsumer Destroy\n";
+  }
 
   void stop() { app_->stop(); }
 
@@ -147,7 +157,7 @@ class MarketConsumer
       const std::string snapshot_req = app_->create_snapshot_request_message(
           INI_CONFIG.get("meta", "ticker"),
           INI_CONFIG.get("meta", "level"));
-      app_->send(snapshot_req);
+      std::ignore = app_->send(snapshot_req);
 #endif
       return;
     }
@@ -181,7 +191,7 @@ class MarketConsumer
         const std::string snapshot_req = app_->create_snapshot_request_message(
             INI_CONFIG.get("meta", "ticker"),
             INI_CONFIG.get("meta", "level"));
-        app_->send(snapshot_req);
+        std::ignore = app_->send(snapshot_req);
         return;
       }
 
@@ -330,6 +340,9 @@ class MarketConsumer
     this->erase_buffer_lower_than_snapshot_impl(snapshot_update_id);
   }
   void resubscribe() { this->resubscribe_impl(); }
+
+  MdApp& app() { return *app_; }
+  const MdApp& app() const { return *app_; }
 
  private:
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;

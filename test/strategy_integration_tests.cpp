@@ -12,7 +12,7 @@
 
 #include "gtest/gtest.h"
 #ifdef ENABLE_WEBSOCKET
-#include "core/websocket/order_entry/ws_oe_app.h"
+#include "core/websocket/order_entry/ws_oe_app.hpp"
 #include "core/websocket/order_entry/exchanges/binance/futures/binance_futures_oe_traits.h"
 #else
 #include "core/fix/fix_oe_app.h"

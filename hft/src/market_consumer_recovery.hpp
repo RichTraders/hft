@@ -40,7 +40,7 @@ class MarketConsumerRecoveryMixin {
     const std::string snapshot_req = self.app_->create_snapshot_request_message(
         INI_CONFIG.get("meta", "ticker"),
         INI_CONFIG.get("meta", "level"));
-    self.app_->send(snapshot_req);
+    std::ignore = self.app_->send(snapshot_req);
 
     self.logger_.info("Gap detected, resubscribing");
   }

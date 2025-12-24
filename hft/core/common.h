@@ -12,6 +12,10 @@
 
 #ifndef COMMON_H
 #define COMMON_H
+
+#include <cstdint>
+#include <ctime>
+
 namespace util {
 constexpr int kMilliseconds = 1000;
 constexpr int kNanoseconds = 1'000'000;

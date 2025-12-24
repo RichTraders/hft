@@ -13,6 +13,8 @@
 #ifndef SPOT_WS_OE_DECODER_H
 #define SPOT_WS_OE_DECODER_H
 
+#include <string_view>
+
 #include <glaze/glaze.hpp>
 #include "exchanges/binance/spot/binance_spot_oe_traits.h"
 #include "schema/spot/response/account_position.h"

@@ -12,6 +12,11 @@
 #ifndef ORDER_GATEWAY_HPP
 #define ORDER_GATEWAY_HPP
 
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <string>
+
 #include "logger.h"
 #include "message_adapter_policy.h"
 #include "order_entry.h"

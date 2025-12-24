@@ -13,6 +13,8 @@
 #ifndef RESERVED_POSITION_TRACKER_H
 #define RESERVED_POSITION_TRACKER_H
 
+#include <cmath>
+
 #include "types.h"
 
 namespace trading {

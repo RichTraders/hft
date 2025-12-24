@@ -1,18 +1,20 @@
 /*
  * MIT License
- * 
+ *
  * Copyright (c) 2025 NewOro Corporation
- * 
- * Permission is hereby granted, free of charge, to use, copy, modify, and distribute 
- * this software for any purpose with or without fee, provided that the above 
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
  * copyright notice appears in all copies.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "risk_manager.h"
+#include <string>
+
 #include "ini_config.hpp"
 #include "logger.h"
+#include "risk_manager.h"
 
 namespace trading {
 RiskCheckResult RiskInfo::checkPreTradeRisk(const common::Side side,

@@ -13,6 +13,9 @@
 #ifndef FEATURE_ENGINE_HPP
 #define FEATURE_ENGINE_HPP
 
+#include <cmath>
+#include <vector>
+
 #include "common/logger.h"
 #include "common/types.h"
 #include "core/market_data.h"

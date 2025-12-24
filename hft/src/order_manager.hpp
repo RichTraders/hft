@@ -12,7 +12,11 @@
 
 #ifndef ORDER_MANAGER_HPP
 #define ORDER_MANAGER_HPP
-#include "risk_manager.h"
+
+#include <format>
+#include <optional>
+#include <string>
+#include <vector>
 
 #include "fast_clock.h"
 #include "ini_config.hpp"
@@ -27,6 +31,7 @@
 #include "performance.h"
 #include "quote_reconciler.h"
 #include "reserved_position_tracker.h"
+#include "risk_manager.h"
 
 namespace trading {
 template <typename Strategy>

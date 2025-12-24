@@ -13,7 +13,12 @@
 #ifndef TRADE_ENGINE_HPP
 #define TRADE_ENGINE_HPP
 
+#include <atomic>
 #include <functional>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <string>
 
 #include "common/logger.h"
 #include "common/memory_pool.hpp"

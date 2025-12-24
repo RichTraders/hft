@@ -12,9 +12,16 @@
 
 #ifndef ORDER_ENTRY_H
 #define ORDER_ENTRY_H
-#include <common/types.h>
 
-#include "common/precision_config.hpp"
+#include <cstdint>
+#include <iomanip>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <string_view>
+
+#include <common/precision_config.hpp>
+#include <common/types.h>
 
 namespace trading {
 

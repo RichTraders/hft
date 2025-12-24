@@ -10,8 +10,11 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "order_state_manager.h"
+#include <cstdint>
+#include <optional>
+
 #include "order_entry.h"
+#include "order_state_manager.h"
 
 namespace trading {
 

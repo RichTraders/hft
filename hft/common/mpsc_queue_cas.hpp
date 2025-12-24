@@ -12,6 +12,20 @@
 
 #pragma once
 
+#include <array>
+#include <atomic>
+#include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <thread>
+#include <type_traits>
+
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || \
+    defined(_M_IX86)
+#include <emmintrin.h>
+#endif
+
 namespace common {
 
 constexpr int kDefaultChunkSize = 512;

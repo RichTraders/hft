@@ -13,6 +13,14 @@
 #ifndef BINANCE_SPOT_DOMAIN_CONVERTER_H
 #define BINANCE_SPOT_DOMAIN_CONVERTER_H
 
+#include <cstdlib>
+#include <optional>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
+
 #include <common/logger.h>
 #include <common/memory_pool.hpp>
 #include "market_data.h"

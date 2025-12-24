@@ -13,6 +13,12 @@
 #ifndef FUTURES_EXCHANGE_INFO_FETCHER_H
 #define FUTURES_EXCHANGE_INFO_FETCHER_H
 
+#include <cstdlib>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+
 #include <glaze/glaze.hpp>
 
 #include "../../../../../http/http_client.h"

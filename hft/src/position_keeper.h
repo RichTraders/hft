@@ -13,6 +13,9 @@
 #ifndef POSITION_KEEPER_H
 #define POSITION_KEEPER_H
 
+#include <array>
+#include <string>
+
 #include "absl/container/flat_hash_map.h"
 #include "common/ini_config.hpp"
 #include "common/logger.h"

@@ -13,6 +13,10 @@
 #ifndef BINANCE_FUTURES_TRAITS_H
 #define BINANCE_FUTURES_TRAITS_H
 
+#include <string>
+#include <string_view>
+#include <variant>
+
 #include "binance_future_domain_converter.hpp"
 #include "binance_futures_dispatcher.h"
 #include "binance_futures_encoder.hpp"

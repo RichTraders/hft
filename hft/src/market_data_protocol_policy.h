@@ -13,6 +13,11 @@
 #ifndef MARKET_DATA_PROTOCOL_POLICY_H
 #define MARKET_DATA_PROTOCOL_POLICY_H
 
+#include <cstddef>
+#include <deque>
+#include <string>
+#include <thread>
+
 #include "depth_validator.h"
 #include "ini_config.hpp"
 #include "market_data.h"

@@ -13,6 +13,11 @@
 #ifndef MARKET_CONSUMER_RECOVERY_HPP
 #define MARKET_CONSUMER_RECOVERY_HPP
 
+#include <atomic>
+#include <chrono>
+#include <string>
+#include <thread>
+
 #include "common/ini_config.hpp"
 #include "stream_state.h"
 

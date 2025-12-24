@@ -13,6 +13,9 @@
 #ifndef WS_MD_MAPPER_H
 #define WS_MD_MAPPER_H
 
+#include <type_traits>
+#include <variant>
+
 #include "common/logger.h"
 #include "common/memory_pool.hpp"
 #include "core/market_data.h"

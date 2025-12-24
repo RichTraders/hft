@@ -13,6 +13,10 @@
 #ifndef BINANCE_FUTURES_FORMATTER_H
 #define BINANCE_FUTURES_FORMATTER_H
 
+#include <format>
+#include <string>
+#include <string_view>
+
 struct BinanceFuturesFormatter {
   static std::string format_depth_stream(std::string_view symbol) {
     return std::format("{0}@depth@100ms", symbol);

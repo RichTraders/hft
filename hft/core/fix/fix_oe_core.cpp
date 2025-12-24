@@ -10,8 +10,11 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "fix_oe_core.h"
+#include <string>
+
 #include <fix8/f8includes.hpp>
+
+#include "fix_oe_core.h"
 #include "NewOroFix44OE_types.hpp"
 #include "NewOroFix44OE_router.hpp"
 #include "NewOroFix44OE_classes.hpp"

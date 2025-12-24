@@ -13,8 +13,22 @@
 #ifndef COMMON_LOGGER_H
 #define COMMON_LOGGER_H
 
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <cstdio>
+#include <ctime>
 #include <format>
+#include <fstream>
+#include <iostream>
+#include <memory>
 #include <source_location>
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include "performance.h"
 #include "thread.hpp"
 

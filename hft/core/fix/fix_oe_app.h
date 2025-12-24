@@ -12,6 +12,11 @@
 
 #ifndef FIX_OE_APP_H
 #define FIX_OE_APP_H
+
+#include <atomic>
+#include <memory>
+#include <string>
+
 #include "authorization.h"
 #include "core/order_entry.h"
 #include "core/protocol_concepts.h"

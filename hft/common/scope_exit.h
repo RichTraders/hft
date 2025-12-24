@@ -12,6 +12,9 @@
 
 #pragma once
 
+#include <type_traits>
+#include <utility>
+
 template <class Functor>
 class ScopeExit {
  public:

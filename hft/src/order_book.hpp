@@ -13,7 +13,16 @@
 #ifndef ORDERBOOK_HPP
 #define ORDERBOOK_HPP
 
+#include <array>
+#include <cassert>
+#include <functional>
+#include <map>
+#include <memory>
+#include <sstream>
 #include <span>
+#include <string>
+#include <vector>
+
 #include "common/ini_config.hpp"
 #include "common/logger.h"
 #include "common/memory_pool.hpp"

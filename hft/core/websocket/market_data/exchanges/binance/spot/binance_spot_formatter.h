@@ -12,6 +12,11 @@
 
 #ifndef BINANCE_SPOT_FORMATTER_H
 #define BINANCE_SPOT_FORMATTER_H
+
+#include <format>
+#include <string>
+#include <string_view>
+
 struct BinanceSpotFormatter {
   static std::string format_depth_stream(std::string_view symbol) {
     return std::format("{0}@depth@100ms", symbol);

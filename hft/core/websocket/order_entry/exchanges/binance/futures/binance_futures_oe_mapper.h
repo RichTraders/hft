@@ -13,6 +13,11 @@
 #ifndef BINANCE_FUTURES_OE_MAPPER_H
 #define BINANCE_FUTURES_OE_MAPPER_H
 
+#include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <string>
+
 #include "common/logger.h"
 #include "core/response_manager.h"
 #include "schema/futures/response/api_response.h"

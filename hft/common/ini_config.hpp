@@ -13,6 +13,19 @@
 #ifndef INI_READER_H
 #define INI_READER_H
 
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
+#include <format>
+#include <fstream>
+#include <iostream>
+#include <ranges>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
+
 #include "singleton.h"
 
 namespace common {

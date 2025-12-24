@@ -13,6 +13,11 @@
 #ifndef PRICE_QTY_ARRAY_H
 #define PRICE_QTY_ARRAY_H
 
+#include <array>
+#include <charconv>
+#include <cstddef>
+#include <vector>
+
 #include <glaze/glaze.hpp>
 
 namespace schema {

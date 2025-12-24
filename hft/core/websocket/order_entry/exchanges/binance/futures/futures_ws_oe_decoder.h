@@ -13,6 +13,9 @@
 #ifndef FUTURES_WS_OE_DECODER_H
 #define FUTURES_WS_OE_DECODER_H
 
+#include <cstddef>
+#include <string_view>
+
 #include <glaze/glaze.hpp>
 #include "binance_futures_oe_traits.h"
 #include "oe_id_constants.h"

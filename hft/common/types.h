@@ -12,7 +12,24 @@
 
 #ifndef TYPES_H
 #define TYPES_H
+
+#include <array>
+#include <cstdint>
+#include <limits>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+
 #include "precision_config.hpp"
+
+#ifndef LIKELY
+#define LIKELY(x) __builtin_expect(!!(x), 1)
+#endif
+#ifndef UNLIKELY
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#endif
 
 namespace common {
 struct OrderId {

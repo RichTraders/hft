@@ -12,6 +12,11 @@
 
 #ifndef RISK_MANAGER_H
 #define RISK_MANAGER_H
+
+#include <sstream>
+#include <string>
+#include <unordered_map>
+
 #include "common/types.h"
 #include "position_keeper.h"
 

@@ -13,6 +13,9 @@
 #ifndef WS_OE_CORE_H
 #define WS_OE_CORE_H
 
+#include <string>
+#include <string_view>
+
 #include "common/logger.h"
 #include "core/order_entry.h"
 #include "oe_exchange_traits.h"

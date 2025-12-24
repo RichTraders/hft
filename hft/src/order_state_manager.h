@@ -13,6 +13,8 @@
 #ifndef ORDER_STATE_MANAGER_H
 #define ORDER_STATE_MANAGER_H
 
+#include <cstdint>
+
 #include "layer_book.h"
 #include "logger.h"
 #include "market_data.h"

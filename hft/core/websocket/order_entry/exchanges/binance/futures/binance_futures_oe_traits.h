@@ -13,6 +13,10 @@
 #ifndef BINANCE_FUTURES_OE_TRAITS_H
 #define BINANCE_FUTURES_OE_TRAITS_H
 
+#include <string>
+#include <string_view>
+#include <variant>
+
 #include "binance_futures_oe_connection_handler.h"
 #include "binance_futures_oe_dispatcher.hpp"
 #include "binance_futures_oe_encoder.hpp"

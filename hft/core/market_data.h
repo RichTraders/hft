@@ -13,8 +13,16 @@
 #ifndef MARKET_DATA_H
 #define MARKET_DATA_H
 
-#include <common/types.h>
+#include <cstdint>
+#include <iomanip>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include <common/ini_config.hpp>
+#include <common/types.h>
 
 constexpr int kNoRelatedSym = 146;
 

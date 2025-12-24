@@ -13,6 +13,10 @@
 #ifndef PROTOCOL_CONCEPTS_H
 #define PROTOCOL_CONCEPTS_H
 
+#include <concepts>
+#include <string>
+#include <type_traits>
+
 #include "core/market_data.h"
 #include "core/order_entry.h"
 

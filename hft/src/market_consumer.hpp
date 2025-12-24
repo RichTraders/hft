@@ -13,6 +13,13 @@
 #ifndef MARKET_CONSUMER_HPP
 #define MARKET_CONSUMER_HPP
 
+#include <chrono>
+#include <deque>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <thread>
+
 #include "common/ini_config.hpp"
 #include "logger.h"
 #include "market_data.h"

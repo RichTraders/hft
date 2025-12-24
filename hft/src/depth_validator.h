@@ -13,6 +13,9 @@
 #ifndef DEPTH_VALIDATOR_H
 #define DEPTH_VALIDATOR_H
 
+#include <cstdint>
+#include <string_view>
+
 namespace trading {
 
 enum class MarketType : uint8_t { kSpot, kFutures };

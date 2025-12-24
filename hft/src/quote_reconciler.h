@@ -13,6 +13,16 @@
 #ifndef QUOTE_RECONCILER_H
 #define QUOTE_RECONCILER_H
 
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <iomanip>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <unordered_set>
+#include <vector>
+
 #include "common/precision_config.hpp"
 #include "fast_clock.h"
 #include "ini_config.hpp"

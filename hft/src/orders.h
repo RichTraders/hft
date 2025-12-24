@@ -13,6 +13,14 @@
 #ifndef OM_ORDER_H
 #define OM_ORDER_H
 
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <limits>
+#include <optional>
+#include <sstream>
+#include <string>
+
 #include "absl/container/flat_hash_map.h"
 #include "common/types.h"
 

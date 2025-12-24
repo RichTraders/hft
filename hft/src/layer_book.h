@@ -12,6 +12,13 @@
 
 #ifndef LAYER_BOOK_H
 #define LAYER_BOOK_H
+
+#include <array>
+#include <iomanip>
+#include <optional>
+#include <sstream>
+#include <string>
+
 #include "absl/container/flat_hash_map.h"
 #include "common/precision_config.hpp"
 #include "orders.h"

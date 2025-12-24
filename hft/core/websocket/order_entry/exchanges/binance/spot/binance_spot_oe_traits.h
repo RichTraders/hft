@@ -13,6 +13,10 @@
 #ifndef BINANCE_SPOT_OE_TRAITS_H
 #define BINANCE_SPOT_OE_TRAITS_H
 
+#include <string>
+#include <string_view>
+#include <variant>
+
 #include "binance_spot_oe_connection_handler.h"
 #include "binance_spot_oe_dispatcher.hpp"
 #include "binance_spot_oe_encoder.h"

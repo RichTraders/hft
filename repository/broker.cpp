@@ -245,7 +245,7 @@ void Broker::on_subscribe(const std::string& str_msg, const WireMessage& msg,
       market_update_data_pool_->allocate(app_->create_market_data_message(msg));
 
   if (state_ == StreamState::kBuffering) {
-    if (data->type == kTrade) {
+    if (data->type != kMarket) {
       for (auto* market_data : data->data)
         market_data_pool_->deallocate(market_data);
       market_update_data_pool_->deallocate(data);
@@ -273,8 +273,7 @@ void Broker::on_subscribe(const std::string& str_msg, const WireMessage& msg,
     return;
   }
 
-  // Skip gap check for trade events
-  if (data->type != kTrade) {
+  if (data->type == kMarket) {
     constexpr auto kMarketType =
         trading::get_market_type<SelectedMarketApp::ExchangeTraits>();
     trading::DepthValidationResult validation_result;

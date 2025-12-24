@@ -39,7 +39,7 @@ public:
 
   void SetUp() override {
     // Load BTCUSDT config before creating order book
-    INI_CONFIG.load("resources/config-BTCUSDT.ini");
+    INI_CONFIG.load("resources/config.ini");
 
     TradeEngineCfgHashMap temp;
     RiskCfg risk = {.max_order_size_ = Qty{1000.},
@@ -653,12 +653,12 @@ std::unique_ptr<Logger::Producer> XrpusdcOrderBookTest::producer;
 TEST_F(XrpusdcOrderBookTest, ConfigLoadedCorrectly) {
   const auto& cfg = book_->config();
 
-  // XRPUSDC config: min=1000, max=1000000, tick_mult=10000
-  // Price range: $0.10 ~ $100.00
+  // XRPUSDC config: min=1000, max=50000, tick_mult=10000
+  // Price range: $0.10 ~ $5.00
   EXPECT_EQ(cfg.min_price_int, 1000);
-  EXPECT_EQ(cfg.max_price_int, 1000000);
+  EXPECT_EQ(cfg.max_price_int, 50000);
   EXPECT_EQ(cfg.tick_multiplier_int, 10000);
-  EXPECT_EQ(cfg.num_levels, 1000000 - 1000 + 1);
+  EXPECT_EQ(cfg.num_levels, 50000 - 1000 + 1);
 }
 
 TEST_F(XrpusdcOrderBookTest, PriceConversionForXrpusdc) {
@@ -678,8 +678,8 @@ TEST_F(XrpusdcOrderBookTest, PriceConversionForXrpusdc) {
   Price min_price{0.10};
   EXPECT_EQ(cfg.price_to_index(min_price), 0);
 
-  // Max price: $100.00 = 1000000 / 10000 -> index = 999000
-  Price max_price{100.00};
+  // Max price: $5.00 = 50000 / 10000 -> index = 49000
+  Price max_price{5.00};
   EXPECT_EQ(cfg.price_to_index(max_price), cfg.num_levels - 1);
 }
 
@@ -712,9 +712,9 @@ TEST_F(XrpusdcOrderBookTest, XrpusdcBoundaryPrices) {
     EXPECT_EQ(cfg.price_to_index(min_price), 0);
   }
 
-  // Add at max price $100.00 (sell side)
+  // Add at max price $5.00 (sell side)
   {
-    const Price max_price = Price{100.00};
+    const Price max_price = Price{5.00};
     const MarketData md(MarketUpdateType::kAdd, OrderId{1}, symbol, Side::kSell, max_price, Qty{25.0});
     book_->on_market_data_updated(&md);
 
@@ -739,8 +739,8 @@ TEST_F(XrpusdcOrderBookTest, XrpusdcPriceBelowMin_ShouldBeRejected) {
 TEST_F(XrpusdcOrderBookTest, XrpusdcPriceAboveMax_ShouldBeRejected) {
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
-  // $100.01 is above max ($100.00)
-  const Price invalid_price = Price{100.01};
+  // $5.01 is above max ($5.00)
+  const Price invalid_price = Price{5.01};
   const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kSell, invalid_price, Qty{10.0});
   book_->on_market_data_updated(&md);
 

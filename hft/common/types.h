@@ -12,6 +12,7 @@
 
 #ifndef TYPES_H
 #define TYPES_H
+#include "precision_config.hpp"
 
 namespace common {
 struct OrderId {
@@ -75,6 +76,17 @@ constexpr auto kClientIdInvalid = std::numeric_limits<uint32_t>::max();
 struct Price {
   double value{std::numeric_limits<double>::max()};
 
+  [[nodiscard]] double truncate() const noexcept {
+    return static_cast<double>(static_cast<int64_t>(
+               this->value * PRECISION_CONFIG.price_multiplier())) /
+           PRECISION_CONFIG.price_multiplier();
+  }
+
+  [[nodiscard]] double truncate(double precision) const noexcept {
+    return static_cast<double>(static_cast<int64_t>(this->value * precision)) /
+           precision;
+  }
+
   Price() noexcept = default;
   explicit constexpr Price(double data) noexcept : value(data) {}
 
@@ -133,6 +145,17 @@ struct Qty {
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<double>::max();
+  }
+
+  [[nodiscard]] double truncate() const noexcept {
+    return static_cast<double>(static_cast<int64_t>(
+               this->value * PRECISION_CONFIG.qty_multiplier())) /
+           PRECISION_CONFIG.qty_multiplier();
+  }
+
+  [[nodiscard]] double truncate(double precision) const noexcept {
+    return static_cast<double>(static_cast<int64_t>(this->value * precision)) /
+           precision;
   }
 
   constexpr bool operator==(double other) const { return value == other; }
@@ -339,7 +362,7 @@ inline MarketUpdateType charToMarketUpdateType(const char character) noexcept {
   }
 }
 
-inline std::string toString(MarketUpdateType type) noexcept {
+inline std::string_view toString(MarketUpdateType type) noexcept {
   switch (type) {
     case MarketUpdateType::kInvalid:
       return "INVALID";
@@ -405,17 +428,6 @@ std::string to_fixed(T data, int precision) {
       precision,
       static_cast<double>(data));
   return std::string(buffer.data());
-}
-
-inline double to_double(std::string_view view) {
-  double result;
-  auto [ptr, ec] =
-      std::from_chars(view.data(), view.data() + view.size(), result);
-
-  if (ec == std::errc()) {
-    return result;
-  }
-  return 0.0;
 }
 
 }  // namespace common

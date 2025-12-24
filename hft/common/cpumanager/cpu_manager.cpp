@@ -16,11 +16,11 @@
 
 #include <charconv>
 
-#if defined(__linux__)
+#ifdef __linux__
 #include <sched.h>
 #include <sys/syscall.h>
 #include <unistd.h>
-#elif defined(__APPLE__)
+#elif __APPLE__
 #include <mach/thread_act.h>
 #include <mach/thread_policy.h>
 #include <pthread.h>
@@ -42,11 +42,11 @@ CpuManager::CpuManager(const Logger::Producer& logger) : logger_(logger) {
       static_cast<bool>(INI_CONFIG.get_int("cpu_id", "use_cpu_to_tid"));
 
   for (int i = 0; i < cpu_use_count; i++) {
-    CpuInfo info;
     const std::string cpu_id = "cpu_" + std::to_string(i);
 
-    info.use_irq = static_cast<bool>(INI_CONFIG.get_int(cpu_id, "use_irq"));
-    info.type = static_cast<uint8_t>(INI_CONFIG.get_int(cpu_id, "cpu_type"));
+    const CpuInfo info = {
+        .use_irq = static_cast<bool>(INI_CONFIG.get_int(cpu_id, "use_irq")),
+        .type = static_cast<uint8_t>(INI_CONFIG.get_int(cpu_id, "cpu_type"))};
     if (info.use_irq) {
       // irq 추가 필요, 현재 없으니 필요 없음
     }
@@ -69,19 +69,17 @@ CpuManager::CpuManager(const Logger::Producer& logger) : logger_(logger) {
     }
 
     // 정책(SCHED_RR 등)에 따라 값(prio/nice) 로딩
-#if defined(__linux__)
+#ifdef __linux__
     if (iter->second.type == SCHED_RR || iter->second.type == SCHED_FIFO) {
       info.value = INI_CONFIG.get_int(thread_id, "prio");
     } else {
       info.value = INI_CONFIG.get_int(thread_id, "nicev");
     }
-#elif defined(__APPLE__)
-    if (iter->second.type == 2 ||
-        iter->second.type == 1) {  // 1:FIFO, 2:RR 가정
-      info.value = INI_CONFIG.get_int(thread_id, "prio");
-    } else {
-      info.value = INI_CONFIG.get_int(thread_id, "nicev");
-    }
+#elif __APPLE__
+    const char* config_key =
+        (iter->second.type == 2 || iter->second.type == 1) ? "prio" : "nicev";
+
+    info.value = INI_CONFIG.get_int(thread_id, config_key);
 #endif
 
     info.tid = 0;
@@ -103,7 +101,7 @@ void CpuManager::trim_newline(std::string& str) {
 // Linux: /proc/pid/task 순회
 // Apple: 외부 스레드 이름 조회 불가. (현재 스레드가 아니면 찾기 매우 어려움)
 ThreadId CpuManager::get_tid_by_thread_name(const std::string& target_name) {
-#if defined(__linux__)
+#ifdef __linux__
   const std::filesystem::path task_dir =
       std::filesystem::path("/proc") / std::to_string(getpid()) / "task";
   std::error_code err_c;
@@ -142,7 +140,7 @@ ThreadId CpuManager::get_tid_by_thread_name(const std::string& target_name) {
   }
   return 0;
 
-#elif defined(__APPLE__)
+#elif __APPLE__
   logger_.warn("APPLE doesn't support get thread id. target id :{}",
       target_name);
   return 0;
@@ -151,8 +149,9 @@ ThreadId CpuManager::get_tid_by_thread_name(const std::string& target_name) {
 #endif
 }
 
+// NOLINTNEXTLINE(readability-make-member-function-const)
 bool CpuManager::init_cpu_to_tid() {
-  if (!use_cpu_to_tid_)
+  if (!use_cpu_to_tid_)  // NOLINTNEXTLINE(readability-simplify-boolean-expr)
     return true;
 
   for (auto& info : thread_info_list_) {
@@ -162,7 +161,7 @@ bool CpuManager::init_cpu_to_tid() {
 
     const int tid = get_tid_by_thread_name(thread_name);
     if (tid == 0) {
-#if defined(__APPLE__)
+#ifdef __APPLE__
       logger_.error(
           "[CpuManager] macOS does not support finding threads by "
           "name externally: '{}'",
@@ -183,7 +182,7 @@ bool CpuManager::init_cpu_to_tid() {
       return true;
 
     int ret = 0;
-#if defined(__linux__)
+#ifdef __linux__
     switch (cpu_info->second.type) {
       case SCHED_FIFO:
         ret = set_cpu_fifo(cpu_id, tid, value);
@@ -204,7 +203,7 @@ bool CpuManager::init_cpu_to_tid() {
         ret = -1;
         break;
     }
-#elif defined(__APPLE__)
+#elif __APPLE__
     if (cpu_info->second.type == 1 /*FIFO*/)
       ret = set_cpu_fifo(cpu_id, tid, value);
     else if (cpu_info->second.type == 2 /*RR*/)
@@ -212,7 +211,6 @@ bool CpuManager::init_cpu_to_tid() {
     else
       ret = set_cpu_other(cpu_id, tid, value);
 #endif
-
     if (ret != 0)
       return true;
   }
@@ -233,7 +231,7 @@ int CpuManager::init_cpu_group(std::string& result) const {
   if (!use_cpu_group_)
     return 1;
 
-#if defined(__linux__)
+#ifdef __linux__
   try {
     std::ifstream cgroup_file("/proc/self/cgroup");
     std::string cgroup_line;
@@ -256,7 +254,7 @@ int CpuManager::init_cpu_group(std::string& result) const {
 }
 
 int CpuManager::set_cpu_to_tid(uint8_t cpu_id, ThreadId tid) {
-#if defined(__linux__)
+#ifdef __linux__
   cpu_set_t cpu_set;
   CPU_ZERO(&cpu_set);
   CPU_SET(cpu_id, &cpu_set);
@@ -275,7 +273,7 @@ int CpuManager::set_cpu_to_tid(uint8_t cpu_id, ThreadId tid) {
   logger_.info("[CpuManager] tid {} allowed CPU : {}", tid, cpu_id);
   return 0;
 
-#elif defined(__APPLE__)
+#elif __APPLE__
   (void)cpu_id;
   (void)tid;
   logger_.info(
@@ -287,7 +285,7 @@ int CpuManager::set_cpu_to_tid(uint8_t cpu_id, ThreadId tid) {
 
 int CpuManager::set_rt(const uint8_t cpu_id, ThreadId tid, SchedPolicy policy,
     int priority) {
-#if defined(__linux__)
+#ifdef __linux__
   const int pmin = sched_get_priority_min(static_cast<int>(policy));
   const int pmax = sched_get_priority_max(static_cast<int>(policy));
   if (priority < pmin || priority > pmax)
@@ -299,7 +297,7 @@ int CpuManager::set_rt(const uint8_t cpu_id, ThreadId tid, SchedPolicy policy,
     return -1;
   return 0;
 
-#elif defined(__APPLE__)
+#elif __APPLE__
   (void)cpu_id;
   (void)policy;
   // Apple: RT 정책 대신 User Interactive QoS 적용 권장
@@ -319,12 +317,12 @@ int CpuManager::set_rt(const uint8_t cpu_id, ThreadId tid, SchedPolicy policy,
 int CpuManager::set_cfs(const uint8_t cpu_id, ThreadId tid, SchedPolicy policy,
     int nicev) {
   if (set_cpu_to_tid(cpu_id, tid) != 0) {
-#if defined(__linux__)
+#ifdef __linux__
     return -1;
 #endif
   }
 
-#if defined(__linux__)
+#ifdef __linux__
   // 정책 변경 (OTHER, BATCH, IDLE)
   if (set_scheduler(tid, 0, static_cast<int>(policy))) {
     logger_.error("[CpuManager] failed to chrt to tid");
@@ -340,7 +338,7 @@ int CpuManager::set_cfs(const uint8_t cpu_id, ThreadId tid, SchedPolicy policy,
 }
 
 int CpuManager::set_cpu_fifo(const uint8_t cpu_id, ThreadId tid, int prio) {
-#if defined(__linux__)
+#ifdef __linux__
   return set_rt(cpu_id, tid, SchedPolicy::kFinfo, prio);
 #else
   // Apple: FIFO 개념 없음 -> High Priority로 처리
@@ -349,7 +347,7 @@ int CpuManager::set_cpu_fifo(const uint8_t cpu_id, ThreadId tid, int prio) {
 }
 
 int CpuManager::set_cpu_rr(const uint8_t cpu_id, ThreadId tid, int prio) {
-#if defined(__linux__)
+#ifdef __linux__
   return set_rt(cpu_id, tid, SchedPolicy::kRr, prio);
 #else
   return set_rt(cpu_id, tid, static_cast<SchedPolicy>(2), prio);
@@ -357,7 +355,7 @@ int CpuManager::set_cpu_rr(const uint8_t cpu_id, ThreadId tid, int prio) {
 }
 
 int CpuManager::set_cpu_other(const uint8_t cpu_id, ThreadId tid, int nicev) {
-#if defined(__linux__)
+#ifdef __linux__
   return set_cfs(cpu_id, tid, SchedPolicy::kOther, nicev);
 #else
   return set_cfs(cpu_id, tid, static_cast<SchedPolicy>(0), nicev);
@@ -365,7 +363,7 @@ int CpuManager::set_cpu_other(const uint8_t cpu_id, ThreadId tid, int nicev) {
 }
 
 int CpuManager::set_cpu_batch(const uint8_t cpu_id, ThreadId tid, int nicev) {
-#if defined(__linux__)
+#ifdef __linux__
   return set_cfs(cpu_id, tid, SchedPolicy::kBatch, nicev);
 #else
   // Apple: Batch 없음 -> Nice 값만 적용
@@ -374,7 +372,7 @@ int CpuManager::set_cpu_batch(const uint8_t cpu_id, ThreadId tid, int nicev) {
 }
 
 int CpuManager::set_cpu_idle(const uint8_t cpu_id, ThreadId tid, int nicev) {
-#if defined(__linux__)
+#ifdef __linux__
   return set_cfs(cpu_id, tid, SchedPolicy::kIdle, nicev);
 #else
   // Apple: QOS_CLASS_BACKGROUND가 적합하나, Nice 값으로 대체
@@ -384,7 +382,7 @@ int CpuManager::set_cpu_idle(const uint8_t cpu_id, ThreadId tid, int nicev) {
 
 int CpuManager::set_scheduler(ThreadId tid, int priority,
     int scheduler_policy) {
-#if defined(__linux__)
+#ifdef __linux__
   const sched_param sched_params{.sched_priority = priority};
   if (sched_setscheduler(tid, scheduler_policy, &sched_params) != 0) {
     logger_.error("[CpuManager] failed to setscheduler: {}", strerror(errno));
@@ -394,7 +392,7 @@ int CpuManager::set_scheduler(ThreadId tid, int priority,
     return -1;
   }
   return 0;
-#elif defined(__APPLE__)
+#elif __APPLE__
   logger_.warn(
       "Apple doesn't support setscheduler. "
       "cpu_id:{},priority:{},scheduler_policy:{}",
@@ -405,7 +403,7 @@ int CpuManager::set_scheduler(ThreadId tid, int priority,
 #endif
 }
 
-#if defined(__linux__)
+#ifdef __linux__
 int CpuManager::sched_setattr_syscall(ThreadId tid,
     const struct sched_attr* attr, unsigned int flags) {
   return static_cast<int>(syscall(SYS_sched_setattr, tid, attr, flags));
@@ -413,7 +411,7 @@ int CpuManager::sched_setattr_syscall(ThreadId tid,
 #endif
 
 int CpuManager::set_affinity(const AffinityInfo& info) {
-#if defined(__linux__)
+#ifdef __linux__
   cpu_set_t cpu_info;
   CPU_ZERO(&cpu_info);
   CPU_SET(info.cpu_id_, &cpu_info);

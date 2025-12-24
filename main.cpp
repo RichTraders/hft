@@ -16,7 +16,7 @@
 #include "precision_config.hpp"
 #include "strategy_config.hpp"
 
-using SelectedOrderGateway = trading::OrderGateway<SelectedStrategy>;
+using SelectedOrderGateway = trading::OrderGateway<>;
 using SelectedTradeEngine = trading::TradeEngine<SelectedStrategy>;
 using SelectedMarketConsumer = trading::MarketConsumer<SelectedStrategy>;
 

@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <functional>
 #include <future>
@@ -39,6 +40,7 @@
 #include <queue>
 #include <random>
 #include <ranges>
+#include <source_location>
 #include <sstream>
 #include <stack>
 #include <stdexcept>

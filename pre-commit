@@ -3,6 +3,9 @@
 CLANG_FORMAT=clang-format
 CLANG_TIDY=clang-tidy
 CACHE_FILE=".clang-tidy-cache"
+BUILD_DIR="build"
+
+OS_NAME=$(uname)
 
 if ! command -v "$CLANG_FORMAT" &> /dev/null; then
   echo "clang-format not found"
@@ -13,8 +16,8 @@ if ! command -v "$CLANG_TIDY" > /dev/null; then
   exit 1
 fi
 
-EXTENSIONS="h cpp cc cxx c hpp"
-FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -Ev "test|NewOroFix44MD_|NewOroFix44OE_|fix_[?:app|md_app|oe_app]|fix_*_[core]|schema" | grep -E "\.(${EXTENSIONS// /|})$")
+EXTENSIONS="cpp cc cxx c"
+FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -Ev "test|NewOroFix44MD_|NewOroFix44OE_|fix_[?:app|md_app|oe_app]|fix_*_[core]|schema|pch\.h" | grep -E "\.(${EXTENSIONS// /|})$")
 
 if [ -z "$FILES" ]; then
   exit 0
@@ -22,12 +25,31 @@ fi
 
 [ -e "$CACHE_FILE" ] || touch "$CACHE_FILE"
 
-if [ ! -e build/compile_commands.json ]; then
-  echo "build/compile_commands.json not found, running cmake..."
-  cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DENABLE_WEBSOCKET=ON ; cmake --build build --target websockets || exit 1
+if [ ! -e "${BUILD_DIR}/compile_commands.json" ]; then
+  echo "${BUILD_DIR}/compile_commands.json not found, running cmake..."
+
+  if [[ "${OS_NAME}" == "Darwin" ]]; then
+    SDK_PATH=$(xcrun --show-sdk-path)
+    echo "Detected macOS SDK: $SDK_PATH"
+
+    cmake -S . -B ${BUILD_DIR} \
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+    -DENABLE_WEBSOCKET=ON \
+    -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
+    -DCMAKE_CXX_STANDARD=20 \
+    -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang \
+    -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ \
+    -DCMAKE_OSX_SYSROOT="$SDK_PATH" \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3
+    cmake --build ${BUILD_DIR} --target websockets || exit 1
+  elif [[ "${OS_NAME}" == "Linux" ]]; then
+    cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DENABLE_WEBSOCKET=ON -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON ; cmake --build ${BUILD_DIR} --target websockets || exit 1
+  fi
+
 fi
 
 FAIL=0
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 for file in $FILES; do
   echo "• $file"
   $CLANG_FORMAT -i "$file"
@@ -42,7 +64,12 @@ for file in $FILES; do
     continue
   fi
 
-  "$CLANG_TIDY" "$file" -p build
+  if [[ "${OS_NAME}" == "Darwin" ]]; then
+    "$CLANG_TIDY" "$file" -p "$BUILD_DIR" --extra-arg="-include" --extra-arg="${SCRIPT_DIR}/include/pch.h"
+  elif [[ "${OS_NAME}" == "Linux" ]]; then
+    "$CLANG_TIDY" "$file" -p "$BUILD_DIR"
+  fi
+
   if [ $? -ne 0 ]; then
     echo "clang-tidy found issues in $file"
     FAIL=1

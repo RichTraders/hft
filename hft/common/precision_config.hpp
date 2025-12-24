@@ -18,20 +18,47 @@
 
 namespace common {
 
+namespace precision_defaults {
+constexpr int kQtyPrecision = 3;
+constexpr int kPricePrecision = 2;
+constexpr double kQtyMultiplier = 10000.;
+constexpr double kPriceMultiplier = 10.;
+}  // namespace precision_defaults
+
 class PrecisionConfig : public Singleton<PrecisionConfig> {
  public:
   void initialize() {
-    qty_precision_ = INI_CONFIG.get_int("meta", "qty_precision", 3);
-    price_precision_ = INI_CONFIG.get_int("meta", "price_precision", 2);
+    qty_precision_ = INI_CONFIG.get_int("meta",
+        "qty_precision",
+        precision_defaults::kQtyPrecision);
+    price_precision_ = INI_CONFIG.get_int("meta",
+        "price_precision",
+        precision_defaults::kPricePrecision);
+    qty_multiplier_ = INI_CONFIG.get_double("meta",
+        "qty_multiplier",
+        precision_defaults::kQtyMultiplier);
+    price_multiplier_ = INI_CONFIG.get_double("meta",
+        "price_multiplier",
+        precision_defaults::kPriceMultiplier);
     initialized_ = true;
   }
 
   [[nodiscard]] int qty_precision() const {
-    return initialized_ ? qty_precision_ : 3;
+    return initialized_ ? qty_precision_ : precision_defaults::kQtyPrecision;
   }
 
   [[nodiscard]] int price_precision() const {
-    return initialized_ ? price_precision_ : 2;
+    return initialized_ ? price_precision_
+                        : precision_defaults::kPricePrecision;
+  }
+
+  [[nodiscard]] double qty_multiplier() const {
+    return initialized_ ? qty_multiplier_ : precision_defaults::kQtyMultiplier;
+  }
+
+  [[nodiscard]] double price_multiplier() const {
+    return initialized_ ? price_multiplier_
+                        : precision_defaults::kPriceMultiplier;
   }
 
   void set_qty_precision(int precision) {
@@ -45,8 +72,10 @@ class PrecisionConfig : public Singleton<PrecisionConfig> {
   }
 
  private:
-  int qty_precision_{3};
-  int price_precision_{2};
+  int qty_precision_{precision_defaults::kQtyPrecision};
+  int price_precision_{precision_defaults::kPricePrecision};
+  double qty_multiplier_{precision_defaults::kQtyMultiplier};
+  double price_multiplier_{precision_defaults::kPriceMultiplier};
   bool initialized_{false};
 };
 

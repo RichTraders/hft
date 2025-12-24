@@ -12,6 +12,7 @@
 
 #ifndef TYPES_H
 #define TYPES_H
+#include "precision_config.hpp"
 
 namespace common {
 struct OrderId {
@@ -75,6 +76,17 @@ constexpr auto kClientIdInvalid = std::numeric_limits<uint32_t>::max();
 struct Price {
   double value{std::numeric_limits<double>::max()};
 
+  [[nodiscard]] double truncate() const noexcept {
+    return static_cast<double>(static_cast<int64_t>(
+               this->value * PRECISION_CONFIG.price_multiplier())) /
+           PRECISION_CONFIG.price_multiplier();
+  }
+
+  [[nodiscard]] double truncate(double precision) const noexcept {
+    return static_cast<double>(static_cast<int64_t>(this->value * precision)) /
+           precision;
+  }
+
   Price() noexcept = default;
   explicit constexpr Price(double data) noexcept : value(data) {}
 
@@ -133,6 +145,17 @@ struct Qty {
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<double>::max();
+  }
+
+  [[nodiscard]] double truncate() const noexcept {
+    return static_cast<double>(static_cast<int64_t>(
+               this->value * PRECISION_CONFIG.qty_multiplier())) /
+           PRECISION_CONFIG.qty_multiplier();
+  }
+
+  [[nodiscard]] double truncate(double precision) const noexcept {
+    return static_cast<double>(static_cast<int64_t>(this->value * precision)) /
+           precision;
   }
 
   constexpr bool operator==(double other) const { return value == other; }

@@ -66,8 +66,13 @@ macro(add_unit_test _TEST_NAME)
 
     if (ENABLE_ASAN)
         message(STATUS "Building with AddressSanitizer")
-        #target_compile_options(${_TEST_NAME}_tests PRIVATE -fsanitize=address -fno-omit-frame-pointer -O1 -g -Wno-error=maybe-uninitialized -Wno-maybe-uninitialized)
-        target_compile_options(${TARGET_NAME} PRIVATE -fsanitize=address -fno-omit-frame-pointer -g -Wno-error=maybe-uninitialized -Wno-maybe-uninitialized)
+        target_compile_options(${TARGET_NAME} PRIVATE -fsanitize=address -fno-omit-frame-pointer -g)
+        # GCC uses -Wno-maybe-uninitialized, Clang uses -Wno-uninitialized
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            target_compile_options(${TARGET_NAME} PRIVATE -Wno-error=maybe-uninitialized -Wno-maybe-uninitialized)
+        elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+            target_compile_options(${TARGET_NAME} PRIVATE -Wno-error=uninitialized -Wno-uninitialized)
+        endif()
         target_link_options(${TARGET_NAME} PRIVATE -fsanitize=address)
     endif ()
 

@@ -49,11 +49,19 @@ std::string PositionInfo::toString() const {
 
 void PositionInfo::add_fill(const ExecutionReport* report,
     const common::Logger::Producer& logger) noexcept {
+  constexpr double kPositionEpsilon = 1e-6;
+
   const auto old_position = position_;
   const auto idx = sideToIndex(report->side);
   const auto opp_side_index = oppIndex(idx);
   const int sgn = sideToValue(report->side);
   position_ += report->last_qty.value * static_cast<double>(sgn);
+
+  // Clean up floating point errors
+  if (std::abs(position_) < kPositionEpsilon) {
+    position_ = 0.0;
+  }
+
   volume_.value += report->last_qty.value;
 
   if (const auto* pos_side =
@@ -75,6 +83,11 @@ void PositionInfo::add_fill(const ExecutionReport* report,
           long_position_ = 0;
           long_cost_ = 0;
         }
+        // Clean up floating point errors
+        if (std::abs(long_position_) < kPositionEpsilon) {
+          long_position_ = 0.0;
+          long_cost_ = 0.0;
+        }
       }
     } else if (*pos_side == common::PositionSide::kShort) {
       if (report->side == Side::kSell) {
@@ -92,6 +105,11 @@ void PositionInfo::add_fill(const ExecutionReport* report,
         if (short_position_ < 0) {
           short_position_ = 0;
           short_cost_ = 0;
+        }
+        // Clean up floating point errors
+        if (std::abs(short_position_) < kPositionEpsilon) {
+          short_position_ = 0.0;
+          short_cost_ = 0.0;
         }
       }
     }

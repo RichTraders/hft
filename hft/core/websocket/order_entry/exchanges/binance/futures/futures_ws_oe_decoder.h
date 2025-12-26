@@ -31,7 +31,7 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
     if (payload.empty()) {
       return WireMessage{};
     }
-    logger_.info("[WsOeCore]payload :{}", payload);
+    logger_.debug("[WsOeCore]payload :{}", payload);
 
     if (payload.contains("ORDER_TRADE_UPDATE")) {
       return this

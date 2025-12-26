@@ -37,6 +37,13 @@ inline trading::ExecutionReport* BinanceSpotOeMapper::to_execution_report(
   // Parse is_maker_side from wire response
   report->is_maker = event.is_maker_side;
 
+  // Trade execution details
+  report->last_price = common::Price{event.last_executed_price};
+  report->commission = event.commission_amount;
+  report->commission_asset = event.commission_asset;
+  report->trade_id = event.trade_id;
+  report->exchange_order_id = static_cast<uint64_t>(event.order_id);
+
   return report;
 }
 

@@ -61,6 +61,15 @@ class BinanceFuturesOeMapper {
     // Parse is_maker from wire response
     report->is_maker = event.is_maker;
 
+    // Trade execution details (Futures has more fields than Spot)
+    report->last_price = common::Price{event.last_filled_price};
+    report->avg_price = common::Price{event.average_price};
+    report->commission = event.commission;
+    report->commission_asset = event.commission_asset;
+    report->realized_profit = event.realized_profit;
+    report->trade_id = event.trade_id;
+    report->exchange_order_id = event.order_id;
+
     return report;
   }
 

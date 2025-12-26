@@ -63,7 +63,7 @@ void OrderStateManager::handle_pending_new(const ExecutionReport* response,
   }
   auto& slot = side_book.slots[layer];
   slot.state = OMOrderState::kPendingNew;
-  logger_.debug("[OrderStateManager] PendingNew {}", response->toString());
+  logger_.info("[OrderStateManager] PendingNew {}", response->toString());
 }
 
 void OrderStateManager::handle_new(const ExecutionReport* response,
@@ -110,7 +110,7 @@ void OrderStateManager::handle_new(const ExecutionReport* response,
     new_slot.state = OMOrderState::kLive;
   }
 
-  logger_.debug("[OrderStateManager] New {}", response->toString());
+  logger_.info("[OrderStateManager] New {}", response->toString());
 }
 
 void OrderStateManager::handle_partially_filled(const ExecutionReport* response,
@@ -138,7 +138,7 @@ void OrderStateManager::handle_partially_filled(const ExecutionReport* response,
     slot.last_used = now_ns;
   }
 
-  logger_.debug("[OrderStateManager] PartiallyFilled {} is_maker={}",
+  logger_.info("[OrderStateManager] PartiallyFilled {} is_maker={}",
       response->toString(),
       response->is_maker);
 }
@@ -160,7 +160,7 @@ void OrderStateManager::handle_filled(const ExecutionReport* response,
   slot.state = OMOrderState::kDead;
   LayerBook::unmap_layer(side_book, layer);
 
-  logger_.debug("[OrderStateManager] Filled {} is_maker={}",
+  logger_.info("[OrderStateManager] Filled {} is_maker={}",
       response->toString(),
       response->is_maker);
 }
@@ -177,7 +177,7 @@ void OrderStateManager::handle_pending_cancel(const ExecutionReport* response,
 
   auto& slot = side_book.slots[layer];
   slot.state = OMOrderState::kPendingCancel;
-  logger_.debug("[OrderStateManager] PendingCancel {}", response->toString());
+  logger_.info("[OrderStateManager] PendingCancel {}", response->toString());
 }
 
 void OrderStateManager::handle_canceled(const ExecutionReport* response,
@@ -191,7 +191,7 @@ void OrderStateManager::handle_canceled(const ExecutionReport* response,
     side_book.orig_id_to_layer.erase(iter);
     auto& slot = side_book.slots[layer];
     slot.state = OMOrderState::kReserved;
-    logger_.debug("[OrderStateManager] Canceled (for replace) {}",
+    logger_.info("[OrderStateManager] Canceled (for replace) {}",
         response->toString());
     return;
   }
@@ -208,7 +208,7 @@ void OrderStateManager::handle_canceled(const ExecutionReport* response,
   slot.state = OMOrderState::kDead;
   LayerBook::unmap_layer(side_book, layer);
 
-  logger_.debug("[OrderStateManager] Canceled {}", response->toString());
+  logger_.info("[OrderStateManager] Canceled {}", response->toString());
 }
 
 void OrderStateManager::handle_rejected_or_expired(

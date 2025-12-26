@@ -39,6 +39,12 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
               "[executionReport]">(payload);
     }
 
+    if (payload.contains("TRADE_LITE")) {
+      // TRADE_LITE is a lightweight duplicate of ORDER_TRADE_UPDATE
+      // We already process ORDER_TRADE_UPDATE, so ignore this
+      return WireMessage{};
+    }
+
     if (payload.contains("ACCOUNT_UPDATE")) {
       return this->decode_or_log<BinanceFuturesOeTraits::BalanceUpdateEnvelope,
           "[accountUpdate]">(payload);

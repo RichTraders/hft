@@ -58,6 +58,9 @@ class BinanceFuturesOeMapper {
       report->position_side = common::toPositionSide(event.position_side);
     }
 
+    // Parse is_maker from wire response
+    report->is_maker = event.is_maker;
+
     return report;
   }
 

@@ -138,7 +138,9 @@ void OrderStateManager::handle_partially_filled(const ExecutionReport* response,
     slot.last_used = now_ns;
   }
 
-  logger_.debug("[OrderStateManager] PartiallyFilled {}", response->toString());
+  logger_.debug("[OrderStateManager] PartiallyFilled {} is_maker={}",
+      response->toString(),
+      response->is_maker);
 }
 
 void OrderStateManager::handle_filled(const ExecutionReport* response,
@@ -158,7 +160,9 @@ void OrderStateManager::handle_filled(const ExecutionReport* response,
   slot.state = OMOrderState::kDead;
   LayerBook::unmap_layer(side_book, layer);
 
-  logger_.debug("[OrderStateManager] Filled {}", response->toString());
+  logger_.debug("[OrderStateManager] Filled {} is_maker={}",
+      response->toString(),
+      response->is_maker);
 }
 
 void OrderStateManager::handle_pending_cancel(const ExecutionReport* response,

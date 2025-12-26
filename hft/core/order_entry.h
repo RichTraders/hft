@@ -415,6 +415,7 @@ struct ExecutionReport {
   common::Side side;
   std::string text;
   std::optional<common::PositionSide> position_side;  // For futures trading
+  bool is_maker = false;                              // taker=false, maker=true
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
@@ -431,6 +432,7 @@ struct ExecutionReport {
     if (position_side) {
       stream << ", position_side=" << common::toString(*position_side);
     }
+    stream << ", is_maker=" << (is_maker ? "true" : "false");
     stream << "}";
     return stream.str();
   }

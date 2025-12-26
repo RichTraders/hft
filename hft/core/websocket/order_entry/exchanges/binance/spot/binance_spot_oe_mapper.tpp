@@ -34,6 +34,9 @@ inline trading::ExecutionReport* BinanceSpotOeMapper::to_execution_report(
   report->text = event.reject_reason;
   report->error_code = 0;
 
+  // Parse is_maker_side from wire response
+  report->is_maker = event.is_maker_side;
+
   return report;
 }
 

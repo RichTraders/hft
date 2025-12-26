@@ -60,7 +60,13 @@ macro(add_unit_test _TEST_NAME)
             -Wno-missing-field-initializers
             -Wno-error=unused-parameter
             -Wno-error=unused-function
-            -Wno-error=return-type-c-linkage)
+    )
+
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(${TARGET_NAME} PRIVATE
+                -Wno-error=return-type-c-linkage
+        )
+    endif()
 
     # ASan flags are now set globally in root CMakeLists.txt
     if (ENABLE_ASAN)

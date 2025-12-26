@@ -69,6 +69,8 @@ class FullPipelineBenchmark : public ::testing::Test {
 
   static void SetUpTestSuite() {
     INI_CONFIG.load("resources/config-xrpusdc.ini");
+    PRECISION_CONFIG.initialize();
+
     logger_ = std::make_unique<Logger>();
     logger_->setLevel(LogLevel::kInfo);
     logger_->clearSink();

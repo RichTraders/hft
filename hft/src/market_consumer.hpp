@@ -24,10 +24,16 @@
 #include "logger.h"
 #include "market_data.h"
 #include "market_data_protocol_policy.h"
+#ifndef USE_RING_BUFFER
 #include "memory_pool.hpp"
+#endif
 #include "protocol_impl.h"
 #include "stream_state.h"
 #include "trade_engine.hpp"
+
+#ifdef USE_RING_BUFFER
+#include "common/market_data_ring_buffer.hpp"
+#endif
 
 namespace trading {
 template <typename Strategy>
@@ -46,6 +52,44 @@ class MarketConsumer
   using ProtocolPolicy = typename MarketDataProtocolPolicySelector<MdApp>::type;
   using WireMessage = MdApp::WireMessage;
 
+#ifdef USE_RING_BUFFER
+  // RingBuffer 생성자
+  MarketConsumer(const common::Logger::Producer& logger,
+      TradeEngine<Strategy>* trade_engine,
+      common::MarketDataRingBuffer* ring_buffer)
+      : ring_buffer_(ring_buffer),
+        logger_(logger),
+        on_instrument_info_fn_([trade_engine](const InstrumentInfo& info) {
+          trade_engine->on_instrument_info(info);
+        }),
+        app_(std::make_unique<MdApp>("BMDWATCH", "SPOT", logger_,
+            nullptr)) {  // pool은 nullptr
+
+    using WireMessage = MdApp::WireMessage;
+    auto register_handler = [this](const std::string& type, auto&& callback) {
+      if constexpr (std::is_pointer_v<WireMessage>) {
+        app_->register_callback(type,
+            [handler = std::forward<decltype(callback)>(callback)](
+                WireMessage wire_msg) mutable { handler(wire_msg); });
+      } else {
+        app_->register_callback(type,
+            [handler = std::forward<decltype(callback)>(callback)](
+                const WireMessage& wire_msg) mutable { handler(wire_msg); });
+      }
+    };
+
+    register_handler("A", [this](auto&& msg) { on_login(msg); });
+    register_handler("W", [this](auto&& msg) { on_snapshot(msg); });
+    register_handler("X", [this](auto&& msg) { on_subscribe(msg); });
+    register_handler("1", [this](auto&& msg) { on_heartbeat(msg); });
+    register_handler("y", [this](auto&& msg) { on_instrument_list(msg); });
+    register_handler("3", [this](auto&& msg) { on_reject(msg); });
+    register_handler("5", [this](auto&& msg) { on_logout(msg); });
+
+    logger_.info("[Constructor] MarketConsumer (RingBuffer) Created");
+  }
+#else
+  // Pool/Queue 생성자
   MarketConsumer(const common::Logger::Producer& logger,
       TradeEngine<Strategy>* trade_engine,
       common::MemoryPool<MarketUpdateData>* market_update_data_pool,
@@ -85,6 +129,7 @@ class MarketConsumer
 
     logger_.info("[Constructor] MarketConsumer Created");
   }
+#endif
 
   void start() {
     if (!app_->start()) {
@@ -93,7 +138,7 @@ class MarketConsumer
   }
 
   ~MarketConsumer() {
-#ifdef ENABLE_WEBSOCKET
+#if defined(ENABLE_WEBSOCKET) && !defined(USE_RING_BUFFER)
     for (auto* buffered : buffered_events_) {
       for (auto* market_data : buffered->data) {
         market_data_pool_->deallocate(market_data);
@@ -108,7 +153,22 @@ class MarketConsumer
   void stop() { app_->stop(); }
 
   void on_login(WireMessage msg) {
-#ifdef ENABLE_WEBSOCKET
+#ifdef USE_RING_BUFFER
+    // RingBuffer: 버퍼링 상태로 전환, 스냅샷 요청
+    logger_.info(
+        "[MarketConsumer][Login] Market consumer successful (RingBuffer)");
+
+    const std::string message =
+        app_->create_snapshot_request_message(INI_CONFIG.get("meta", "ticker"),
+            INI_CONFIG.get("meta", "level"));
+
+    if (UNLIKELY(!app_->send(message))) {
+      logger_.error(
+          "[MarketConsumer][Message] failed to send snapshot request");
+    }
+    state_ = StreamState::kBuffering;
+    first_buffered_update_id_ = 0;
+#elif defined(ENABLE_WEBSOCKET)
     ProtocolPolicy::handle_login(*app_,
         std::move(msg),
         state_,
@@ -132,6 +192,17 @@ class MarketConsumer
   void on_snapshot(const WireMessage& msg) {
     logger_.info("[MarketConsumer]Snapshot making start");
 
+#ifdef USE_RING_BUFFER
+    // RingBuffer: DomainMapper를 통해 스냅샷을 RingBuffer에 직접 쓰기
+    bool success = app_->write_snapshot_to_ring_buffer(msg, ring_buffer_);
+    if (!success) {
+      logger_.error("[MarketConsumer] Failed to write snapshot to ring buffer");
+      return;
+    }
+
+    state_ = StreamState::kRunning;
+    logger_.info("[MarketConsumer]Snapshot Done (RingBuffer)");
+#else
     auto* snapshot_data = market_update_data_pool_->allocate(
         app_->create_snapshot_data_message(msg));
 
@@ -279,10 +350,26 @@ class MarketConsumer
 
     state_ = StreamState::kRunning;
     logger_.info("[MarketConsumer]Snapshot Done");
+#endif  // USE_RING_BUFFER
   }
 
   void on_subscribe(WireMessage msg) {
-#ifdef ENABLE_WEBSOCKET
+#ifdef USE_RING_BUFFER
+    // RingBuffer: DomainMapper를 통해 RingBuffer에 직접 쓰기
+    if (state_ == StreamState::kBuffering) {
+      // 버퍼링 모드: 스냅샷 대기 중이므로 무시 (또는 별도 버퍼링 로직)
+      // TODO: 필요 시 depth 버퍼링 로직 추가
+      return;
+    }
+
+    if (state_ == StreamState::kRunning) {
+      // 정상 모드: DomainMapper를 통해 RingBuffer에 직접 쓰기
+      bool success = app_->write_to_ring_buffer(msg, ring_buffer_);
+      if (!success) {
+        logger_.error("[MarketConsumer] Failed to write to ring buffer");
+      }
+    }
+#elif defined(ENABLE_WEBSOCKET)
     ProtocolPolicy::handle_subscribe(*app_,
         msg,
         state_,
@@ -352,6 +439,14 @@ class MarketConsumer
   const MdApp& app() const { return *app_; }
 
  private:
+#ifdef USE_RING_BUFFER
+  common::MarketDataRingBuffer* ring_buffer_;
+  const common::Logger::Producer& logger_;
+  std::function<void(const InstrumentInfo&)> on_instrument_info_fn_;
+  std::unique_ptr<MdApp> app_;
+  StreamState state_{StreamState::kAwaitingSnapshot};
+  uint64_t first_buffered_update_id_{0};
+#else
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
   const common::Logger::Producer& logger_;
@@ -370,6 +465,7 @@ class MarketConsumer
   std::atomic<uint64_t> generation_{0};
   std::atomic<uint64_t> current_generation_{0};
 #endif
+#endif  // USE_RING_BUFFER
 };
 
 }  // namespace trading

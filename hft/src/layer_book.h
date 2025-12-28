@@ -73,7 +73,9 @@ struct SideBook {
   std::array<std::optional<PendingReplaceInfo>, kSlotsPerSide> pending_repl;
   absl::flat_hash_map<uint64_t, int> orig_id_to_layer;
   absl::flat_hash_map<uint64_t, int> new_id_to_layer;
-  SideBook() { layer_ticks.fill(kTicksInvalid); }
+  SideBook() {
+    layer_ticks.fill(kTicksInvalid);
+  }  // NOLINT(modernize-use-equals-default)
 };
 
 struct PositionBook {
@@ -181,7 +183,7 @@ class LayerBook {
     if (const int layer = find_free_layer(side_book); layer >= 0)
       return {.layer = layer, .victim_live_layer = std::nullopt, .tick = tick};
     const int vidx = pick_victim_layer(side_book);
-    std::optional<int> victim{};
+    std::optional<int> victim{};  // NOLINT(misc-const-correctness)
     if (side_book.slots[vidx].state == OMOrderState::kLive)
       victim = vidx;
     return {.layer = vidx, .victim_live_layer = victim, .tick = tick};
@@ -198,7 +200,7 @@ class LayerBook {
     for (size_t pos_idx = 0; pos_idx < 2; ++pos_idx) {
       for (size_t side_idx = 0; side_idx < 2; ++side_idx) {
         const auto& side = books_[symbol][pos_idx].sides[side_idx];
-        uint64_t last = 0;
+        uint64_t last = 0;  // NOLINT(misc-const-correctness)
         for (const auto& slot :
             side.slots | std::ranges::views::filter(is_active)) {
           last = std::max(last, slot.last_used);

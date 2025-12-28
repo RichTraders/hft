@@ -23,6 +23,10 @@
 #include "schema/futures/response/trade.h"
 #include "types.h"
 
+#ifdef USE_RING_BUFFER
+#include "common/market_data_ring_buffer.hpp"
+#endif
+
 inline MarketData* make_entry(common::MemoryPool<MarketData>* pool,
     const std::string& symbol, common::Side side, double price, double qty,
     common::MarketUpdateType update_type) {
@@ -58,6 +62,18 @@ struct BinanceFuturesMdMessageConverter {
   [[nodiscard]] auto make_reject_visitor() const {
     return RejectVisitor{*this};
   }
+
+#ifdef USE_RING_BUFFER
+  [[nodiscard]] auto make_ring_buffer_visitor(
+      common::MarketDataRingBuffer* ring_buffer) const {
+    return RingBufferVisitor{*this, ring_buffer};
+  }
+
+  [[nodiscard]] auto make_ring_buffer_snapshot_visitor(
+      common::MarketDataRingBuffer* ring_buffer) const {
+    return RingBufferSnapshotVisitor{*this, ring_buffer};
+  }
+#endif
 
  private:
   const common::Logger::Producer& logger_;
@@ -408,5 +424,148 @@ struct BinanceFuturesMdMessageConverter {
    private:
     const common::Logger::Producer& logger_;
   };
+
+#ifdef USE_RING_BUFFER
+  // RingBuffer에 직접 쓰기 위한 Visitor
+  struct RingBufferVisitor {
+    RingBufferVisitor(const BinanceFuturesMdMessageConverter& converter,
+        common::MarketDataRingBuffer* ring_buffer)
+        : logger_(converter.logger_), ring_buffer_(ring_buffer) {}
+
+    [[nodiscard]] bool operator()(std::monostate) const {
+      return true;  // No-op
+    }
+
+    [[nodiscard]] bool operator()(
+        const schema::futures::DepthResponse& msg) const {
+      const size_t bid_count = msg.data.bids.size();
+      const size_t ask_count = msg.data.asks.size();
+      const size_t total_count = bid_count + ask_count;
+
+      if (total_count == 0) {
+        return true;
+      }
+
+      thread_local std::vector<common::MarketDataEntry> temp_entries;
+      temp_entries.clear();
+      temp_entries.reserve(total_count);
+
+      for (const auto& bid : msg.data.bids) {
+        const double qty = bid[1];
+        const auto type = qty <= 0.0 ? common::MarketUpdateType::kCancel
+                                     : common::MarketUpdateType::kAdd;
+        temp_entries.push_back({type,
+            common::Side::kBuy,
+            common::Price{bid[0]},
+            common::Qty{qty}});
+      }
+
+      for (const auto& ask : msg.data.asks) {
+        const double qty = ask[1];
+        const auto type = qty <= 0.0 ? common::MarketUpdateType::kCancel
+                                     : common::MarketUpdateType::kAdd;
+        temp_entries.push_back({type,
+            common::Side::kSell,
+            common::Price{ask[0]},
+            common::Qty{qty}});
+      }
+
+      return ring_buffer_->write_depth(msg.data.start_update_id,
+          msg.data.end_update_id,
+          msg.data.final_update_id_in_last_stream,
+          temp_entries.data(),
+          temp_entries.size());
+    }
+
+    [[nodiscard]] bool operator()(
+        const schema::futures::TradeEvent& msg) const {
+      const auto side = msg.data.is_buyer_market_maker ? common::Side::kSell
+                                                       : common::Side::kBuy;
+      return ring_buffer_->write_trade(side,
+          common::Price{msg.data.price},
+          common::Qty{msg.data.quantity});
+    }
+
+    [[nodiscard]] bool operator()(
+        const schema::futures::BookTickerEvent& msg) const {
+      return ring_buffer_->write_book_ticker(
+          common::Price{msg.data.best_bid_price},
+          common::Qty{msg.data.best_bid_qty},
+          common::Price{msg.data.best_ask_price},
+          common::Qty{msg.data.best_ask_qty});
+    }
+
+    [[nodiscard]] bool operator()(
+        const schema::futures::DepthSnapshot& /*msg*/) const {
+      // Snapshot은 별도 visitor 사용
+      return true;
+    }
+
+    [[nodiscard]] bool operator()(
+        const schema::futures::ApiResponse& /*msg*/) const {
+      return true;
+    }
+
+    [[nodiscard]] bool operator()(
+        const schema::futures::ExchangeInfoHttpResponse& /*msg*/) const {
+      return true;
+    }
+
+   private:
+    [[maybe_unused]] const common::Logger::Producer& logger_;
+    common::MarketDataRingBuffer* ring_buffer_;
+  };
+
+  struct RingBufferSnapshotVisitor {
+    RingBufferSnapshotVisitor(const BinanceFuturesMdMessageConverter& converter,
+        common::MarketDataRingBuffer* ring_buffer)
+        : logger_(converter.logger_), ring_buffer_(ring_buffer) {}
+
+    [[nodiscard]] bool operator()(std::monostate) const { return false; }
+
+    [[nodiscard]] bool operator()(
+        const schema::futures::DepthSnapshot& msg) const {
+      const size_t bid_count = msg.result.bids.size();
+      const size_t ask_count = msg.result.asks.size();
+      const size_t total_count = bid_count + ask_count;
+
+      if (total_count == 0) {
+        return true;
+      }
+
+      thread_local std::vector<common::MarketDataEntry> temp_entries;
+      temp_entries.clear();
+      temp_entries.reserve(total_count);
+
+      for (const auto& [price, qty] : msg.result.bids) {
+        temp_entries.push_back({common::MarketUpdateType::kAdd,
+            common::Side::kBuy,
+            common::Price{price},
+            common::Qty{qty}});
+      }
+
+      for (const auto& [price, qty] : msg.result.asks) {
+        temp_entries.push_back({common::MarketUpdateType::kAdd,
+            common::Side::kSell,
+            common::Price{price},
+            common::Qty{qty}});
+      }
+
+      return ring_buffer_->write_snapshot(msg.result.book_update_id,
+          temp_entries.data(),
+          temp_entries.size());
+    }
+
+    template <typename T>
+    [[nodiscard]] bool operator()(const T&) const {
+      logger_.error("Snapshot requested from non-depth wire message");
+      return false;
+    }
+
+   private:
+    const common::Logger::Producer& logger_;
+    common::MarketDataRingBuffer* ring_buffer_;
+  };
+#endif
 };
 #endif  //BINANCE_FUTURE_MESSAGE_VISITOR_H

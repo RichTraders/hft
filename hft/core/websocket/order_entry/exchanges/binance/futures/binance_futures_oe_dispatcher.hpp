@@ -24,24 +24,30 @@ struct BinanceFuturesOeDispatchRouter {
   static constexpr int kHttpOK = 200;
 
   template <typename T>
-  static constexpr std::optional<std::string_view> get_dispatch_type(const T& msg) {
+  static constexpr std::optional<std::string_view> get_dispatch_type(
+      const T& msg) {
     using MsgType = std::decay_t<T>;
 
-    if constexpr (std::is_same_v<MsgType, schema::futures::ExecutionReportResponse>) {
-      if (msg.event.execution_type == "CANCELED" && msg.event.reject_reason != "NONE") {
+    if constexpr (std::is_same_v<MsgType,
+                      schema::futures::ExecutionReportResponse>) {
+      if (msg.event.execution_type == "CANCELED" &&
+          msg.event.reject_reason != "NONE") {
         return "9";
       }
       return "8";
-    } else if constexpr (std::is_same_v<MsgType, schema::futures::SessionLogonResponse>) {
+    } else if constexpr (std::is_same_v<MsgType,
+                             schema::futures::SessionLogonResponse>) {
       return "A";
-    } else if constexpr (std::is_same_v<MsgType, schema::futures::ApiResponse>) {
+    } else if constexpr (std::is_same_v<MsgType,
+                             schema::futures::ApiResponse>) {
       if (msg.status != kHttpOK) {
         return "8";
       }
       return std::nullopt;
-    } else if constexpr (std::is_same_v<MsgType, schema::futures::PlaceOrderResponse>) {
-      return std::nullopt;
-    } else if constexpr (std::is_same_v<MsgType, schema::futures::AccountUpdateResponse>) {
+    } else if constexpr (std::is_same_v<MsgType,
+                             schema::futures::PlaceOrderResponse> ||
+                         std::is_same_v<MsgType,
+                             schema::futures::AccountUpdateResponse>) {
       return std::nullopt;
     }
     return std::nullopt;
@@ -51,39 +57,62 @@ struct BinanceFuturesOeDispatchRouter {
   static void process_message(
       const typename ExchangeTraits::WireMessage& message,
       const ContextType& context) {
-    std::visit([&context, &message](auto&& arg) {
-      using T = std::decay_t<decltype(arg)>;
+    std::visit(
+        [&context, &message](auto&& arg) {
+          using T = std::decay_t<decltype(arg)>;
 
-      if constexpr (std::is_same_v<T, typename ExchangeTraits::ExecutionReportResponse>) {
-        handle_execution_report<ExchangeTraits>(arg, context, message);
-      } else if constexpr (std::is_same_v<T, typename ExchangeTraits::SessionLogonResponse>) {
-        handle_session_logon<ExchangeTraits>(arg, context, message);
-      } else if constexpr (std::is_same_v<T, typename ExchangeTraits::SessionUserSubscriptionResponse>) {
-        handle_user_subscription<ExchangeTraits>(arg, context, message);
-      } else if constexpr (std::is_same_v<T, typename ExchangeTraits::CancelAndReorderResponse>) {
-        if constexpr (ExchangeTraits::supports_cancel_and_reorder()) {
-          handle_cancel_and_reorder_response<ExchangeTraits>(arg, context, message);
-        }
-      } else if constexpr (std::is_same_v<T, typename ExchangeTraits::ModifyOrderResponse>) {
-        handle_modify_order_response<ExchangeTraits>(arg, context, message);
-      } else if constexpr (std::is_same_v<T, typename ExchangeTraits::CancelAllOrdersResponse>) {
-        handle_cancel_all_response<ExchangeTraits>(arg, context, message);
-      } else if constexpr (std::is_same_v<T, typename ExchangeTraits::PlaceOrderResponse>) {
-        handle_place_order_response<ExchangeTraits>(arg, context, message);
-      } else if constexpr (std::is_same_v<T, typename ExchangeTraits::CancelOrderResponse>) {
-        handle_cancel_order_response<ExchangeTraits>(arg, context, message);
-      } else if constexpr (std::is_same_v<T, typename ExchangeTraits::ApiResponse>) {
-        handle_api_response<ExchangeTraits>(arg, context, message);
-      } else if constexpr (std::is_same_v<T, typename ExchangeTraits::BalanceUpdateEnvelope>) {
-        handle_balance_update<ExchangeTraits>(arg, context);
-      } else if constexpr (std::is_same_v<T, typename ExchangeTraits::OutboundAccountPositionEnvelope>) {
-        handle_account_updated<ExchangeTraits>(arg, context);
-      } else if constexpr (std::is_same_v<T, typename ExchangeTraits::ListenKeyExpiredEvent>) {
-        handle_listen_key_expired<ExchangeTraits>(arg, context);
-      } else if constexpr (!std::is_same_v<T, std::monostate>) {
-        context.logger->warn("[Dispatcher] Unhandled message type");
-      }
-    }, message);
+          if constexpr (std::is_same_v<T,
+                            typename ExchangeTraits::ExecutionReportResponse>) {
+            handle_execution_report<ExchangeTraits>(arg, context, message);
+          } else if constexpr (std::is_same_v<T,
+                                   typename ExchangeTraits::
+                                       SessionLogonResponse>) {
+            handle_session_logon<ExchangeTraits>(arg, context, message);
+          } else if constexpr (std::is_same_v<T,
+                                   typename ExchangeTraits::
+                                       SessionUserSubscriptionResponse>) {
+            handle_user_subscription<ExchangeTraits>(arg, context, message);
+          } else if constexpr (std::is_same_v<T,
+                                   typename ExchangeTraits::
+                                       CancelAndReorderResponse>) {
+            if constexpr (ExchangeTraits::supports_cancel_and_reorder()) {
+              handle_cancel_and_reorder_response<ExchangeTraits>(arg,
+                  context,
+                  message);
+            }
+          } else if constexpr (
+              std::is_same_v<T, typename ExchangeTraits::ModifyOrderResponse>) {
+            handle_modify_order_response<ExchangeTraits>(arg, context, message);
+          } else if constexpr (std::is_same_v<T,
+                                   typename ExchangeTraits::
+                                       CancelAllOrdersResponse>) {
+            handle_cancel_all_response<ExchangeTraits>(arg, context, message);
+          } else if constexpr (
+              std::is_same_v<T, typename ExchangeTraits::PlaceOrderResponse>) {
+            handle_place_order_response<ExchangeTraits>(arg, context, message);
+          } else if constexpr (
+              std::is_same_v<T, typename ExchangeTraits::CancelOrderResponse>) {
+            handle_cancel_order_response<ExchangeTraits>(arg, context, message);
+          } else if constexpr (std::is_same_v<T,
+                                   typename ExchangeTraits::ApiResponse>) {
+            handle_api_response<ExchangeTraits>(arg, context, message);
+          } else if constexpr (std::is_same_v<T,
+                                   typename ExchangeTraits::
+                                       BalanceUpdateEnvelope>) {
+            handle_balance_update<ExchangeTraits>(arg, context);
+          } else if constexpr (std::is_same_v<T,
+                                   typename ExchangeTraits::
+                                       OutboundAccountPositionEnvelope>) {
+            handle_account_updated<ExchangeTraits>(arg, context);
+          } else if constexpr (std::is_same_v<T,
+                                   typename ExchangeTraits::
+                                       ListenKeyExpiredEvent>) {
+            handle_listen_key_expired<ExchangeTraits>(arg, context);
+          } else if constexpr (!std::is_same_v<T, std::monostate>) {
+            context.logger->warn("[Dispatcher] Unhandled message type");
+          }
+        },
+        message);
   }
 
  private:
@@ -101,7 +130,8 @@ struct BinanceFuturesOeDispatchRouter {
 
     context.app->dispatch(std::string(dispatch_type), message);
     context.order_manager->remove_pending_request(event.client_order_id);
-    context.order_manager->remove_cancel_and_reorder_pair(event.client_order_id);
+    context.order_manager->remove_cancel_and_reorder_pair(
+        event.client_order_id);
   }
 
   template <typename ExchangeTraits, typename ContextType>
@@ -113,21 +143,26 @@ struct BinanceFuturesOeDispatchRouter {
       context.logger->info("[Dispatcher] session.logon successful");
 
       if constexpr (ExchangeTraits::requires_listen_key()) {
-        const std::string user_stream_msg = context.app->create_user_data_stream_subscribe();
+        const std::string user_stream_msg =
+            context.app->create_user_data_stream_subscribe();
         if (!user_stream_msg.empty()) {
           context.app->send(user_stream_msg);
-          context.logger->info("[Dispatcher] Sent userDataStream.start request");
+          context.logger->info(
+              "[Dispatcher] Sent userDataStream.start request");
         }
       } else {
-        const std::string user_stream_msg = context.app->create_user_data_stream_subscribe();
+        const std::string user_stream_msg =
+            context.app->create_user_data_stream_subscribe();
         if (!user_stream_msg.empty()) {
           context.app->send(user_stream_msg);
         }
       }
     } else {
       if (response.error.has_value()) {
-        context.logger->error("[Dispatcher] session.logon failed: status={}, error={}",
-                              response.status, response.error.value().message);
+        context.logger->error(
+            "[Dispatcher] session.logon failed: status={}, error={}",
+            response.status,
+            response.error.value().message);
       }
     }
     context.app->dispatch("A", message);
@@ -139,17 +174,24 @@ struct BinanceFuturesOeDispatchRouter {
       const ContextType& context,
       const typename ExchangeTraits::WireMessage& /*message*/) {
     if (response.status != kHttpOK) {
-      context.logger->warn("[Dispatcher] UserDataStream response failed: id={}, status={}",
-                           response.id, response.status);
+      context.logger->warn(
+          "[Dispatcher] UserDataStream response failed: id={}, status={}",
+          response.id,
+          response.status);
       return;
     }
 
     if constexpr (ExchangeTraits::requires_listen_key()) {
-      if (response.result.has_value() && !response.result.value().listen_key.empty()) {
-        context.app->handle_listen_key_response(response.result.value().listen_key);
-        context.logger->info("[Dispatcher] Received listenKey, delegating to app for stream setup");
+      if (response.result.has_value() &&
+          !response.result.value().listen_key.empty()) {
+        context.app->handle_listen_key_response(
+            response.result.value().listen_key);
+        context.logger->info(
+            "[Dispatcher] Received listenKey, delegating to app for stream "
+            "setup");
       } else {
-        context.logger->error("[Dispatcher] UserDataStream response missing listenKey");
+        context.logger->error(
+            "[Dispatcher] UserDataStream response missing listenKey");
       }
     }
   }
@@ -161,8 +203,11 @@ struct BinanceFuturesOeDispatchRouter {
       const typename ExchangeTraits::WireMessage& message) {
     if (response.status != kHttpOK) {
       if (response.error.has_value()) {
-        context.logger->warn("[Dispatcher] API response failed: id={}, status={}, error={}",
-                             response.id, response.status, response.error.value().message);
+        context.logger->warn(
+            "[Dispatcher] API response failed: id={}, status={}, error={}",
+            response.id,
+            response.status,
+            response.error.value().message);
         context.app->dispatch("8", message);
       }
     }
@@ -175,8 +220,11 @@ struct BinanceFuturesOeDispatchRouter {
       const typename ExchangeTraits::WireMessage& /*message*/) {
     if (response.status != kHttpOK && response.error.has_value()) {
       const auto& error = response.error.value();
-      context.logger->warn("[Dispatcher] CancelAndReorder failed: id={}, status={}, error={}",
-                           response.id, response.status, error.message);
+      context.logger->warn(
+          "[Dispatcher] CancelAndReorder failed: id={}, status={}, error={}",
+          response.id,
+          response.status,
+          error.message);
 
       if (!error.data.has_value()) {
         return;
@@ -185,10 +233,12 @@ struct BinanceFuturesOeDispatchRouter {
       const auto& error_data = error.data.value();
 
       const auto new_order_id_opt =
-          core::WsOrderManager<ExchangeTraits>::extract_client_order_id(response.id);
+          core::WsOrderManager<ExchangeTraits>::extract_client_order_id(
+              response.id);
       if (!new_order_id_opt.has_value()) {
-        context.logger->error("[Dispatcher] Failed to extract client_order_id from {}",
-                              response.id);
+        context.logger->error(
+            "[Dispatcher] Failed to extract client_order_id from {}",
+            response.id);
         return;
       }
       std::uint64_t new_order_id = new_order_id_opt.value();
@@ -196,11 +246,15 @@ struct BinanceFuturesOeDispatchRouter {
       const auto original_order_id_opt =
           context.order_manager->get_original_order_id(new_order_id);
       if (!original_order_id_opt.has_value()) {
-        context.logger->warn("[Dispatcher] No cancel_and_reorder pair found for new_order_id={}",
-                             new_order_id);
+        context.logger->warn(
+            "[Dispatcher] No cancel_and_reorder pair found for new_order_id={}",
+            new_order_id);
 
-        auto synthetic_report = context.order_manager->create_synthetic_execution_report(
-            response.id, error.code, error.message);
+        auto synthetic_report =
+            context.order_manager->create_synthetic_execution_report(
+                response.id,
+                error.code,
+                error.message);
         if (synthetic_report.has_value()) {
           context.app->dispatch("8", synthetic_report.value());
         }
@@ -209,25 +263,36 @@ struct BinanceFuturesOeDispatchRouter {
       const auto original_order_id = original_order_id_opt.value();
 
       if (error_data.new_order_result != "SUCCESS") {
-        context.logger->info("[Dispatcher] New order {}, creating synthetic report",
-                             error_data.new_order_result);
-        auto new_order_report = context.order_manager->create_synthetic_execution_report(
-            response.id, error.code, error.message);
+        context.logger->info(
+            "[Dispatcher] New order {}, creating synthetic report",
+            error_data.new_order_result);
+        auto new_order_report =
+            context.order_manager->create_synthetic_execution_report(
+                response.id,
+                error.code,
+                error.message);
         if (new_order_report.has_value()) {
           context.app->dispatch("8", new_order_report.value());
         }
       }
 
-      if (error_data.cancel_result == "FAILURE" && error_data.new_order_result != "SUCCESS") {
-        context.logger->info("[Dispatcher] Cancel FAILURE, creating synthetic report");
-        const auto orig_request_id = "ordercancel_" + std::to_string(original_order_id);
-        auto cancel_report = context.order_manager->create_synthetic_execution_report(
-            orig_request_id, error.code, error.message);
+      if (error_data.cancel_result == "FAILURE" &&
+          error_data.new_order_result != "SUCCESS") {
+        context.logger->info(
+            "[Dispatcher] Cancel FAILURE, creating synthetic report");
+        const auto orig_request_id =
+            "ordercancel_" + std::to_string(original_order_id);
+        auto cancel_report =
+            context.order_manager->create_synthetic_execution_report(
+                orig_request_id,
+                error.code,
+                error.message);
         if (cancel_report.has_value()) {
           context.app->dispatch("8", cancel_report.value());
         }
       } else if (error_data.cancel_result == "SUCCESS") {
-        context.logger->info("[Dispatcher] Cancel SUCCESS (no synthetic report needed)");
+        context.logger->info(
+            "[Dispatcher] Cancel SUCCESS (no synthetic report needed)");
       }
 
       context.order_manager->remove_pending_request(new_order_id);
@@ -242,11 +307,16 @@ struct BinanceFuturesOeDispatchRouter {
       const ContextType& context,
       const typename ExchangeTraits::WireMessage& /*message*/) {
     if (response.status != kHttpOK && response.error.has_value()) {
-      context.logger->warn("[Dispatcher] ModifyOrder failed: id={}, status={}, error={}",
-                           response.id, response.status, response.error.value().message);
+      context.logger->warn(
+          "[Dispatcher] ModifyOrder failed: id={}, status={}, error={}",
+          response.id,
+          response.status,
+          response.error.value().message);
 
-      auto synthetic_report = context.order_manager->create_synthetic_execution_report(
-          response.id, response.error.value().code, response.error.value().message);
+      auto synthetic_report =
+          context.order_manager->create_synthetic_execution_report(response.id,
+              response.error.value().code,
+              response.error.value().message);
       if (synthetic_report.has_value()) {
         context.app->dispatch("8", synthetic_report.value());
       }
@@ -258,16 +328,23 @@ struct BinanceFuturesOeDispatchRouter {
       const typename ExchangeTraits::CancelAllOrdersResponse& response,
       const ContextType& context,
       const typename ExchangeTraits::WireMessage& /*message*/) {
-    if constexpr (std::is_same_v<typename ExchangeTraits::CancelAllOrdersResponse, std::monostate>) {
+    if constexpr (std::is_same_v<
+                      typename ExchangeTraits::CancelAllOrdersResponse,
+                      std::monostate>) {
       return;
     }
 
     if (response.status != kHttpOK && response.error.has_value()) {
-      context.logger->warn("[Dispatcher] CancelAll failed: id={}, status={}, error={}",
-                           response.id, response.status, response.error.value().message);
+      context.logger->warn(
+          "[Dispatcher] CancelAll failed: id={}, status={}, error={}",
+          response.id,
+          response.status,
+          response.error.value().message);
 
-      auto synthetic_report = context.order_manager->create_synthetic_execution_report(
-          response.id, response.error.value().code, response.error.value().message);
+      auto synthetic_report =
+          context.order_manager->create_synthetic_execution_report(response.id,
+              response.error.value().code,
+              response.error.value().message);
       if (synthetic_report.has_value()) {
         context.app->dispatch("8", synthetic_report.value());
       }
@@ -280,11 +357,16 @@ struct BinanceFuturesOeDispatchRouter {
       const ContextType& context,
       const typename ExchangeTraits::WireMessage& /*message*/) {
     if (response.status != kHttpOK && response.error.has_value()) {
-      context.logger->warn("[Dispatcher] PlaceOrder failed: id={}, status={}, error={}",
-                           response.id, response.status, response.error.value().message);
+      context.logger->warn(
+          "[Dispatcher] PlaceOrder failed: id={}, status={}, error={}",
+          response.id,
+          response.status,
+          response.error.value().message);
 
-      auto synthetic_report = context.order_manager->create_synthetic_execution_report(
-          response.id, response.error.value().code, response.error.value().message);
+      auto synthetic_report =
+          context.order_manager->create_synthetic_execution_report(response.id,
+              response.error.value().code,
+              response.error.value().message);
       if (synthetic_report.has_value()) {
         context.app->dispatch("8", synthetic_report.value());
       }
@@ -294,48 +376,57 @@ struct BinanceFuturesOeDispatchRouter {
   template <typename ExchangeTraits, typename ContextType>
   static void handle_cancel_order_response(
       const typename ExchangeTraits::CancelOrderResponse& response,
-      const ContextType& context,
-      const typename ExchangeTraits::WireMessage&) {
+      const ContextType& context, const typename ExchangeTraits::WireMessage&) {
     if (response.status == kHttpOK) {
-      context.logger->debug("[Dispatcher] CancelOrder success: id={}, orderId={}, status={}",
-                            response.id, response.result.order_id, response.result.status);
+      context.logger->debug(
+          "[Dispatcher] CancelOrder success: id={}, orderId={}, status={}",
+          response.id,
+          response.result.order_id,
+          response.result.status);
     } else {
       context.logger->warn("[Dispatcher] CancelOrder failed: id={}, status={}",
-                           response.id, response.status);
+          response.id,
+          response.status);
     }
 
     const auto client_order_id_opt =
-        core::WsOrderManager<ExchangeTraits>::extract_client_order_id(response.id);
+        core::WsOrderManager<ExchangeTraits>::extract_client_order_id(
+            response.id);
     if (client_order_id_opt.has_value()) {
-      context.order_manager->remove_pending_request(client_order_id_opt.value());
+      context.order_manager->remove_pending_request(
+          client_order_id_opt.value());
     }
   }
 
   template <typename ExchangeTraits, typename ContextType>
   static void handle_balance_update(
       const typename ExchangeTraits::BalanceUpdateEnvelope& /*envelope*/,
-      const ContextType& /*context*/) {
-  }
+      const ContextType& /*context*/) {}
 
   template <typename ExchangeTraits, typename ContextType>
   static void handle_account_updated(
-      const typename ExchangeTraits::OutboundAccountPositionEnvelope& /*envelope*/,
-      const ContextType& /*context*/) {
-  }
+      const typename ExchangeTraits::
+          OutboundAccountPositionEnvelope& /*envelope*/,
+      const ContextType& /*context*/) {}
 
   template <typename ExchangeTraits, typename ContextType>
   static void handle_listen_key_expired(
       const typename ExchangeTraits::ListenKeyExpiredEvent& event,
       const ContextType& context) {
-    context.logger->warn("[Dispatcher] listenKey expired at event_time={}, requesting new listenKey",
-                         event.event_time);
+    context.logger->warn(
+        "[Dispatcher] listenKey expired at event_time={}, requesting new "
+        "listenKey",
+        event.event_time);
 
-    const std::string user_stream_msg = context.app->create_user_data_stream_subscribe();
+    const std::string user_stream_msg =
+        context.app->create_user_data_stream_subscribe();
     if (!user_stream_msg.empty()) {
       context.app->send(user_stream_msg);
-      context.logger->info("[Dispatcher] Sent userDataStream.start to obtain new listenKey");
+      context.logger->info(
+          "[Dispatcher] Sent userDataStream.start to obtain new listenKey");
     } else {
-      context.logger->error("[Dispatcher] Failed to create userDataStream.start message");
+      context.logger->error(
+          "[Dispatcher] Failed to create userDataStream.start message");
     }
   }
 };

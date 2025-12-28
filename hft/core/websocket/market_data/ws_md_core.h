@@ -22,6 +22,10 @@
 #include "ws_md_domain_mapper.h"
 #include "ws_md_encoder.hpp"
 
+#ifdef USE_RING_BUFFER
+#include "common/market_data_ring_buffer.hpp"
+#endif
+
 namespace core {
 template <ExchangeTraits Exchange, typename DecoderType>
 class WsMdCore {
@@ -91,6 +95,18 @@ class WsMdCore {
   [[nodiscard]] WireMessage decode(std::string_view payload) const {
     return decoder_.decode(payload);
   }
+
+#ifdef USE_RING_BUFFER
+  bool write_to_ring_buffer(const WireMessage& msg,
+      common::MarketDataRingBuffer* ring_buffer) const {
+    return mapper_.write_to_ring_buffer(msg, ring_buffer);
+  }
+
+  bool write_snapshot_to_ring_buffer(const WireMessage& msg,
+      common::MarketDataRingBuffer* ring_buffer) const {
+    return mapper_.write_snapshot_to_ring_buffer(msg, ring_buffer);
+  }
+#endif
 
  private:
   const common::Logger::Producer& logger_;

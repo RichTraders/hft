@@ -24,6 +24,10 @@
 #include "ws_md_core.h"
 #include "ws_transport.h"
 
+#ifdef USE_RING_BUFFER
+#include "common/market_data_ring_buffer.hpp"
+#endif
+
 #ifdef USE_FUTURES_API
 #include "binance_futures_traits.h"
 #else
@@ -220,6 +224,18 @@ class WsMarketDataAppT {
       const WireMessage& msg) const {
     return stream_core_.create_reject_message(msg);
   }
+
+#ifdef USE_RING_BUFFER
+  bool write_to_ring_buffer(const WireMessage& msg,
+      common::MarketDataRingBuffer* ring_buffer) const {
+    return stream_core_.write_to_ring_buffer(msg, ring_buffer);
+  }
+
+  bool write_snapshot_to_ring_buffer(const WireMessage& msg,
+      common::MarketDataRingBuffer* ring_buffer) const {
+    return stream_core_.write_snapshot_to_ring_buffer(msg, ring_buffer);
+  }
+#endif
 
   [[nodiscard]] std::optional<InstrumentInfo> fetch_instrument_info_http(
       const std::string& symbol = "") const {

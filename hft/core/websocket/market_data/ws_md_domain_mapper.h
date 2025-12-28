@@ -22,6 +22,10 @@
 #include "exchange_traits.h"
 #include "protocol_decoder.h"
 
+#ifdef USE_RING_BUFFER
+#include "common/market_data_ring_buffer.hpp"
+#endif
+
 namespace core {
 
 template <ExchangeTraits Exchange, ProtocolDecoder Decoder>
@@ -65,6 +69,40 @@ class WsMdDomainMapper {
     // return std::visit(converter.make_reject_visitor(), msg);
     return MarketDataReject();
   }
+
+#ifdef USE_RING_BUFFER
+  /**
+   * RingBuffer에 market data 직접 쓰기
+   */
+  bool write_to_ring_buffer(const WireMessage& msg,
+      common::MarketDataRingBuffer* ring_buffer) const {
+    if constexpr (std::is_same_v<Converter, std::monostate>) {
+      (void)msg;
+      (void)ring_buffer;
+      return false;
+    } else {
+      Converter converter(logger_, market_data_pool_);
+      return std::visit(converter.make_ring_buffer_visitor(ring_buffer), msg);
+    }
+  }
+
+  /**
+   * RingBuffer에 snapshot 직접 쓰기
+   */
+  bool write_snapshot_to_ring_buffer(const WireMessage& msg,
+      common::MarketDataRingBuffer* ring_buffer) const {
+    if constexpr (std::is_same_v<Converter, std::monostate>) {
+      (void)msg;
+      (void)ring_buffer;
+      return false;
+    } else {
+      Converter converter(logger_, market_data_pool_);
+      return std::visit(
+          converter.make_ring_buffer_snapshot_visitor(ring_buffer),
+          msg);
+    }
+  }
+#endif
 
  private:
   using Side = common::Side;

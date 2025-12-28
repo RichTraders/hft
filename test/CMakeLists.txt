@@ -135,3 +135,96 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION "${TEST_RUNTIME_DIR}
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION "${TEST_RUNTIME_DIR}")
+
+# =============================================================================
+# Full Pipeline Benchmark 타겟들 (별도 타겟)
+# =============================================================================
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/full_pipeline_benchmark_tests.cpp")
+    # Onepass + RingBuffer 버전
+    add_executable(full_pipeline_ringbuffer_benchmark_tests
+            full_pipeline_benchmark_tests.cpp)
+    target_compile_definitions(full_pipeline_ringbuffer_benchmark_tests PRIVATE
+            ENABLE_WEBSOCKET
+            UNIT_TEST
+            USE_RING_BUFFER
+            USE_ONEPASS_DECODER
+            MEASUREMENT)
+    target_link_libraries(full_pipeline_ringbuffer_benchmark_tests PRIVATE
+            HftLib_ws
+            GTest::gtest_main
+            GTest::gmock
+            cap)
+    target_precompile_headers(full_pipeline_ringbuffer_benchmark_tests PRIVATE
+            ${CMAKE_SOURCE_DIR}/include/pch.h)
+    target_include_directories(full_pipeline_ringbuffer_benchmark_tests PRIVATE
+            ${TEST_STRATEGY_INCLUDE_DIR})
+    target_compile_options(full_pipeline_ringbuffer_benchmark_tests PRIVATE
+            -Wno-missing-field-initializers
+            -Wno-error=unused-parameter
+            -Wno-error=unused-function
+            -Wno-error=return-type-c-linkage)
+
+    # Onepass + Pool/Queue 버전
+    add_executable(full_pipeline_onepass_benchmark_tests
+            full_pipeline_benchmark_tests.cpp)
+    target_compile_definitions(full_pipeline_onepass_benchmark_tests PRIVATE
+            ENABLE_WEBSOCKET
+            UNIT_TEST
+            USE_ONEPASS_DECODER
+            MEASUREMENT)
+    target_link_libraries(full_pipeline_onepass_benchmark_tests PRIVATE
+            HftLib_ws
+            GTest::gtest_main
+            GTest::gmock
+            cap)
+    target_precompile_headers(full_pipeline_onepass_benchmark_tests PRIVATE
+            ${CMAKE_SOURCE_DIR}/include/pch.h)
+    target_include_directories(full_pipeline_onepass_benchmark_tests PRIVATE
+            ${TEST_STRATEGY_INCLUDE_DIR})
+    target_compile_options(full_pipeline_onepass_benchmark_tests PRIVATE
+            -Wno-missing-field-initializers
+            -Wno-error=unused-parameter
+            -Wno-error=unused-function
+            -Wno-error=return-type-c-linkage)
+
+    # Json + Pool/Queue 버전 (기존 방식)
+    add_executable(full_pipeline_json_benchmark_tests
+            full_pipeline_benchmark_tests.cpp)
+    target_compile_definitions(full_pipeline_json_benchmark_tests PRIVATE
+            ENABLE_WEBSOCKET
+            UNIT_TEST
+            MEASUREMENT)
+    target_link_libraries(full_pipeline_json_benchmark_tests PRIVATE
+            HftLib_ws
+            GTest::gtest_main
+            GTest::gmock
+            cap)
+    target_precompile_headers(full_pipeline_json_benchmark_tests PRIVATE
+            ${CMAKE_SOURCE_DIR}/include/pch.h)
+    target_include_directories(full_pipeline_json_benchmark_tests PRIVATE
+            ${TEST_STRATEGY_INCLUDE_DIR})
+    target_compile_options(full_pipeline_json_benchmark_tests PRIVATE
+            -Wno-missing-field-initializers
+            -Wno-error=unused-parameter
+            -Wno-error=unused-function
+            -Wno-error=return-type-c-linkage)
+
+    if (ENABLE_ASAN)
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            target_compile_options(full_pipeline_ringbuffer_benchmark_tests PRIVATE
+                    -Wno-error=maybe-uninitialized -Wno-maybe-uninitialized)
+            target_compile_options(full_pipeline_onepass_benchmark_tests PRIVATE
+                    -Wno-error=maybe-uninitialized -Wno-maybe-uninitialized)
+            target_compile_options(full_pipeline_json_benchmark_tests PRIVATE
+                    -Wno-error=maybe-uninitialized -Wno-maybe-uninitialized)
+        elseif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+            target_compile_options(full_pipeline_ringbuffer_benchmark_tests PRIVATE
+                    -Wno-error=uninitialized -Wno-uninitialized)
+            target_compile_options(full_pipeline_onepass_benchmark_tests PRIVATE
+                    -Wno-error=uninitialized -Wno-uninitialized)
+            target_compile_options(full_pipeline_json_benchmark_tests PRIVATE
+                    -Wno-error=uninitialized -Wno-uninitialized)
+        endif()
+    endif()
+endif()
+

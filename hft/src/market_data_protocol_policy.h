@@ -23,6 +23,11 @@
 #include "market_data.h"
 #include "stream_state.h"
 
+#ifdef USE_RING_BUFFER
+#include "common/market_data_ring_buffer.hpp"
+#include "websocket/market_data/exchanges/binance/futures/binance_future_ring_buffer_converter.hpp"
+#endif
+
 namespace trading {
 
 struct WebSocketMarketDataPolicy {

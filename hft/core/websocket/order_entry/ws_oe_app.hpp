@@ -46,9 +46,8 @@ constexpr int kDefaultRecvWindow = 5000;
 
 inline std::string get_signature_base64_impl(std::string_view timestamp_ms,
     std::uint32_t recv_window_ms = kDefaultRecvWindow) {
-  EVP_PKEY* private_key =
-      Util::load_ed25519(AUTHORIZATION.get_pem_file_path(),
-          AUTHORIZATION.get_private_password().c_str());
+  EVP_PKEY* private_key = Util::load_ed25519(AUTHORIZATION.get_pem_file_path(),
+      AUTHORIZATION.get_private_password().c_str());
 
   std::vector<std::pair<std::string, std::string>> params;
   params.emplace_back("apiKey", AUTHORIZATION.get_api_key());
@@ -82,7 +81,7 @@ using DefaultOeApiTransport = WebSocketTransport<"OEApi">;
 using DefaultOeStreamTransport = WebSocketTransport<"OEStream">;
 
 template <typename ApiTransportT = DefaultOeApiTransport,
-          typename StreamTransportT = DefaultOeStreamTransport>
+    typename StreamTransportT = DefaultOeStreamTransport>
 class WsOrderEntryAppT {
  public:
   using ApiTransportType = ApiTransportT;
@@ -99,9 +98,9 @@ class WsOrderEntryAppT {
       WsOeCoreImpl::ExchangeTraits::requires_stream_transport(),
       std::unique_ptr<StreamTransportType>, std::monostate>;
 
-  using DispatchContextType = WsOeDispatchContext<
-      typename WsOeCoreImpl::ExchangeTraits,
-      WsOrderEntryAppT<ApiTransportT, StreamTransportT>>;
+  using DispatchContextType =
+      WsOeDispatchContext<typename WsOeCoreImpl::ExchangeTraits,
+          WsOrderEntryAppT<ApiTransportT, StreamTransportT>>;
 
   using OptionalKeepaliveThread =
       std::conditional_t<WsOeCoreImpl::ExchangeTraits::requires_listen_key(),
@@ -117,11 +116,13 @@ class WsOrderEntryAppT {
         ws_order_manager_(logger_),
         dispatch_context_(&logger_, &ws_order_manager_, this),
         host_(std::string(WsOeCoreImpl::ExchangeTraits::get_api_host())),
-        path_(std::string(WsOeCoreImpl::ExchangeTraits::get_api_endpoint_path())),
+        path_(
+            std::string(WsOeCoreImpl::ExchangeTraits::get_api_endpoint_path())),
         port_(WsOeCoreImpl::ExchangeTraits::get_api_port()),
         use_ssl_(WsOeCoreImpl::ExchangeTraits::use_ssl()),
         stream_transport_([] {
-          if constexpr (WsOeCoreImpl::ExchangeTraits::requires_stream_transport()) {
+          if constexpr (WsOeCoreImpl::ExchangeTraits::
+                            requires_stream_transport()) {
             return std::make_unique<StreamTransportType>();
           } else {
             return std::monostate{};
@@ -135,11 +136,12 @@ class WsOrderEntryAppT {
       return false;
     }
 
-    api_transport_ = std::make_unique<ApiTransportType>(host_,
-        port_, path_, use_ssl_, true);
+    api_transport_ =
+        std::make_unique<ApiTransportType>(host_, port_, path_, use_ssl_, true);
 
-    api_transport_->register_message_callback(
-        [this](std::string_view payload) { this->handle_api_payload(payload); });
+    api_transport_->register_message_callback([this](std::string_view payload) {
+      this->handle_api_payload(payload);
+    });
     return true;
   }
 
@@ -180,7 +182,8 @@ class WsOrderEntryAppT {
   }
 
   // NOLINTBEGIN(performance-unnecessary-value-param)
-  [[nodiscard]] std::string create_heartbeat_message(WireMessage /*message*/) const {
+  [[nodiscard]] std::string create_heartbeat_message(
+      WireMessage /*message*/) const {
     return ws_oe_core_.create_heartbeat_message();
   }
   // NOLINTEND(performance-unnecessary-value-param)
@@ -221,7 +224,8 @@ class WsOrderEntryAppT {
   }
 
   [[nodiscard]] trading::OrderMassCancelReport*
-  create_order_mass_cancel_report_message(const WireMassCancelReport& msg) const {
+  create_order_mass_cancel_report_message(
+      const WireMassCancelReport& msg) const {
     return ws_oe_core_.create_order_mass_cancel_report_message(msg);
   }
 
@@ -309,14 +313,16 @@ class WsOrderEntryAppT {
       }
 
       if (payload == "__CONNECTED__") {
-        using ConnectionHandler = typename WsOeCoreImpl::ExchangeTraits::ConnectionHandler;
+        using ConnectionHandler =
+            typename WsOeCoreImpl::ExchangeTraits::ConnectionHandler;
         ConnectionContext<WsOrderEntryAppT> ctx(this, TransportId::kStream);
         ConnectionHandler::on_connected(ctx, TransportId::kStream);
         return;
       }
 
       constexpr int kDefaultLogLen = 200;
-      logger_.debug("[WsOrderEntryApp]Received stream payload (size: {}): {}...",
+      logger_.debug(
+          "[WsOrderEntryApp]Received stream payload (size: {}): {}...",
           payload.size(),
           payload.substr(0, std::min<size_t>(kDefaultLogLen, payload.size())));
 
@@ -342,7 +348,8 @@ class WsOrderEntryAppT {
   void initiate_session_logon() {
     if constexpr (WsOeCoreImpl::ExchangeTraits::requires_signature_logon()) {
       const auto cur_timestamp = std::to_string(util::get_timestamp_epoch());
-      const std::string sig_b64 = detail::get_signature_base64_impl(cur_timestamp, 0);
+      const std::string sig_b64 =
+          detail::get_signature_base64_impl(cur_timestamp, 0);
       auto log_on_message =
           ws_oe_core_.create_log_on_message(sig_b64, cur_timestamp);
       api_transport_->write(log_on_message);
@@ -364,7 +371,9 @@ class WsOrderEntryAppT {
   const ApiTransportType& api_transport() const { return *api_transport_; }
 
   template <typename T = StreamTransportType>
-  auto stream_transport() -> std::enable_if_t<!std::is_same_v<T, std::monostate>, T&> {
+  auto stream_transport() -> T&
+    requires(!std::is_same_v<T, std::monostate>)
+  {
     return *stream_transport_;
   }
 
@@ -374,7 +383,8 @@ class WsOrderEntryAppT {
       return;
     }
     if (payload == "__CONNECTED__") {
-      using ConnectionHandler = typename WsOeCoreImpl::ExchangeTraits::ConnectionHandler;
+      using ConnectionHandler =
+          typename WsOeCoreImpl::ExchangeTraits::ConnectionHandler;
       ConnectionContext<WsOrderEntryAppT> ctx(this, TransportId::kApi);
       ConnectionHandler::on_connected(ctx, TransportId::kApi);
       return;
@@ -398,8 +408,9 @@ class WsOrderEntryAppT {
   }
 
   static std::string get_signature_base64(const std::string& payload) {
-    EVP_PKEY* private_key = Util::load_ed25519(AUTHORIZATION.get_pem_file_path(),
-        AUTHORIZATION.get_private_password().c_str());
+    EVP_PKEY* private_key =
+        Util::load_ed25519(AUTHORIZATION.get_pem_file_path(),
+            AUTHORIZATION.get_private_password().c_str());
 
     const std::string signature = Util::sign_and_base64(private_key, payload);
 
@@ -407,7 +418,8 @@ class WsOrderEntryAppT {
     return signature;
   }
 
-  void stop_stream_transport_impl(std::unique_ptr<StreamTransportType>& transport) {
+  void stop_stream_transport_impl(
+      std::unique_ptr<StreamTransportType>& transport) {
     if (transport) {
       transport->interrupt();
     }
@@ -431,13 +443,18 @@ class WsOrderEntryAppT {
       this->handle_stream_payload(payload);
     });
 
-    transport->initialize(stream_host, stream_port, stream_path, use_ssl_, false);
+    transport->initialize(stream_host,
+        stream_port,
+        stream_path,
+        use_ssl_,
+        false);
 
     logger_.info("[WsOeApp] Stream transport connected");
   }
   void start_stream_transport_impl(std::monostate&, const std::string&) {}
 
-  void start_keepalive_impl(std::unique_ptr<common::Thread<"ListenKeyOE">>& thread) {
+  void start_keepalive_impl(
+      std::unique_ptr<common::Thread<"ListenKeyOE">>& thread) {
     if (keepalive_running_.exchange(true)) {
       return;
     }
@@ -448,7 +465,8 @@ class WsOrderEntryAppT {
   }
   void start_keepalive_impl(std::monostate&) {}
 
-  void stop_keepalive_impl(std::unique_ptr<common::Thread<"ListenKeyOE">>& thread) {
+  void stop_keepalive_impl(
+      std::unique_ptr<common::Thread<"ListenKeyOE">>& thread) {
     if (!keepalive_running_.exchange(false)) {
       return;
     }
@@ -500,7 +518,8 @@ class WsOrderEntryAppT {
   std::unique_ptr<ApiTransportType> api_transport_;
   std::atomic<bool> running_{false};
 
-  std::unordered_map<MsgType, std::function<void(const WireMessage&)>> callbacks_;
+  std::unordered_map<MsgType, std::function<void(const WireMessage&)>>
+      callbacks_;
 
   const std::string host_;
   const std::string path_;

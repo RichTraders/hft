@@ -21,8 +21,12 @@
 #include <string>
 
 #include "common/logger.h"
+#ifdef USE_RING_BUFFER
+#include "common/market_data_ring_buffer.hpp"
+#else
 #include "common/memory_pool.hpp"
 #include "common/spsc_queue.h"
+#endif
 #include "common/thread.hpp"
 #include "common/types.h"
 #include "core/response_manager.h"
@@ -54,16 +58,55 @@ template <typename Strategy>
 using MarketOrderBookHashMap =
     std::map<std::string, std::unique_ptr<MarketOrderBook<Strategy>>>;
 
+#ifndef USE_RING_BUFFER
 #ifdef UNIT_TEST
 constexpr std::size_t kMarketDataCapacity = 262144;  // 256K for tests
 #else
 constexpr std::size_t kMarketDataCapacity = 128;
+#endif
 #endif
 constexpr int kResponseQueueSize = 64;
 
 template <typename Strategy>
 class TradeEngine {
  public:
+#ifdef USE_RING_BUFFER
+  // RingBuffer 생성자
+  explicit TradeEngine(const common::Logger::Producer& logger,
+      common::MarketDataRingBuffer* ring_buffer,
+      ResponseManager* response_manager,
+      const common::TradeEngineCfgHashMap& ticker_cfg)
+    requires std::is_constructible_v<Strategy, OrderManager<Strategy>*,
+                 const FeatureEngine<Strategy>*, const InventoryManager*,
+                 PositionKeeper*, const common::Logger::Producer&,
+                 const common::TradeEngineCfgHashMap&>
+      : logger_(logger),
+        ring_buffer_(ring_buffer),
+        response_manager_(response_manager),
+        feature_engine_(std::make_unique<FeatureEngine<Strategy>>(logger_)),
+        position_keeper_(std::make_unique<PositionKeeper>(logger_)),
+        risk_manager_(std::make_unique<RiskManager>(logger_,
+            position_keeper_.get(), ticker_cfg)),
+        inventory_manager_(std::make_unique<InventoryManager>(logger,
+            position_keeper_.get(), ticker_cfg)),
+        order_manager_(std::make_unique<OrderManager<Strategy>>(logger_, this,
+            *risk_manager_)),
+        strategy_(order_manager_.get(), feature_engine_.get(),
+            inventory_manager_.get(), position_keeper_.get(), logger_,
+            ticker_cfg) {
+    const std::string ticker = INI_CONFIG.get("meta", "ticker");
+    auto orderbook =
+        std::make_unique<MarketOrderBook<Strategy>>(ticker, logger_);
+    response_queue_ = std::make_unique<
+        common::SPSCQueue<ResponseCommon, kResponseQueueSize>>();
+    orderbook->set_trade_engine(this);
+    ticker_order_book_.insert({ticker, std::move(orderbook)});
+
+    thread_.start(&TradeEngine::run, this);
+    logger_.info("[Constructor] TradeEngine (RingBuffer) Created");
+  }
+#else
+  // Pool/Queue 생성자
   explicit TradeEngine(const common::Logger::Producer& logger,
       common::MemoryPool<MarketUpdateData>* market_update_data_pool,
       common::MemoryPool<MarketData>* market_data_pool,
@@ -76,9 +119,9 @@ class TradeEngine {
       : logger_(logger),
         market_update_data_pool_(market_update_data_pool),
         market_data_pool_(market_data_pool),
-        response_manager_(response_manager),
         queue_(std::make_unique<
             common::SPSCQueue<MarketUpdateData*, kMarketDataCapacity>>()),
+        response_manager_(response_manager),
         feature_engine_(std::make_unique<FeatureEngine<Strategy>>(logger_)),
         position_keeper_(std::make_unique<PositionKeeper>(logger_)),
         risk_manager_(std::make_unique<RiskManager>(logger_,
@@ -101,6 +144,7 @@ class TradeEngine {
     thread_.start(&TradeEngine::run, this);
     logger_.info("[Constructor] TradeEngine Created");
   }
+#endif
 
   ~TradeEngine() {
     running_.store(false, std::memory_order_release);
@@ -116,12 +160,13 @@ class TradeEngine {
     };
   }
 
-
   void stop() { running_.store(false, std::memory_order_release); }
 
+#ifndef USE_RING_BUFFER
   bool on_market_data_updated(MarketUpdateData* data) {
     return queue_->enqueue(data);
   }
+#endif
 
   void on_orderbook_updated(const common::TickerId& ticker, common::Price price,
       common::Side side, MarketOrderBook<Strategy>* market_order_book) {
@@ -189,13 +234,18 @@ class TradeEngine {
   static constexpr int kMarketDataBatchLimit = 128;
   static constexpr int kResponseBatchLimit = 64;
   static constexpr double kQtyDefault = 0.00001;
+
   const common::Logger::Producer& logger_;
+#ifdef USE_RING_BUFFER
+  common::MarketDataRingBuffer* ring_buffer_;
+#else
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
-  ResponseManager* response_manager_;
-  std::function<void(const RequestCommon&)> order_request_handler_;
   std::unique_ptr<common::SPSCQueue<MarketUpdateData*, kMarketDataCapacity>>
       queue_;
+#endif
+  ResponseManager* response_manager_;
+  std::function<void(const RequestCommon&)> order_request_handler_;
   common::Thread<"TradeEngine"> thread_;
   std::unique_ptr<common::SPSCQueue<ResponseCommon, kResponseQueueSize>>
       response_queue_;
@@ -212,6 +262,112 @@ class TradeEngine {
 
   double qty_increment_{kQtyDefault};
 
+#ifdef USE_RING_BUFFER
+  void run() {
+    common::WaitStrategy wait;
+    const std::string ticker = INI_CONFIG.get("meta", "ticker");
+
+    while (running_.load(std::memory_order_acquire)) {
+      int md_processed = 0;
+
+      // Trade 처리
+      ring_buffer_->read_trade(
+          [&](common::Side side, common::Price price, common::Qty qty) {
+            wait.reset();
+            START_MEASURE(MAKE_ORDERBOOK_ALL);
+            MarketData trade_data;
+            trade_data.type = common::MarketUpdateType::kTrade;
+            trade_data.side = side;
+            trade_data.price = price;
+            trade_data.qty = qty;
+            trade_data.ticker_id = ticker;
+            START_MEASURE(MAKE_ORDERBOOK_UNIT);
+            ticker_order_book_[ticker]->on_market_data_updated(&trade_data);
+            END_MEASURE(MAKE_ORDERBOOK_UNIT, logger_);
+            END_MEASURE(MAKE_ORDERBOOK_ALL, logger_);
+            ++md_processed;
+          });
+
+      // Depth/BookTicker 처리
+      ring_buffer_->read_depth([&](uint16_t type,
+                                   const common::DepthMeta&,
+                                   const common::MarketDataEntry* entries,
+                                   size_t count) {
+        wait.reset();
+        START_MEASURE(MAKE_ORDERBOOK_ALL);
+        for (size_t i = 0; i < count; ++i) {
+          MarketData md;
+          md.type = entries[i].type;
+          md.side = entries[i].side;
+          md.price = entries[i].price;
+          md.qty = entries[i].qty;
+          md.ticker_id = ticker;
+          START_MEASURE(MAKE_ORDERBOOK_UNIT);
+          ticker_order_book_[ticker]->on_market_data_updated(&md);
+          END_MEASURE(MAKE_ORDERBOOK_UNIT, logger_);
+        }
+        END_MEASURE(MAKE_ORDERBOOK_ALL, logger_);
+        ++md_processed;
+      });
+
+      // Snapshot 처리
+      ring_buffer_->read_snapshot([&](const common::DepthMeta&,
+                                      const common::MarketDataEntry* entries,
+                                      size_t count) {
+        wait.reset();
+        START_MEASURE(MAKE_ORDERBOOK_ALL);
+        for (size_t i = 0; i < count; ++i) {
+          MarketData snapshot_data;
+          snapshot_data.type = entries[i].type;
+          snapshot_data.side = entries[i].side;
+          snapshot_data.price = entries[i].price;
+          snapshot_data.qty = entries[i].qty;
+          snapshot_data.ticker_id = ticker;
+          START_MEASURE(MAKE_ORDERBOOK_UNIT);
+          ticker_order_book_[ticker]->on_market_data_updated(&snapshot_data);
+          END_MEASURE(MAKE_ORDERBOOK_UNIT, logger_);
+        }
+        END_MEASURE(MAKE_ORDERBOOK_ALL, logger_);
+        ++md_processed;
+      });
+
+      // Response 처리
+      int resp_processed = 0;
+      ResponseCommon response;
+      while (response_queue_->dequeue(response) &&
+             resp_processed < kResponseBatchLimit) {
+        wait.reset();
+        START_MEASURE(RESPONSE_COMMON);
+        switch (response.res_type) {
+          case ResponseType::kExecutionReport:
+            on_order_updated(response.execution_report);
+            response_manager_->execution_report_deallocate(
+                response.execution_report);
+            break;
+          case ResponseType::kOrderCancelReject:
+            on_order_cancel_reject(response.order_cancel_reject);
+            response_manager_->order_cancel_reject_deallocate(
+                response.order_cancel_reject);
+            break;
+          case ResponseType::kOrderMassCancelReport:
+            on_order_mass_cancel_report(response.order_mass_cancel_report);
+            response_manager_->order_mass_cancel_report_deallocate(
+                response.order_mass_cancel_report);
+            break;
+          case ResponseType::kInvalid:
+          default:
+            break;
+        }
+        END_MEASURE(RESPONSE_COMMON, logger_);
+        ++resp_processed;
+      }
+
+      if (md_processed == 0 && resp_processed == 0) {
+        wait.idle_hot();
+      }
+    }
+  }
+#else
   void run() {
     common::WaitStrategy wait;
     while (running_.load(std::memory_order_acquire)) {
@@ -273,6 +429,7 @@ class TradeEngine {
       }
     }
   }
+#endif
 
   void on_order_cancel_reject(const OrderCancelReject* reject) {
     logger_.info("[OrderResult]Order cancel request is rejected. error :{}",

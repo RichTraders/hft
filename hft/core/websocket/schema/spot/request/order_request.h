@@ -43,9 +43,10 @@ struct PlaceOrderParams {
   std::optional<std::string> peg_offset_type;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = PlaceOrderParams;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       
       "symbol",   &T::symbol,
       "side",     &T::side,
@@ -82,9 +83,10 @@ struct OrderPlaceRequest {
   PlaceOrderParams params;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = OrderPlaceRequest;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "id",     &T::id,
       "method", &T::method,
       "params", &T::params

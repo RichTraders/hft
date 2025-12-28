@@ -14,8 +14,7 @@
 #define MODIFY_ORDER_RESPONSE_H
 #include <glaze/glaze.hpp>
 #include "api_response.h"
-namespace schema {
-namespace futures {
+namespace schema::futures {
 struct ModifyOrderResult {
   std::uint64_t order_id{};
   std::string symbol;
@@ -50,9 +49,10 @@ struct ModifyOrderResult {
   std::int64_t update_time{};
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
         using T = ModifyOrderResult;
-        static constexpr auto value = glz::object(
+        static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
             "orderId",                  &T::order_id,
             "symbol",                   &T::symbol,
             "status",                   &T::status,
@@ -94,9 +94,10 @@ struct ModifyOrderResponse {
   std::optional<std::vector<RateLimit>> rate_limits;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
         using T = ModifyOrderResponse;
-        static constexpr auto value = glz::object(
+        static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
             "id",           &T::id,
             "status",       &T::status,
             "result",       &T::result,
@@ -105,6 +106,5 @@ struct ModifyOrderResponse {
     };
   // clang-format on
 };
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 #endif  //MODIFY_ORDER_RESPONSE_H

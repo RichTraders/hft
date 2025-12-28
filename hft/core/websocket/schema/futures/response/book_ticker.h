@@ -29,9 +29,10 @@ struct BookTickerData {
   double best_ask_qty;         // "A" - best ask qty
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = BookTickerData;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
         "e", &T::event_type,
         "u", &T::update_id,
         "E", &T::event_time,
@@ -49,9 +50,11 @@ struct BookTickerEvent {
   std::string stream;
   BookTickerData data;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = BookTickerEvent;
-    static constexpr auto value =
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("stream", &T::stream, "data", &T::data);
   };
 };

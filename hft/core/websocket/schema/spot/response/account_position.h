@@ -23,20 +23,22 @@ struct AccountBalance {
   double locked_balance{};  // "l"
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = AccountBalance;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "a", &T::asset,
         "f", ::glz::quoted_num<&T::free_balance>,
         "l", ::glz::quoted_num<&T::locked_balance>);
   };
   // clang-format on
 };
-inline std::ostream& operator<<(std::ostream& os, const AccountBalance& v) {
-  os << "asset: " << v.asset << "\n";
-  os << "free_balance: " << v.free_balance << "\n";
-  os << "locked_balance: " << v.locked_balance << "\n";
-  return os;
+inline std::ostream& operator<<(
+    std::ostream& out, const AccountBalance& balance) {
+  out << "asset: " << balance.asset << "\n";
+  out << "free_balance: " << balance.free_balance << "\n";
+  out << "locked_balance: " << balance.locked_balance << "\n";
+  return out;
 }
 
 struct OutboundAccountPositionEvent {
@@ -46,9 +48,10 @@ struct OutboundAccountPositionEvent {
   std::vector<AccountBalance> balances;  // "B"
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = OutboundAccountPositionEvent;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "e", &T::event_type,
         "E", &T::event_time,
         "u", &T::last_update_time,
@@ -77,9 +80,10 @@ struct BalanceUpdateEvent {
   std::int64_t clear_time{};  // "T"
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = BalanceUpdateEvent;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "e", &T::event_type,
         "E", &T::event_time,
         "a", &T::asset,
@@ -104,9 +108,10 @@ struct SubscriptionEventEnvelope {
   EventT event;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = SubscriptionEventEnvelope<EventT>;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "subscriptionId", &T::subscription_id,
         "event", &T::event);
   };
@@ -124,6 +129,6 @@ using OutboundAccountPositionEnvelope =
     SubscriptionEventEnvelope<OutboundAccountPositionEvent>;
 
 using BalanceUpdateEnvelope = SubscriptionEventEnvelope<BalanceUpdateEvent>;
-}  // namespace schema
 
+}  // namespace schema
 #endif  //ACCOUNT_POSITION_H

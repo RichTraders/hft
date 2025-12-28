@@ -13,8 +13,7 @@
 #ifndef FUTURES_DEPTH_H
 #define FUTURES_DEPTH_H
 #include <glaze/glaze.hpp>
-namespace schema {
-namespace futures {
+namespace schema::futures {
 struct DepthData {
   std::string event_type;
   std::uint64_t timestamp;
@@ -28,9 +27,10 @@ struct DepthData {
   std::vector<std::array<double, 2>> asks;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = DepthData;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       glz::object(
         "e", &T::event_type,
         "E", &T::timestamp,
@@ -49,13 +49,14 @@ struct DepthResponse {
   std::string stream;
   DepthData data;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = DepthResponse;
-    static constexpr auto value =
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("stream", &T::stream, "data", &T::data);
   };
 };
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 
 #endif  //FUTURES_DEPTH_H

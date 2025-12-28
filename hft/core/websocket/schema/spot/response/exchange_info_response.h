@@ -20,9 +20,11 @@ namespace schema {
 struct ExchangeFilter {
   std::string filter_type;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = ExchangeFilter;
-    static constexpr auto value = glz::object("filterType", &T::filter_type);
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr auto value = glz::object("filterType", &T::filter_type);  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
   };
 };
 
@@ -38,9 +40,10 @@ struct SymbolFilter {
   std::optional<std::string> step_size;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = SymbolFilter;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       "filterType", &T::filter_type,
 
       "minPrice",   &T::min_price,
@@ -91,9 +94,10 @@ struct SymbolInfo {
   std::vector<std::string> allowed_self_trade_prevention_modes;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = SymbolInfo;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       "symbol",                    &T::symbol,
       "status",                    &T::status,
 
@@ -142,9 +146,10 @@ struct ExchangeInfoResult {
   std::vector<SymbolInfo> symbols;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = ExchangeInfoResult;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       "timezone",        &T::timezone,
       "serverTime",      &T::server_time,
      // "rateLimits",      &T::rate_limits,
@@ -162,9 +167,10 @@ struct ExchangeInfoResponse {
   std::optional<std::vector<RateLimit>> rate_limits;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = ExchangeInfoResponse;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       "id",         &T::id,
       "status",     &T::status,
       "result",     &T::result,

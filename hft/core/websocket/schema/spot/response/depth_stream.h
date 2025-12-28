@@ -26,9 +26,10 @@ struct DepthData {
   std::vector<std::array<double, 2>> asks;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = DepthData;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
       glz::object(
         "e", &T::event_type,
         "E", &T::timestamp,
@@ -45,11 +46,13 @@ struct DepthResponse {
   std::string stream;
   DepthData data;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = DepthResponse;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("stream", &T::stream, "data", &T::data);
   };
 };
 }
+}  // namespace schema
 #endif  //DEPTH_STREAM_H

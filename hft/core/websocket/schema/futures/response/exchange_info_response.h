@@ -16,8 +16,7 @@
 
 #include "api_response.h"
 
-namespace schema {
-namespace futures {
+namespace schema::futures {
 
 struct SymbolFilter {
   std::string filter_type;
@@ -47,9 +46,10 @@ struct SymbolFilter {
   std::optional<std::string> position_control_side;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = SymbolFilter;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       "filterType",          &T::filter_type,
 
       "minPrice",            &T::min_price,
@@ -80,9 +80,10 @@ struct AssetInfo {
   std::optional<std::string> auto_asset_exchange;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = AssetInfo;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       "asset",             &T::asset,
       "marginAvailable",   &T::margin_available,
       "autoAssetExchange", &T::auto_asset_exchange
@@ -125,9 +126,10 @@ struct SymbolInfo {
   std::optional<std::vector<std::string>> permission_sets;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = SymbolInfo;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       "symbol",                &T::symbol,
       "pair",                  &T::pair,
       "contractType",          &T::contract_type,
@@ -175,9 +177,10 @@ struct ExchangeInfoHttpResponse {
   std::vector<SymbolInfo> symbols;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = ExchangeInfoHttpResponse;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       "timezone",       &T::timezone,
       "serverTime",     &T::server_time,
       "futuresType",    &T::futures_type,
@@ -190,6 +193,5 @@ struct ExchangeInfoHttpResponse {
   // clang-format on
 };
 
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 #endif  // FUTURES_EXCHANGE_INFO_RESPONSE_H

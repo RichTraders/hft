@@ -14,8 +14,7 @@
 #define NEW_ORDER_H
 #include <glaze/glaze.hpp>
 
-namespace schema {
-namespace futures {
+namespace schema::futures {
 struct PlaceOrderParams {
   std::string symbol;
   std::string side;
@@ -51,9 +50,10 @@ struct PlaceOrderParams {
   std::optional<std::int64_t> recv_window;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = PlaceOrderParams;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "symbol",         &T::symbol,
       "side",           &T::side,
       "type",           &T::type,
@@ -93,9 +93,10 @@ struct OrderPlaceRequest {
     std::string message;
     int code;
     // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
       using T = ErrorT;
-      static constexpr auto value = glz::object(
+      static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "msg",  &T::message,
         "code", &T::code
       );
@@ -105,9 +106,10 @@ struct OrderPlaceRequest {
   std::optional<ErrorT> error;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = OrderPlaceRequest;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "id",     &T::id,
       "method", &T::method,
       "params", &T::params,
@@ -116,7 +118,6 @@ struct OrderPlaceRequest {
   };
   // clang-format on
 };
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 
 #endif  //NEW_ORDER_H

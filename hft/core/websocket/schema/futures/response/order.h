@@ -15,8 +15,7 @@
 #include <glaze/glaze.hpp>
 #include "api_response.h"
 
-namespace schema {
-namespace futures {
+namespace schema::futures {
 struct OrderResult {
   std::uint64_t order_id{};
   std::string symbol;
@@ -51,9 +50,10 @@ struct OrderResult {
   std::int64_t update_time{};
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = OrderResult;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "orderId",        &T::order_id,
       "symbol",         &T::symbol,
       "status",         &T::status,
@@ -90,13 +90,13 @@ struct PlaceOrderResponse {
   std::optional<std::vector<RateLimit>> rate_limits;
   std::optional<ErrorResponse<>> error;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = PlaceOrderResponse;
-    static constexpr auto value = glz::object("id", &T::id, "status",
+    static constexpr auto value = glz::object("id", &T::id, "status",  // NOLINT(readability-identifier-naming)
         &T::status, "result", &T::result, "rateLimits", &T::rate_limits,
         "error", &T::error);
   };
 };
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 #endif  //FUTURES_ORDER_H

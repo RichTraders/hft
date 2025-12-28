@@ -17,9 +17,10 @@ namespace schema {
 struct SessionUserSubscriptionRequest {
   std::string id;
   const std::string method = "userDataStream.subscribe";
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = SessionUserSubscriptionRequest;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("id", &T::id, "method", &T::method);
   };
 };
@@ -27,9 +28,10 @@ struct SessionUserSubscriptionRequest {
 struct SessionUserUnsubscriptionRequest {
   std::string id;
   std::string method = "userDataStream.unsubscribe";
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = SessionUserUnsubscriptionRequest;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("id", &T::id, "method", &T::method);
   };
 };

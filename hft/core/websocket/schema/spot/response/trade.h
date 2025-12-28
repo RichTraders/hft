@@ -30,10 +30,11 @@ struct AggregateTradeEvent {
   bool ignore_flag;                 // "M"
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = AggregateTradeEvent;
 
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "e", &T::event_type,
         "E", &T::event_time,
         "s", &T::symbol,
@@ -60,11 +61,12 @@ struct TradeData {
   bool is_buyer_market_maker;  // "m"
   bool ignore_flag;            // "M"
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = TradeData;
 
     // clang-format off
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "e", &T::event_type,
         "E", &T::event_time,
         "s", &T::symbol,
@@ -82,12 +84,13 @@ struct TradeEvent {
   std::string stream;
   TradeData data;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = TradeEvent;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("stream", &T::stream, "data", &T::data);
   };
 };
-}  // namespace schema
 
+}  // namespace schema
 #endif  //AGGREGATE_TRADE_H

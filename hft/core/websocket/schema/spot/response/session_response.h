@@ -21,9 +21,10 @@ struct SessionUserSubscriptionResponse {
     std::int32_t subscription_id;
 
     // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
       using T = Result;
-      static constexpr auto value = glz::object(
+      static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "subscriptionId", &T::subscription_id
       );
     };
@@ -38,9 +39,10 @@ struct SessionUserSubscriptionResponse {
   std::optional<Result> result;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = SessionUserSubscriptionResponse;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
           "id", &T::id,
           "status", &T::status,
           "rateLimits", &T::rate_limit,
@@ -57,9 +59,10 @@ struct SessionUserUnsubscriptionResponse {
 
   struct Result {
     // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
       using T = Result;
-      static constexpr auto value = glz::object(
+      static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       );
     };
     // clang-format on
@@ -68,9 +71,10 @@ struct SessionUserUnsubscriptionResponse {
   std::optional<Result> result;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = SessionUserUnsubscriptionResponse;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
           "id", &T::id,
           "status", &T::status,
           "rateLimits", &T::rate_limit,
@@ -93,9 +97,10 @@ struct SessionLogonResponse {
     bool user_data_stream;
 
     // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
       using T = Result;
-      static constexpr auto value = glz::object(
+      static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "apiKey", &T::api_key,
         "authorizedSince", &T::authorized_since,
         "connectedSince", &T::connected_since,
@@ -111,9 +116,10 @@ struct SessionLogonResponse {
   std::optional<std::vector<RateLimit>> rate_limits;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = SessionLogonResponse;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "id", &T::id,
       "status", &T::status,
       "error", &T::error,
@@ -122,6 +128,6 @@ struct SessionLogonResponse {
   };
   // clang-format on
 };
-}  // namespace schema
 
+}  // namespace schema
 #endif  //SESSION_RESPONSE_H

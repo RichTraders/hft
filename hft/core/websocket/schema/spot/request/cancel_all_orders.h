@@ -24,9 +24,10 @@ struct CancelAllOpenOrdersParams {
   std::optional<double> recv_window;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = CancelAllOpenOrdersParams;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "symbol",    &T::symbol,
       "apiKey",    &T::api_key,
       "recvWindow", glz::quoted_num<&T::recv_window>,
@@ -43,9 +44,10 @@ struct OpenOrdersCancelAllRequest {
   CancelAllOpenOrdersParams params;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = OpenOrdersCancelAllRequest;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "id",     &T::id,
       "method", &T::method,
       "params", &T::params

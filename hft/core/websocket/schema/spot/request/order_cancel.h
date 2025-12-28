@@ -29,9 +29,10 @@ struct CancelOrderParams {
   std::optional<double> recv_window;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = CancelOrderParams;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "symbol", &T::symbol,
         "orderId", &T::order_id,
         "origClientOrderId", &T::orig_client_order_id,
@@ -50,13 +51,14 @@ struct OrderCancelRequest {
   std::string method = "order.cancel";
   CancelOrderParams params;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = OrderCancelRequest;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("id", &T::id, "method", &T::method, "params", &T::params);
   };
 };
 
-}  // namespace schema
 
+}  // namespace schema
 #endif

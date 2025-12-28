@@ -15,8 +15,7 @@
 #include <glaze/glaze.hpp>
 #include "api_response.h"
 
-namespace schema {
-namespace futures {
+namespace schema::futures {
 struct DepthSnapshotResult {
   std::uint64_t book_update_id;
   std::uint64_t message_output_time;
@@ -25,9 +24,10 @@ struct DepthSnapshotResult {
   std::vector<std::array<double, 2>> asks;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = DepthSnapshotResult;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
         "lastUpdateId", &T::book_update_id,
         "E", &T::message_output_time,
         "T",&T::transaction_time,
@@ -45,9 +45,10 @@ struct DepthSnapshot {
   std::optional<std::vector<RateLimit>> rateLimits;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = DepthSnapshot;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
         "id", &T::id,
         "status", &T::status,
         "result", &T::result,
@@ -56,6 +57,5 @@ struct DepthSnapshot {
   };
   // clang-format on
 };
-}
-}
+}  // namespace schema::futures
 #endif //DEPTH_SNAPSHOT_H

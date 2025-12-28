@@ -15,13 +15,17 @@
 
 #include "global.h"
 
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <deque>
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iomanip>
 #include <mutex>
 #include <queue>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -30,6 +34,23 @@
 namespace core {
 
 enum class ReplayMode : uint8_t { kInstant, kRealtime };
+
+struct OrderSimulatorConfig {
+  bool enabled = false;
+  std::chrono::milliseconds delay{1};
+  bool auto_fill = true;
+};
+
+struct ParsedOrderRequest {
+  std::string client_order_id;
+  std::string symbol;
+  std::string side;
+  std::string position_side;
+  double price = 0.0;
+  double quantity = 0.0;
+  bool is_cancel = false;
+  bool valid = false;
+};
 
 template <FixedString ThreadName>
 class FileTransport {
@@ -65,12 +86,19 @@ class FileTransport {
     }
   }
 
-  int write(const std::string& buffer) const {
+  int write(const std::string& buffer) {
     if (!connected_ || interrupted_) {
       return -1;
     }
-    std::lock_guard<std::mutex> lock(write_mutex_);
-    sent_messages_.push_back(buffer);
+    {
+      std::lock_guard<std::mutex> lock(write_mutex_);
+      sent_messages_.push_back(buffer);
+    }
+
+    if (simulator_config_.enabled) {
+      schedule_execution_report(buffer);
+    }
+
     return static_cast<int>(buffer.size());
   }
 
@@ -246,6 +274,7 @@ class FileTransport {
   }
 
   void reset() {
+    stop_simulator();
     std::lock_guard<std::mutex> lock1(write_mutex_);
     std::lock_guard<std::mutex> lock2(queue_mutex_);
     std::lock_guard<std::mutex> lock3(replay_mutex_);
@@ -258,6 +287,25 @@ class FileTransport {
     interrupted_ = false;
     notify_connected_ = false;
     last_timestamp_ = 0;
+  }
+
+  void enable_order_simulator(
+      std::chrono::milliseconds delay = std::chrono::milliseconds{1},
+      bool auto_fill = true) {
+    simulator_config_.enabled = true;
+    simulator_config_.delay = delay;
+    simulator_config_.auto_fill = auto_fill;
+    simulator_running_.store(true, std::memory_order_release);
+    simulator_thread_ = std::thread([this]() { simulator_loop(); });
+  }
+
+  void stop_simulator() {
+    simulator_config_.enabled = false;
+    simulator_running_.store(false, std::memory_order_release);
+    simulator_cv_.notify_all();
+    if (simulator_thread_.joinable()) {
+      simulator_thread_.join();
+    }
   }
 
  private:
@@ -299,6 +347,166 @@ class FileTransport {
     replay_queue_.push(TimedMessage{timestamp, std::string(payload)});
   }
 
+  struct PendingOrder {
+    ParsedOrderRequest request;
+    std::chrono::steady_clock::time_point execute_time;
+  };
+
+  void schedule_execution_report(const std::string& order_msg) {
+    ParsedOrderRequest req = parse_order_request(order_msg);
+    if (!req.valid) {
+      return;
+    }
+
+    PendingOrder pending;
+    pending.request = std::move(req);
+    pending.execute_time =
+        std::chrono::steady_clock::now() + simulator_config_.delay;
+
+    {
+      std::lock_guard<std::mutex> lock(simulator_mutex_);
+      pending_orders_.push(std::move(pending));
+    }
+    simulator_cv_.notify_one();
+  }
+
+  void simulator_loop() {
+    while (simulator_running_.load(std::memory_order_acquire)) {
+      std::unique_lock<std::mutex> lock(simulator_mutex_);
+
+      if (pending_orders_.empty()) {
+        simulator_cv_.wait(lock, [this]() {
+          return !pending_orders_.empty() ||
+                 !simulator_running_.load(std::memory_order_acquire);
+        });
+        continue;
+      }
+
+      auto now = std::chrono::steady_clock::now();
+      if (pending_orders_.top().execute_time > now) {
+        simulator_cv_.wait_until(lock, pending_orders_.top().execute_time);
+        continue;
+      }
+
+      PendingOrder order =
+          std::move(const_cast<PendingOrder&>(pending_orders_.top()));
+      pending_orders_.pop();
+      lock.unlock();
+
+      std::string response = generate_execution_report(order.request);
+      if (callback_ && !response.empty()) {
+        callback_(response);
+      }
+    }
+  }
+
+  static ParsedOrderRequest parse_order_request(const std::string& msg) {
+    ParsedOrderRequest req;
+
+    auto method_pos = msg.find("\"method\":");
+    if (method_pos == std::string::npos) {
+      return req;
+    }
+
+    const bool is_place = msg.find("\"order.place\"") != std::string::npos;
+    const bool is_cancel = msg.find("\"order.cancel\"") != std::string::npos;
+    if (!is_place && !is_cancel) {
+      return req;
+    }
+
+    req.is_cancel = is_cancel;
+    req.client_order_id = extract_string_field(msg, "newClientOrderId");
+    if (req.client_order_id.empty()) {
+      req.client_order_id = extract_string_field(msg, "origClientOrderId");
+    }
+    req.symbol = extract_string_field(msg, "symbol");
+    req.side = extract_string_field(msg, "side");
+    req.position_side = extract_string_field(msg, "positionSide");
+    req.price = extract_double_field(msg, "price");
+    req.quantity = extract_double_field(msg, "quantity");
+
+    req.valid = !req.client_order_id.empty() && !req.symbol.empty();
+    return req;
+  }
+
+  static std::string extract_string_field(const std::string& msg,
+      const char* field) {
+    const std::string pattern = std::string("\"") + field + "\":\"";
+    auto pos = msg.find(pattern);
+    if (pos == std::string::npos) {
+      return "";
+    }
+    pos += pattern.size();
+    auto end = msg.find('"', pos);
+    if (end == std::string::npos) {
+      return "";
+    }
+    return msg.substr(pos, end - pos);
+  }
+
+  static double extract_double_field(const std::string& msg,
+      const char* field) {
+    const std::string pattern = std::string("\"") + field + "\":";
+    auto pos = msg.find(pattern);
+    if (pos == std::string::npos) {
+      return 0.0;
+    }
+    pos += pattern.size();
+    while (pos < msg.size() && (msg[pos] == ' ' || msg[pos] == '"')) {
+      ++pos;
+    }
+    std::string num_str;
+    while (pos < msg.size() &&
+           (std::isdigit(msg[pos]) || msg[pos] == '.' || msg[pos] == '-')) {
+      num_str += msg[pos++];
+    }
+    return num_str.empty() ? 0.0 : std::stod(num_str);
+  }
+
+  std::string generate_execution_report(const ParsedOrderRequest& req) const {
+    auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch())
+                      .count();
+
+    std::string exec_type;
+    if (req.is_cancel) {
+      exec_type = "CANCELED";
+    } else {
+      exec_type = simulator_config_.auto_fill ? "TRADE" : "NEW";
+    }
+    std::string ord_status;
+    if (req.is_cancel) {
+      ord_status = "CANCELED";
+    } else {
+      ord_status = simulator_config_.auto_fill ? "FILLED" : "NEW";
+    }
+    std::string filled_qty =
+        simulator_config_.auto_fill ? std::to_string(req.quantity) : "0";
+
+    constexpr int kPricePrecision = 8;
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(kPricePrecision);
+    // NOLINTBEGIN(modernize-raw-string-literal)
+    oss << "{\"e\":\"ORDER_TRADE_UPDATE\",\"T\":" << now_ms
+        << ",\"E\":" << now_ms << ",\"o\":{" << "\"s\":\"" << req.symbol
+        << "\"," << "\"c\":\"" << req.client_order_id << "\"," << "\"S\":\""
+        << req.side << "\"," << "\"o\":\"LIMIT\"," << "\"f\":\"GTC\","
+        << "\"q\":\"" << req.quantity << "\"," << "\"p\":\"" << req.price
+        << "\"," << "\"ap\":\"" << req.price << "\"," << "\"sp\":\"0\","
+        << "\"x\":\"" << exec_type << "\"," << "\"X\":\"" << ord_status << "\","
+        << "\"i\":" << now_ms << "," << "\"l\":\"" << filled_qty << "\","
+        << "\"z\":\"" << filled_qty << "\"," << "\"L\":\"" << req.price << "\","
+        << "\"n\":\"0\"," << "\"N\":\"USDC\"," << "\"T\":" << now_ms << ","
+        << "\"t\":" << now_ms << "," << "\"b\":\"0\"," << "\"a\":\"0\","
+        << "\"m\":false," << "\"R\":false," << "\"wt\":\"CONTRACT_PRICE\","
+        << "\"ot\":\"LIMIT\"," << "\"ps\":\"" << req.position_side << "\","
+        << "\"cp\":false," << "\"rp\":\"0\"," << "\"pP\":false," << "\"si\":0,"
+        << "\"ss\":0," << "\"V\":\"EXPIRE_TAKER\"," << "\"pm\":\"NONE\","
+        << "\"gtd\":0," << "\"er\":\"0\"" << "}}";
+    // NOLINTEND(modernize-raw-string-literal)
+    return oss.str();
+  }
+
   MessageCallback callback_;
   bool notify_connected_{false};
   bool connected_{false};
@@ -317,6 +525,17 @@ class FileTransport {
   ReplayMode mode_ = ReplayMode::kInstant;
   double speed_ = 1.0;
   uint64_t last_timestamp_ = 0;
+
+  OrderSimulatorConfig simulator_config_;
+  std::atomic<bool> simulator_running_{false};
+  std::thread simulator_thread_;
+  mutable std::mutex simulator_mutex_;
+  std::condition_variable simulator_cv_;
+  std::priority_queue<PendingOrder, std::vector<PendingOrder>,
+      decltype([](const PendingOrder& lhs, const PendingOrder& rhs) {
+        return lhs.execute_time > rhs.execute_time;
+      })>
+      pending_orders_;
 };
 
 }  // namespace core

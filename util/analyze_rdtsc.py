@@ -224,6 +224,22 @@ def print_stats(stats: MeasurementStats):
     print(f"  {'Max:':12} {stats.max_val:>14,.0f}  {cycles_to_us(stats.max_val):>12.3f} us")
 
 
+def print_markdown_table(all_stats: list[MeasurementStats]):
+    """Print statistics as a markdown table."""
+    print("\n## RDTSC Latency Summary (microseconds)\n")
+    print("| Measurement | Count | Mean | Std | P50 | P90 | P99 | Min | Max |")
+    print("|-------------|------:|-----:|----:|----:|----:|----:|----:|----:|")
+    for stats in all_stats:
+        print(f"| {stats.name} | {stats.count:,} | "
+              f"{cycles_to_us(stats.mean):.3f} | "
+              f"{cycles_to_us(stats.std):.3f} | "
+              f"{cycles_to_us(stats.p50):.3f} | "
+              f"{cycles_to_us(stats.p90):.3f} | "
+              f"{cycles_to_us(stats.p99):.3f} | "
+              f"{cycles_to_us(stats.min_val):.3f} | "
+              f"{cycles_to_us(stats.max_val):.3f} |")
+
+
 def find_latest_log_group() -> str:
     """
     Find the most recent benchmark log file group.
@@ -283,6 +299,10 @@ Examples:
                         help=f'CPU frequency in Hz (default: {CPU_FREQ_HZ:.3e})')
     parser.add_argument('--no-merge', action='store_true',
                         help='Do not merge related files, parse single file only')
+    parser.add_argument('--markdown', '-m', action='store_true',
+                        help='Output as markdown table')
+    parser.add_argument('--output', '-o', type=str, default=None,
+                        help='Output file for markdown table')
     args = parser.parse_args()
 
     CPU_FREQ_HZ = args.freq
@@ -345,11 +365,6 @@ Examples:
     for name, values in sorted(measurements.items()):
         print(f"  {name}: {len(values):,} samples")
 
-    print("\n" + "=" * 70)
-    print("RDTSC Cycle Statistics")
-    print("=" * 70)
-
-    # Sort by importance
     priority_order = [
         'Convert_Message_Stream',
         'Convert_Message_API',
@@ -360,16 +375,30 @@ Examples:
         'MAKE_ORDERBOOK_ALL',
     ]
 
-    # Print priority tags first
+    all_stats = []
     for tag in priority_order:
         if tag in measurements:
-            stats = compute_stats(tag, measurements[tag])
-            print_stats(stats)
-
-    # Print remaining tags
+            all_stats.append(compute_stats(tag, measurements[tag]))
     for tag in sorted(measurements.keys()):
         if tag not in priority_order:
-            stats = compute_stats(tag, measurements[tag])
+            all_stats.append(compute_stats(tag, measurements[tag]))
+
+    if args.markdown or args.output:
+        import io
+        from contextlib import redirect_stdout
+
+        if args.output:
+            with open(args.output, 'w') as f:
+                with redirect_stdout(f):
+                    print_markdown_table(all_stats)
+            print(f"Markdown table saved to: {args.output}")
+        else:
+            print_markdown_table(all_stats)
+    else:
+        print("\n" + "=" * 70)
+        print("RDTSC Cycle Statistics")
+        print("=" * 70)
+        for stats in all_stats:
             print_stats(stats)
 
     return 0

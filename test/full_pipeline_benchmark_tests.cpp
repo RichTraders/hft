@@ -18,8 +18,7 @@
 #include <numeric>
 #include <vector>
 
-#include "core/transport/file_transport.h"
-
+#include "common/cpumanager/cpu_manager.h"
 #include "common/ini_config.hpp"
 #include "common/logger.h"
 #include "common/memory_pool.hpp"
@@ -53,6 +52,7 @@ class FullPipelineBenchmark : public ::testing::Test {
  protected:
   static inline std::unique_ptr<Logger> logger_;
   static inline std::unique_ptr<Logger::Producer> producer_;
+  static inline std::unique_ptr<CpuManager> cpu_manager_;
 
   static std::string make_log_filename() {
     auto now = std::chrono::system_clock::now();
@@ -83,6 +83,7 @@ class FullPipelineBenchmark : public ::testing::Test {
   }
 
   static void TearDownTestSuite() {
+    cpu_manager_.reset();
     producer_.reset();
     logger_->shutdown();
     logger_.reset();
@@ -126,13 +127,30 @@ class FullPipelineBenchmark : public ::testing::Test {
     trade_engine_->init_order_gateway(order_gateway_.get());
     order_gateway_->init_trade_engine(trade_engine_.get());
 
+    order_gateway_->app().api_transport().simulate_connect();
+    order_gateway_->app().api_transport().enable_order_simulator(
+        std::chrono::milliseconds{1}, true);
+
     market_consumer_ = std::make_unique<TestMarketConsumer>(*producer_,
         trade_engine_.get(),
         market_update_data_pool_.get(),
         market_data_pool_.get());
+
+    market_consumer_->start();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    cpu_manager_ = std::make_unique<CpuManager>(*producer_);
+    std::string cpu_init_result;
+    if (cpu_manager_->init_cpu_group(cpu_init_result)) {
+      std::cout << "CPU group init: " << cpu_init_result << std::endl;
+    }
+    if (cpu_manager_->init_cpu_to_tid()) {
+      std::cout << "CPU to TID init skipped" << std::endl;
+    }
   }
 
   void TearDown() override {
+    order_gateway_->app().api_transport().stop_simulator();
     market_consumer_.reset();
     trade_engine_->stop();
     order_gateway_->stop();

@@ -415,6 +415,16 @@ struct ExecutionReport {
   common::Side side;
   std::string text;
   std::optional<common::PositionSide> position_side;  // For futures trading
+  bool is_maker = false;                              // taker=false, maker=true
+
+  // Trade execution details
+  common::Price last_price = common::Price{.0f};  // Last executed price
+  common::Price avg_price = common::Price{.0f};   // Average price (Futures)
+  double commission = 0.0;                        // Commission amount
+  std::optional<std::string> commission_asset;    // Commission asset
+  double realized_profit = 0.0;                   // Realized profit (Futures)
+  std::int64_t trade_id = 0;                      // Trade ID
+  std::uint64_t exchange_order_id = 0;            // Exchange order ID
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
@@ -431,6 +441,16 @@ struct ExecutionReport {
     if (position_side) {
       stream << ", position_side=" << common::toString(*position_side);
     }
+    stream << ", is_maker=" << (is_maker ? "true" : "false")
+           << ", last_price=" << last_price.value
+           << ", avg_price=" << avg_price.value
+           << ", commission=" << commission;
+    if (commission_asset) {
+      stream << ", commission_asset=" << *commission_asset;
+    }
+    stream << ", realized_profit=" << realized_profit
+           << ", trade_id=" << trade_id
+           << ", exchange_order_id=" << exchange_order_id;
     stream << "}";
     return stream.str();
   }

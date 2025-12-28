@@ -95,7 +95,7 @@ bool WsOrderEntryApp::send(const std::string& msg) const {
   if (!api_transport_ || msg.empty()) {
     return false;
   }
-  logger_.info("[WsOrderEntryApp] Sending message to server :{}", msg);
+  logger_.debug("[WsOrderEntryApp] Sending message to server :{}", msg);
   return api_transport_->write(msg) >= 0;
 }
 

@@ -63,7 +63,7 @@ void OrderStateManager::handle_pending_new(const ExecutionReport* response,
   }
   auto& slot = side_book.slots[layer];
   slot.state = OMOrderState::kPendingNew;
-  logger_.debug("[OrderStateManager] PendingNew {}", response->toString());
+  logger_.info("[OrderStateManager] PendingNew {}", response->toString());
 }
 
 void OrderStateManager::handle_new(const ExecutionReport* response,
@@ -173,7 +173,7 @@ void OrderStateManager::handle_pending_cancel(const ExecutionReport* response,
 
   auto& slot = side_book.slots[layer];
   slot.state = OMOrderState::kPendingCancel;
-  logger_.debug("[OrderStateManager] PendingCancel {}", response->toString());
+  logger_.info("[OrderStateManager] PendingCancel {}", response->toString());
 }
 
 void OrderStateManager::handle_canceled(const ExecutionReport* response,

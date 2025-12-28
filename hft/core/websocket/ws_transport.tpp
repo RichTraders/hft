@@ -197,8 +197,11 @@ int WebSocketTransport<ThreadName>::write(const std::string& buffer) const {
               << std::endl;
     return -1;
   }
+
+  /*
   std::cout << "[WebSocketTransport][" << ThreadName << "]: write:" << buffer
             << "\n";
+  */
 
   std::string payload(LWS_PRE + buffer.size(), '\0');
   std::memcpy(payload.data() + LWS_PRE, buffer.data(), buffer.size());

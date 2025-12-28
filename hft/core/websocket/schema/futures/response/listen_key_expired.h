@@ -27,7 +27,7 @@ struct ListenKeyExpiredEvent {
     using T = ListenKeyExpiredEvent;
     static constexpr auto value = glz::object(
       "e", &T::event_type,
-      "E", &T::event_time
+      "E", glz::quoted_num<&T::event_time>
     );
   };
   // clang-format on

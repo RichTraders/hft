@@ -31,12 +31,18 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
     if (payload.empty()) {
       return WireMessage{};
     }
-    logger_.info("[WsOeCore]payload :{}", payload);
+    logger_.debug("[WsOeCore]payload :{}", payload);
 
     if (payload.contains("ORDER_TRADE_UPDATE")) {
       return this
           ->decode_or_log<BinanceFuturesOeTraits::ExecutionReportResponse,
               "[executionReport]">(payload);
+    }
+
+    if (payload.contains("TRADE_LITE")) {
+      // TRADE_LITE is a lightweight duplicate of ORDER_TRADE_UPDATE
+      // We already process ORDER_TRADE_UPDATE, so ignore this
+      return WireMessage{};
     }
 
     if (payload.contains("ACCOUNT_UPDATE")) {

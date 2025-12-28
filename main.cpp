@@ -12,6 +12,7 @@
 
 #include "hft_lib.h"
 
+#include <pthread.h>
 #include <csignal>
 #include "precision_config.hpp"
 #include "strategy_config.hpp"
@@ -25,6 +26,7 @@ void block_all_signals(sigset_t& set) {
   pthread_sigmask(SIG_BLOCK, &set, nullptr);
 }
 int main() {
+  pthread_setname_np(pthread_self(), "hft_main");
   sigset_t set;
   block_all_signals(set);
 

@@ -103,7 +103,7 @@ class OrderManager {
             now);
       }
     } else if (response->ord_status == OrdStatus::kPartiallyFilled) {
-      int layer = LayerBook::find_layer_by_id(side_book, response->cl_order_id);
+      const int layer = LayerBook::find_layer_by_id(side_book, response->cl_order_id);
       if (layer >= 0 && side_book.slots[layer].state == OMOrderState::kLive) {
         expiry_manager_.register_expiry(response->symbol,
             response->side,

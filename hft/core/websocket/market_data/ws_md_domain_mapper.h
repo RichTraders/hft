@@ -40,7 +40,7 @@ class WsMdDomainMapper {
       (void)msg;
       return MarketUpdateData();  // Not implemented for this exchange
     } else {
-      Converter converter(logger_, market_data_pool_);
+      const Converter converter(logger_, market_data_pool_);
       return std::visit(converter.make_market_data_visitor(), msg);
     }
   }
@@ -50,7 +50,7 @@ class WsMdDomainMapper {
       (void)msg;
       return MarketUpdateData();  // Not implemented for this exchange
     } else {
-      Converter converter(logger_, market_data_pool_);
+      const Converter converter(logger_, market_data_pool_);
       return std::visit(converter.make_snapshot_visitor(), msg);
     }
   }

@@ -77,7 +77,7 @@ class WsOrderManager {
     uint64_t client_order_id = client_order_id_opt.value();
 
     typename PendingRequestMap::accessor accessor;
-    bool found = pending_requests_.find(accessor, client_order_id);
+    const bool found = pending_requests_.find(accessor, client_order_id);
 
     if (!found) {
       logger_.warn(

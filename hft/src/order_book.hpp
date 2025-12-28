@@ -787,6 +787,7 @@ class MarketOrderBook final {
     if (consume_bucket(bidx, off))
       return filled;
 
+    // NOLINTNEXTLINE(bugprone-infinite-loop) - filled is modified via reference in consume_bucket lambda
     while (filled < want) {
       bidx = jump_next_bucket(bidx);
       if (bidx < 0)

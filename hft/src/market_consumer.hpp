@@ -349,7 +349,7 @@ class MarketConsumer
   void resubscribe() { this->resubscribe_impl(); }
 
   MdApp& app() { return *app_; }
-  const MdApp& app() const { return *app_; }
+  [[nodiscard]] const MdApp& app() const { return *app_; }
 
  private:
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;

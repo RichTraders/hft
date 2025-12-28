@@ -146,7 +146,7 @@ class OrderGateway {
   }
 
   OeApp& app() { return *app_; }
-  const OeApp& app() const { return *app_; }
+  [[nodiscard]] const OeApp& app() const { return *app_; }
 
   void order_request(const RequestCommon& request) {
     switch (request.req_type) {

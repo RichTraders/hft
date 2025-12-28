@@ -45,6 +45,30 @@ Quick setup:
 
 See [util/README.md](util/README.md) for complete documentation.
 
+## CPU Monitoring
+
+Check which processes are running on each CPU core:
+```bash
+ps -eo pid,comm,psr --no-headers | sort -k3 -n | awk '{cpu[$3] = cpu[$3] $1 " " $2 "\n"} END {for (c in cpu) {print "=== CPU " c " ==="; print cpu[c]}}'
+```
+
+Check current CPU isolation status:
+```bash
+# Check iso.slice allowed CPUs
+systemctl show iso.slice | grep AllowedCPUs
+
+# Check kernel boot parameters for CPU isolation
+cat /proc/cmdline | tr ' ' '\n' | grep -E "isolcpus|nohz_full|rcu_nocbs"
+
+# Check isolated CPUs (kernel level)
+cat /sys/devices/system/cpu/isolated
+```
+
+Check CPU usage per core:
+```bash
+mpstat -P ALL 1 3
+```
+
 Based on Binance fix protocol, you need to install some files.
 
 3 files needed. \

@@ -76,6 +76,7 @@ endfunction()
 
 add_strategy_target(HFT_maker "trading::ObiVwapDirectionalStrategy" "ObiVwapDirectionalStrategy")
 add_strategy_target(HFT_taker "trading::LiquidTaker" "LiquidTaker")
+add_strategy_target(HFT_mean_reversion "trading::MeanReversionMakerStrategy" "MeanReversionMakerStrategy")
 # Default target for backward compatibility (uses obi vwap directional strategy)
 add_strategy_target(HFTMain "trading::ObiVwapDirectionalStrategy" "ObiVwapDirectionalStrategy")
 

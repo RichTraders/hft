@@ -152,7 +152,7 @@ class MeanReversionMakerStrategy
     this->logger_.info(
         "[MeanReversionMaker] Initialized | min_quantity:{:.2f} BTC | "
         "simultaneous:{} | trend_filter:{}",
-        INI_CONFIG.get_double("wall_defense", "min_quantity", 50.0),
+        dynamic_threshold_->get_min_quantity(),
         allow_simultaneous_positions_,
         trend_filter_enabled_);
   }
@@ -180,7 +180,7 @@ class MeanReversionMakerStrategy
     allow_short_entry_ = ask_wall_info_.is_valid;
 
     if (log_wall_detection_) {
-      this->logger_.info(
+      this->logger_.debug(
           "[Wall@100ms] Threshold:{:.0f} | Bid:{:.0f}@{:.4f}%({}) | "
           "Ask:{:.0f}@{:.4f}%({})",
           current_wall_threshold_,

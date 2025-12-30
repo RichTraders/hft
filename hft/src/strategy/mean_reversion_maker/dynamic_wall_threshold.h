@@ -131,6 +131,7 @@ class DynamicWallThreshold {
   // === Getters ===
   double get_volume_threshold() const { return volume_threshold_; }
   double get_orderbook_threshold() const { return orderbook_threshold_; }
+  double get_min_quantity() const { return min_quantity_; }
 
  private:
   // === Calculate percentile ===

@@ -77,59 +77,57 @@ class MeanReversionMakerStrategy
             INI_CONFIG.get_int("strategy", "allow_simultaneous_positions", 0)),
 
         // === Wall detection ===
-        wall_max_distance_pct_(
-            INI_CONFIG.get_double("strategy", "wall_max_distance_pct", 0.0015)),
+        wall_max_distance_pct_(INI_CONFIG.get_double("wall_detection",
+            "max_distance_pct", 0.0015)),
         wall_max_levels_(
-            INI_CONFIG.get_int("strategy", "wall_max_levels", 100)),
+            INI_CONFIG.get_int("wall_detection", "max_levels", 100)),
 
         // === Defense ===
         defense_qty_multiplier_(
-            INI_CONFIG.get_double("strategy", "defense_qty_multiplier", 2.0)),
+            INI_CONFIG.get_double("wall_defense", "qty_multiplier", 2.0)),
 
         // === Entry ===
         entry_obi_threshold_(
-            INI_CONFIG.get_double("strategy", "entry_obi_threshold", 0.25)),
-        entry_obi_levels_(
-            INI_CONFIG.get_int("strategy", "entry_obi_levels", 5)),
-        position_size_(
-            INI_CONFIG.get_double("strategy", "position_size", 0.01)),
+            INI_CONFIG.get_double("entry", "obi_threshold", 0.25)),
+        entry_obi_levels_(INI_CONFIG.get_int("entry", "obi_levels", 5)),
+        position_size_(INI_CONFIG.get_double("entry", "position_size", 0.01)),
         entry_safety_margin_(
-            INI_CONFIG.get_double("strategy", "entry_safety_margin", 0.00005)),
+            INI_CONFIG.get_double("entry", "safety_margin", 0.00005)),
         min_spread_filter_(
-            INI_CONFIG.get_double("strategy", "min_spread_filter", 0.0004)),
+            INI_CONFIG.get_double("entry", "min_spread_filter", 0.0004)),
 
         // === Exit ===
         wall_amount_decay_ratio_(
-            INI_CONFIG.get_double("strategy", "wall_amount_decay_ratio", 0.5)),
-        wall_distance_expand_ratio_(INI_CONFIG.get_double("strategy",
-            "wall_distance_expand_ratio", 1.2)),
-        max_loss_pct_(INI_CONFIG.get_double("strategy", "max_loss_pct", 0.002)),
+            INI_CONFIG.get_double("exit", "wall_amount_decay_ratio", 0.5)),
+        wall_distance_expand_ratio_(
+            INI_CONFIG.get_double("exit", "wall_distance_expand_ratio", 1.2)),
+        max_loss_pct_(INI_CONFIG.get_double("exit", "max_loss_pct", 0.002)),
 
         // === Logging ===
-        log_wall_detection_(INI_CONFIG.get("strategy", "log_wall_detection",
-                                "false") == "true"),
+        log_wall_detection_(
+            INI_CONFIG.get("debug", "log_wall_detection", "false") == "true"),
         log_defense_check_(
-            INI_CONFIG.get("strategy", "log_defense_check", "false") == "true"),
+            INI_CONFIG.get("debug", "log_defense_check", "false") == "true"),
         log_entry_exit_(
-            INI_CONFIG.get("strategy", "log_entry_exit", "false") == "true"),
+            INI_CONFIG.get("debug", "log_entry_exit", "false") == "true"),
 
         // === Robust Z-score ===
         zscore_window_size_(
-            INI_CONFIG.get_int("strategy", "zscore_window_size", 30)),
+            INI_CONFIG.get_int("robust_zscore", "window_size", 30)),
         zscore_min_samples_(
-            INI_CONFIG.get_int("strategy", "zscore_min_samples", 20)),
+            INI_CONFIG.get_int("robust_zscore", "min_samples", 20)),
         zscore_entry_threshold_(
-            INI_CONFIG.get_double("strategy", "zscore_entry_threshold", 2.5)),
+            INI_CONFIG.get_double("robust_zscore", "entry_threshold", 2.5)),
 
         // === Trend Filter ===
-        trend_filter_enabled_(INI_CONFIG.get("strategy", "trend_filter_enabled",
-                                  "true") == "true"),
+        trend_filter_enabled_(
+            INI_CONFIG.get("trend_filter", "enabled", "true") == "true"),
         trend_lookback_ticks_(
-            INI_CONFIG.get_int("strategy", "trend_lookback_ticks", 5)),
+            INI_CONFIG.get_int("trend_filter", "lookback_ticks", 5)),
         trend_consecutive_threshold_(
-            INI_CONFIG.get_int("strategy", "trend_consecutive_threshold", 4)),
+            INI_CONFIG.get_int("trend_filter", "consecutive_threshold", 4)),
         trend_volume_multiplier_(
-            INI_CONFIG.get_double("strategy", "trend_volume_multiplier", 1.5)),
+            INI_CONFIG.get_double("trend_filter", "volume_multiplier", 1.5)),
 
         // === OBI calculation buffers ===
         bid_qty_(entry_obi_levels_),
@@ -138,15 +136,15 @@ class MeanReversionMakerStrategy
 
         // === Dynamic threshold module ===
         dynamic_threshold_(std::make_unique<DynamicWallThreshold>(
-            INI_CONFIG.get_double("strategy", "wall_volume_ema_alpha", 0.03),
-            INI_CONFIG.get_double("strategy", "wall_volume_multiplier", 4.0),
-            INI_CONFIG.get_int("strategy", "wall_volume_min_samples", 20),
-            INI_CONFIG.get_int("strategy", "wall_orderbook_top_levels", 20),
-            INI_CONFIG.get_double("strategy", "wall_orderbook_multiplier", 3.0),
-            INI_CONFIG.get_double("strategy", "wall_orderbook_percentile", 80),
-            INI_CONFIG.get_double("strategy", "wall_volume_weight", 0.7),
-            INI_CONFIG.get_double("strategy", "wall_orderbook_weight", 0.3),
-            INI_CONFIG.get_double("strategy", "wall_min_quantity", 3.5))),
+            INI_CONFIG.get_double("wall_defense", "volume_ema_alpha", 0.03),
+            INI_CONFIG.get_double("wall_defense", "volume_multiplier", 4.0),
+            INI_CONFIG.get_int("wall_defense", "volume_min_samples", 20),
+            INI_CONFIG.get_int("wall_defense", "orderbook_top_levels", 20),
+            INI_CONFIG.get_double("wall_defense", "orderbook_multiplier", 3.0),
+            INI_CONFIG.get_double("wall_defense", "orderbook_percentile", 80),
+            INI_CONFIG.get_double("wall_defense", "volume_weight", 0.7),
+            INI_CONFIG.get_double("wall_defense", "orderbook_weight", 0.3),
+            INI_CONFIG.get_double("wall_defense", "min_quantity", 50.0))),
 
         // === Robust Z-score module ===
         robust_zscore_(std::make_unique<RobustZScore>(zscore_window_size_,
@@ -154,7 +152,7 @@ class MeanReversionMakerStrategy
     this->logger_.info(
         "[MeanReversionMaker] Initialized | min_quantity:{:.2f} BTC | "
         "simultaneous:{} | trend_filter:{}",
-        INI_CONFIG.get_double("strategy", "wall_min_quantity", 3.5),
+        INI_CONFIG.get_double("wall_defense", "min_quantity", 50.0),
         allow_simultaneous_positions_,
         trend_filter_enabled_);
   }

@@ -91,8 +91,6 @@ class MeanReversionMakerStrategy
             INI_CONFIG.get_double("strategy", "entry_obi_threshold", 0.25)),
         entry_obi_levels_(
             INI_CONFIG.get_int("strategy", "entry_obi_levels", 5)),
-        entry_discount_threshold_pct_(INI_CONFIG.get_double("strategy",
-            "entry_discount_threshold_pct", 0.0002)),
         position_size_(
             INI_CONFIG.get_double("strategy", "position_size", 0.01)),
         entry_safety_margin_(
@@ -106,9 +104,8 @@ class MeanReversionMakerStrategy
         wall_distance_expand_ratio_(INI_CONFIG.get_double("strategy",
             "wall_distance_expand_ratio", 1.2)),
         max_loss_pct_(INI_CONFIG.get_double("strategy", "max_loss_pct", 0.002)),
-        stop_loss_mode_(INI_CONFIG.get("strategy", "stop_loss_mode", "taker")),
 
-        // === infoging ===
+        // === Logging ===
         log_wall_detection_(INI_CONFIG.get("strategy", "log_wall_detection",
                                 "false") == "true"),
         log_defense_check_(
@@ -229,23 +226,12 @@ class MeanReversionMakerStrategy
       }
     }
 
-    // Accumulate trade volume for wall threshold
+    // Accumulate trade volume for wall threshold (EMA update)
     dynamic_threshold_->on_trade(current_time,
         market_data->price.value,
         market_data->qty.value);
 
-    // === 2. Log thresholds (1 second interval) ===
-    if (current_time - last_volume_threshold_update_ns_ > 1'000'000'000ULL) {
-      last_volume_threshold_update_ns_ = current_time;
-
-      if (log_wall_detection_) {
-        this->logger_.info("[Threshold] Volume:{:.0f}, Orderbook:{:.0f}",
-            dynamic_threshold_->get_volume_threshold(),
-            dynamic_threshold_->get_orderbook_threshold());
-      }
-    }
-
-    // === 3. Long entry check ===
+    // === 2. Long entry check ===
     if (market_data->side == common::Side::kSell && allow_long_entry_ &&
         (!long_position_.is_active || allow_simultaneous_positions_)) {
 
@@ -257,7 +243,7 @@ class MeanReversionMakerStrategy
       }
     }
 
-    // === 4. Short entry check ===
+    // === 3. Short entry check ===
     if (market_data->side == common::Side::kBuy && allow_short_entry_ &&
         (!short_position_.is_active || allow_simultaneous_positions_)) {
 
@@ -269,7 +255,7 @@ class MeanReversionMakerStrategy
       }
     }
 
-    // === 5. Save BBO snapshot ===
+    // === 4. Save BBO snapshot ===
     prev_bbo_ = *current_bbo;
   }
 
@@ -752,14 +738,12 @@ class MeanReversionMakerStrategy
   const double defense_qty_multiplier_;
   const double entry_obi_threshold_;
   const int entry_obi_levels_;
-  const double entry_discount_threshold_pct_;
   const double position_size_;
   const double entry_safety_margin_;
   const double min_spread_filter_;
   const double wall_amount_decay_ratio_;
   const double wall_distance_expand_ratio_;
   const double max_loss_pct_;
-  const std::string stop_loss_mode_;
   const bool log_wall_detection_;
   const bool log_defense_check_;
   const bool log_entry_exit_;
@@ -788,7 +772,6 @@ class MeanReversionMakerStrategy
   // Dynamic threshold
   double current_wall_threshold_;
   std::unique_ptr<DynamicWallThreshold> dynamic_threshold_;
-  uint64_t last_volume_threshold_update_ns_{0};
 
   // Robust Z-score module
   std::unique_ptr<RobustZScore> robust_zscore_;

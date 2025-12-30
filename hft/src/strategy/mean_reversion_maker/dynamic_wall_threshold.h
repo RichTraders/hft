@@ -43,7 +43,11 @@ class DynamicWallThreshold {
         min_quantity_(min_quantity),
         // Pre-allocate vectors for orderbook threshold calculation
         bid_qty_(orderbook_top_levels),
-        ask_qty_(orderbook_top_levels) {}
+        ask_qty_(orderbook_top_levels) {
+    // Reserve capacity for percentile calculation vectors
+    bid_quantities_.reserve(orderbook_top_levels);
+    ask_quantities_.reserve(orderbook_top_levels);
+  }
 
   // === Main calculation function ===
   template <typename MarketOrderBookT>
@@ -95,30 +99,28 @@ class DynamicWallThreshold {
     (void)order_book->peek_qty(false, orderbook_top_levels_, ask_qty_, {});
 
     // Find 80th percentile of BTC quantities (not USDT notional)
-    std::vector<double> bid_quantities;
-    std::vector<double> ask_quantities;
-    bid_quantities.reserve(orderbook_top_levels_);
-    ask_quantities.reserve(orderbook_top_levels_);
+    bid_quantities_.clear();
+    ask_quantities_.clear();
 
     for (int i = 0; i < orderbook_top_levels_; ++i) {
       if (bid_qty_[i] > 0) {
-        bid_quantities.push_back(bid_qty_[i]);
+        bid_quantities_.push_back(bid_qty_[i]);
       }
       if (ask_qty_[i] > 0) {
-        ask_quantities.push_back(ask_qty_[i]);
+        ask_quantities_.push_back(ask_qty_[i]);
       }
     }
 
-    if (bid_quantities.empty() || ask_quantities.empty()) {
+    if (bid_quantities_.empty() || ask_quantities_.empty()) {
       orderbook_threshold_ = 0.0;
       return;
     }
 
     // Calculate 80th percentile of BTC quantities
     double bid_percentile_qty =
-        calculate_percentile(bid_quantities, orderbook_percentile_);
+        calculate_percentile(bid_quantities_, orderbook_percentile_);
     double ask_percentile_qty =
-        calculate_percentile(ask_quantities, orderbook_percentile_);
+        calculate_percentile(ask_quantities_, orderbook_percentile_);
     double avg_qty = (bid_percentile_qty + ask_percentile_qty) / 2.0;
 
     // Convert to USDT using mid price
@@ -168,8 +170,8 @@ class DynamicWallThreshold {
   // Pre-allocated vectors for orderbook threshold calculation (avoid repeated heap allocation)
   std::vector<double> bid_qty_;
   std::vector<double> ask_qty_;
-  std::vector<double> bid_notionals_;
-  std::vector<double> ask_notionals_;
+  std::vector<double> bid_quantities_;
+  std::vector<double> ask_quantities_;
 };
 
 }  // namespace trading

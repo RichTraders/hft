@@ -30,7 +30,9 @@
 #endif
 
 namespace common {
-namespace {}
+namespace {
+constexpr int kDecimalBase = 10;
+}
 // NOLINTBEGIN(unused-parameter)
 CpuManager::CpuManager(const Logger::Producer& logger) : logger_(logger) {
   const int cpu_use_count = INI_CONFIG.get_int("cpu_id", "count");

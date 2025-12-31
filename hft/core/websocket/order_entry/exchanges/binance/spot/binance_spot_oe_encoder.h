@@ -15,6 +15,7 @@
 
 #include <string>
 
+#include "common/fixed_point.hpp"
 #include "common/logger.h"
 #include "common/precision_config.hpp"
 #include "order_entry.h"

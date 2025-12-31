@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "fast_clock.h"
+#include "fixed_point_config.hpp"
 #include "ini_config.hpp"
 #include "layer_book.h"
 #include "logger.h"
@@ -115,9 +116,9 @@ class OrderManager {
       }
     }
 
-    logger_.debug("[OrderUpdated]Order Id:{} reserved_position:{:.6f}",
+    logger_.debug("[OrderUpdated]Order Id:{} reserved_position:{}",
         response->cl_order_id.value,
-        position_tracker_.get_reserved().value);
+        position_tracker_.get_reserved());
 
     dump_all_slots(response->symbol,
         std::format("After {} oid={}",
@@ -134,7 +135,8 @@ class OrderManager {
               auto symbol) { return symbol.symbol == target_ticker; });
 
       if (sym != instrument_info.symbols.end()) {
-        venue_policy_.set_qty_increment(sym->min_qty_increment);
+        venue_policy_.set_qty_increment(
+            static_cast<int64_t>(sym->min_qty_increment * common::FixedPointConfig::kQtyScale));
       }
 
       logger_.info("[OrderManager] Updated qty_increment to {}",
@@ -142,7 +144,7 @@ class OrderManager {
     }
   }
 
-  void new_order(const TickerId& ticker_id, Price price, Side side, Qty qty,
+  void new_order(const TickerId& ticker_id, common::PriceType price, Side side, common::QtyType qty,
       OrderId order_id,
       std::optional<common::PositionSide> position_side =
           std::nullopt) noexcept {
@@ -163,7 +165,7 @@ class OrderManager {
 
   void modify_order(const TickerId& ticker_id,
       const OrderId& cancel_new_order_id, const OrderId& order_id,
-      const OrderId& original_order_id, Price price, Side side, Qty qty,
+      const OrderId& original_order_id, common::PriceType price, Side side, common::QtyType qty,
       std::optional<common::PositionSide> position_side =
           std::nullopt) noexcept {
 
@@ -264,15 +266,16 @@ class OrderManager {
       order::Actions& acts) {
     const auto& ticker =
         intents.empty() ? std::string{} : intents.front().ticker;
-    auto running = position_tracker_.get_reserved();
+    common::QtyType running = common::QtyType::from_raw(position_tracker_.get_reserved());
     auto allow_new = [&](auto& actions) {
       for (auto action = actions.begin(); action != actions.end();) {
-        const auto delta = action->qty;
+        const common::QtyType delta = action->qty;
         if (risk_manager_.check_pre_trade_risk(ticker,
                 action->side,
                 delta,
                 running) == RiskCheckResult::kAllowed) {
-          running += common::sideToValue(action->side) * delta.value;
+          running = common::QtyType::from_raw(
+              running.value + common::sideToValue(action->side) * delta.value);
           ++action;
         } else {
           action = actions.erase(action);
@@ -281,12 +284,14 @@ class OrderManager {
     };
     auto allow_repl = [&](auto& actions) {
       for (auto action = actions.begin(); action != actions.end();) {
-        const auto delta = action->qty - action->last_qty;
+        const common::QtyType delta = common::QtyType::from_raw(
+            action->qty.value - action->last_qty.value);
         if (risk_manager_.check_pre_trade_risk(ticker,
                 action->side,
                 delta,
                 running) == RiskCheckResult::kAllowed) {
-          running += common::sideToValue(action->side) * delta.value;
+          running = common::QtyType::from_raw(
+              running.value + common::sideToValue(action->side) * delta.value);
           ++action;
         } else {
           action = actions.erase(action);
@@ -306,7 +311,7 @@ class OrderManager {
       auto& [state, price, qty, last_used, cl_order_id] =
           side_book.slots[action.layer];
 
-      const uint64_t tick = tick_converter_.to_ticks(action.price.value);
+      const uint64_t tick = tick_converter_.to_ticks_raw(action.price.value);
       if (const int existing = LayerBook::find_layer_by_ticks(side_book, tick);
           existing >= 0 && existing != action.layer) {
         continue;
@@ -325,7 +330,7 @@ class OrderManager {
           action.qty,
           action.cl_order_id,
           action.position_side);
-      position_tracker_.add_reserved(action.side, action.qty);
+      position_tracker_.add_reserved(action.side, action.qty.value);
 
       logger_.info(
           "[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}, "
@@ -334,7 +339,7 @@ class OrderManager {
           action.layer,
           common::toString(action.side),
           common::toString(action.cl_order_id),
-          position_tracker_.get_reserved().value);
+          position_tracker_.get_reserved());
 
       expiry_manager_.register_expiry(ticker,
           action.side,
@@ -353,7 +358,7 @@ class OrderManager {
           layer_book_.side_book(ticker, action.side, action.position_side);
       auto& slot = side_book.slots[action.layer];
 
-      const uint64_t tick = tick_converter_.to_ticks(action.price.value);
+      const uint64_t tick = tick_converter_.to_ticks_raw(action.price.value);
       if (const int existing = LayerBook::find_layer_by_ticks(side_book, tick);
           existing >= 0 && existing != action.layer) {
         continue;
@@ -421,7 +426,7 @@ class OrderManager {
             action.position_side);
       }
 
-      const auto delta_qty = action.qty - action.last_qty;
+      const auto delta_qty = action.qty.value - action.last_qty.value;
       position_tracker_.add_reserved(action.side, delta_qty);
       logger_.info(
           "[Apply][REPLACE] tick:{}/ layer={}, side:{}, order_id={}, "
@@ -430,7 +435,7 @@ class OrderManager {
           action.layer,
           common::toString(action.side),
           common::toString(action.cl_order_id),
-          position_tracker_.get_reserved().value);
+          position_tracker_.get_reserved());
       expiry_manager_.register_expiry(ticker,
           action.side,
           action.position_side,
@@ -452,11 +457,11 @@ class OrderManager {
       cancel_order(ticker, action.original_cl_order_id, action.position_side);
       logger_.info(
           "[Apply][CANCEL] layer={}, side:{}, order_id={}, "
-          "previous order id :{}",
+          "reserved: {}",
           action.layer,
           common::toString(action.side),
           common::toString(action.original_cl_order_id),
-          position_tracker_.get_reserved().value);
+          position_tracker_.get_reserved());
     }
   }
 
@@ -502,9 +507,9 @@ class OrderManager {
   void dump_all_slots(const std::string& symbol,
       std::string_view context) noexcept {
     logger_.debug("[SLOT_DUMP] ========== {} ==========", context);
-    logger_.debug("[SLOT_DUMP] Symbol: {}, Reserved: {:.10f}",
+    logger_.debug("[SLOT_DUMP] Symbol: {}, Reserved: {}",
         symbol,
-        position_tracker_.get_reserved().value);
+        position_tracker_.get_reserved());
 
     for (int side_idx = 0; side_idx < 2; ++side_idx) {
       const auto side =
@@ -528,8 +533,8 @@ class OrderManager {
             layer,
             trading::toString(slot.state),
             tick,
-            slot.price.value,
-            slot.qty.value,
+            slot.price.to_double(),
+            slot.qty.to_double(),
             slot.cl_order_id.value);
       }
     }

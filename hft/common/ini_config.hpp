@@ -134,6 +134,18 @@ class IniConfig : public Singleton<IniConfig> {
     }
   }
 
+  int64_t get_int64(const std::string_view section,
+      const std::string_view key, const int64_t def = 0) const {
+    try {
+      auto value = get(section, key);
+      std::erase(value, '\'');
+      std::erase(value, ',');
+      return std::stoll(value);
+    } catch (...) {
+      return def;
+    }
+  }
+
   double get_double(const std::string_view section, const std::string_view key,
       const double def = 0.0) const {
     try {

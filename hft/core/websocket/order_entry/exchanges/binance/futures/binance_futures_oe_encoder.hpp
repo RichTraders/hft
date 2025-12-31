@@ -15,6 +15,7 @@
 
 #include "authorization.h"
 #include "common.h"
+#include "common/fixed_point.hpp"
 #include "common/logger.h"
 #include "order_entry.h"
 
@@ -134,11 +135,11 @@ class BinanceFuturesOeEncoder {
         std::to_string(order.cl_order_id.value);
     payload.params.side = std::string(toString(order.side));
     payload.params.type = std::string(toString(order.ord_type));
-    payload.params.quantity = order.order_qty.truncate();
+    payload.params.quantity = common::qty_to_actual_double(order.order_qty);
 
     if (order.ord_type == trading::OrderType::kLimit) {
       payload.params.time_in_force = std::string(toString(order.time_in_force));
-      payload.params.price = order.price.truncate();
+      payload.params.price = common::price_to_actual_double(order.price);
     }
     payload.params.self_trade_prevention_mode =
         toString(order.self_trade_prevention_mode);
@@ -182,9 +183,9 @@ class BinanceFuturesOeEncoder {
     payload.params.origin_client_order_id = replace.cl_origin_order_id.value;
     payload.params.timestamp = util::get_timestamp_epoch();
 
-    payload.params.quantity = replace.order_qty.truncate();
+    payload.params.quantity = common::qty_to_actual_double(replace.order_qty);
     if (replace.ord_type == trading::OrderType::kLimit) {
-      payload.params.price = replace.price.truncate();
+      payload.params.price = common::price_to_actual_double(replace.price);
     }
 
     if (replace.position_side) {
@@ -203,10 +204,8 @@ class BinanceFuturesOeEncoder {
     payload.params.symbol = modify.symbol;
     payload.params.side = toString(modify.side);
     payload.params.origin_client_order_id = modify.orig_client_order_id.value;
-    payload.params.price = std::stod(common::to_fixed(modify.price.value,
-        PRECISION_CONFIG.price_precision()));
-    payload.params.quantity = std::stod(common::to_fixed(modify.order_qty.value,
-        PRECISION_CONFIG.qty_precision()));
+    payload.params.price = common::price_to_actual_double(modify.price);
+    payload.params.quantity = common::qty_to_actual_double(modify.order_qty);
 
     if (modify.position_side) {
       payload.params.position_side = common::toString(*modify.position_side);

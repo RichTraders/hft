@@ -23,7 +23,7 @@ template <typename Derived>
 class WsOeDecoderBase {
  protected:
   template <class T, FixedString Label>
-  auto decode_or_log(std::string_view payload) const {
+  [[nodiscard]] auto decode_or_log(std::string_view payload) const {
     using WireMessage = typename Derived::WireMessage;
 
     auto parsed = glz::read_json<T>(payload);
@@ -46,7 +46,7 @@ class WsOeDecoderBase {
   explicit WsOeDecoderBase(const common::Logger::Producer& logger)
       : logger_(logger) {}
 
-  auto decode(std::string_view payload) const {
+  [[nodiscard]] auto decode(std::string_view payload) const {
     return static_cast<const Derived*>(this)->decode_impl(payload);
   }
 };

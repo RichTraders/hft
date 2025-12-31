@@ -48,163 +48,146 @@ class ObiVwapDirectionalStrategy
       const common::TradeEngineCfgHashMap&)
       : BaseStrategy(order_manager, feature_engine, inventory_manager,
             position_keeper, logger),
-        variance_denominator_(
-            INI_CONFIG.get_double("strategy", "variance_denominator")),
-        position_variance_(
-            INI_CONFIG.get_double("strategy", "position_variance") /
-            variance_denominator_),
-        enter_threshold_(INI_CONFIG.get_double("strategy", "enter_threshold")),
-        exit_threshold_(INI_CONFIG.get_double("strategy", "exit_threshold")),
         obi_level_(
             INI_CONFIG.get_int("strategy", "obi_level", kDefaultOBILevel10)),
-        safety_margin_(INI_CONFIG.get_double("strategy", "safety_margin",
-            kDefaultSafetyMargin)),
-        minimum_spread_(
-            1 / std::pow(kDenominatorBase, PRECISION_CONFIG.price_precision())),
+        safety_margin_(static_cast<int64_t>(
+            INI_CONFIG.get_double("strategy", "safety_margin") *
+            common::FixedPointConfig::kPriceScale)),
+        minimum_spread_(INI_CONFIG.get_int64("strategy", "minimum_spread")),
+        enter_threshold_(INI_CONFIG.get_int64("strategy", "enter_threshold")),
+        exit_threshold_(INI_CONFIG.get_int64("strategy", "exit_threshold")),
+        position_variance_(
+            INI_CONFIG.get_int64("strategy", "position_variance")),
         bid_qty_(obi_level_),
-        ask_qty_(obi_level_) {}
+        ask_qty_(obi_level_) {
+    assert(obi_level_ > 0 && ((obi_level_ & (obi_level_ - 1)) == 0));
+  }
 
-  void on_orderbook_updated(const common::TickerId&, common::Price,
+  void on_orderbook_updated(const common::TickerId&, common::PriceType,
       common::Side, const MarketOrderBookT*) noexcept {}
 
   void on_trade_updated(const MarketData* market_data,
       MarketOrderBookT* order_book) noexcept {
     const auto ticker = market_data->ticker_id;
     const auto* bbo = order_book->get_bbo();
-    if (bbo->bid_qty.value == common::kQtyInvalid ||
-        bbo->ask_qty.value == common::kQtyInvalid ||
-        bbo->bid_price.value == common::kPriceInvalid ||
-        bbo->ask_price.value == common::kPriceInvalid ||
-        bbo->ask_price.value < bbo->bid_price.value) {
+
+    if (!bbo->bid_qty.is_valid() || !bbo->ask_qty.is_valid() ||
+        !bbo->bid_price.is_valid() || !bbo->ask_price.is_valid() ||
+        bbo->ask_price < bbo->bid_price) {
       this->logger_.warn("Invalid BBO. Skipping quoting.");
       return;
     }
 
-    (void)order_book->peek_qty(true, obi_level_, bid_qty_, {});
-    (void)order_book->peek_qty(false, obi_level_, ask_qty_, {});
+    std::ignore = order_book->peek_qty(true,
+        obi_level_,
+        std::span<int64_t>(bid_qty_),
+        {});
+    std::ignore = order_book->peek_qty(false,
+        obi_level_,
+        std::span<int64_t>(ask_qty_),
+        {});
 
-    const auto vwap = this->feature_engine_->get_vwap();
-
-    const double obi =
-        FeatureEngineT::orderbook_imbalance_from_levels(bid_qty_, ask_qty_);
-    const auto mid = this->feature_engine_->get_mid_price();
-    const double spread = this->feature_engine_->get_spread_fast();
-    double denom = std::max({spread, minimum_spread_});
-    const auto delta = (mid - vwap) / denom;
-    if (!std::isfinite(spread) || spread <= 0.0) {
-      this->logger_.trace("Non-positive spread ({}). Using denom={}",
-          spread,
-          denom);
-    }
-    const auto signal = std::abs(delta * obi);
+    const int64_t vwap = this->feature_engine_->get_vwap();
+    const int64_t obi = this->feature_engine_->orderbook_imbalance_int64(bid_qty_, ask_qty_);
+    const int64_t mid = this->feature_engine_->get_mid_price();
+    const int64_t spread = this->feature_engine_->get_spread_fast();
+    const int64_t denom = std::max(spread, minimum_spread_);
+    constexpr int64_t kDeltaScale = 100;
+    const int64_t delta_scaled =
+        (denom > 0) ? ((mid - vwap) * kDeltaScale) / denom : 0;
+    const int64_t delta_obi_scaled = delta_scaled * obi;
+    const int64_t signal = std::abs(delta_obi_scaled);
 
     std::vector<QuoteIntentType> intents;
-    intents.reserve(4);
+    intents.reserve(1);
 
     this->logger_.debug(
-        "[Updated] delta:{} obi:{} signal:{} mid:{}, vwap:{}, spread:{:.4f}",
-        delta,
+        "[Updated] delta:{} obi:{} signal:{} mid:{}, vwap:{}, spread:{}",
+        delta_obi_scaled,
         obi,
         signal,
         mid,
         vwap,
         spread);
 
-    if (delta * obi > enter_threshold_) {
-      const auto best_bid_price = order_book->get_bbo()->bid_price;
-      auto intent = make_quote_intent(ticker,
-          common::Side::kBuy,
-          best_bid_price - safety_margin_,
-          Qty{round5(signal * position_variance_)});
+    const int64_t delta_obi = delta_obi_scaled;
+
+    if (delta_obi > enter_threshold_) {
+      const int64_t best_bid_price = bbo->bid_price.value;
+      const auto order_price =
+          common::PriceType::from_raw(best_bid_price - safety_margin_);
+      const auto order_qty =
+          common::QtyType::from_raw(signal / position_variance_);
+      auto intent =
+          make_quote_intent(ticker, common::Side::kBuy, order_price, order_qty);
       if constexpr (SelectedOeTraits::supports_position_side()) {
         intent.position_side = common::PositionSide::kLong;
       }
       intents.push_back(intent);
 
-      this->logger_.debug(
-          "[Directional]Long Entry. price:{}, qty:{}, side:buy, "
-          "delta:{} "
-          "obi:{} signal:{}, mid:{}, vwap:{}, spread:{:.4f}",
-          best_bid_price.value - safety_margin_,
-          round5(signal * position_variance_),
-          delta,
-          obi,
-          signal,
-          mid,
-          vwap,
-          spread);
-    } else if (delta * obi < -enter_threshold_) {
-      const auto best_ask_price = order_book->get_bbo()->ask_price;
+      this->logger_.debug("[Directional]Long Entry. price:{}, qty:{}, side:buy",
+          order_price.value,
+          order_qty.value);
+    } else if (delta_obi < -enter_threshold_) {
+      const int64_t best_ask_price = bbo->ask_price.value;
+      const auto order_price =
+          common::PriceType::from_raw(best_ask_price + safety_margin_);
+      const auto order_qty =
+          common::QtyType::from_raw(signal / position_variance_);
       auto intent = make_quote_intent(ticker,
           common::Side::kSell,
-          best_ask_price + safety_margin_,
-          Qty{round5(signal * position_variance_)});
+          order_price,
+          order_qty);
       if constexpr (SelectedOeTraits::supports_position_side()) {
         intent.position_side = common::PositionSide::kShort;
       }
       intents.push_back(intent);
       this->logger_.debug(
-          "[Directional]Short Entry. price:{}, qty:{}, side:sell, "
-          "delta:{} "
-          "obi:{} signal:{}, mid:{}, vwap:{}, spread:{:.4f}",
-          best_ask_price.value + safety_margin_,
-          round5(signal * position_variance_),
-          delta,
-          obi,
-          signal,
-          mid,
-          vwap,
-          spread);
-    } else if (delta * obi < exit_threshold_) {
+          "[Directional]Short Entry. price:{}, qty:{}, side:sell",
+          order_price.value,
+          order_qty.value);
+    } else if (delta_obi < exit_threshold_) {
       if constexpr (SelectedOeTraits::supports_position_side()) {
         const auto* pos_info =
             this->position_keeper_->get_position_info(ticker);
-        if (pos_info->long_position_ > 0) {
-          const auto best_bid_price = order_book->get_bbo()->bid_price;
+        if (pos_info->long_position_raw_ > 0) {
+          const int64_t best_bid_price = bbo->bid_price.value;
+          const auto order_price =
+              common::PriceType::from_raw(best_bid_price + safety_margin_);
+          const auto order_qty =
+              common::QtyType::from_raw(signal / position_variance_);
           auto intent = make_quote_intent(ticker,
               common::Side::kSell,
-              best_bid_price + safety_margin_,
-              Qty{round5(signal * position_variance_)});
+              order_price,
+              order_qty);
           intent.position_side = common::PositionSide::kLong;
           intents.push_back(intent);
           this->logger_.debug(
-              "[Directional]Long Exit. price:{}, qty:{}, side:sell, "
-              "delta:{} "
-              "obi:{} signal:{}, mid:{}, vwap:{}, spread:{:.4f}",
-              best_bid_price.value - safety_margin_,
-              round5(signal * position_variance_),
-              delta,
-              obi,
-              signal,
-              mid,
-              vwap,
-              spread);
+              "[Directional]Long Exit. price:{}, qty:{}, side:sell",
+              order_price.value,
+              order_qty.value);
         }
       }
-    } else if (delta * obi > -exit_threshold_) {
+    } else if (delta_obi > -exit_threshold_) {
       if constexpr (SelectedOeTraits::supports_position_side()) {
         const auto* pos_info =
             this->position_keeper_->get_position_info(ticker);
-        if (pos_info->short_position_ > 0) {
-          const auto best_ask_price = order_book->get_bbo()->ask_price;
+        if (pos_info->short_position_raw_ > 0) {
+          const int64_t best_ask_price = bbo->ask_price.value;
+          const auto order_price =
+              common::PriceType::from_raw(best_ask_price - safety_margin_);
+          const auto order_qty =
+              common::QtyType::from_raw(signal / position_variance_);
           auto intent = make_quote_intent(ticker,
               common::Side::kBuy,
-              best_ask_price - safety_margin_,
-              Qty{round5(signal * position_variance_)});
+              order_price,
+              order_qty);
           intent.position_side = common::PositionSide::kShort;
           intents.push_back(intent);
           this->logger_.debug(
-              "[Directional]Short Exit. price:{}, qty:{}, side:buy, "
-              "delta:{} "
-              "obi:{} signal:{}, mid:{}, vwap:{}, spread:{:.4f}",
-              best_ask_price.value + safety_margin_,
-              round5(signal * position_variance_),
-              delta,
-              obi,
-              signal,
-              mid,
-              vwap,
-              spread);
+              "[Directional]Short Exit. price:{}, qty:{}, side:buy",
+              order_price.value,
+              order_qty.value);
         }
       }
     }
@@ -216,7 +199,7 @@ class ObiVwapDirectionalStrategy
 
  private:
   static QuoteIntentType make_quote_intent(const common::TickerId& ticker,
-      common::Side side, common::Price price, Qty qty) {
+      common::Side side, common::PriceType price, common::QtyType qty) {
     QuoteIntentType intent{};
     intent.ticker = ticker;
     intent.side = side;
@@ -226,17 +209,15 @@ class ObiVwapDirectionalStrategy
   }
 
   static constexpr int kDefaultOBILevel10 = 10;
-  static constexpr double kDefaultSafetyMargin = 5.0;
-  static constexpr int kDenominatorBase = 10;
-  const double variance_denominator_;
-  const double position_variance_;
-  const double enter_threshold_;
-  const double exit_threshold_;
   const int obi_level_;
-  const double safety_margin_;
-  const double minimum_spread_;
-  std::vector<double> bid_qty_;
-  std::vector<double> ask_qty_;
+
+  const int64_t safety_margin_;
+  const int64_t minimum_spread_;
+  const int64_t enter_threshold_;
+  const int64_t exit_threshold_;
+  const int64_t position_variance_;
+  std::vector<int64_t> bid_qty_;
+  std::vector<int64_t> ask_qty_;
 };
 
 }  // namespace trading

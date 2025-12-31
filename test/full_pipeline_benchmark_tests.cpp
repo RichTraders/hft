@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "common/cpumanager/cpu_manager.h"
+#include "common/fixed_point_config.hpp"
 #include "common/ini_config.hpp"
 #include "common/logger.h"
 #include "common/memory_pool.hpp"
@@ -27,6 +28,7 @@
 #include "core/response_manager.h"
 #include "core/websocket/market_data/ws_md_app.hpp"
 #include "core/websocket/order_entry/ws_oe_app.hpp"
+#include "core/transport/file_transport.h"
 #include "market_consumer.hpp"
 #include "order_gateway.hpp"
 #include "strategy_config.hpp"
@@ -72,7 +74,7 @@ class FullPipelineBenchmark : public ::testing::Test {
     PRECISION_CONFIG.initialize();
 
     logger_ = std::make_unique<Logger>();
-    logger_->setLevel(LogLevel::kInfo);
+    logger_->setLevel(LogLevel::kDebug);
     logger_->clearSink();
     //logger_->addSink(std::make_unique<ConsoleSink>());
     auto log_filename = make_log_filename();
@@ -102,13 +104,13 @@ class FullPipelineBenchmark : public ::testing::Test {
         std::make_unique<MemoryPool<OrderMassCancelReport>>(1024);
 
     TradeEngineCfgHashMap config_map;
-    config_map[INI_CONFIG.get("meta", "ticker")] = {.clip_ = Qty{0},
+    config_map[INI_CONFIG.get("meta", "ticker")] = {.clip_ = QtyType::from_raw(0),
         .threshold_ = 0,
         .risk_cfg_ =
-            RiskCfg(Qty{INI_CONFIG.get_double("risk", "max_order_size")},
-                Qty{INI_CONFIG.get_double("risk", "max_position")},
-                Qty{INI_CONFIG.get_double("risk", "min_position", 0.)},
-                INI_CONFIG.get_double("risk", "max_loss"))};
+            RiskCfg(QtyType::from_int64(INI_CONFIG.get_int64("risk", "max_order_size")),
+                QtyType::from_int64(INI_CONFIG.get_int64("risk", "max_position")),
+                QtyType::from_int64(INI_CONFIG.get_int64("risk", "min_position")),
+                INI_CONFIG.get_int64("risk", "max_loss") * FixedPointConfig::kPnlScale)};
 
     response_manager_ = std::make_unique<ResponseManager>(*producer_,
         execution_report_pool_.get(),

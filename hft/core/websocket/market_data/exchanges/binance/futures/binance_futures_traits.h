@@ -84,7 +84,7 @@ struct BinanceFuturesTraits {
   }
 
   static std::string get_stream_endpoint_path() {
-    return INI_CONFIG.get_with_symbol("auth",
+    return INI_CONFIG.get_with_symbol("exchange",
         "md_ws_path",
         "/stream?streams=btcusdt@depth/btcusdt@aggTrade");
   }

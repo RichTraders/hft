@@ -102,29 +102,80 @@ namespace ofs = offset;
   return static_cast<uint8_t>(chr - ofs::kDigitBase) < ofs::kDigitRange;
 }
 
-// Parse quoted double inline (e.g., "123.456")
+// NOLINTNEXTLINE(modernize-avoid-c-arrays)
+static constexpr int64_t kPowersOf10[] = {
+    1LL,         10LL,         100LL,         1000LL,        10000LL,
+    100000LL,    1000000LL,    10000000LL,    100000000LL,   1000000000LL,
+    10000000000LL
+};
+
+// NOLINTNEXTLINE(modernize-avoid-c-arrays)
+static constexpr double kDoublePowersOf10[] = {
+    1.0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10
+};
+
 [[gnu::always_inline]] inline double parse_double_inline(
     const char*& ptr) noexcept {
-  double int_part = 0.0;
-  while (is_digit(*ptr)) {
-    int_part = int_part * ofs::kDecimalBase + (*ptr++ - ofs::kDigitBase);
-  }
+  uint64_t mantissa = 0;
+  int frac_digits = 0;
+  bool in_frac = false;
 
-  if (*ptr == '.') {
-    ++ptr;
-    double frac_part = 0.0;
-    double frac_div = 1.0;
-
-    while (is_digit(*ptr)) {
-      frac_part = frac_part * ofs::kDecimalBase + (*ptr++ - ofs::kDigitBase);
-      frac_div *= ofs::kDecimalBase;
+  while (true) {
+    const char chr = *ptr;  // NOLINT(readability-identifier-length)
+    if (is_digit(chr)) {
+      mantissa = mantissa * ofs::kDecimalBase +  // NOLINT(bugprone-narrowing-conversions)
+                 static_cast<uint64_t>(chr - ofs::kDigitBase);  // NOLINT(bugprone-narrowing-conversions)
+      if (in_frac) ++frac_digits;
+      ++ptr;
+    } else if (chr == '.') {
+      in_frac = true;
+      ++ptr;
+    } else {
+      break;
     }
+  }
+  ++ptr;  // skip closing '"'
 
-    int_part += frac_part / frac_div;
+  if (frac_digits == 0) {
+    return static_cast<double>(mantissa);
+  }
+  return static_cast<double>(mantissa) / kDoublePowersOf10[frac_digits];
+}
+
+#include "common/fixed_point_config.hpp"
+
+template <int64_t Scale>
+[[gnu::always_inline]] inline int64_t parse_fixed_inline(
+    const char*& ptr) noexcept {
+  int64_t mantissa = 0;
+  int frac_digits = 0;
+  bool in_frac = false;
+
+  while (true) {
+    const char chr = *ptr;  // NOLINT(readability-identifier-length)
+    if (is_digit(chr)) {
+      mantissa = mantissa * ofs::kDecimalBase +  // NOLINT(bugprone-narrowing-conversions)
+          static_cast<int64_t>(chr - ofs::kDigitBase);  // NOLINT(bugprone-narrowing-conversions)
+      if (in_frac) ++frac_digits;
+      ++ptr;
+    } else if (chr == '.') {
+      in_frac = true;
+      ++ptr;
+    } else {
+      break;
+    }
+  }
+  ++ptr;  // skip closing '"'
+
+  // ex: "98234.12" with Scale=10000
+  //     mantissa=9823412, frac_digits=2
+  //     result = 9823412 * (10000 / 100) = 982341200
+  if (frac_digits == 0) {
+    return mantissa * Scale;
   }
 
-  ++ptr;  // skip closing '"'
-  return int_part;
+  const int64_t scale_divisor = kPowersOf10[frac_digits];
+  return mantissa * (Scale / scale_divisor);
 }
 
 [[gnu::always_inline]] inline void skip_digits(const char*& ptr) noexcept {
@@ -252,9 +303,11 @@ class OnepassBinanceFuturesMdDecoder {
     result.data.bids.reserve(ofs::kDepthReserve);
     while (*ptr == '[') {
       ptr += ofs::kPriceQtyEntry;
-      const double price = onepass::parse_double_inline(ptr);
+      const int64_t price = onepass::parse_fixed_inline<
+          common::FixedPointConfig::kPriceScale>(ptr);
       ptr += ofs::kPriceQtyEntry;
-      const double qty = onepass::parse_double_inline(ptr);
+      const int64_t qty = onepass::parse_fixed_inline<
+          common::FixedPointConfig::kQtyScale>(ptr);
       ++ptr;
       result.data.bids.push_back({price, qty});
       if (*ptr == ',')
@@ -265,9 +318,11 @@ class OnepassBinanceFuturesMdDecoder {
     result.data.asks.reserve(ofs::kDepthReserve);
     while (*ptr == '[') {
       ptr += ofs::kPriceQtyEntry;
-      const double price = onepass::parse_double_inline(ptr);
+      const int64_t price = onepass::parse_fixed_inline<
+          common::FixedPointConfig::kPriceScale>(ptr);
       ptr += ofs::kPriceQtyEntry;
-      const double qty = onepass::parse_double_inline(ptr);
+      const int64_t qty = onepass::parse_fixed_inline<
+          common::FixedPointConfig::kQtyScale>(ptr);
       ++ptr;
       result.data.asks.push_back({price, qty});
       if (*ptr == ',')
@@ -301,10 +356,12 @@ class OnepassBinanceFuturesMdDecoder {
     result.data.symbol.assign(ptr, s_end);
 
     ptr = s_end + ofs::kTradePriceSkip;  // ","ptr":"
-    result.data.price = onepass::parse_double_inline(ptr);
+    result.data.price = onepass::parse_fixed_inline<
+        common::FixedPointConfig::kPriceScale>(ptr);
 
     ptr += ofs::kTradeQtySkip;  // ","q":"
-    result.data.quantity = onepass::parse_double_inline(ptr);
+    result.data.quantity = onepass::parse_fixed_inline<
+        common::FixedPointConfig::kQtyScale>(ptr);
 
     ptr += ofs::kTradeFirstIdSkip;  // ","f":
     onepass::skip_digits(ptr);
@@ -341,16 +398,20 @@ class OnepassBinanceFuturesMdDecoder {
     result.data.symbol.assign(ptr, s_end);
 
     ptr = s_end + ofs::kBookTickerBidPriceSkip;  // ","b":"
-    result.data.best_bid_price = onepass::parse_double_inline(ptr);
+    result.data.best_bid_price = onepass::parse_fixed_inline<
+        common::FixedPointConfig::kPriceScale>(ptr);
 
     ptr += ofs::kBookTickerBidQtySkip;  // ,"B":"
-    result.data.best_bid_qty = onepass::parse_double_inline(ptr);
+    result.data.best_bid_qty = onepass::parse_fixed_inline<
+        common::FixedPointConfig::kQtyScale>(ptr);
 
     ptr += ofs::kBookTickerAskPriceSkip;  // ,"a":"
-    result.data.best_ask_price = onepass::parse_double_inline(ptr);
+    result.data.best_ask_price = onepass::parse_fixed_inline<
+        common::FixedPointConfig::kPriceScale>(ptr);
 
     ptr += ofs::kBookTickerAskQtySkip;  // ,"A":"
-    result.data.best_ask_qty = onepass::parse_double_inline(ptr);
+    result.data.best_ask_qty = onepass::parse_fixed_inline<
+        common::FixedPointConfig::kQtyScale>(ptr);
 
     return WireMessage{std::in_place_type<BookTickerEvent>, std::move(result)};
   }
@@ -381,9 +442,9 @@ class OnepassBinanceFuturesMdDecoder {
     result.result.bids.reserve(ofs::kSnapshotReserve);
     while (*ptr == '[') {
       ptr += ofs::kPriceQtyEntry;
-      const double price = onepass::parse_double_inline(ptr);
+      const int64_t price = onepass::parse_fixed_inline<common::FixedPointConfig::kPriceScale>(ptr);
       ptr += ofs::kPriceQtyEntry;
-      const double qty = onepass::parse_double_inline(ptr);
+      const int64_t qty = onepass::parse_fixed_inline<common::FixedPointConfig::kQtyScale>(ptr);
       ++ptr;
       result.result.bids.push_back({price, qty});
       if (*ptr == ',')
@@ -394,9 +455,9 @@ class OnepassBinanceFuturesMdDecoder {
     result.result.asks.reserve(ofs::kSnapshotReserve);
     while (*ptr == '[') {
       ptr += ofs::kPriceQtyEntry;
-      const double price = onepass::parse_double_inline(ptr);
+      const int64_t price = onepass::parse_fixed_inline<common::FixedPointConfig::kPriceScale>(ptr);
       ptr += ofs::kPriceQtyEntry;
-      const double qty = onepass::parse_double_inline(ptr);
+      const int64_t qty = onepass::parse_fixed_inline<common::FixedPointConfig::kQtyScale>(ptr);
       ++ptr;
       result.result.asks.push_back({price, qty});
       if (*ptr == ',')

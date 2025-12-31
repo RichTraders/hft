@@ -73,6 +73,7 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
   [[nodiscard]] WireMessage decode_id_response(std::string_view payload) const {
     const char id_char = payload[oe_decode::kIdOffset];
 
+    // NOLINTBEGIN(bugprone-branch-clone) - each case decodes a different type
     switch (id_char) {
       case oe_id::kSubscribe:
         return this->decode_or_log<
@@ -109,6 +110,7 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
       default:
         break;
     }
+    // NOLINTEND(bugprone-branch-clone)
 
     return this
         ->decode_or_log<BinanceFuturesOeTraits::ApiResponse, "[API response]">(

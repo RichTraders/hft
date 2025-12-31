@@ -33,8 +33,8 @@
 namespace trading::order {
 struct ActionNew {
   int layer;
-  common::Price price;
-  common::Qty qty;
+  common::PriceType price;
+  common::QtyType qty;
   common::Side side;
   common::OrderId cl_order_id;
   std::optional<common::PositionSide> position_side;
@@ -42,12 +42,12 @@ struct ActionNew {
 
 struct ActionReplace {
   int layer;
-  common::Price price;
-  common::Qty qty;
+  common::PriceType price;
+  common::QtyType qty;
   common::Side side;
   common::OrderId cl_order_id;
   common::OrderId original_cl_order_id;
-  common::Qty last_qty;
+  common::QtyType last_qty;
   std::optional<common::PositionSide> position_side;
 };
 
@@ -63,7 +63,7 @@ inline std::string toString(const ActionNew& action) {
   std::ostringstream stream;
   stream << std::fixed << std::setprecision(PRECISION_CONFIG.qty_precision());
   stream << "ActionNew{" << "layer=" << action.layer << ", "
-         << "price=" << action.price.value << ", " << "qty=" << action.qty.value
+         << "price=" << action.price.to_double() << ", " << "qty=" << action.qty.to_double()
          << ", " << "side=" << common::toString(action.side) << ", "
          << "cl_order_id=" << common::toString(action.cl_order_id);
   if (action.position_side) {
@@ -77,7 +77,7 @@ inline std::string toString(const ActionReplace& action) {
   std::ostringstream stream;
   stream << std::fixed << std::setprecision(PRECISION_CONFIG.qty_precision());
   stream << "ActionReplace{" << "layer=" << action.layer << ", "
-         << "price=" << action.price.value << ", " << "qty=" << action.qty.value
+         << "price=" << action.price.to_double() << ", " << "qty=" << action.qty.to_double()
          << ", " << "side=" << common::toString(action.side) << ", "
          << "cl_order_id=" << common::toString(action.cl_order_id) << ", "
          << "original_cl_order_id="
@@ -117,25 +117,27 @@ struct Actions {
 class VenuePolicy {
  public:
   VenuePolicy()
-      : minimum_usdt_(INI_CONFIG.get_double("venue", "minimum_order_usdt")),
-        minimum_qty_(INI_CONFIG.get_double("venue", "minimum_order_qty")),
-        maximum_qty_(INI_CONFIG.get_double("venue", "maximum_order_qty")),
+      : minimum_usdt_(INI_CONFIG.get_int64("venue", "minimum_order_usdt") *
+                      common::FixedPointConfig::kPriceScale),
+        minimum_qty_(INI_CONFIG.get_int64("venue", "minimum_order_qty") *
+                     common::FixedPointConfig::kQtyScale),
+        maximum_qty_(INI_CONFIG.get_int64("venue", "maximum_order_qty") *
+                     common::FixedPointConfig::kQtyScale),
         minimum_time_gap_(
-            INI_CONFIG.get_double("venue", "minimum_order_time_gap")),
+            INI_CONFIG.get_int64("venue", "minimum_order_time_gap")),
         qty_increment_(kQtyDefault) {}
 
   ~VenuePolicy() = default;
 
-  void set_qty_increment(double increment) { qty_increment_ = increment; }
+  void set_qty_increment(int64_t increment) { qty_increment_ = increment; }
 
-  [[nodiscard]] common::Qty round_qty(common::Qty qty) const noexcept {
-    const double steps = qty.value / qty_increment_;
-    const double rounded = std::ceil(steps) * qty_increment_;
-    return common::Qty{rounded};
+  [[nodiscard]] common::QtyType round_qty(common::QtyType qty) const noexcept {
+    const int64_t steps = (qty.value + qty_increment_ - 1) / qty_increment_;
+    return common::QtyType::from_raw(steps * qty_increment_);
   }
 
   void filter_by_venue(const std::string& symbol, Actions& actions,
-      uint64_t current_time, LayerBook& layer_book) {
+      uint64_t current_time, LayerBook& layer_book) const {
     auto last_times = layer_book.get_last_time(symbol);
     // [LONG_BUY, LONG_SELL, SHORT_BUY, SHORT_SELL]
 
@@ -144,7 +146,7 @@ class VenuePolicy {
                                    std::optional<common::PositionSide>
                                        pos_side,
                                    size_t time_idx) {
-      if (current_time - last_times[time_idx] < minimum_time_gap_) {
+      if (current_time - last_times[time_idx] < static_cast<uint64_t>(minimum_time_gap_)) {
         for (size_t i = 0; i < vec.size();) {
           if (vec[i].side == side && vec[i].position_side == pos_side) {
             vec[i] = std::move(vec.back());
@@ -209,29 +211,43 @@ class VenuePolicy {
         3);
 
     for (auto& action : actions.news) {
-      action.qty.value =
-          action.qty.value < minimum_qty_ ? minimum_qty_ : action.qty.value;
+      if (action.qty.value < minimum_qty_) {
+        action.qty.value = minimum_qty_;
+      }
 
-      const double order_usdt = action.price.value * action.qty.value;
+      const int64_t order_usdt =
+          action.price.value * action.qty.value /
+          common::FixedPointConfig::kQtyScale;
 
       if (order_usdt < minimum_usdt_) {
-        action.qty.value = minimum_usdt_ / action.price.value;
+        action.qty.value =
+            minimum_usdt_ * common::FixedPointConfig::kQtyScale /
+            action.price.value;
       }
-      action.qty.value = std::min(maximum_qty_, action.qty.value);
+      if (action.qty.value > maximum_qty_) {
+        action.qty.value = maximum_qty_;
+      }
 
       action.qty = round_qty(action.qty);
     }
 
     for (auto& action : actions.repls) {
-      action.qty.value =
-          action.qty.value < minimum_qty_ ? minimum_qty_ : action.qty.value;
+      if (action.qty.value < minimum_qty_) {
+        action.qty.value = minimum_qty_;
+      }
 
-      const double order_usdt = action.price.value * action.qty.value;
+      const int64_t order_usdt =
+          action.price.value * action.qty.value /
+          common::FixedPointConfig::kQtyScale;
 
       if (order_usdt < minimum_usdt_) {
-        action.qty.value = minimum_usdt_ / action.price.value;
+        action.qty.value =
+            minimum_usdt_ * common::FixedPointConfig::kQtyScale /
+            action.price.value;
       }
-      action.qty.value = std::min(maximum_qty_, action.qty.value);
+      if (action.qty.value > maximum_qty_) {
+        action.qty.value = maximum_qty_;
+      }
 
       action.qty = round_qty(action.qty);
       action.last_qty = round_qty(action.last_qty);
@@ -239,12 +255,12 @@ class VenuePolicy {
   }
 
  private:
-  static constexpr double kQtyDefault = 0.00001;
-  const double minimum_usdt_;
-  const double minimum_qty_;
-  const double maximum_qty_;
-  const uint64_t minimum_time_gap_;
-  double qty_increment_;
+  static constexpr int64_t kQtyDefault = 1;
+  const int64_t minimum_usdt_;
+  const int64_t minimum_qty_;
+  const int64_t maximum_qty_;
+  const int64_t minimum_time_gap_;
+  int64_t qty_increment_;
 };
 
 struct TickConverter {
@@ -254,12 +270,17 @@ struct TickConverter {
   static constexpr int kDigitMax = 9;
   static constexpr double kPower = 10.;
   static constexpr double kDiff = 1e-12;
+  int64_t scale_int = 0;
 
   explicit TickConverter(double tick) noexcept {
     for (int digit = 0; digit <= kDigitMax; ++digit) {
       const double powered = std::pow(kPower, digit);
       if (std::abs((tick * powered) - 1.0) < kDiff) {
         scale = powered;
+        // tick=0.1 -> scale=10, kPriceScale=10 -> scale_int = 10/10 = 1
+        // price_raw / scale_int = ticks
+        scale_int = common::FixedPointConfig::kPriceScale /
+                    static_cast<int64_t>(powered);
         return;
       }
     }
@@ -272,14 +293,19 @@ struct TickConverter {
     }
     return std::llround(price * inv);
   }
+
+  [[nodiscard]] uint64_t to_ticks_raw(int64_t price_raw) const noexcept {
+    return static_cast<uint64_t>(price_raw / scale_int);
+  }
 };
 
 template <typename QuoteIntentType>
 class QuoteReconciler {
  public:
   explicit QuoteReconciler(double tick_size)
-      : min_replace_qty_delta_(
-            INI_CONFIG.get_double("orders", "min_replace_qty_delta")),
+      : min_replace_qty_delta_(static_cast<int64_t>(
+            INI_CONFIG.get_double("orders", "min_replace_qty_delta") *
+            common::FixedPointConfig::kQtyScale)),
         min_replace_tick_delta_(
             INI_CONFIG.get_uint64_t("orders", "min_replace_tick_delta")),
         tick_converter_(tick_size) {}
@@ -327,12 +353,10 @@ class QuoteReconciler {
 
         auto& side_book = layer_book.side_book(ticker_id, side, pos_side);
         const bool active =
-            intent.price && intent.price->isValid() && intent.qty.value > 0;
+            intent.price && intent.price->is_valid() && intent.qty.value > 0;
         if (!active)
           continue;
-        //active_intent = true;
-
-        const uint64_t tick = tick_converter_.to_ticks(intent.price->value);
+        const uint64_t tick = tick_converter_.to_ticks_raw(intent.price->value);
         want_ticks.emplace(tick);
 
         auto assign = LayerBook::plan_layer(side_book, tick);
@@ -361,15 +385,14 @@ class QuoteReconciler {
               .cl_order_id = common::OrderId{now},
               .position_side = pos_side});
         } else if (slot.state == OMOrderState::kLive) {
-          const auto slot_tick = tick_converter_.to_ticks(slot.price.value);
-          const auto intent_tick =
-              tick_converter_.to_ticks(intent.price->value);
+          const auto slot_tick = tick_converter_.to_ticks_raw(slot.price.value);
+          const auto intent_tick = tick_converter_.to_ticks_raw(intent.price->value);
           const bool price_diff =
               slot_tick > intent_tick
                   ? slot_tick - intent_tick >= min_replace_tick_delta_
                   : intent_tick - slot_tick >= min_replace_tick_delta_;
-          const bool qty_diff = (std::abs(slot.qty.value - intent.qty.value) >=
-                                 min_replace_qty_delta_);
+          const int64_t qty_delta = slot.qty.value - intent.qty.value;
+          const bool qty_diff = std::abs(qty_delta) >= min_replace_qty_delta_;
           if (price_diff || qty_diff) {
             acts.repls.push_back(ActionReplace{.layer = assign.layer,
                 .price = *intent.price,
@@ -405,7 +428,7 @@ class QuoteReconciler {
   }
 
  private:
-  double min_replace_qty_delta_;
+  int64_t min_replace_qty_delta_;
   uint64_t min_replace_tick_delta_;
   TickConverter tick_converter_;
 };

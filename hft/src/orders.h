@@ -92,16 +92,16 @@ struct Order {
 struct SpotQuoteIntent {
   common::TickerId ticker;
   common::Side side;
-  std::optional<common::Price> price;
-  common::Qty qty;
+  std::optional<common::PriceType> price;
+  common::QtyType qty;
 };
 
 struct FuturesQuoteIntent {
   common::TickerId ticker;
   common::Side side;
   common::PositionSide position_side;
-  std::optional<common::Price> price;
-  common::Qty qty;
+  std::optional<common::PriceType> price;
+  common::QtyType qty;
 };
 
 constexpr int kSlotsPerSide = 8;

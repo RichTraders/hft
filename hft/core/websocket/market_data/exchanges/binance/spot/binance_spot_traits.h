@@ -79,7 +79,7 @@ struct BinanceSpotTraits {
   }
 
   static std::string get_stream_endpoint_path() {
-    return INI_CONFIG.get("auth",
+    return INI_CONFIG.get("exchange",
         "md_ws_path",
         "/stream?streams=btcusdt@depth@100ms/btcusdt@trade");
   }

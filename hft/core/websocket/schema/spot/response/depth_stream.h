@@ -53,6 +53,5 @@ struct DepthResponse {
         glz::object("stream", &T::stream, "data", &T::data);
   };
 };
-}
 }  // namespace schema
 #endif  //DEPTH_STREAM_H

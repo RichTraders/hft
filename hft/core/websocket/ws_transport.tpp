@@ -20,6 +20,7 @@ namespace {
 
 constexpr int kServiceIntervalMs = 50;
 constexpr std::string_view kConnectedSignalString = "__CONNECTED__";
+constexpr size_t kRxBufferSize = static_cast<size_t>(64) * 1024;
 
 template <FixedString ThreadName>
 struct Protocols {
@@ -27,7 +28,7 @@ struct Protocols {
       : entries{lws_protocols{"fix-websocket",
                     WebSocketTransport<ThreadName>::callback,
                     0,
-                    64 * 1024,
+                    kRxBufferSize,
                     0,
                     nullptr,
                     0},
@@ -194,7 +195,7 @@ int WebSocketTransport<ThreadName>::write(const std::string& buffer) const {
       interrupted_.load(std::memory_order_acquire)) {
     std::cout << "[WebSocketTransport::write] write failed. connected:"
               << connected_.load() << ", interrupted: " << interrupted_.load()
-              << std::endl;
+              << '\n';
     return -1;
   }
   std::cout << "[WebSocketTransport][" << ThreadName << "]: write:" << buffer
@@ -244,12 +245,12 @@ int WebSocketTransport<ThreadName>::handle_callback(struct lws* wsi,
       break;
     }
     case LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER: {
-      unsigned char** p_data = static_cast<unsigned char**>(data);
-      unsigned char* end = (*p_data) + len;
+      auto* p_data = static_cast<unsigned char**>(data);
+      auto* end = (*p_data) + len;
 
       if (api_key_.empty())
         break;
-      const unsigned char* token =
+      const auto* token =
           reinterpret_cast<const unsigned char*>(api_key_.data());
 
       if (lws_add_http_header_by_name(wsi,
@@ -268,7 +269,7 @@ int WebSocketTransport<ThreadName>::handle_callback(struct lws* wsi,
         fragment_buffer_.append(static_cast<const char*>(data), len);
 
         const auto is_final = lws_is_final_fragment(wsi);
-        const auto no_remaining = !lws_remaining_packet_payload(wsi);
+        const auto no_remaining = lws_remaining_packet_payload(wsi) == 0;
 
         if (is_final && no_remaining) {
           if (LIKELY(message_callback_)) {

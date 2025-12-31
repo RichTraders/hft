@@ -23,10 +23,10 @@ struct BookTickerData {
   std::int64_t event_time;     // "E" - event time
   std::int64_t transaction_time;  // "T" - transaction time
   std::string symbol;          // "s" - symbol
-  double best_bid_price;       // "b" - best bid price
-  double best_bid_qty;         // "B" - best bid qty
-  double best_ask_price;       // "a" - best ask price
-  double best_ask_qty;         // "A" - best ask qty
+  int64_t best_bid_price;      // "b" - best bid price
+  int64_t best_bid_qty;        // "B" - best bid qty
+  int64_t best_ask_price;      // "a" - best ask price
+  int64_t best_ask_qty;        // "A" - best ask qty
 
   // clang-format off
   // NOLINTNEXTLINE(readability-identifier-naming)

@@ -18,8 +18,8 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <sstream>
 #include <span>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -36,10 +36,10 @@ template <typename Strategy>
 class TradeEngine;
 
 struct BBO {
-  common::Price bid_price = common::Price{common::kPriceInvalid};
-  common::Price ask_price = common::Price{common::kPriceInvalid};
-  common::Qty bid_qty = common::Qty{common::kQtyInvalid};
-  common::Qty ask_qty = common::Qty{common::kQtyInvalid};
+  common::PriceType bid_price = common::PriceType::from_raw(0);
+  common::PriceType ask_price = common::PriceType::from_raw(0);
+  common::QtyType bid_qty = common::QtyType::from_raw(0);
+  common::QtyType ask_qty = common::QtyType::from_raw(0);
 
   [[nodiscard]] auto toString() const {
     std::ostringstream stream;
@@ -93,28 +93,37 @@ struct OrderBookConfig {
     };
   }
 
-  [[nodiscard]] int price_to_index(common::Price price) const noexcept {
-    return static_cast<int>(price.value * tick_multiplier_int) - min_price_int;
+  [[nodiscard]] int price_to_index(common::PriceType price) const noexcept {
+    // kPriceScale == tick_multiplier_int, so price.raw_value is the tick index
+    return static_cast<int>(price.value) - min_price_int;
   }
 
-  [[nodiscard]] common::Price index_to_price(int index) const noexcept {
-    return common::Price{
-        static_cast<double>(min_price_int + index) / tick_multiplier_int};
+  [[nodiscard]] common::PriceType index_to_price(int index) const noexcept {
+    return common::PriceType::from_raw(
+        static_cast<int64_t>(min_price_int) + static_cast<int64_t>(index));
   }
 };
 
 struct MarketOrder {
-  common::Qty qty = common::Qty{.0f};
+  common::QtyType qty = common::QtyType::from_raw(0);
   bool active = false;
   MarketOrder() noexcept = default;
-  explicit MarketOrder(common::Qty qty_, bool active_ = false) noexcept
+
+  explicit MarketOrder(common::QtyType qty_, bool active_ = false) noexcept
       : qty(qty_), active(active_) {}
+
   [[nodiscard]] auto toString() const -> std::string {
     std::ostringstream stream;
-    stream << "[MarketOrder]" << "[" << "qty:" << qty.value << " "
+    stream << "[MarketOrder]" << "[" << "qty:" << qty.to_double() << " "
            << "active:" << active << " ";
     return stream.str();
   }
+
+  [[nodiscard]] bool is_positive() const noexcept { return qty.value > 0; }
+  [[nodiscard]] double qty_as_double() const noexcept {
+    return qty.to_double();
+  }
+  [[nodiscard]] int64_t qty_raw() const noexcept { return qty.value; }
 };
 
 struct Bucket {
@@ -128,25 +137,35 @@ struct Bucket {
 
 // Legacy global functions - deprecated, use OrderBookConfig methods instead
 // Kept for backward compatibility with existing code
-inline int priceToIndex(common::Price price_int,
+inline int priceToIndex(common::PriceType price_int,
     const OrderBookConfig& cfg) noexcept {
   return cfg.price_to_index(price_int);
 }
 
-inline common::Price indexToPrice(int index,
+inline common::PriceType indexToPrice(int index,
     const OrderBookConfig& cfg) noexcept {
   return cfg.index_to_price(index);
 }
 
 struct LevelView {
   int idx;
-  double qty;
-  double price;
+  int64_t qty_raw;
+  int64_t price_raw;
+
+  [[nodiscard]] double qty() const noexcept {
+    return static_cast<double>(qty_raw) / common::FixedPointConfig::kQtyScale;
+  }
+
+  [[nodiscard]] double price() const noexcept {
+    return static_cast<double>(price_raw) /
+           common::FixedPointConfig::kPriceScale;
+  }
 };
 
 inline int bucket_of(int idx) noexcept {
   return idx / kBucketSize;
 }
+
 inline int offset_of(int idx) noexcept {
   return idx & (kBucketSize - 1);
 }
@@ -156,11 +175,16 @@ inline const MarketOrder* level_ptr(const Bucket* bucket, int off) noexcept {
 }
 
 // NOLINTBEGIN
+template <typename T>
 inline bool push_if_active(const Bucket* bucket, int bidx, int off,
-    std::span<double> qty_out, std::span<int> idx_out, int& filled, int want) {
+    std::span<T> qty_out, std::span<int> idx_out, int& filled, int want) {
   const auto& market_order = bucket->orders[off];
-  if (market_order.active && market_order.qty.value > 0.0) {
-    qty_out[filled] = market_order.qty.value;
+  if (market_order.active && market_order.is_positive()) {
+    if constexpr (std::is_same_v<T, int64_t>) {
+      qty_out[filled] = market_order.qty_raw();
+    } else {
+      qty_out[filled] = market_order.qty_as_double();
+    }
     if (!idx_out.empty())
       idx_out[filled] = bidx * kBucketSize + off;
     ++filled;
@@ -210,9 +234,9 @@ uint64_t first_mask(int start_off) {
   }
 }
 
-template <common::Side S>
+template <common::Side S, typename T>
 bool consume_first_word(const Bucket* bucket, int bidx, int start_off,
-    std::span<double> qty_out, std::span<int> idx_out, int& filled, int want) {
+    std::span<T> qty_out, std::span<int> idx_out, int& filled, int want) {
   const int word_idx = start_off >> kWordShift;
   const uint64_t mask = first_mask<S>(start_off);
   const uint64_t word = bucket->bitmap[word_idx] & mask;
@@ -228,9 +252,9 @@ bool consume_first_word(const Bucket* bucket, int bidx, int start_off,
   }
 }
 
-template <common::Side S>
+template <common::Side S, typename T>
 bool consume_following_words(const Bucket* bucket, int bidx, int start_off,
-    std::span<double> qty_out, std::span<int> idx_out, int& filled, int want) {
+    std::span<T> qty_out, std::span<int> idx_out, int& filled, int want) {
   const int word_idx = start_off >> kWordShift;
 
   auto on_off = [&](int off) {
@@ -244,7 +268,7 @@ bool consume_following_words(const Bucket* bucket, int bidx, int start_off,
     }
   } else {
     for (int idx = word_idx + 1; idx < kBucketBitmapWords && filled < want;
-         ++idx) {
+        ++idx) {
       if (scan_word<false>(bucket->bitmap[idx], idx, on_off))
         return true;
     }
@@ -252,22 +276,17 @@ bool consume_following_words(const Bucket* bucket, int bidx, int start_off,
   return filled >= want;
 }
 
-template <common::Side S>
+template <common::Side S, typename T>
 bool consume_bucket_side(const Bucket* bucket, int bidx, int start_off,
-    std::span<double> qty_out, std::span<int> idx_out, int& filled, int want) {
+    std::span<T> qty_out, std::span<int> idx_out, int& filled, int want) {
   if (!bucket)
     return false;
 
-  if (consume_first_word<S>(bucket,
-          bidx,
-          start_off,
-          qty_out,
-          idx_out,
-          filled,
-          want)) {
+  if (consume_first_word<S,
+          T>(bucket, bidx, start_off, qty_out, idx_out, filled, want)) {
     return true;
   }
-  return consume_following_words<S>(bucket,
+  return consume_following_words<S, T>(bucket,
       bidx,
       start_off,
       qty_out,
@@ -279,6 +298,7 @@ bool consume_bucket_side(const Bucket* bucket, int bidx, int start_off,
 constexpr uint64_t mask_before(int bit) {
   return (bit == 0) ? 0ULL : ((1ULL << bit) - 1);
 }
+
 constexpr uint64_t mask_after_inclusive(int bit) {
   return ~((1ULL << (bit + 1)) - 1);
 }
@@ -317,10 +337,11 @@ int jump_next_bucket_impl(std::span<const uint64_t> summary, int start_bidx) {
   }
   return -1;
 }
+
 bool push_level_if_positive(const Bucket* bucket, int bucket_idx, int local_off,
     const auto& indexToPrice, std::vector<LevelView>& out, int level) {
   const MarketOrder* market_order = level_ptr(bucket, local_off);
-  if (market_order->qty.value <= 0.0)
+  if (!market_order->is_positive())
     return false;
   const int global_idx = bucket_idx * kBucketSize + local_off;
   out.push_back(LevelView{global_idx,
@@ -373,20 +394,21 @@ void consume_levels_in_bucket(const Bucket* bucket, int bucket_idx, int off,
 
   if constexpr (IsBid) {
     for (int workd_idx = word_index - 1;
-         workd_idx >= 0 && static_cast<int>(out.size()) < level;
-         --workd_idx) {
+        workd_idx >= 0 && static_cast<int>(out.size()) < level;
+        --workd_idx) {
       if (scan_word<true>(bucket->bitmap[workd_idx], workd_idx, on_off))
         return;
     }
   } else {
     for (int word_idx = word_index + 1;
-         word_idx < kBucketBitmapWords && static_cast<int>(out.size()) < level;
-         ++word_idx) {
+        word_idx < kBucketBitmapWords && static_cast<int>(out.size()) < level;
+        ++word_idx) {
       if (scan_word<false>(bucket->bitmap[word_idx], word_idx, on_off))
         return;
     }
   }
 }
+
 // NOLINTEND
 
 template <typename Strategy>
@@ -422,26 +444,50 @@ class MarketOrderBook final {
     trade_engine_ = nullptr;
   }
 
-  auto on_market_data_updated(
-      const MarketData* market_update) noexcept -> void {
-    const double max_price = static_cast<double>(config_.max_price_int) /
-                             config_.tick_multiplier_int;
-    const double min_price = static_cast<double>(config_.min_price_int) /
-                             config_.tick_multiplier_int;
+  auto on_market_data_updated(const MarketData* market_update) noexcept
+      -> void {
 
-    if (market_update->price.value > max_price ||
-        market_update->price.value < min_price) {
+    const int64_t max_price_raw = config_.max_price_int;
+    const int64_t min_price_raw = config_.min_price_int;
+
+    if (market_update->price.value > max_price_raw ||
+        market_update->price.value < min_price_raw) {
       logger_.error("common::Price[{}] is invalid (range: {} ~ {})",
-          market_update->price.value,
-          min_price,
-          max_price);
+          market_update->price.to_double(),
+          static_cast<double>(min_price_raw) /
+              common::FixedPointConfig::kPriceScale,
+          static_cast<double>(max_price_raw) /
+              common::FixedPointConfig::kPriceScale);
       return;
     }
 
     const int idx = config_.price_to_index(market_update->price);
-    const common::Qty qty = market_update->qty;
+    const auto qty = market_update->qty;
 
     switch (market_update->type) {
+      case common::MarketUpdateType::kInvalid:
+        logger_.error("error in market update data");
+        break;
+      case common::MarketUpdateType::kClear: {
+        for (int i = 0; i < config_.bucket_count; ++i) {
+          if (bidBuckets_[i]) {
+            bid_bucket_pool_->deallocate(bidBuckets_[i]);
+            bidBuckets_[i] = nullptr;
+          }
+          if (askBuckets_[i]) {
+            ask_bucket_pool_->deallocate(askBuckets_[i]);
+            askBuckets_[i] = nullptr;
+          }
+        }
+        std::fill(bidSummary_.begin(), bidSummary_.end(), 0);
+        std::fill(askSummary_.begin(), askSummary_.end(), 0);
+        bbo_ = {.bid_price = common::PriceType::from_raw(0),
+            .ask_price = common::PriceType::from_raw(0),
+            .bid_qty = common::QtyType::from_raw(0),
+            .ask_qty = common::QtyType::from_raw(0)};
+        logger_.info("Cleared all market data.");
+        return;
+      }
       case common::MarketUpdateType::kAdd:
       case common::MarketUpdateType::kModify: {
         add_order(market_update, idx, qty);
@@ -465,29 +511,6 @@ class MarketOrderBook final {
         }
         return;
       }
-      case common::MarketUpdateType::kClear: {
-        for (int i = 0; i < config_.bucket_count; ++i) {
-          if (bidBuckets_[i]) {
-            bid_bucket_pool_->deallocate(bidBuckets_[i]);
-            bidBuckets_[i] = nullptr;
-          }
-          if (askBuckets_[i]) {
-            ask_bucket_pool_->deallocate(askBuckets_[i]);
-            askBuckets_[i] = nullptr;
-          }
-        }
-        std::fill(bidSummary_.begin(), bidSummary_.end(), 0);
-        std::fill(askSummary_.begin(), askSummary_.end(), 0);
-        bbo_ = {.bid_price = common::Price{common::kPriceInvalid},
-            .ask_price = common::Price{common::kPriceInvalid},
-            .bid_qty = common::Qty{common::kQtyInvalid},
-            .ask_qty = common::Qty{common::kQtyInvalid}};
-        logger_.info("Cleared all market data.");
-        return;
-      }
-      case common::MarketUpdateType::kInvalid:
-        logger_.error("error in market update data");
-        break;
     }
 
     logger_.trace("[Updated] {} {}",
@@ -517,9 +540,9 @@ class MarketOrderBook final {
 
       for (int off = 0; off < kBucketSize; ++off) {
         const MarketOrder& order = bucket->orders[off];
-        if (order.active && order.qty.value > 0.) {
+        if (order.active && order.is_positive()) {
           const int global_idx = bucket_idx * kBucketSize + off;
-          const common::Price price = config_.index_to_price(global_idx);
+          const auto price = config_.index_to_price(global_idx);
           stream << (is_bid ? "[BID]" : "[ASK]") << " idx:" << global_idx
                  << " price:" << common::toString(price)
                  << " qty:" << common::toString(order.qty) << "\n";
@@ -629,7 +652,7 @@ class MarketOrderBook final {
     }
 
     for (int iter = summary_word_index + 1; iter < config_.summary_words;
-         ++iter) {
+        ++iter) {
       if (const uint64_t summary_word = summary_bitmap[iter]) {
         const int bit = __builtin_ctzll(summary_word);
         const int next_bucket_index = (iter << kWordShift) + bit;
@@ -691,7 +714,7 @@ class MarketOrderBook final {
     int bucket_idx = bucket_of(idx);
     int off = offset_of(idx);
 
-    auto price_of = [this](int gidx) -> common::Price {
+    auto price_of = [this](int gidx) -> common::PriceType {
       return config_.index_to_price(gidx);
     };
 
@@ -736,7 +759,8 @@ class MarketOrderBook final {
     return static_cast<int>(out.size());
   }
 
-  [[nodiscard]] int peek_qty(bool is_bid, int level, std::span<double> qty_out,
+  template <typename T>
+  [[nodiscard]] int peek_qty(bool is_bid, int level, std::span<T> qty_out,
       std::span<int> idx_out) const noexcept {
     const auto want = std::min<int>(level, static_cast<int>(qty_out.size()));
     if (want <= 0)
@@ -753,7 +777,7 @@ class MarketOrderBook final {
         return false;
 
       if (is_bid) {
-        return consume_bucket_side<common::Side::kBuy>(bucket,
+        return consume_bucket_side<common::Side::kBuy, T>(bucket,
             bidx,
             start_off,
             qty_out,
@@ -761,7 +785,7 @@ class MarketOrderBook final {
             filled,
             want);
       }
-      return consume_bucket_side<common::Side::kSell>(bucket,
+      return consume_bucket_side<common::Side::kSell, T>(bucket,
           bidx,
           start_off,
           qty_out,
@@ -799,6 +823,7 @@ class MarketOrderBook final {
 
     return filled;
   }
+
   // NOLINTEND(readability-function-cognitive-complexity)
 
   static void on_trade_update(MarketData* /*market_data*/) {}
@@ -829,7 +854,7 @@ class MarketOrderBook final {
   std::unique_ptr<common::MemoryPool<Bucket>> bid_bucket_pool_;
   std::unique_ptr<common::MemoryPool<Bucket>> ask_bucket_pool_;
 
-  void update_bid(int idx, common::Qty qty) {
+  void update_bid(int idx, common::QtyType qty) {
     const int bucket_idx = idx / kBucketSize;
     const int off = idx & (kBucketSize - 1);
 
@@ -838,14 +863,14 @@ class MarketOrderBook final {
       std::ranges::fill(bidBuckets_[bucket_idx]->bitmap, 0);
       for (auto& order : bidBuckets_[bucket_idx]->orders) {
         order.active = false;
-        order.qty = common::Qty{.0};
+        order.qty = common::QtyType::from_raw(0);
       }
     }
     Bucket* const bucket = bidBuckets_[bucket_idx];
 
     auto& order = bucket->orders[off];
     order.qty = qty;
-    order.active = (qty.value > .0);
+    order.active = (qty.value > 0);
 
     const int word = off >> kWordShift;
     const uint64_t mask = (1ULL << (off & kWordMask));
@@ -863,7 +888,7 @@ class MarketOrderBook final {
     }
   }
 
-  void update_ask(const int idx, const common::Qty qty) {
+  void update_ask(const int idx, const common::QtyType qty) {
     const int bidx = idx / kBucketSize;
     const int off = idx & (kBucketSize - 1);
 
@@ -872,14 +897,14 @@ class MarketOrderBook final {
       std::ranges::fill(askBuckets_[bidx]->bitmap, 0);
       for (auto& order : askBuckets_[bidx]->orders) {
         order.active = false;
-        order.qty = common::Qty{.0};
+        order.qty = common::QtyType::from_raw(0);
       }
     }
     Bucket* bucket = askBuckets_[bidx];
 
     auto& order = bucket->orders[off];
     order.qty = qty;
-    order.active = (qty.value > .0);
+    order.active = (qty.value > 0);
 
     const int word = off >> kWordShift;
     const uint64_t mask = (1ULL << (off & kWordMask));
@@ -943,36 +968,36 @@ class MarketOrderBook final {
     return -1;
   }
 
-  [[nodiscard]] common::Price best_bid_price() const noexcept {
+  [[nodiscard]] common::PriceType best_bid_price() const noexcept {
     const int idx = best_bid_idx();
     return (idx >= 0) ? config_.index_to_price(idx)
-                      : common::Price{common::kPriceInvalid};
+                      : common::PriceType::from_raw(0);
   }
 
-  [[nodiscard]] common::Price best_ask_price() const noexcept {
+  [[nodiscard]] common::PriceType best_ask_price() const noexcept {
     const int idx = best_ask_idx();
     return (idx >= 0) ? config_.index_to_price(idx)
-                      : common::Price{common::kPriceInvalid};
+                      : common::PriceType::from_raw(0);
   }
 
-  [[nodiscard]] common::Qty best_bid_qty() const noexcept {
+  [[nodiscard]] common::QtyType best_bid_qty() const noexcept {
     const int idx = best_bid_idx();
     if (idx < 0)
-      return common::Qty{common::kQtyInvalid};
+      return common::QtyType::from_raw(0);
     const int bidx = idx / kBucketSize;
     const int off = idx & (kBucketSize - 1);
     Bucket* bucket = bidBuckets_[bidx];
-    return bucket ? bucket->orders[off].qty : common::Qty{common::kQtyInvalid};
+    return bucket ? bucket->orders[off].qty : common::QtyType::from_raw(0);
   }
 
-  [[nodiscard]] common::Qty best_ask_qty() const noexcept {
+  [[nodiscard]] common::QtyType best_ask_qty() const noexcept {
     const int idx = best_ask_idx();
     if (idx < 0)
-      return common::Qty{common::kQtyInvalid};
+      return common::QtyType::from_raw(0);
     const int bidx = idx / kBucketSize;
     const int off = idx & (kBucketSize - 1);
     Bucket* bucket = askBuckets_[bidx];
-    return bucket ? bucket->orders[off].qty : common::Qty{common::kQtyInvalid};
+    return bucket ? bucket->orders[off].qty : common::QtyType::from_raw(0);
   }
 
   void trade_order(const MarketData* market_update, const int idx) {
@@ -982,9 +1007,9 @@ class MarketOrderBook final {
     if (market_update->side == common::Side::kBuy) {
       Bucket* bucket = bidBuckets_[bidx];
       if (bucket && bucket->orders[off].active) {
-        bucket->orders[off].qty.value -= market_update->qty.value;
-        if (bucket->orders[off].qty.value <= 0.) {
-          update_bid(idx, common::Qty{0.});
+        bucket->orders[off].qty -= market_update->qty;
+        if (bucket->orders[off].qty.value <= 0) {
+          update_bid(idx, common::QtyType::from_raw(0));
         }
         bbo_.bid_price = best_bid_price();
         bbo_.bid_qty = best_bid_qty();
@@ -992,9 +1017,9 @@ class MarketOrderBook final {
     } else {
       Bucket* bucket = askBuckets_[bidx];
       if (bucket && bucket->orders[off].active) {
-        bucket->orders[off].qty.value -= market_update->qty.value;
-        if (bucket->orders[off].qty.value <= 0.) {
-          update_ask(idx, common::Qty{0.});
+        bucket->orders[off].qty -= market_update->qty;
+        if (bucket->orders[off].qty.value <= 0) {
+          update_ask(idx, common::QtyType::from_raw(0));
         }
         bbo_.ask_price = best_ask_price();
         bbo_.ask_qty = best_ask_qty();
@@ -1004,18 +1029,18 @@ class MarketOrderBook final {
 
   void delete_order(const MarketData* market_update, const int idx) {
     if (market_update->side == common::Side::kBuy) {
-      update_bid(idx, common::Qty{0.});
+      update_bid(idx, common::QtyType::from_raw(0));
       bbo_.bid_price = best_bid_price();
       bbo_.bid_qty = best_bid_qty();
     } else {
-      update_ask(idx, common::Qty{0.});
+      update_ask(idx, common::QtyType::from_raw(0));
       bbo_.ask_price = best_ask_price();
       bbo_.ask_qty = best_ask_qty();
     }
   }
 
   void add_order(const MarketData* market_update, const int idx,
-      const common::Qty qty) {
+      const common::QtyType qty) {
     if (market_update->side == common::Side::kBuy) {
       update_bid(idx, qty);
       bbo_.bid_price = best_bid_price();

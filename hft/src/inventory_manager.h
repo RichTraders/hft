@@ -31,9 +31,11 @@ class InventoryManager {
   InventoryManager(InventoryManager&&) = delete;
   InventoryManager& operator=(InventoryManager&&) = delete;
 
+  // Returns price adjustment (scaled by kPriceScale)
   [[nodiscard]] auto get_quote_adjustment(common::Side side,
-      const common::TickerId& ticker_id) const noexcept -> double;
+      const common::TickerId& ticker_id) const noexcept -> int64_t;
 
+  // Returns skew coefficient as double for logging
   [[nodiscard]] auto get_skew_coefficient() const noexcept -> double;
   void set_skew_coefficient(double coefficient) noexcept;
 
@@ -42,7 +44,7 @@ class InventoryManager {
   const common::Logger::Producer& logger_;
   PositionKeeper* position_keeper_;
   LinearSkewModel model_;
-  double target_position_;
+  int64_t target_position_;  // scaled by kQtyScale
 };
 
 }  // namespace trading

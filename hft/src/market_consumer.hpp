@@ -63,6 +63,7 @@ class MarketConsumer
             market_data_pool_)) {
 
     using WireMessage = MdApp::WireMessage;
+    // NOLINTNEXTLINE(bugprone-branch-clone) - different parameter passing semantics
     auto register_handler = [this](const std::string& type, auto&& callback) {
       if constexpr (std::is_pointer_v<WireMessage>) {
         app_->register_callback(type,
@@ -215,7 +216,7 @@ class MarketConsumer
     }
 
 #ifdef ENABLE_WEBSOCKET
-    bool first_buffered = true;
+    bool first_buffered = true;  // NOLINT(misc-const-correctness)
     constexpr auto kMarketType =
         get_market_type<typename MdApp::ExchangeTraits>();
 

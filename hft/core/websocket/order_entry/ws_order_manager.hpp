@@ -27,8 +27,8 @@ struct PendingOrderRequest {
   std::uint64_t client_order_id{0};
   std::string symbol;
   common::Side side{common::Side::kInvalid};
-  common::Price price{0.0};
-  common::Qty order_qty{0.0};
+  common::PriceType price{common::PriceType::from_raw(0)};
+  common::QtyType order_qty{common::QtyType::from_raw(0)};
   trading::OrderType ord_type{trading::OrderType::kInvalid};
   trading::TimeInForce time_in_force{trading::TimeInForce::kInvalid};
   std::optional<common::PositionSide> position_side;
@@ -114,8 +114,8 @@ class WsOrderManager {
       event.side = common::toString(pending.side);
       event.order_type = trading::toString(pending.ord_type);
       event.time_in_force = trading::toString(pending.time_in_force);
-      event.order_price = pending.price.value;
-      event.order_quantity = pending.order_qty.value;
+      event.order_price = pending.price.to_double();
+      event.order_quantity = pending.order_qty.to_double();
 
       if constexpr (ExchangeTraits::requires_listen_key()) {
         if (pending.position_side) {
@@ -203,7 +203,7 @@ class WsOrderManager {
       return std::nullopt;
     }
 
-    uint64_t result = 0;
+    uint64_t result = 0;  // NOLINT(misc-const-correctness)
     auto [ptr, ec] = std::from_chars(numeric_part.data(),
         numeric_part.data() + numeric_part.size(),
         result);

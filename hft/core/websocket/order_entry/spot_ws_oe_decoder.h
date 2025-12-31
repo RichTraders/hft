@@ -50,7 +50,7 @@ class SpotWsOeDecoder : public WsOeDecoderBase<SpotWsOeDecoder> {
               payload);
     }
 
-    schema::WsHeader header{};
+    schema::WsHeader header{};  // NOLINT(misc-const-correctness)
     const auto error_code =
         glz::read<glz::opts{.error_on_unknown_keys = 0, .partial_read = 1}>(
             header,

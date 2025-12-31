@@ -23,6 +23,7 @@
 #include <utility>
 
 #include "precision_config.hpp"
+#include "fixed_point.hpp"
 
 #ifndef LIKELY
 #define LIKELY(x) __builtin_expect(!!(x), 1)
@@ -93,16 +94,7 @@ constexpr auto kClientIdInvalid = std::numeric_limits<uint32_t>::max();
 struct Price {
   double value{std::numeric_limits<double>::max()};
 
-  [[nodiscard]] double truncate() const noexcept {
-    return static_cast<double>(static_cast<int64_t>(
-               this->value * PRECISION_CONFIG.price_multiplier())) /
-           PRECISION_CONFIG.price_multiplier();
-  }
-
-  [[nodiscard]] double truncate(double precision) const noexcept {
-    return static_cast<double>(static_cast<int64_t>(this->value * precision)) /
-           precision;
-  }
+  [[nodiscard]] double to_double() const noexcept { return value; }
 
   Price() noexcept = default;
   explicit constexpr Price(double data) noexcept : value(data) {}
@@ -160,19 +152,10 @@ struct Qty {
   Qty() noexcept = default;
   constexpr explicit Qty(double data) noexcept : value(data) {}
 
+  [[nodiscard]] double to_double() const noexcept { return value; }
+
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<double>::max();
-  }
-
-  [[nodiscard]] double truncate() const noexcept {
-    return static_cast<double>(static_cast<int64_t>(
-               this->value * PRECISION_CONFIG.qty_multiplier())) /
-           PRECISION_CONFIG.qty_multiplier();
-  }
-
-  [[nodiscard]] double truncate(double precision) const noexcept {
-    return static_cast<double>(static_cast<int64_t>(this->value * precision)) /
-           precision;
   }
 
   constexpr bool operator==(double other) const { return value == other; }
@@ -247,6 +230,9 @@ inline auto toString(Qty qty) -> std::string {
 }
 
 constexpr auto kQtyInvalid = std::numeric_limits<double>::max();
+
+using PriceType = FixedPrice;
+using QtyType = FixedQty;
 
 struct Priority {
   uint64_t value{std::numeric_limits<uint64_t>::max()};
@@ -400,18 +386,27 @@ inline std::string_view toString(MarketUpdateType type) noexcept {
 }
 
 struct RiskCfg {
-  Qty max_order_size_ = Qty{0};
-  Qty max_position_ = Qty{0};
-  Qty min_position_ = Qty{0};
-  double max_loss_ = 0;
+  QtyType max_order_size_;
+  QtyType max_position_;
+  QtyType min_position_;
+  int64_t max_loss_ = 0;
+
+  RiskCfg() = default;
+
+  RiskCfg(QtyType max_order, QtyType max_pos, QtyType min_pos, int64_t max_loss)
+      : max_order_size_(max_order),
+        max_position_(max_pos),
+        min_position_(min_pos),
+        max_loss_(max_loss)
+  {}
 
   [[nodiscard]] auto toString() const {
     std::ostringstream stream;
 
     stream << "RiskCfg{"
-           << "max-order-size:" << common::toString(max_order_size_) << " "
-           << "max-position:" << common::toString(max_position_) << " "
-           << "min-position:" << common::toString(min_position_) << " "
+           << "max-order-size:" << max_order_size_.value << " "
+           << "max-position:" << max_position_.value << " "
+           << "min-position:" << min_position_.value << " "
            << "max-loss:" << max_loss_ << "}";
 
     return stream.str();
@@ -419,13 +414,13 @@ struct RiskCfg {
 };
 
 struct TradeEngineCfg {
-  Qty clip_ = Qty{0};
-  double threshold_ = 0;
+  QtyType clip_;
+  int64_t threshold_ = 0;
   RiskCfg risk_cfg_;
 
   [[nodiscard]] auto toString() const {
     std::ostringstream stream;
-    stream << "TradeEngineCfg{" << "clip:" << common::toString(clip_) << " "
+    stream << "TradeEngineCfg{" << "clip:" << clip_.value << " "
            << "thresh:" << threshold_ << " " << "risk:" << risk_cfg_.toString()
            << "}";
 

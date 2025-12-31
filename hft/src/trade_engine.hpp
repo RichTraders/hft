@@ -123,7 +123,7 @@ class TradeEngine {
     return queue_->enqueue(data);
   }
 
-  void on_orderbook_updated(const common::TickerId& ticker, common::Price price,
+  void on_orderbook_updated(const common::TickerId& ticker, common::PriceType price,
       common::Side side, MarketOrderBook<Strategy>* market_order_book) {
     START_MEASURE(ORDERBOOK_UPDATED);
     feature_engine_->on_order_book_updated(price, side, market_order_book);

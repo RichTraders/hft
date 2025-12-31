@@ -240,41 +240,38 @@ def print_markdown_table(all_stats: list[MeasurementStats]):
               f"{cycles_to_us(stats.max_val):.3f} |")
 
 
-def find_latest_log_group() -> str:
+def find_latest_log_group(directory: str = ".", keyword: str = "benchmark_rdtsc") -> str:
     """
-    Find the most recent benchmark log file group.
+    Find the most recent benchmark log file group in given directory with keyword.
+
+    Args:
+        directory: Directory to search in
+        keyword: Keyword to filter log files (default: "benchmark_rdtsc")
+
     Returns the base name (without _N suffix) of the latest log group.
     """
-    pattern = "benchmark_rdtsc_*.log"
+    pattern = os.path.join(directory, f"*{keyword}*.log")
     files = glob.glob(pattern)
     if not files:
-        return "benchmark_rdtsc.log"
+        return os.path.join(directory, f"{keyword}.log")
 
-    # Group files by base name (remove _N suffix)
-    base_names = set()
-    for f in files:
-        # Remove .log extension
-        name = f[:-4] if f.endswith('.log') else f
-        # Remove _N suffix if present
-        match = re.match(r'(.+?)(?:_\d+)?$', name)
-        if match:
-            base_names.add(match.group(1))
+    # Find the latest file by modification time
+    latest_file = max(files, key=os.path.getmtime)
 
-    if not base_names:
-        return max(files, key=os.path.getmtime)
+    # Remove .log extension to get base name
+    base_name = latest_file[:-4] if latest_file.endswith('.log') else latest_file
 
-    # Find the latest base name by checking any of its files
-    latest_base = None
-    latest_mtime = 0
-    for base in base_names:
-        related = find_related_files(base)
-        if related:
-            mtime = max(os.path.getmtime(f) for f in related)
-            if mtime > latest_mtime:
-                latest_mtime = mtime
-                latest_base = base
+    # Check if this is part of a group (has _1, _2, _3 siblings)
+    # by removing trailing _N suffix for grouping
+    match = re.match(r'(.+?)(?:_\d+)$', os.path.basename(base_name))
+    if match:
+        # Check if parent base exists
+        parent_base = os.path.join(os.path.dirname(base_name), match.group(1))
+        related = find_related_files(parent_base)
+        if len(related) > 1:
+            return parent_base
 
-    return latest_base if latest_base else "benchmark_rdtsc.log"
+    return base_name
 
 
 def main():
@@ -289,10 +286,16 @@ Examples:
   %(prog)s benchmark_20251225230026         # Merge _1.log, _2.log, etc. by time
   %(prog)s benchmark_20251225230026.log     # Same as above
   %(prog)s --skip 100 benchmark.log         # Skip first 100 warmup samples
+  %(prog)s -d /path/to/build/test           # Find latest log in directory
+  %(prog)s -d /path/to/build/test -k rdtsc  # Find latest log with keyword
         """
     )
     parser.add_argument('logfile', nargs='?',
                         help='Log file or base name (default: latest)')
+    parser.add_argument('--dir', '-d', type=str, default='.',
+                        help='Directory to search for log files (default: current)')
+    parser.add_argument('--keyword', '-k', type=str, default='benchmark_rdtsc',
+                        help='Keyword to filter log files (default: benchmark_rdtsc)')
     parser.add_argument('--skip', '-s', type=int, default=0,
                         help='Number of initial samples to skip per tag (warmup)')
     parser.add_argument('--freq', '-f', type=float, default=CPU_FREQ_HZ,
@@ -310,7 +313,7 @@ Examples:
     if args.logfile:
         base_path = args.logfile
     else:
-        base_path = find_latest_log_group()
+        base_path = find_latest_log_group(args.dir, args.keyword)
         print(f"Auto-detected latest log group: {base_path}")
 
     # Find related files

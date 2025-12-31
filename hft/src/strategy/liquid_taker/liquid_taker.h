@@ -40,7 +40,7 @@ class LiquidTaker : public BaseStrategy<LiquidTaker> {
       : BaseStrategy<LiquidTaker>(order_manager, feature_engine,
             inventory_manager, position_keeper, logger) {}
 
-  void on_orderbook_updated(const common::TickerId&, common::Price,
+  void on_orderbook_updated(const common::TickerId&, common::PriceType,
       common::Side, const MarketOrderBookT*) const noexcept {}
 
   void on_trade_updated(const MarketData*, MarketOrderBookT*) const noexcept {}

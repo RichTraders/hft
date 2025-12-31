@@ -106,7 +106,7 @@ void OrderStateManager::handle_new(const ExecutionReport* response,
   } else {
     // Case: general new order
     side_book.layer_ticks[layer] =
-        tick_converter_.to_ticks(response->price.value);
+        tick_converter_.to_ticks_raw(response->price.value);
     new_slot.price = response->price;
     new_slot.qty = response->leaves_qty;
     new_slot.cl_order_id = response->cl_order_id;
@@ -128,12 +128,11 @@ void OrderStateManager::handle_partially_filled(const ExecutionReport* response,
   }
 
   auto& slot = side_book.slots[layer];
-  const auto filled_qty = slot.qty - response->leaves_qty;
+  const int64_t filled_qty = slot.qty.value - response->leaves_qty.value;
   position_tracker.remove_partial_fill(response->side, filled_qty);
-
   slot.qty = response->leaves_qty;
-  slot.state = (response->leaves_qty.value <= 0.0) ? OMOrderState::kDead
-                                                   : OMOrderState::kLive;
+  slot.state = (response->leaves_qty.value <= 0) ? OMOrderState::kDead
+                                                 : OMOrderState::kLive;
 
   if (slot.state == OMOrderState::kDead) {
     LayerBook::unmap_layer(side_book, layer);
@@ -156,7 +155,7 @@ void OrderStateManager::handle_filled(const ExecutionReport* response,
   }
 
   auto& slot = side_book.slots[layer];
-  position_tracker.remove_reserved(response->side, slot.qty);
+  position_tracker.remove_reserved(response->side, slot.qty.value);
   slot.qty = response->leaves_qty;
   slot.state = OMOrderState::kDead;
   LayerBook::unmap_layer(side_book, layer);
@@ -203,7 +202,7 @@ void OrderStateManager::handle_canceled(const ExecutionReport* response,
   }
 
   auto& slot = side_book.slots[layer];
-  position_tracker.remove_reserved(response->side, slot.qty);
+  position_tracker.remove_reserved(response->side, slot.qty.value);
   slot.state = OMOrderState::kDead;
   LayerBook::unmap_layer(side_book, layer);
 
@@ -226,7 +225,7 @@ void OrderStateManager::handle_rejected_or_expired(
   if (const auto& pend_opt = side_book.pending_repl[layer];
       layer >= 0 && pend_opt.has_value()) {
     const auto& pend = *pend_opt;
-    const auto delta_qty = pend.new_qty - pend.last_qty;
+    const auto delta_qty = pend.new_qty.value - pend.last_qty.value;
     position_tracker.remove_reserved(response->side, delta_qty);
 
     side_book.pending_repl[layer].reset();
@@ -253,14 +252,14 @@ void OrderStateManager::handle_rejected_or_expired(
         "[OrderStateManager] Rejected (replace failed, restored original "
         "oid={}, price={:.2f}, qty={:.6f}) {}",
         pend.original_cl_order_id.value,
-        pend.original_price.value,
-        pend.last_qty.value,
+        pend.original_price.to_double(),
+        pend.last_qty.to_double(),
         response->toString());
   } else {
     layer = find_layer(side_book, response->cl_order_id, response->price);
     if (layer >= 0) {
       auto& slot = side_book.slots[layer];
-      position_tracker.remove_reserved(response->side, slot.qty);
+      position_tracker.remove_reserved(response->side, slot.qty.value);
       slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
     } else {
@@ -276,12 +275,12 @@ void OrderStateManager::handle_rejected_or_expired(
 }
 
 int OrderStateManager::find_layer(const order::SideBook& side_book,
-    const common::OrderId& order_id, common::Price price) const noexcept {
+    const common::OrderId& order_id, common::PriceType price) const noexcept {
   const int layer = LayerBook::find_layer_by_id(side_book, order_id);
   if (layer >= 0)
     return layer;
 
-  const uint64_t tick = tick_converter_.to_ticks(price.value);
+  const uint64_t tick = tick_converter_.to_ticks_raw(price.value);
   return LayerBook::find_layer_by_ticks(side_book, tick);
 }
 

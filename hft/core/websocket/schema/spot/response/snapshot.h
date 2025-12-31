@@ -50,6 +50,5 @@ struct DepthSnapshot {
     );
   };
 };
-}
 }  // namespace schema
 #endif  //SNAPSHOT_H

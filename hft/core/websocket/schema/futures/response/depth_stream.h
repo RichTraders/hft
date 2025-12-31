@@ -23,8 +23,8 @@ struct DepthData {
   std::uint64_t end_update_id;
   std::uint64_t final_update_id_in_last_stream;
 
-  std::vector<std::array<double, 2>> bids;
-  std::vector<std::array<double, 2>> asks;
+  std::vector<std::array<int64_t, 2>> bids;
+  std::vector<std::array<int64_t, 2>> asks;
 
   // clang-format off
   // NOLINTNEXTLINE(readability-identifier-naming)

@@ -23,6 +23,7 @@ option(USE_FUTURES_API "Use Binance Futures API instead of Spot API" ON)
 option(ENABLE_TESTS "Build and fetch test dependencies" ON)
 option(LOGGER_PERF_TRACE "Enable logger performance tracing with RDTSC" OFF)
 option(ENABLE_ASAN "Build with AddressSanitizer" OFF)
+set(FIXED_POINT_SYMBOL "XRPUSDC" CACHE STRING "Target symbol for FixedPoint config")
 
 if (ENABLE_ASAN)
     message(STATUS "Building with AddressSanitizer (global)")
@@ -57,6 +58,14 @@ endif ()
 if (LOGGER_PERF_TRACE)
     add_compile_definitions(LOGGER_PERF_TRACE)
     message(STATUS "Logger performance tracing enabled (RDTSC)")
+endif ()
+
+# FixedPoint config (int64_t based arithmetic - always enabled)
+if (FIXED_POINT_SYMBOL STREQUAL "XRPUSDC")
+    add_compile_definitions(FIXED_POINT_SYMBOL_XRPUSDC)
+    message(STATUS "FixedPoint: XRPUSDC (price=4, qty=1)")
+else ()
+    message(STATUS "FixedPoint: BTCUSDC (price=1, qty=3) [default]")
 endif ()
 
 include_directories(

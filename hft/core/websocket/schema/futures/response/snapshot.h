@@ -20,8 +20,8 @@ struct DepthSnapshotResult {
   std::uint64_t book_update_id;
   std::uint64_t message_output_time;
   std::uint64_t transaction_time;
-  std::vector<std::array<double, 2>> bids;
-  std::vector<std::array<double, 2>> asks;
+  std::vector<std::array<int64_t, 2>> bids;
+  std::vector<std::array<int64_t, 2>> asks;
 
   // clang-format off
   // NOLINTNEXTLINE(readability-identifier-naming)

@@ -89,8 +89,8 @@ MarketData* FixMdCore::allocate_with_retry(
         OrderId{kOrderIdInvalid},
         TickerId{symbol},
         side,
-        Price{static_cast<float>(price)},
-        qty == nullptr ? Qty{kQtyInvalid} : Qty{static_cast<float>(qty->get())});
+        common::PriceType::from_double(price),
+        qty == nullptr ? common::QtyType::from_raw(0) : common::QtyType::from_double(qty->get()));
   };
 
   auto* market_data = allocate_fn();
@@ -375,8 +375,8 @@ MarketUpdateData FixMdCore::create_snapshot_data_message(WireMessage msg) {
           OrderId{},
           TickerId{symbol->get()},
           Side::kInvalid,
-          Price{},
-          Qty{}));
+          common::PriceType::from_raw(0),
+          common::QtyType::from_raw(0)));
   const auto& last_book_update_id = msg->get<LastBookUpdateID>()->get();
 
   for (size_t i = 0; i < entries->size(); ++i) {
@@ -392,8 +392,8 @@ MarketUpdateData FixMdCore::create_snapshot_data_message(WireMessage msg) {
             OrderId{kOrderIdInvalid},
             TickerId{symbol->get()},
             charToSide(side->get()),
-            Price{static_cast<float>(price->get())},
-            Qty{static_cast<float>(qty->get())}));
+            common::PriceType::from_double(price->get()),
+            common::QtyType::from_double(qty->get())));
   }
   return MarketUpdateData(
     0ULL,

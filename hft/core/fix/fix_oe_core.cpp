@@ -112,13 +112,13 @@ std::string FixOeCore::create_order_message(
   request.add_field(new Symbol(order_data.symbol));
   request.add_field(new Side(trading::to_char(order_data.side)));
   request.add_field(new OrdType(trading::to_char(order_data.ord_type)));
-  request.add_field(new OrderQty(order_data.order_qty.value));
+  request.add_field(new OrderQty(order_data.order_qty.to_double()));
   request.add_field(new SelfTradePreventionMode(
       trading::to_char(order_data.self_trade_prevention_mode)));
 
   if (order_data.ord_type == trading::OrderType::kLimit) {
     // Limit 주문일 때만
-    request.add_field(new Price(order_data.price.value));
+    request.add_field(new Price(order_data.price.to_double()));
     request.add_field(
         new TimeInForce(trading::to_char(order_data.time_in_force)));
   }
@@ -180,7 +180,7 @@ std::string FixOeCore::create_cancel_and_reorder_message(
   request.add_field(new Side(trading::to_char(cancel_and_re_order.side)));
   request.add_field(
       new OrdType(trading::to_char(cancel_and_re_order.ord_type)));
-  request.add_field(new OrderQty(cancel_and_re_order.order_qty.value));
+  request.add_field(new OrderQty(cancel_and_re_order.order_qty.to_double()));
   request.add_field(new SelfTradePreventionMode(
       trading::to_char(cancel_and_re_order.self_trade_prevention_mode)));
   request.add_field(new OrderCancelRequestAndNewOrderSingleMode(
@@ -188,7 +188,7 @@ std::string FixOeCore::create_cancel_and_reorder_message(
 
   if (cancel_and_re_order.ord_type == trading::OrderType::kLimit) {
     // Limit 주문일 때만
-    request.add_field(new Price(cancel_and_re_order.price.value));
+    request.add_field(new Price(cancel_and_re_order.price.to_double()));
     request.add_field(
         new TimeInForce(trading::to_char(cancel_and_re_order.time_in_force)));
     static_cast<OrderQty*>(request.get_field(44))
@@ -241,17 +241,17 @@ trading::ExecutionReport* FixOeCore::create_execution_report_message(
 
   ret->symbol = symbol->get();
   ret->cl_order_id = common::OrderId{std::stoull(cl_order_id->get())};
-  ret->cum_qty.value = cum_qty->get();
+  ret->cum_qty = common::QtyType::from_double(cum_qty->get());
   ret->exec_type = trading::exec_type_from_char(exec_type->get());
-  ret->last_qty.value = last_qty->get();
+  ret->last_qty = common::QtyType::from_double(last_qty->get());
   ret->ord_status = trading::ord_status_from_char(ord_status->get());
   ret->side = common::charToSide(side->get() - 1);  // 1: Buy, 2: Sell
 
   if (likely(leaves_qty != nullptr))
-    ret->leaves_qty.value = leaves_qty->get();
+    ret->leaves_qty = common::QtyType::from_double(leaves_qty->get());
 
   if (likely(price != nullptr))
-    ret->price.value = price->get();
+    ret->price = common::PriceType::from_double(price->get());
 
   if (error_code != nullptr)
     ret->error_code = error_code->get();

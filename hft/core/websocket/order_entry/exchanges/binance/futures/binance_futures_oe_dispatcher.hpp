@@ -39,6 +39,7 @@ struct BinanceFuturesOeDispatchRouter {
         return "8";
       }
       return std::nullopt;
+    // NOLINTNEXTLINE(bugprone-branch-clone) - each branch handles different message types
     } else if constexpr (std::is_same_v<MsgType, schema::futures::PlaceOrderResponse>) {
       return std::nullopt;
     } else if constexpr (std::is_same_v<MsgType, schema::futures::AccountUpdateResponse>) {
@@ -115,13 +116,13 @@ struct BinanceFuturesOeDispatchRouter {
       if constexpr (ExchangeTraits::requires_listen_key()) {
         const std::string user_stream_msg = context.app->create_user_data_stream_subscribe();
         if (!user_stream_msg.empty()) {
-          context.app->send(user_stream_msg);
+          std::ignore = context.app->send(user_stream_msg);
           context.logger->info("[Dispatcher] Sent userDataStream.start request");
         }
       } else {
         const std::string user_stream_msg = context.app->create_user_data_stream_subscribe();
         if (!user_stream_msg.empty()) {
-          context.app->send(user_stream_msg);
+          std::ignore = context.app->send(user_stream_msg);
         }
       }
     } else {
@@ -332,7 +333,7 @@ struct BinanceFuturesOeDispatchRouter {
 
     const std::string user_stream_msg = context.app->create_user_data_stream_subscribe();
     if (!user_stream_msg.empty()) {
-      context.app->send(user_stream_msg);
+      std::ignore = context.app->send(user_stream_msg);
       context.logger->info("[Dispatcher] Sent userDataStream.start to obtain new listenKey");
     } else {
       context.logger->error("[Dispatcher] Failed to create userDataStream.start message");

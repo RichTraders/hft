@@ -17,8 +17,9 @@
 #include "risk_manager.h"
 
 namespace trading {
+
 RiskCheckResult RiskInfo::checkPreTradeRisk(const common::Side side,
-    const common::Qty qty, common::Qty reserved_position,
+    const common::QtyType qty, common::QtyType reserved_position,
     const common::Logger::Producer& logger) noexcept {
   if (qty.value > risk_cfg_.max_order_size_.value) {
     logger.debug("[Risk]Order is too large [Desired:{}][Allow:{}]",
@@ -26,35 +27,38 @@ RiskCheckResult RiskInfo::checkPreTradeRisk(const common::Side side,
         risk_cfg_.max_order_size_.value);
     return RiskCheckResult::kOrderTooLarge;
   }
-  if (position_info_->position_ + reserved_position.value +
+  const int64_t current_position = position_info_->get_position();
+  const int64_t current_total_pnl = position_info_->get_total_pnl();
+
+  if (current_position + reserved_position.value +
           sideToValue(side) * qty.value >
       risk_cfg_.max_position_.value) {
     logger.debug(
         "[Risk]Maximum position allowed has been reached."
         "[Desired:{}][Current:{}][Working:{}][Allow:{}]",
         sideToValue(side) * qty.value,
-        position_info_->position_,
+        current_position,
         reserved_position.value,
         risk_cfg_.max_position_.value);
     return RiskCheckResult::kPositionTooLarge;
   }
-  if (position_info_->position_ + reserved_position.value +
+  if (current_position + reserved_position.value +
           sideToValue(side) * qty.value <
       risk_cfg_.min_position_.value) {
     logger.debug(
         "[Risk]Minimum position allowed has been reached."
         "[Desired:{}][Current:{}][Working:{}][Allow:{}]",
         sideToValue(side) * qty.value,
-        position_info_->position_,
+        current_position,
         reserved_position.value,
         risk_cfg_.min_position_.value);
     return RiskCheckResult::kPositionTooSmall;
   }
-  if (position_info_->total_pnl_ < risk_cfg_.max_loss_) {
+  if (current_total_pnl < risk_cfg_.max_loss_) {
     logger.debug(
         "[Risk]Maximum PnL allowed has been reached."
         "[Current:{}][Allow:{}]",
-        position_info_->total_pnl_,
+        current_total_pnl,
         risk_cfg_.max_loss_);
     return RiskCheckResult::kLossTooLarge;
   }

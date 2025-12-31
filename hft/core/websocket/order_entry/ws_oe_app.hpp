@@ -131,6 +131,7 @@ class WsOrderEntryAppT {
   ~WsOrderEntryAppT() { stop(); }
 
   bool start() {
+    // NOLINTNEXTLINE(readability-simplify-boolean-expr)
     if (running_.exchange(true)) {
       return false;
     }
@@ -157,7 +158,7 @@ class WsOrderEntryAppT {
     api_transport_.reset();
   }
 
-  bool send(const std::string& msg) const {
+  [[nodiscard]] bool send(const std::string& msg) const {
     if (!api_transport_ || msg.empty()) {
       return false;
     }
@@ -364,7 +365,8 @@ class WsOrderEntryAppT {
   const ApiTransportType& api_transport() const { return *api_transport_; }
 
   template <typename T = StreamTransportType>
-  auto stream_transport() -> std::enable_if_t<!std::is_same_v<T, std::monostate>, T&> {
+    requires (!std::is_same_v<T, std::monostate>)
+  auto stream_transport() -> T& {
     return *stream_transport_;
   }
 

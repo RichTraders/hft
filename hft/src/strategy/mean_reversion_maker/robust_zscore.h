@@ -37,9 +37,12 @@ class RobustZScore {
   /**
    * @param window_size Number of recent prices to track (e.g., 30 ticks)
    * @param min_samples Minimum samples required before calculating Z-score
+   * @param min_mad_threshold Minimum MAD threshold to prevent extreme Z-scores (default: 5.0 for BTC)
    */
-  RobustZScore(int window_size, int min_samples)
-      : window_size_(window_size), min_samples_(min_samples) {
+  RobustZScore(int window_size, int min_samples, double min_mad_threshold = 5.0)
+      : window_size_(window_size),
+        min_samples_(min_samples),
+        min_mad_threshold_(min_mad_threshold) {
     // deque does not support reserve()
   }
 
@@ -71,7 +74,13 @@ class RobustZScore {
     const double scale_factor = 1.4826;
     double robust_std = mad * scale_factor;
 
-    // Prevent division by zero
+    // Minimum MAD threshold to prevent extreme Z-scores during range-bound markets
+    // When MAD is too small (e.g., 1.5-2.0), even tiny price movements create large Z-scores
+    // BTC: 5.0 (equivalent to ~$7.4 std dev at $88k)
+    // XRP: 0.01 (equivalent to ~$0.015 std dev at $2.5)
+    robust_std = std::max(robust_std, min_mad_threshold_);
+
+    // Prevent division by zero (should not occur with min_mad_threshold)
     if (robust_std < 1e-8) {
       return 0.0;
     }
@@ -149,6 +158,7 @@ class RobustZScore {
 
   int window_size_;
   int min_samples_;
+  double min_mad_threshold_;
   std::deque<double> prices_;
 };
 

@@ -344,15 +344,18 @@ struct RequestCommon {
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
-    stream << std::fixed << std::setprecision(PRECISION_CONFIG.qty_precision());
+    stream << std::fixed;
     stream << "RequestCommon{"
            << "cl_cancel_order_id=" << cl_cancel_order_id.value
            << ", cl_order_id=" << cl_order_id.value
            << ", orig_cl_order_id=" << orig_cl_order_id.value
            << ", symbol=" << symbol << ", side=" << common::toString(side)
-           << ", order_qty=" << order_qty.value
-           << ", ord_type=" << trading::toString(ord_type)
-           << ", price=" << price.value
+           << ", order_qty="
+           << std::setprecision(PRECISION_CONFIG.qty_precision())
+           << order_qty.value << ", ord_type=" << trading::toString(ord_type)
+           << ", price="
+           << std::setprecision(PRECISION_CONFIG.price_precision())
+           << price.value
            << ", time_in_force=" << trading::toString(time_in_force)
            << ", self_trade_prevention_mode="
            << trading::toString(self_trade_prevention_mode);
@@ -428,23 +431,28 @@ struct ExecutionReport {
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
-    stream << std::fixed << std::setprecision(PRECISION_CONFIG.qty_precision());
+    stream << std::fixed;
     stream << "ExecutionReport{" << "order_id=" << cl_order_id.value
            << ", symbol=" << symbol
            << ", exec_type=" << trading::toString(exec_type)
-           << ", ord_status=" << trading::toString(ord_status)
-           << ", cum_qty=" << cum_qty.value
-           << ", leaves_qty=" << leaves_qty.value
-           << ", last_qty=" << last_qty.value << ", error_code=" << error_code
-           << ", price=" << price.value << ", side=" << common::toString(side)
+           << ", ord_status=" << trading::toString(ord_status) << ", cum_qty="
+           << std::setprecision(PRECISION_CONFIG.qty_precision())
+           << cum_qty.value << ", leaves_qty="
+           << std::setprecision(PRECISION_CONFIG.qty_precision())
+           << leaves_qty.value << ", last_qty="
+           << std::setprecision(PRECISION_CONFIG.qty_precision())
+           << last_qty.value << ", error_code=" << error_code << ", price="
+           << std::setprecision(PRECISION_CONFIG.price_precision())
+           << price.value << ", side=" << common::toString(side)
            << ", text=" << text;
     if (position_side) {
       stream << ", position_side=" << common::toString(*position_side);
     }
-    stream << ", is_maker=" << (is_maker ? "true" : "false")
-           << ", last_price=" << last_price.value
-           << ", avg_price=" << avg_price.value
-           << ", commission=" << commission;
+    stream << ", is_maker=" << (is_maker ? "true" : "false") << ", last_price="
+           << std::setprecision(PRECISION_CONFIG.price_precision())
+           << last_price.value << ", avg_price="
+           << std::setprecision(PRECISION_CONFIG.price_precision())
+           << avg_price.value << ", commission=" << commission;
     if (commission_asset) {
       stream << ", commission_asset=" << *commission_asset;
     }

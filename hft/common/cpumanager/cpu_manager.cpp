@@ -30,9 +30,6 @@
 #endif
 
 namespace common {
-namespace {
-constexpr int kDecimalBase = 10;
-}
 // NOLINTBEGIN(unused-parameter)
 CpuManager::CpuManager(const Logger::Producer& logger) : logger_(logger) {
   const int cpu_use_count = INI_CONFIG.get_int("cpu_id", "count");
@@ -102,6 +99,7 @@ void CpuManager::trim_newline(std::string& str) {
 // Apple: 외부 스레드 이름 조회 불가. (현재 스레드가 아니면 찾기 매우 어려움)
 ThreadId CpuManager::get_tid_by_thread_name(const std::string& target_name) {
 #ifdef __linux__
+  constexpr int kDecimalBase = 10;
   const std::filesystem::path task_dir =
       std::filesystem::path("/proc") / std::to_string(getpid()) / "task";
   std::error_code err_c;

@@ -50,12 +50,19 @@ class MeanReversionMakerStrategy
     bool is_valid{false};
   };
 
+  // === Position state enumeration ===
+  enum class PositionStatus : uint8_t {
+    NONE = 0,     // No position, no pending order
+    PENDING = 1,  // Order sent, waiting for fill
+    ACTIVE = 2    // Position filled and active
+  };
+
   // === Position state structure ===
   struct PositionState {
     double qty{0.0};
     double entry_price{0.0};
     WallInfo entry_wall_info;
-    bool is_active{false};
+    PositionStatus status{PositionStatus::NONE};
   };
 
   // === Trade record for trend detection ===
@@ -118,6 +125,8 @@ class MeanReversionMakerStrategy
             INI_CONFIG.get_int("robust_zscore", "min_samples", 20)),
         zscore_entry_threshold_(
             INI_CONFIG.get_double("robust_zscore", "entry_threshold", 2.5)),
+        zscore_min_mad_threshold_(
+            INI_CONFIG.get_double("robust_zscore", "min_mad_threshold", 5.0)),
 
         // === Trend Filter ===
         trend_filter_enabled_(
@@ -148,7 +157,7 @@ class MeanReversionMakerStrategy
 
         // === Robust Z-score module ===
         robust_zscore_(std::make_unique<RobustZScore>(zscore_window_size_,
-            zscore_min_samples_)) {
+            zscore_min_samples_, zscore_min_mad_threshold_)) {
     this->logger_.info(
         "[MeanReversionMaker] Initialized | min_quantity:{:.2f} BTC | "
         "simultaneous:{} | trend_filter:{}",
@@ -205,7 +214,11 @@ class MeanReversionMakerStrategy
 
     // BBO validation
     if (!is_bbo_valid(current_bbo)) {
-      this->logger_.warn("Invalid BBO. Skipping.");
+      this->logger_.warn("Invalid BBO | bid:{}/{} ask:{}/{}",
+          current_bbo->bid_price.value,
+          current_bbo->bid_qty.value,
+          current_bbo->ask_price.value,
+          current_bbo->ask_qty.value);
       return;
     }
 
@@ -231,7 +244,8 @@ class MeanReversionMakerStrategy
 
     // === 2. Long entry check ===
     if (market_data->side == common::Side::kSell && allow_long_entry_ &&
-        (!long_position_.is_active || allow_simultaneous_positions_)) {
+        (long_position_.status == PositionStatus::NONE ||
+            allow_simultaneous_positions_)) {
 
       if (validate_defense_realtime(market_data,
               prev_bbo_,
@@ -243,7 +257,8 @@ class MeanReversionMakerStrategy
 
     // === 3. Short entry check ===
     if (market_data->side == common::Side::kBuy && allow_short_entry_ &&
-        (!short_position_.is_active || allow_simultaneous_positions_)) {
+        (short_position_.status == PositionStatus::NONE ||
+            allow_simultaneous_positions_)) {
 
       if (validate_defense_realtime(market_data,
               prev_bbo_,
@@ -257,25 +272,96 @@ class MeanReversionMakerStrategy
     prev_bbo_ = *current_bbo;
   }
 
-  void on_order_updated(const ExecutionReport*) noexcept {
+  void on_order_updated(const ExecutionReport* report) noexcept {
     // Note: TradeEngine already calls position_keeper_->add_fill(report)
     // Do NOT call it again here to avoid double-counting
+
+    // Only sync position state on FILLED, CANCELED, or REJECTED events
+    if (report->ord_status != trading::OrdStatus::kFilled &&
+        report->ord_status != trading::OrdStatus::kPartiallyFilled &&
+        report->ord_status != trading::OrdStatus::kCanceled &&
+        report->ord_status != trading::OrdStatus::kRejected) {
+      return;
+    }
 
     // Get current position from PositionKeeper
     auto* pos_info = this->position_keeper_->get_position_info(ticker_);
 
-    // Sync Long position state
-    if (long_position_.is_active && pos_info->long_position_ == 0.0) {
-      long_position_.is_active = false;
+    // === Handle FILLED: PENDING → ACTIVE ===
+    if (report->ord_status == trading::OrdStatus::kFilled ||
+        report->ord_status == trading::OrdStatus::kPartiallyFilled) {
+
+      // Activate LONG position
+      if (report->side == common::Side::kBuy &&
+          pos_info->long_position_ > 0.0 &&
+          long_position_.status == PositionStatus::PENDING) {
+        long_position_.status = PositionStatus::ACTIVE;
+        long_position_.entry_price = report->avg_price.value;
+        if (log_entry_exit_) {
+          this->logger_.info(
+              "[Entry Filled] LONG | qty:{} | price:{} | wall:${:.0f}@{:.4f}%",
+              pos_info->long_position_,
+              report->avg_price.value,
+              long_position_.entry_wall_info.accumulated_amount,
+              long_position_.entry_wall_info.distance_pct * 100);
+        }
+      }
+
+      // Activate SHORT position
+      if (report->side == common::Side::kSell &&
+          pos_info->short_position_ > 0.0 &&
+          short_position_.status == PositionStatus::PENDING) {
+        short_position_.status = PositionStatus::ACTIVE;
+        short_position_.entry_price = report->avg_price.value;
+        if (log_entry_exit_) {
+          this->logger_.info(
+              "[Entry Filled] SHORT | qty:{} | price:{} | wall:${:.0f}@{:.4f}%",
+              pos_info->short_position_,
+              report->avg_price.value,
+              short_position_.entry_wall_info.accumulated_amount,
+              short_position_.entry_wall_info.distance_pct * 100);
+        }
+      }
+    }
+
+    // === Handle CANCELED/REJECTED: PENDING → NONE ===
+    if (report->ord_status == trading::OrdStatus::kCanceled ||
+        report->ord_status == trading::OrdStatus::kRejected) {
+
+      // Cancel LONG order
+      if (report->side == common::Side::kBuy &&
+          long_position_.status == PositionStatus::PENDING) {
+        long_position_.status = PositionStatus::NONE;
+        if (log_entry_exit_) {
+          this->logger_.info("[Entry Canceled] LONG | reason:{}",
+              trading::toString(report->ord_status));
+        }
+      }
+
+      // Cancel SHORT order
+      if (report->side == common::Side::kSell &&
+          short_position_.status == PositionStatus::PENDING) {
+        short_position_.status = PositionStatus::NONE;
+        if (log_entry_exit_) {
+          this->logger_.info("[Entry Canceled] SHORT | reason:{}",
+              trading::toString(report->ord_status));
+        }
+      }
+    }
+
+    // === Handle position close: ACTIVE → NONE ===
+    if (long_position_.status == PositionStatus::ACTIVE &&
+        pos_info->long_position_ == 0.0) {
+      long_position_.status = PositionStatus::NONE;
       if (log_entry_exit_) {
         this->logger_.info("[Exit Complete] Long closed | PnL: {:.2f}",
             pos_info->long_real_pnl_);
       }
     }
 
-    // Sync Short position state
-    if (short_position_.is_active && pos_info->short_position_ == 0.0) {
-      short_position_.is_active = false;
+    if (short_position_.status == PositionStatus::ACTIVE &&
+        pos_info->short_position_ == 0.0) {
+      short_position_.status = PositionStatus::NONE;
       if (log_entry_exit_) {
         this->logger_.info("[Exit Complete] Short closed | PnL: {:.2f}",
             pos_info->short_real_pnl_);
@@ -353,7 +439,7 @@ class MeanReversionMakerStrategy
                              trade->qty.value * defense_qty_multiplier_);
 
       if (log_defense_check_) {
-        this->logger_.info(
+        this->logger_.debug(
             "[Defense] Long | trade_qty:{}, prev_bid:{}/{}, curr_bid:{}/{}, "
             "result:{}",
             trade->qty.value,
@@ -374,7 +460,7 @@ class MeanReversionMakerStrategy
                              trade->qty.value * defense_qty_multiplier_);
 
       if (log_defense_check_) {
-        this->logger_.info(
+        this->logger_.debug(
             "[Defense] Short | trade_qty:{}, prev_ask:{}/{}, curr_ask:{}/{}, "
             "result:{}",
             trade->qty.value,
@@ -411,7 +497,7 @@ class MeanReversionMakerStrategy
       return false;  // Direction not strong enough
     }
 
-    // === 2. Volume acceleration check (optional) ===
+    // === 2. Volume acceleration check (required) ===
     if (recent_trades_.size() == static_cast<size_t>(trend_lookback_ticks_)) {
       // Recent 2 ticks average volume
       double vol_recent = (recent_trades_[3].qty + recent_trades_[4].qty) / 2.0;
@@ -423,13 +509,13 @@ class MeanReversionMakerStrategy
 
       // Volume accelerating (strong trend signal)
       if (vol_recent > vol_old * trend_volume_multiplier_) {
-        return true;  // Strong trend acceleration
+        return true;  // Strong trend acceleration - BLOCK entry
       }
     }
 
-    // Direction consistent but volume not accelerating
-    // Conservative: still consider it as trend acceleration
-    return true;
+    // Direction consistent but volume NOT accelerating
+    // Allow entry - likely normal market movement, not dangerous trend
+    return false;
   }
 
   // ========================================
@@ -457,7 +543,7 @@ class MeanReversionMakerStrategy
 
     if (log_entry_exit_) {
       this->logger_.info(
-          "[RobustZ] price:{} | median:{:.2f} | MAD:{:.4f} | z:{:.2f}",
+          "[RobustZ] price:{} | median:{:.4f} | MAD:{:.4f} | z:{:.4f}",
           trade->price.value,
           robust_zscore_->get_median(),
           robust_zscore_->get_mad(),
@@ -479,34 +565,74 @@ class MeanReversionMakerStrategy
     // 4. Trend acceleration filter (SAFETY)
     if (is_trend_accelerating(common::Side::kSell)) {
       if (log_entry_exit_) {
-        this->logger_.info("[Entry Block] Long | Trend accelerating | z:{:.2f}",
-            z_robust);
+        int sell_count = 0;
+        for (const auto& trade : recent_trades_) {
+          if (trade.side == common::Side::kSell)
+            sell_count++;
+        }
+        this->logger_.info(
+            "[Entry Block] Long | Trend accelerating | z:{:.2f} | sells:{}/{}",
+            z_robust,
+            sell_count,
+            recent_trades_.size());
       }
       return;
     }
 
-    // 5. OBI check (buy dominance)
+    // 5. OBI check (sell dominance for mean reversion)
+    // Mean reversion: enter LONG when sell pressure is moderate (expect bounce)
+    // Allow range: -0.25 <= OBI < 0 (prevent extreme values like -0.98)
     double obi = calculate_orderbook_imbalance(order_book);
-    if (obi < entry_obi_threshold_)
+    if (obi >= 0.0) {
+      if (log_entry_exit_) {
+        this->logger_.info(
+            "[Entry Block] Long | OBI not negative | z:{:.2f} | obi:{:.2f}",
+            z_robust,
+            obi);
+      }
       return;
+    }
+    if (obi < -entry_obi_threshold_) {
+      if (log_entry_exit_) {
+        this->logger_.info(
+            "[Entry Block] Long | OBI too extreme | z:{:.2f} | obi:{:.2f} < "
+            "-{:.2f}",
+            z_robust,
+            obi,
+            entry_obi_threshold_);
+      }
+      return;
+    }
 
     // 6. Spread filter
     double spread =
         (bbo->ask_price.value - bbo->bid_price.value) / bbo->bid_price.value;
-    if (spread < min_spread_filter_)
+    if (spread < min_spread_filter_) {
+      if (log_entry_exit_) {
+        this->logger_.info(
+            "[Entry Block] Long | Spread too small | z:{:.2f} | spread:{:.4f}% "
+            "< "
+            "{:.4f}%",
+            z_robust,
+            spread * 100,
+            min_spread_filter_ * 100);
+      }
       return;
+    }
 
-    // 7. Execute entry
-    place_entry_order(common::Side::kBuy, bbo->bid_price.value);
-
-    long_position_.is_active = true;
+    // 7. Set position to PENDING state BEFORE sending order
+    long_position_.status = PositionStatus::PENDING;
     long_position_.qty = position_size_;
     long_position_.entry_price = bbo->bid_price.value;
     long_position_.entry_wall_info = bid_wall_info_;
 
+    // 8. Execute entry
+    place_entry_order(common::Side::kBuy, bbo->bid_price.value);
+
     if (log_entry_exit_) {
       this->logger_.info(
-          "[Entry] LONG | z_robust:{:.2f} | price:{} | wall:${:.0f}@{:.4f}% | "
+          "[Entry Signal] LONG | z_robust:{:.2f} | price:{} | "
+          "wall:${:.0f}@{:.4f}% | "
           "obi:{:.2f}",
           z_robust,
           bbo->bid_price.value,
@@ -540,35 +666,74 @@ class MeanReversionMakerStrategy
     // 4. Trend acceleration filter (SAFETY)
     if (is_trend_accelerating(common::Side::kBuy)) {
       if (log_entry_exit_) {
+        int buy_count = 0;
+        for (const auto& trade : recent_trades_) {
+          if (trade.side == common::Side::kBuy)
+            buy_count++;
+        }
         this->logger_.info(
-            "[Entry Block] Short | Trend accelerating | z:{:.2f}",
-            z_robust);
+            "[Entry Block] Short | Trend accelerating | z:{:.2f} | buys:{}/{}",
+            z_robust,
+            buy_count,
+            recent_trades_.size());
       }
       return;
     }
 
-    // 5. OBI check (sell dominance)
+    // 5. OBI check (buy dominance for mean reversion)
+    // Mean reversion: enter SHORT when buy pressure is moderate (expect drop)
+    // Allow range: 0 < OBI <= 0.25 (prevent extreme values like +0.98)
     double obi = calculate_orderbook_imbalance(order_book);
-    if (obi > -entry_obi_threshold_)
+    if (obi <= 0.0) {
+      if (log_entry_exit_) {
+        this->logger_.info(
+            "[Entry Block] Short | OBI not positive | z:{:.2f} | obi:{:.2f}",
+            z_robust,
+            obi);
+      }
       return;
+    }
+    if (obi > entry_obi_threshold_) {
+      if (log_entry_exit_) {
+        this->logger_.info(
+            "[Entry Block] Short | OBI too extreme | z:{:.2f} | obi:{:.2f} > "
+            "{:.2f}",
+            z_robust,
+            obi,
+            entry_obi_threshold_);
+      }
+      return;
+    }
 
     // 6. Spread filter
     double spread =
         (bbo->ask_price.value - bbo->bid_price.value) / bbo->bid_price.value;
-    if (spread < min_spread_filter_)
+    if (spread < min_spread_filter_) {
+      if (log_entry_exit_) {
+        this->logger_.info(
+            "[Entry Block] Short | Spread too small | z:{:.2f} | "
+            "spread:{:.4f}% < "
+            "{:.4f}%",
+            z_robust,
+            spread * 100,
+            min_spread_filter_ * 100);
+      }
       return;
+    }
 
-    // 7. Execute entry
-    place_entry_order(common::Side::kSell, bbo->ask_price.value);
-
-    short_position_.is_active = true;
+    // 7. Set position to PENDING state BEFORE sending order
+    short_position_.status = PositionStatus::PENDING;
     short_position_.qty = position_size_;
     short_position_.entry_price = bbo->ask_price.value;
     short_position_.entry_wall_info = ask_wall_info_;
 
+    // 8. Execute entry
+    place_entry_order(common::Side::kSell, bbo->ask_price.value);
+
     if (log_entry_exit_) {
       this->logger_.info(
-          "[Entry] SHORT | z_robust:{:.2f} | price:{} | wall:${:.0f}@{:.4f}% | "
+          "[Entry Signal] SHORT | z_robust:{:.2f} | price:{} | "
+          "wall:${:.0f}@{:.4f}% | "
           "obi:{:.2f}",
           z_robust,
           bbo->ask_price.value,
@@ -599,6 +764,18 @@ class MeanReversionMakerStrategy
     }
 
     intent.qty = Qty{position_size_};
+
+    if (log_entry_exit_) {
+      this->logger_.info(
+          "[Order Sent] {} | base_price:{} | margin:{} | order_price:{} | "
+          "qty:{}",
+          side == common::Side::kBuy ? "BUY" : "SELL",
+          base_price,
+          entry_safety_margin_,
+          intent.price.value().value,
+          position_size_);
+    }
+
     this->order_manager_->apply({intent});
   }
 
@@ -609,7 +786,7 @@ class MeanReversionMakerStrategy
     const auto* bbo = order_book->get_bbo();
 
     // === Long stop loss ===
-    if (long_position_.is_active) {
+    if (long_position_.status == PositionStatus::ACTIVE) {
       bool should_exit = false;
       std::string reason;
 
@@ -637,12 +814,12 @@ class MeanReversionMakerStrategy
 
       if (should_exit) {
         emergency_exit(common::Side::kSell, bbo->ask_price.value, reason);
-        long_position_.is_active = false;
+        long_position_.status = PositionStatus::NONE;
       }
     }
 
     // === Short stop loss ===
-    if (short_position_.is_active) {
+    if (short_position_.status == PositionStatus::ACTIVE) {
       bool should_exit = false;
       std::string reason;
 
@@ -670,7 +847,7 @@ class MeanReversionMakerStrategy
 
       if (should_exit) {
         emergency_exit(common::Side::kBuy, bbo->bid_price.value, reason);
-        short_position_.is_active = false;
+        short_position_.status = PositionStatus::NONE;
       }
     }
   }
@@ -748,6 +925,7 @@ class MeanReversionMakerStrategy
   const int zscore_window_size_;
   const int zscore_min_samples_;
   const double zscore_entry_threshold_;
+  const double zscore_min_mad_threshold_;
   const bool trend_filter_enabled_;
   const int trend_lookback_ticks_;
   const int trend_consecutive_threshold_;

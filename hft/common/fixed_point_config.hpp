@@ -19,16 +19,13 @@ namespace common {
 
 template <typename T>
 concept IFixedPointConfig = requires {
-    // 1. static constexpr int64_t 멤버들이 존재하고, 타입이 일치해야 함
     { T::kPriceScale } -> std::convertible_to<int64_t>;
     { T::kQtyScale }   -> std::convertible_to<int64_t>;
     { T::kPnlScale }   -> std::convertible_to<int64_t>;
-    
-    // 2. static constexpr int 멤버들이 존재해야 함
+
     { T::kPricePrecision } -> std::convertible_to<int>;
     { T::kQtyPrecision }   -> std::convertible_to<int>;
 
-    // (선택) 값에 대한 컴파일 타임 검증도 가능 (예: Scale은 0보다 커야 한다)
     requires T::kPriceScale > 0;
 };
 

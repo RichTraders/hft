@@ -14,6 +14,7 @@
 #define ONEPASS_BINANCE_FUTURES_MD_DECODER_H
 
 #include <common/logger.h>
+#include <common/fixed_point_config.hpp>
 #include <glaze/glaze.hpp>
 
 #include "global.h"
@@ -25,6 +26,10 @@
 #include "schema/futures/response/trade.h"
 
 namespace core {
+
+// Import scale constants from global common namespace before entering nested namespaces
+inline constexpr int64_t kGlobalPriceScale = ::common::FixedPointConfig::kPriceScale;
+inline constexpr int64_t kGlobalQtyScale = ::common::FixedPointConfig::kQtyScale;
 
 namespace onepass {
 
@@ -304,10 +309,10 @@ class OnepassBinanceFuturesMdDecoder {
     while (*ptr == '[') {
       ptr += ofs::kPriceQtyEntry;
       const int64_t price = onepass::parse_fixed_inline<
-          common::FixedPointConfig::kPriceScale>(ptr);
+          kGlobalPriceScale>(ptr);
       ptr += ofs::kPriceQtyEntry;
       const int64_t qty = onepass::parse_fixed_inline<
-          common::FixedPointConfig::kQtyScale>(ptr);
+          kGlobalQtyScale>(ptr);
       ++ptr;
       result.data.bids.push_back({price, qty});
       if (*ptr == ',')
@@ -319,10 +324,10 @@ class OnepassBinanceFuturesMdDecoder {
     while (*ptr == '[') {
       ptr += ofs::kPriceQtyEntry;
       const int64_t price = onepass::parse_fixed_inline<
-          common::FixedPointConfig::kPriceScale>(ptr);
+          kGlobalPriceScale>(ptr);
       ptr += ofs::kPriceQtyEntry;
       const int64_t qty = onepass::parse_fixed_inline<
-          common::FixedPointConfig::kQtyScale>(ptr);
+          kGlobalQtyScale>(ptr);
       ++ptr;
       result.data.asks.push_back({price, qty});
       if (*ptr == ',')
@@ -357,11 +362,11 @@ class OnepassBinanceFuturesMdDecoder {
 
     ptr = s_end + ofs::kTradePriceSkip;  // ","ptr":"
     result.data.price = onepass::parse_fixed_inline<
-        common::FixedPointConfig::kPriceScale>(ptr);
+        kGlobalPriceScale>(ptr);
 
     ptr += ofs::kTradeQtySkip;  // ","q":"
     result.data.quantity = onepass::parse_fixed_inline<
-        common::FixedPointConfig::kQtyScale>(ptr);
+        kGlobalQtyScale>(ptr);
 
     ptr += ofs::kTradeFirstIdSkip;  // ","f":
     onepass::skip_digits(ptr);
@@ -399,19 +404,19 @@ class OnepassBinanceFuturesMdDecoder {
 
     ptr = s_end + ofs::kBookTickerBidPriceSkip;  // ","b":"
     result.data.best_bid_price = onepass::parse_fixed_inline<
-        common::FixedPointConfig::kPriceScale>(ptr);
+        kGlobalPriceScale>(ptr);
 
     ptr += ofs::kBookTickerBidQtySkip;  // ,"B":"
     result.data.best_bid_qty = onepass::parse_fixed_inline<
-        common::FixedPointConfig::kQtyScale>(ptr);
+        kGlobalQtyScale>(ptr);
 
     ptr += ofs::kBookTickerAskPriceSkip;  // ,"a":"
     result.data.best_ask_price = onepass::parse_fixed_inline<
-        common::FixedPointConfig::kPriceScale>(ptr);
+        kGlobalPriceScale>(ptr);
 
     ptr += ofs::kBookTickerAskQtySkip;  // ,"A":"
     result.data.best_ask_qty = onepass::parse_fixed_inline<
-        common::FixedPointConfig::kQtyScale>(ptr);
+        kGlobalQtyScale>(ptr);
 
     return WireMessage{std::in_place_type<BookTickerEvent>, std::move(result)};
   }
@@ -442,9 +447,9 @@ class OnepassBinanceFuturesMdDecoder {
     result.result.bids.reserve(ofs::kSnapshotReserve);
     while (*ptr == '[') {
       ptr += ofs::kPriceQtyEntry;
-      const int64_t price = onepass::parse_fixed_inline<common::FixedPointConfig::kPriceScale>(ptr);
+      const int64_t price = onepass::parse_fixed_inline<kGlobalPriceScale>(ptr);
       ptr += ofs::kPriceQtyEntry;
-      const int64_t qty = onepass::parse_fixed_inline<common::FixedPointConfig::kQtyScale>(ptr);
+      const int64_t qty = onepass::parse_fixed_inline<kGlobalQtyScale>(ptr);
       ++ptr;
       result.result.bids.push_back({price, qty});
       if (*ptr == ',')
@@ -455,9 +460,9 @@ class OnepassBinanceFuturesMdDecoder {
     result.result.asks.reserve(ofs::kSnapshotReserve);
     while (*ptr == '[') {
       ptr += ofs::kPriceQtyEntry;
-      const int64_t price = onepass::parse_fixed_inline<common::FixedPointConfig::kPriceScale>(ptr);
+      const int64_t price = onepass::parse_fixed_inline<kGlobalPriceScale>(ptr);
       ptr += ofs::kPriceQtyEntry;
-      const int64_t qty = onepass::parse_fixed_inline<common::FixedPointConfig::kQtyScale>(ptr);
+      const int64_t qty = onepass::parse_fixed_inline<kGlobalQtyScale>(ptr);
       ++ptr;
       result.result.asks.push_back({price, qty});
       if (*ptr == ',')

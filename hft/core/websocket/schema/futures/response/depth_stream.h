@@ -13,6 +13,8 @@
 #ifndef FUTURES_DEPTH_H
 #define FUTURES_DEPTH_H
 #include <glaze/glaze.hpp>
+#include "schema/price_qty_array.h"
+
 namespace schema::futures {
 struct DepthData {
   std::string event_type;
@@ -23,8 +25,8 @@ struct DepthData {
   std::uint64_t end_update_id;
   std::uint64_t final_update_id_in_last_stream;
 
-  std::vector<std::array<int64_t, 2>> bids;
-  std::vector<std::array<int64_t, 2>> asks;
+  FixedPriceQtyArray bids;
+  FixedPriceQtyArray asks;
 
   // clang-format off
   // NOLINTNEXTLINE(readability-identifier-naming)
@@ -39,8 +41,8 @@ struct DepthData {
         "U", &T::start_update_id,
         "u", &T::end_update_id,
         "pu", &T::final_update_id_in_last_stream,
-        "b", glz::quoted_num<&T::bids>,
-        "a", glz::quoted_num<&T::asks>);
+        "b", &T::bids,
+        "a", &T::asks);
   };
   // clang-format on
 };

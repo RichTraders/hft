@@ -20,6 +20,8 @@
 using namespace core;
 using namespace trading;
 using namespace common;
+using PriceType = common::PriceType;
+using QtyType = common::QtyType;
 
 // Type alias for the test
 using TestWsOrderManager = WsOrderManager<BinanceSpotOeTraits>;
@@ -134,8 +136,8 @@ TEST_F(WsOrderManagerTest, RegisterPendingRequest_Success) {
   request.symbol = "BTCUSDT";
   request.side = Side::kBuy;
   request.ord_type = OrderType::kLimit;
-  request.order_qty = Qty{1.5};
-  request.price = Price{50000.00};
+  request.order_qty = QtyType::from_double(1.5);
+  request.price = PriceType::from_double(50000.00);
   request.time_in_force = TimeInForce::kGoodTillCancel;
 
   std::string request_id = "orderplace_1234567890";
@@ -162,7 +164,7 @@ TEST_F(WsOrderManagerTest, RegisterPendingRequest_MarketOrder_Success) {
   request.symbol = "ETHUSDT";
   request.side = Side::kSell;
   request.ord_type = OrderType::kMarket;
-  request.order_qty = Qty{2.0};
+  request.order_qty = QtyType::from_double(2.0);
   request.time_in_force = TimeInForce::kImmediateOrCancel;
 
   std::string request_id = "orderplace_9999999999";
@@ -186,8 +188,8 @@ TEST_F(WsOrderManagerTest, RemovePendingRequest_Success) {
   request.symbol = "BTCUSDT";
   request.side = Side::kBuy;
   request.ord_type = OrderType::kLimit;
-  request.order_qty = Qty{1.0};
-  request.price = Price{50000.00};
+  request.order_qty = QtyType::from_double(1.0);
+  request.price = PriceType::from_double(50000.00);
 
   std::string request_id = "orderplace_7777777777";
 
@@ -244,8 +246,8 @@ TEST_F(WsOrderManagerTest, CreateSyntheticReport_InsufficientBalance_Code2010) {
   request.symbol = "BTCUSDT";
   request.side = Side::kBuy;
   request.ord_type = OrderType::kLimit;
-  request.order_qty = Qty{10.0};
-  request.price = Price{60000.00};
+  request.order_qty = QtyType::from_double(10.0);
+  request.price = PriceType::from_double(60000.00);
   request.time_in_force = TimeInForce::kGoodTillCancel;
 
   std::string request_id = "orderplace_2222222222";
@@ -273,8 +275,8 @@ TEST_F(WsOrderManagerTest, CreateSyntheticReport_CleanupPendingRequest) {
   request.symbol = "BTCUSDT";
   request.side = Side::kBuy;
   request.ord_type = OrderType::kLimit;
-  request.order_qty = Qty{1.0};
-  request.price = Price{50000.00};
+  request.order_qty = QtyType::from_double(1.0);
+  request.price = PriceType::from_double(50000.00);
   request.time_in_force = TimeInForce::kGoodTillCancel;
 
   std::string request_id = "orderplace_4444444444";
@@ -321,8 +323,8 @@ TEST_F(WsOrderManagerTest, RealJson_PlaceOrderFail_InsufficientBalance) {
   request.symbol = "BTCUSDT";
   request.side = Side::kBuy;
   request.ord_type = OrderType::kLimit;
-  request.order_qty = Qty{10.0};
-  request.price = Price{60000.00};
+  request.order_qty = QtyType::from_double(10.0);
+  request.price = PriceType::from_double(60000.00);
   request.time_in_force = TimeInForce::kGoodTillCancel;
 
   order_manager_->register_pending_request(request);
@@ -370,8 +372,8 @@ TEST_F(WsOrderManagerTest, RealJson_CancelOrderFail_UnknownOrder) {
   request.symbol = "ETHUSDT";
   request.side = Side::kSell;
   request.ord_type = OrderType::kLimit;
-  request.order_qty = Qty{5.0};
-  request.price = Price{3000.00};
+  request.order_qty = QtyType::from_double(5.0);
+  request.price = PriceType::from_double(3000.00);
   request.time_in_force = TimeInForce::kImmediateOrCancel;
 
   order_manager_->register_pending_request(request);
@@ -449,8 +451,8 @@ TEST_F(WsOrderManagerTest, RealJson_MultipleErrors_IndependentHandling) {
   request1.symbol = "BTCUSDT";
   request1.side = Side::kBuy;
   request1.ord_type = OrderType::kLimit;
-  request1.order_qty = Qty{1.0};
-  request1.price = Price{50000.00};
+  request1.order_qty = QtyType::from_double(1.0);
+  request1.price = PriceType::from_double(50000.00);
   request1.time_in_force = TimeInForce::kGoodTillCancel;
 
   PendingOrderRequest request2;
@@ -458,7 +460,7 @@ TEST_F(WsOrderManagerTest, RealJson_MultipleErrors_IndependentHandling) {
   request2.symbol = "ETHUSDT";
   request2.side = Side::kSell;
   request2.ord_type = OrderType::kMarket;
-  request2.order_qty = Qty{2.0};
+  request2.order_qty = QtyType::from_double(2.0);
 
   order_manager_->register_pending_request(request1);
   order_manager_->register_pending_request(request2);
@@ -604,8 +606,8 @@ TEST_F(WsOrderManagerTest, RealJson_CancelAndReorder_CancelSuccessNewFailure) {
   new_order_request.symbol = "BTCUSDT";
   new_order_request.side = Side::kBuy;
   new_order_request.ord_type = OrderType::kLimit;
-  new_order_request.order_qty = Qty{0.00006};
-  new_order_request.price = Price{90636.16};
+  new_order_request.order_qty = QtyType::from_double(0.00006);
+  new_order_request.price = PriceType::from_double(90636.16);
   new_order_request.time_in_force = TimeInForce::kGoodTillCancel;
   order_manager_->register_pending_request(new_order_request);
 
@@ -613,8 +615,8 @@ TEST_F(WsOrderManagerTest, RealJson_CancelAndReorder_CancelSuccessNewFailure) {
   cancel_request.client_order_id = original_order_id;
   cancel_request.symbol = "BTCUSDT";
   cancel_request.side = Side::kBuy;
-  cancel_request.price = Price{0.0};
-  cancel_request.order_qty = Qty{0.0};
+  cancel_request.price = PriceType::from_double(0.0);
+  cancel_request.order_qty = QtyType::from_double(0.0);
   cancel_request.ord_type = OrderType::kInvalid;
   cancel_request.time_in_force = TimeInForce::kInvalid;
   order_manager_->register_pending_request(cancel_request);
@@ -703,8 +705,8 @@ TEST_F(WsOrderManagerTest, RealJson_CancelAndReorder_CancelFailureNewNotAttempte
   new_order_request.symbol = "BTCUSDT";
   new_order_request.side = Side::kBuy;
   new_order_request.ord_type = OrderType::kLimit;
-  new_order_request.order_qty = Qty{0.00010};
-  new_order_request.price = Price{90000.00};
+  new_order_request.order_qty = QtyType::from_double(0.00010);
+  new_order_request.price = PriceType::from_double(90000.00);
   new_order_request.time_in_force = TimeInForce::kGoodTillCancel;
   order_manager_->register_pending_request(new_order_request);
 
@@ -712,8 +714,8 @@ TEST_F(WsOrderManagerTest, RealJson_CancelAndReorder_CancelFailureNewNotAttempte
   cancel_request.client_order_id = original_order_id;
   cancel_request.symbol = "BTCUSDT";
   cancel_request.side = Side::kBuy;
-  cancel_request.price = Price{0.0};
-  cancel_request.order_qty = Qty{0.0};
+  cancel_request.price = PriceType::from_double(0.0);
+  cancel_request.order_qty = QtyType::from_double(0.0);
   cancel_request.ord_type = OrderType::kInvalid;
   cancel_request.time_in_force = TimeInForce::kInvalid;
   order_manager_->register_pending_request(cancel_request);
@@ -777,8 +779,8 @@ TEST_F(WsOrderManagerTest, CancelAndReorder_MemoryLeakPrevention_AllScenarios) {
   new_order_request.symbol = "BTCUSDT";
   new_order_request.side = Side::kBuy;
   new_order_request.ord_type = OrderType::kLimit;
-  new_order_request.order_qty = Qty{1.0};
-  new_order_request.price = Price{50000.00};
+  new_order_request.order_qty = QtyType::from_double(1.0);
+  new_order_request.price = PriceType::from_double(50000.00);
   new_order_request.time_in_force = TimeInForce::kGoodTillCancel;
   order_manager_->register_pending_request(new_order_request);
 
@@ -786,8 +788,8 @@ TEST_F(WsOrderManagerTest, CancelAndReorder_MemoryLeakPrevention_AllScenarios) {
   cancel_request.client_order_id = original_order_id;
   cancel_request.symbol = "BTCUSDT";
   cancel_request.side = Side::kBuy;
-  cancel_request.price = Price{0.0};
-  cancel_request.order_qty = Qty{0.0};
+  cancel_request.price = PriceType::from_double(0.0);
+  cancel_request.order_qty = QtyType::from_double(0.0);
   cancel_request.ord_type = OrderType::kInvalid;
   cancel_request.time_in_force = TimeInForce::kInvalid;
   order_manager_->register_pending_request(cancel_request);
@@ -862,8 +864,8 @@ TEST_F(WsOrderManagerConcurrencyTest, ConcurrentRegisterAndRemove_NoDeadlock) {
       request.symbol = "BTCUSDT";
       request.side = Side::kBuy;
       request.ord_type = OrderType::kLimit;
-      request.order_qty = Qty{1.0};
-      request.price = Price{50000.0};
+      request.order_qty = QtyType::from_double(1.0);
+      request.price = PriceType::from_double(50000.0);
       request.time_in_force = TimeInForce::kGoodTillCancel;
 
       order_manager_->register_pending_request(request);
@@ -912,7 +914,7 @@ TEST_F(WsOrderManagerConcurrencyTest, ConcurrentRegisterAndSyntheticReport_NoDea
       request.symbol = "ETHUSDT";
       request.side = Side::kSell;
       request.ord_type = OrderType::kMarket;
-      request.order_qty = Qty{2.0};
+      request.order_qty = QtyType::from_double(2.0);
       request.time_in_force = TimeInForce::kImmediateOrCancel;
 
       order_manager_->register_pending_request(request);
@@ -1025,8 +1027,8 @@ TEST_F(WsOrderManagerConcurrencyTest, MultipleProducersMultipleConsumers_NoDeadl
         request.symbol = "BTCUSDT";
         request.side = (i % 2 == 0) ? Side::kBuy : Side::kSell;
         request.ord_type = OrderType::kLimit;
-        request.order_qty = Qty{1.0};
-        request.price = Price{50000.0};
+        request.order_qty = QtyType::from_double(1.0);
+        request.price = PriceType::from_double(50000.0);
         request.time_in_force = TimeInForce::kGoodTillCancel;
 
         order_manager_->register_pending_request(request);
@@ -1070,8 +1072,8 @@ TEST_F(WsOrderManagerConcurrencyTest, RapidRegisterRemoveSameKey_NoDeadlock) {
       request.symbol = "BTCUSDT";
       request.side = Side::kBuy;
       request.ord_type = OrderType::kLimit;
-      request.order_qty = Qty{1.0};
-      request.price = Price{50000.0};
+      request.order_qty = QtyType::from_double(1.0);
+      request.price = PriceType::from_double(50000.0);
       request.time_in_force = TimeInForce::kGoodTillCancel;
 
       order_manager_->register_pending_request(request);
@@ -1115,8 +1117,8 @@ TEST_F(WsOrderManagerConcurrencyTest, ConcurrentSyntheticReportCreation_DataInte
     request.symbol = "BTCUSDT_" + std::to_string(i);  // Unique symbol per order
     request.side = Side::kBuy;
     request.ord_type = OrderType::kLimit;
-    request.order_qty = Qty{static_cast<double>(i)};
-    request.price = Price{static_cast<double>(i * 100)};
+    request.order_qty = QtyType::from_double(static_cast<double>(i));
+    request.price = PriceType::from_double(static_cast<double>(i * 100));
     request.time_in_force = TimeInForce::kGoodTillCancel;
 
     order_manager_->register_pending_request(request);

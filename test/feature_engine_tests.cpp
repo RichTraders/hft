@@ -42,8 +42,8 @@ class FeatureEngineTest : public ::testing::Test {
     market_update_pool = new MemoryPool<MarketUpdateData>(8);
 
     TradeEngineCfg cfg;
-    cfg.risk_cfg_.max_order_size_ = Qty{10};
-    cfg.risk_cfg_.max_position_ = Qty{50};
+    cfg.risk_cfg_.max_order_size_ = QtyType::from_double(10);
+    cfg.risk_cfg_.max_position_ = QtyType::from_double(50);
     cfg.risk_cfg_.max_loss_ = -1000;
 
     ticker_cfg =
@@ -83,8 +83,8 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
   TestOrderBook book("BTCUSDT", producer);
   book.set_trade_engine(trade_engine);
   {
-    const Price p = Price{100'000.};
-    const Qty q{20.0};
+    const auto p = PriceType::from_double(100'000.);
+    const auto q = QtyType::from_double(20.0);
     const MarketData md{MarketUpdateType::kAdd,
         OrderId{kOrderIdInvalid},
         symbol,
@@ -94,8 +94,8 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
     book.on_market_data_updated(&md);
   }
   {
-    const Price p = Price{200'000.};
-    const Qty q{80.0};
+    const auto p = PriceType::from_double(200'000.);
+    const auto q = QtyType::from_double(80.0);
     const MarketData md{MarketUpdateType::kAdd,
         OrderId{kOrderIdInvalid},
         symbol,
@@ -105,14 +105,17 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
     book.on_market_data_updated(&md);
   }
 
+  // expected_mid as double (unscaled): 120000
+  // Scaled by kPriceScale=10: 1200000
   double expected_mid = (100'000 * 80. + 200'000 * 20.) / (20.0 + 80.0);
 
-  auto price = Price{200'000};
+  auto price = PriceType::from_double(200'000);
   auto side = Side::kSell;
 
   engine.on_order_book_updated(price, side, &book);
 
-  EXPECT_DOUBLE_EQ(engine.get_market_price(), expected_mid);
+  // get_market_price_double() returns unscaled value
+  EXPECT_DOUBLE_EQ(engine.get_market_price_double(), expected_mid);
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
@@ -124,8 +127,8 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
   book.set_trade_engine(trade_engine);
   {
     std::string symbol = "BTCUSDT";
-    const Price p = Price{100'000.};
-    const Qty q{20.0};
+    const auto p = PriceType::from_double(100'000.);
+    const auto q = QtyType::from_double(20.0);
     const MarketData md{MarketUpdateType::kAdd,
         OrderId{kOrderIdInvalid},
         symbol,
@@ -136,8 +139,8 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
   }
   {
     std::string symbol = "BTCUSDT";
-    const Price p = Price{200'000.};
-    const Qty q{80.0};
+    const auto p = PriceType::from_double(200'000.);
+    const auto q = QtyType::from_double(80.0);
     const MarketData md{MarketUpdateType::kAdd,
         OrderId{kOrderIdInvalid},
         symbol,
@@ -152,11 +155,12 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
       OrderId{kOrderIdInvalid},
       symbol,
       Side::kBuy,
-      Price{200'000},
-      Qty{10.0}};
+      PriceType::from_double(200'000),
+      QtyType::from_double(10.0)};
   book.on_market_data_updated(&md);
 
-  double expected_ratio = md.qty.value / book.get_bbo()->ask_qty.value;
+  // Both values are scaled by kQtyScale, ratio is dimensionless
+  double expected_ratio = static_cast<double>(md.qty.value) / static_cast<double>(book.get_bbo()->ask_qty.value);
 
   engine.on_trade_updated(&md, &book);
 
@@ -173,18 +177,20 @@ TEST_F(FeatureEngineTest, OnTradeUpdate) {
   book.set_trade_engine(trade_engine);
 
   struct T {
-    Price p;
-    Qty q;
+    PriceType p;
+    QtyType q;
     Side s;
   };
   T ticks[] = {
-      {Price{100.0}, Qty{10.0}, common::Side::kTrade},
-      {Price{102.0}, Qty{20.0}, common::Side::kTrade},
-      {Price{104.0}, Qty{30.0}, common::Side::kTrade},
-      {Price{106.0}, Qty{40.0}, common::Side::kTrade},
+      {PriceType::from_double(100.0), QtyType::from_double(10.0), common::Side::kTrade},
+      {PriceType::from_double(102.0), QtyType::from_double(20.0), common::Side::kTrade},
+      {PriceType::from_double(104.0), QtyType::from_double(30.0), common::Side::kTrade},
+      {PriceType::from_double(106.0), QtyType::from_double(40.0), common::Side::kTrade},
   };
 
-  double sum_pq = 0.0, sum_q = 0.0;
+  // Use scaled values: vwap_raw = sum(p_raw * q_raw) / sum(q_raw)
+  // Unit: (price_scale * qty_scale) / qty_scale = price_scale
+  int64_t sum_pq = 0, sum_q = 0;
   for (auto& t : ticks) {
     std::string symbol = "BTCUSDT";
     MarketData md(common::MarketUpdateType::kTrade,
@@ -197,8 +203,9 @@ TEST_F(FeatureEngineTest, OnTradeUpdate) {
     sum_pq += t.p.value * t.q.value;
     sum_q += t.q.value;
   }
-  const double expected = sum_pq / sum_q;
-  EXPECT_FLOAT_EQ(engine.get_vwap(), expected);
+  // get_vwap() returns int64 scaled by kPriceScale
+  const int64_t expected = sum_pq / sum_q;
+  EXPECT_EQ(engine.get_vwap(), expected);
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction) {
@@ -210,26 +217,29 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction) {
 
   const size_t W = 64;
   const size_t N = W + 7;
-  double sum_pq = 0.0, sum_q = 0.0;
-  std::deque<std::pair<double, double>> win;  // (price, qty)
+  // Use scaled values: vwap = sum(p_raw * q_raw) / sum(q_raw)
+  int64_t sum_pq = 0, sum_q = 0;
+  std::deque<std::pair<int64_t, int64_t>> win;  // (price_raw, qty_raw)
 
   for (size_t i = 0; i < N; ++i) {
     const double px = 100.0 + static_cast<double>(i);
     const double qty = 1.0 + static_cast<double>(i % 5);
     std::string symbol = "BTCUSDT";
 
+    auto p = PriceType::from_double(px);
+    auto q = QtyType::from_double(qty);
     MarketData md(common::MarketUpdateType::kTrade,
         common::OrderId{0},
         symbol,
         common::Side::kTrade,
-        Price{px},
-        Qty{qty});
+        p,
+        q);
 
     engine.on_trade_updated(&md, &book);
 
-    win.emplace_back(px, qty);
-    sum_pq += px * qty;
-    sum_q += qty;
+    win.emplace_back(p.value, q.value);
+    sum_pq += p.value * q.value;
+    sum_q += q.value;
     if (win.size() > W) {
       auto [opx, oq] = win.front();
       win.pop_front();
@@ -237,12 +247,12 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_WindowEviction) {
       sum_q -= oq;
     }
 
-    if (sum_q > 0.0) {
-      const double expected = sum_pq / sum_q;
-      EXPECT_NEAR(engine.get_vwap(), expected, 1e-9)
+    if (sum_q > 0) {
+      const int64_t expected = sum_pq / sum_q;
+      EXPECT_EQ(engine.get_vwap(), expected)
           << "i=" << i << " W=" << W << " sum_q=" << sum_q;
     } else {
-      EXPECT_DOUBLE_EQ(engine.get_vwap(), 0.0);
+      EXPECT_EQ(engine.get_vwap(), 0);
     }
   }
 }
@@ -257,26 +267,31 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_MultiWraps) {
   const size_t W = 64;
   const size_t N = 3 * W + 11;
 
-  double sum_pq = 0.0, sum_q = 0.0;
-  std::deque<std::pair<double, double>> win;
+  // Use scaled values: vwap = sum(p_raw * q_raw) / sum(q_raw)
+  int64_t sum_pq = 0, sum_q = 0;
+  std::deque<std::pair<int64_t, int64_t>> win;
 
   for (size_t i = 0; i < N; ++i) {
-    const double px = 200.0 + 0.25 * static_cast<double>(i);
+    // Note: 0.25 increments may lose precision with kPriceScale=10
+    // Use integer-friendly values
+    const double px = 200.0 + static_cast<double>(i);
     const double qty = (i % 7 == 0) ? 10.0 : (1.0 + static_cast<double>(i % 3));
     std::string symbol = "BTCUSDT";
 
+    auto p = PriceType::from_double(px);
+    auto q = QtyType::from_double(qty);
     MarketData md(common::MarketUpdateType::kTrade,
         common::OrderId{42},
         symbol,
         common::Side::kTrade,
-        Price{px},
-        Qty{qty});
+        p,
+        q);
 
     engine.on_trade_updated(&md, &book);
 
-    win.emplace_back(px, qty);
-    sum_pq += px * qty;
-    sum_q += qty;
+    win.emplace_back(p.value, q.value);
+    sum_pq += p.value * q.value;
+    sum_q += q.value;
     if (win.size() > W) {
       auto [opx, oq] = win.front();
       win.pop_front();
@@ -285,9 +300,9 @@ TEST_F(FeatureEngineTest, OnTradeUpdate_RollingVWAP_MultiWraps) {
     }
 
     if (i % (W / 3 + 1) == 0 || i + 1 == N) {
-      ASSERT_GT(sum_q, 0.0);
-      const double expected = sum_pq / sum_q;
-      EXPECT_NEAR(engine.get_vwap(), expected, 1e-9)
+      ASSERT_GT(sum_q, static_cast<int64_t>(0));
+      const int64_t expected = sum_pq / sum_q;
+      EXPECT_EQ(engine.get_vwap(), expected)
           << "multi-wrap check at i=" << i;
     }
   }

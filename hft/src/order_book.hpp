@@ -36,10 +36,10 @@ template <typename Strategy>
 class TradeEngine;
 
 struct BBO {
-  common::PriceType bid_price = common::PriceType::from_raw(0);
-  common::PriceType ask_price = common::PriceType::from_raw(0);
-  common::QtyType bid_qty = common::QtyType::from_raw(0);
-  common::QtyType ask_qty = common::QtyType::from_raw(0);
+  common::PriceType bid_price;
+  common::PriceType ask_price;
+  common::QtyType bid_qty;
+  common::QtyType ask_qty;
 
   [[nodiscard]] auto toString() const {
     std::ostringstream stream;
@@ -481,10 +481,10 @@ class MarketOrderBook final {
         }
         std::fill(bidSummary_.begin(), bidSummary_.end(), 0);
         std::fill(askSummary_.begin(), askSummary_.end(), 0);
-        bbo_ = {.bid_price = common::PriceType::from_raw(0),
-            .ask_price = common::PriceType::from_raw(0),
-            .bid_qty = common::QtyType::from_raw(0),
-            .ask_qty = common::QtyType::from_raw(0)};
+        bbo_ = {.bid_price = common::PriceType{},  // kInvalidValue
+            .ask_price = common::PriceType{},      // kInvalidValue
+            .bid_qty = common::QtyType{},          // kInvalidValue
+            .ask_qty = common::QtyType{}};         // kInvalidValue
         logger_.info("Cleared all market data.");
         return;
       }
@@ -971,19 +971,19 @@ class MarketOrderBook final {
   [[nodiscard]] common::PriceType best_bid_price() const noexcept {
     const int idx = best_bid_idx();
     return (idx >= 0) ? config_.index_to_price(idx)
-                      : common::PriceType::from_raw(0);
+                      : common::PriceType{};
   }
 
   [[nodiscard]] common::PriceType best_ask_price() const noexcept {
     const int idx = best_ask_idx();
     return (idx >= 0) ? config_.index_to_price(idx)
-                      : common::PriceType::from_raw(0);
+                      : common::PriceType{};
   }
 
   [[nodiscard]] common::QtyType best_bid_qty() const noexcept {
     const int idx = best_bid_idx();
     if (idx < 0)
-      return common::QtyType::from_raw(0);
+      return common::QtyType{};
     const int bidx = idx / kBucketSize;
     const int off = idx & (kBucketSize - 1);
     Bucket* bucket = bidBuckets_[bidx];
@@ -993,7 +993,7 @@ class MarketOrderBook final {
   [[nodiscard]] common::QtyType best_ask_qty() const noexcept {
     const int idx = best_ask_idx();
     if (idx < 0)
-      return common::QtyType::from_raw(0);
+      return common::QtyType{};
     const int bidx = idx / kBucketSize;
     const int off = idx & (kBucketSize - 1);
     Bucket* bucket = askBuckets_[bidx];

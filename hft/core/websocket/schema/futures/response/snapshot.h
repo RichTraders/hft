@@ -14,14 +14,15 @@
 #define DEPTH_SNAPSHOT_H
 #include <glaze/glaze.hpp>
 #include "api_response.h"
+#include "schema/price_qty_array.h"
 
 namespace schema::futures {
 struct DepthSnapshotResult {
   std::uint64_t book_update_id;
   std::uint64_t message_output_time;
   std::uint64_t transaction_time;
-  std::vector<std::array<int64_t, 2>> bids;
-  std::vector<std::array<int64_t, 2>> asks;
+  ::schema::FixedPriceQtyArray bids;
+  ::schema::FixedPriceQtyArray asks;
 
   // clang-format off
   // NOLINTNEXTLINE(readability-identifier-naming)
@@ -31,8 +32,8 @@ struct DepthSnapshotResult {
         "lastUpdateId", &T::book_update_id,
         "E", &T::message_output_time,
         "T",&T::transaction_time,
-        "bids", glz::quoted_num<&T::bids>,
-        "asks", glz::quoted_num<&T::asks>
+        "bids", &T::bids,
+        "asks", &T::asks
     );
   };
   // clang-format on

@@ -14,14 +14,20 @@
 #define TRADE_H
 
 #include <glaze/glaze.hpp>
+#include "schema/price_qty_array.h"
+
 namespace schema::futures {
+
+using ScaledPrice = ::ScaledInt64<::common::FixedPointConfig::kPriceScale>;
+using ScaledQty = ::ScaledInt64<::common::FixedPointConfig::kQtyScale>;
+
 struct AggregateTradeEvent {
   std::string event_type;           // "e"
   std::int64_t event_time;          // "E"
   std::string symbol;               // "s"
   std::int64_t aggregate_trade_id;  // "a"
-  int64_t price;                    // "p"
-  int64_t quantity;                 // "q"
+  ScaledPrice price;                // "p"
+  ScaledQty quantity;               // "q"
   std::int64_t first_trade_id;      // "f"
   std::int64_t last_trade_id;       // "l"
   std::int64_t trade_time;          // "T"
@@ -37,8 +43,8 @@ struct AggregateTradeEvent {
         "E", &T::event_time,
         "s", &T::symbol,
         "a", &T::aggregate_trade_id,
-        "p", glz::quoted_num<&T::price>,
-        "q", glz::quoted_num<&T::quantity>,
+        "p", &T::price,
+        "q", &T::quantity,
         "f", &T::first_trade_id,
         "l", &T::last_trade_id,
         "T", &T::trade_time,

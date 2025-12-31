@@ -44,11 +44,13 @@ std::unique_ptr<Logger::Producer> StrategyIntegrationTest::producer;
 
 TEST_F(StrategyIntegrationTest, TradeEngineConstructsWithSelectedStrategy) {
   TradeEngineCfgHashMap cfg;
-  RiskCfg risk = {.max_order_size_ = Qty{0.0001},
-                  .max_position_ = Qty{0.0004},
-                  .max_loss_ = -0.3};
+  RiskCfg risk;
+  risk.max_order_size_ = QtyType::from_double(0.0001);
+  risk.max_position_ = QtyType::from_double(0.0004);
+  // max_loss_ is int64_t scaled by kPnlScale; -0.3 * 10000 = -3000
+  risk.max_loss_ = -3000;
   TradeEngineCfg tempcfg = {
-      .clip_ = Qty{100000}, .threshold_ = 10, .risk_cfg_ = risk};
+      .clip_ = QtyType::from_double(100000), .threshold_ = 10, .risk_cfg_ = risk};
   cfg.emplace("BTCUSDT", tempcfg);
 
   {

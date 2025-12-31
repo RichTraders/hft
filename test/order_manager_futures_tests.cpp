@@ -74,8 +74,8 @@ TEST_F(OrderManagerFuturesTest, LayerBook_LongBuy_AccessibleAndIsolated) {
 
   // Set order in LONG BUY book
   long_buy.slots[0].cl_order_id = OrderId{10001};
-  long_buy.slots[0].price = Price{50000.0};
-  long_buy.slots[0].qty = Qty{1.0};
+  long_buy.slots[0].price = PriceType::from_double(50000.0);
+  long_buy.slots[0].qty = QtyType::from_double(1.0);
   long_buy.slots[0].state = OMOrderState::kLive;
 
   // Verify it's in the right book
@@ -88,8 +88,8 @@ TEST_F(OrderManagerFuturesTest, LayerBook_LongSell_ExitPosition) {
 
   // LONG exit order (sell to close long position)
   long_sell.slots[0].cl_order_id = OrderId{10002};
-  long_sell.slots[0].price = Price{50100.0};
-  long_sell.slots[0].qty = Qty{1.0};
+  long_sell.slots[0].price = PriceType::from_double(50100.0);
+  long_sell.slots[0].qty = QtyType::from_double(1.0);
   long_sell.slots[0].state = OMOrderState::kLive;
 
   auto& verify_book = layer_book_->side_book("BTCUSDT", Side::kSell, PositionSide::kLong);
@@ -101,8 +101,8 @@ TEST_F(OrderManagerFuturesTest, LayerBook_ShortSell_EntryPosition) {
 
   // SHORT entry order (sell to open short position)
   short_sell.slots[0].cl_order_id = OrderId{20001};
-  short_sell.slots[0].price = Price{50000.0};
-  short_sell.slots[0].qty = Qty{2.0};
+  short_sell.slots[0].price = PriceType::from_double(50000.0);
+  short_sell.slots[0].qty = QtyType::from_double(2.0);
   short_sell.slots[0].state = OMOrderState::kLive;
 
   auto& verify_book = layer_book_->side_book("BTCUSDT", Side::kSell, PositionSide::kShort);
@@ -114,8 +114,8 @@ TEST_F(OrderManagerFuturesTest, LayerBook_ShortBuy_ExitPosition) {
 
   // SHORT exit order (buy to close short position)
   short_buy.slots[0].cl_order_id = OrderId{20002};
-  short_buy.slots[0].price = Price{49900.0};
-  short_buy.slots[0].qty = Qty{2.0};
+  short_buy.slots[0].price = PriceType::from_double(49900.0);
+  short_buy.slots[0].qty = QtyType::from_double(2.0);
   short_buy.slots[0].state = OMOrderState::kLive;
 
   auto& verify_book = layer_book_->side_book("BTCUSDT", Side::kBuy, PositionSide::kShort);
@@ -126,27 +126,27 @@ TEST_F(OrderManagerFuturesTest, LayerBook_LongAndShort_CompletelyIsolated) {
   // Place order in LONG BUY
   auto& long_buy = layer_book_->side_book("BTCUSDT", Side::kBuy, PositionSide::kLong);
   long_buy.slots[0].cl_order_id = OrderId{10001};
-  long_buy.slots[0].price = Price{50000.0};
-  long_buy.slots[0].qty = Qty{1.0};
+  long_buy.slots[0].price = PriceType::from_double(50000.0);
+  long_buy.slots[0].qty = QtyType::from_double(1.0);
   long_buy.slots[0].state = OMOrderState::kLive;
 
   // Place order in SHORT BUY (different position, same side)
   auto& short_buy = layer_book_->side_book("BTCUSDT", Side::kBuy, PositionSide::kShort);
   short_buy.slots[0].cl_order_id = OrderId{20001};
-  short_buy.slots[0].price = Price{49900.0};
-  short_buy.slots[0].qty = Qty{2.0};
+  short_buy.slots[0].price = PriceType::from_double(49900.0);
+  short_buy.slots[0].qty = QtyType::from_double(2.0);
   short_buy.slots[0].state = OMOrderState::kLive;
 
   // Verify complete isolation
   EXPECT_NE(long_buy.slots[0].cl_order_id, short_buy.slots[0].cl_order_id);
-  EXPECT_NE(long_buy.slots[0].price, short_buy.slots[0].price);
-  EXPECT_NE(long_buy.slots[0].qty, short_buy.slots[0].qty);
+  EXPECT_NE(long_buy.slots[0].price.value, short_buy.slots[0].price.value);
+  EXPECT_NE(long_buy.slots[0].qty.value, short_buy.slots[0].qty.value);
 
   // Modify LONG position
-  long_buy.slots[0].qty = Qty{1.5};
+  long_buy.slots[0].qty = QtyType::from_double(1.5);
 
   // Verify SHORT unchanged
-  EXPECT_EQ(short_buy.slots[0].qty.value, 2.0);
+  EXPECT_EQ(short_buy.slots[0].qty.to_double(), 2.0);
 }
 
 // ============================================================================
@@ -175,21 +175,21 @@ TEST_F(OrderManagerFuturesTest, ProcessReplace_PendingReplInfoUsesSameId) {
 
   const int layer = 0;
   const OrderId order_id{30001};
-  const Price old_price{50000.0};
-  const Price new_price{50100.0};
-  const Qty old_qty{1.0};
-  const Qty new_qty{1.5};
+  const auto old_price = PriceType::from_double(50000.0);
+  const auto new_price = PriceType::from_double(50100.0);
+  const auto old_qty = QtyType::from_double(1.0);
+  const auto new_qty = QtyType::from_double(1.5);
 
   // Create pending replace (Futures style)
   book.pending_repl[layer] = PendingReplaceInfo(
     new_price,
     new_qty,
-    static_cast<uint64_t>(new_price.value / 0.01),
+    static_cast<uint64_t>(new_price.to_double() / 0.01),
     order_id,  // new_cl_order_id = same as original
     old_qty,
     order_id,  // original_cl_order_id
     old_price,
-    static_cast<uint64_t>(old_price.value / 0.01)
+    static_cast<uint64_t>(old_price.to_double() / 0.01)
   );
 
   ASSERT_TRUE(book.pending_repl[layer].has_value());
@@ -268,15 +268,15 @@ TEST_F(OrderManagerFuturesTest, Scenario_LongPosition_EntryAndExit) {
   // Entry: LONG BUY
   auto& entry_book = layer_book_->side_book("BTCUSDT", Side::kBuy, PositionSide::kLong);
   entry_book.slots[0].cl_order_id = OrderId{60001};
-  entry_book.slots[0].price = Price{50000.0};
-  entry_book.slots[0].qty = Qty{1.0};
+  entry_book.slots[0].price = PriceType::from_double(50000.0);
+  entry_book.slots[0].qty = QtyType::from_double(1.0);
   entry_book.slots[0].state = OMOrderState::kLive;
 
   // Exit: LONG SELL
   auto& exit_book = layer_book_->side_book("BTCUSDT", Side::kSell, PositionSide::kLong);
   exit_book.slots[0].cl_order_id = OrderId{60002};
-  exit_book.slots[0].price = Price{50500.0};
-  exit_book.slots[0].qty = Qty{1.0};
+  exit_book.slots[0].price = PriceType::from_double(50500.0);
+  exit_book.slots[0].qty = QtyType::from_double(1.0);
   exit_book.slots[0].state = OMOrderState::kLive;
 
   // Verify both exist independently
@@ -288,15 +288,15 @@ TEST_F(OrderManagerFuturesTest, Scenario_ShortPosition_EntryAndExit) {
   // Entry: SHORT SELL
   auto& entry_book = layer_book_->side_book("BTCUSDT", Side::kSell, PositionSide::kShort);
   entry_book.slots[0].cl_order_id = OrderId{60003};
-  entry_book.slots[0].price = Price{50000.0};
-  entry_book.slots[0].qty = Qty{2.0};
+  entry_book.slots[0].price = PriceType::from_double(50000.0);
+  entry_book.slots[0].qty = QtyType::from_double(2.0);
   entry_book.slots[0].state = OMOrderState::kLive;
 
   // Exit: SHORT BUY
   auto& exit_book = layer_book_->side_book("BTCUSDT", Side::kBuy, PositionSide::kShort);
   exit_book.slots[0].cl_order_id = OrderId{60004};
-  exit_book.slots[0].price = Price{49500.0};
-  exit_book.slots[0].qty = Qty{2.0};
+  exit_book.slots[0].price = PriceType::from_double(49500.0);
+  exit_book.slots[0].qty = QtyType::from_double(2.0);
   exit_book.slots[0].state = OMOrderState::kLive;
 
   EXPECT_EQ(entry_book.slots[0].state, OMOrderState::kLive);
@@ -307,13 +307,13 @@ TEST_F(OrderManagerFuturesTest, Scenario_SimultaneousLongAndShort) {
   // LONG position: BUY entry
   auto& long_buy = layer_book_->side_book("BTCUSDT", Side::kBuy, PositionSide::kLong);
   long_buy.slots[0].cl_order_id = OrderId{70001};
-  long_buy.slots[0].qty = Qty{1.0};
+  long_buy.slots[0].qty = QtyType::from_double(1.0);
   long_buy.slots[0].state = OMOrderState::kLive;
 
   // SHORT position: SELL entry (at same time)
   auto& short_sell = layer_book_->side_book("BTCUSDT", Side::kSell, PositionSide::kShort);
   short_sell.slots[0].cl_order_id = OrderId{70002};
-  short_sell.slots[0].qty = Qty{1.0};
+  short_sell.slots[0].qty = QtyType::from_double(1.0);
   short_sell.slots[0].state = OMOrderState::kLive;
 
   // Both should coexist
@@ -321,8 +321,8 @@ TEST_F(OrderManagerFuturesTest, Scenario_SimultaneousLongAndShort) {
   EXPECT_EQ(short_sell.slots[0].state, OMOrderState::kLive);
 
   // Modify LONG
-  long_buy.slots[0].qty = Qty{1.5};
+  long_buy.slots[0].qty = QtyType::from_double(1.5);
 
   // SHORT unaffected
-  EXPECT_EQ(short_sell.slots[0].qty.value, 1.0);
+  EXPECT_EQ(short_sell.slots[0].qty.to_double(), 1.0);
 }

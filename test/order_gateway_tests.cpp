@@ -112,7 +112,7 @@ TEST_F(OrderGatewayTest, NewOrderSingle) {
   request.cl_order_id.value = cl_order_id;
   request.symbol = INI_CONFIG.get("meta", "ticker");
   request.side = common::Side::kSell;
-  request.order_qty.value = 0.01;
+  request.order_qty = QtyType::from_double(0.01);
   request.price.value = 120000;
   request.ord_type = trading::OrderType::kLimit;
   request.time_in_force = trading::TimeInForce::kGoodTillCancel;

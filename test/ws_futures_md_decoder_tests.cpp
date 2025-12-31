@@ -120,8 +120,9 @@ TEST_F(WsFuturesMdDecoderTest, DecodeDepthUpdate_RealData_ParsesCorrectly) {
   EXPECT_FALSE(depth.data.asks.empty());
 
   if (!depth.data.bids.empty()) {
-    EXPECT_DOUBLE_EQ(depth.data.bids[0][0], 1000.00);
-    EXPECT_DOUBLE_EQ(depth.data.bids[0][1], 28.319);
+    // kPriceScale=10: "1000.00" -> 10000, kQtyScale=1000: "28.319" -> 28319
+    EXPECT_EQ(depth.data.bids[0][0], 10000);
+    EXPECT_EQ(depth.data.bids[0][1], 28319);
   }
 }
 
@@ -147,8 +148,9 @@ TEST_F(WsFuturesMdDecoderTest, DecodeTradeEvent_RealData_ParsesCorrectly) {
   EXPECT_EQ(trade.data.symbol, "BTCUSDT");
   EXPECT_EQ(trade.data.event_time, 1765623793856);
   EXPECT_EQ(trade.data.aggregate_trade_id, 3011637835);
-  EXPECT_DOUBLE_EQ(trade.data.price, 90558.30);
-  EXPECT_DOUBLE_EQ(trade.data.quantity, 0.704);
+  // kPriceScale=10: "90558.30" -> 905583, kQtyScale=1000: "0.704" -> 704
+  EXPECT_EQ(trade.data.price, 905583);
+  EXPECT_EQ(trade.data.quantity, 704);
   EXPECT_EQ(trade.data.first_trade_id, 7007399071);
   EXPECT_EQ(trade.data.last_trade_id, 7007399080);
   EXPECT_EQ(trade.data.trade_time, 1765623793745);
@@ -182,13 +184,15 @@ TEST_F(WsFuturesMdDecoderTest, DecodeSnapshot_RealData_ParsesCorrectly) {
   EXPECT_FALSE(snapshot.result.asks.empty());
 
   if (!snapshot.result.bids.empty()) {
-    EXPECT_DOUBLE_EQ(snapshot.result.bids[0][0], 90545.20);
-    EXPECT_DOUBLE_EQ(snapshot.result.bids[0][1], 0.618);
+    // kPriceScale=10: "90545.20" -> 905452, kQtyScale=1000: "0.618" -> 618
+    EXPECT_EQ(snapshot.result.bids[0][0], 905452);
+    EXPECT_EQ(snapshot.result.bids[0][1], 618);
   }
 
   if (!snapshot.result.asks.empty()) {
-    EXPECT_DOUBLE_EQ(snapshot.result.asks[0][0], 90545.30);
-    EXPECT_DOUBLE_EQ(snapshot.result.asks[0][1], 23.955);
+    // kPriceScale=10: "90545.30" -> 905453, kQtyScale=1000: "23.955" -> 23955
+    EXPECT_EQ(snapshot.result.asks[0][0], 905453);
+    EXPECT_EQ(snapshot.result.asks[0][1], 23955);
   }
 }
 
@@ -272,10 +276,12 @@ TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_RealData_ParsesCorrectly) {
   EXPECT_EQ(book_ticker.data.update_id, 9519725001721);
   EXPECT_EQ(book_ticker.data.event_time, 1766452642241);
   EXPECT_EQ(book_ticker.data.transaction_time, 1766452642240);
-  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_price, 1.9022);
-  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_qty, 7.3);
-  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_price, 1.9023);
-  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_qty, 2108.3);
+  // kPriceScale=10: "1.9022" -> 19, kQtyScale=1000: "7.3" -> 7300
+  EXPECT_EQ(book_ticker.data.best_bid_price, 19);
+  EXPECT_EQ(book_ticker.data.best_bid_qty, 7300);
+  // kPriceScale=10: "1.9023" -> 19, kQtyScale=1000: "2108.3" -> 2108300
+  EXPECT_EQ(book_ticker.data.best_ask_price, 19);
+  EXPECT_EQ(book_ticker.data.best_ask_qty, 2108300);
 }
 
 TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_InlineData_ParsesCorrectly) {
@@ -291,10 +297,12 @@ TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_InlineData_ParsesCorrectly) {
   EXPECT_EQ(book_ticker.stream, "ethusdt@bookTicker");
   EXPECT_EQ(book_ticker.data.symbol, "ETHUSDT");
   EXPECT_EQ(book_ticker.data.update_id, 123456789);
-  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_price, 2000.50);
-  EXPECT_DOUBLE_EQ(book_ticker.data.best_bid_qty, 100.5);
-  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_price, 2001.00);
-  EXPECT_DOUBLE_EQ(book_ticker.data.best_ask_qty, 50.25);
+  // kPriceScale=10: "2000.50" -> 20005, kQtyScale=1000: "100.5" -> 100500
+  EXPECT_EQ(book_ticker.data.best_bid_price, 20005);
+  EXPECT_EQ(book_ticker.data.best_bid_qty, 100500);
+  // kPriceScale=10: "2001.00" -> 20010, kQtyScale=1000: "50.25" -> 50250
+  EXPECT_EQ(book_ticker.data.best_ask_price, 20010);
+  EXPECT_EQ(book_ticker.data.best_ask_qty, 50250);
 }
 
 // ============================================================================

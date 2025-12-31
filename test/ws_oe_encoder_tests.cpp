@@ -20,6 +20,8 @@
 using namespace core;
 using namespace trading;
 using namespace common;
+using PriceType = common::PriceType;
+using QtyType = common::QtyType;
 
 // Helper function to validate JSON structure
 bool is_valid_json(std::string_view json) {
@@ -120,8 +122,8 @@ TEST_F(WsOeEncoderTest, CreateOrderMessage_LimitOrder_ContainsAllFields) {
   order.symbol = "BTCUSDT";
   order.side = OrderSide::kBuy;
   order.ord_type = OrderType::kLimit;
-  order.order_qty = Qty{1.50000};
-  order.price = Price{50000.00};
+  order.order_qty = QtyType::from_double(1.50000);
+  order.price = PriceType::from_double(50000.00);
   order.cl_order_id = OrderId{1234567890};
   order.time_in_force = TimeInForce::kGoodTillCancel;
   order.self_trade_prevention_mode = SelfTradePreventionMode::kNone;
@@ -144,7 +146,7 @@ TEST_F(WsOeEncoderTest, CreateOrderMessage_MarketOrder_ProducesValidJson) {
   order.symbol = "ETHUSDT";
   order.side = OrderSide::kSell;
   order.ord_type = OrderType::kMarket;
-  order.order_qty = Qty{2.0};
+  order.order_qty = QtyType::from_double(2.0);
   order.cl_order_id = OrderId{9876543210};
   order.self_trade_prevention_mode = SelfTradePreventionMode::kExpireTaker;
 
@@ -177,8 +179,8 @@ TEST_F(WsOeEncoderTest, CreateCancelAndReorderMessage_ValidRequest_ContainsAllPa
   replace.cl_new_order_id = OrderId{3333333333};
   replace.side = OrderSide::kBuy;
   replace.ord_type = OrderType::kLimit;
-  replace.order_qty = Qty{0.75};
-  replace.price = Price{51000.00};
+  replace.order_qty = QtyType::from_double(0.75);
+  replace.price = PriceType::from_double(51000.00);
   replace.time_in_force = TimeInForce::kGoodTillCancel;
   replace.self_trade_prevention_mode = SelfTradePreventionMode::kNone;
 
@@ -206,37 +208,42 @@ TEST_F(WsOeEncoderTest, CreateOrderAllCancel_ValidSymbol_ProducesValidJson) {
 // Field Validation Tests
 // ============================================================================
 
-TEST_F(WsOeEncoderTest, PriceFormatting_TwoDecimalPrecision_CorrectFormat) {
+TEST_F(WsOeEncoderTest, PriceFormatting_CorrectPrecision) {
   NewSingleOrderData order;
   order.symbol = "BTCUSDT";
   order.side = OrderSide::kBuy;
   order.ord_type = OrderType::kLimit;
-  order.order_qty = Qty{0.00012};
-  order.price = Price{12345.68};
+  // Use values compatible with BTCUSDCConfig scale factors
+  // kPriceScale=10 supports 1 decimal place, kQtyScale=1000 supports 3 decimal places
+  order.order_qty = QtyType::from_double(0.001);  // 0.001 * 1000 = 1
+  order.price = PriceType::from_double(12345.6);  // 12345.6 * 10 = 123456
   order.cl_order_id = OrderId{123};
   order.time_in_force = TimeInForce::kGoodTillCancel;
   order.self_trade_prevention_mode = SelfTradePreventionMode::kNone;
 
   std::string result = encoder_->create_order_message(order);
 
-  EXPECT_NE(result.find("12345.68"), std::string::npos);
+  // With kPriceScale=10, price is stored with 1 decimal place precision
+  EXPECT_NE(result.find("12345.6"), std::string::npos);
 }
 
-TEST_F(WsOeEncoderTest, QuantityFormatting_FiveDecimalPrecision_CorrectFormat) {
+TEST_F(WsOeEncoderTest, QuantityFormatting_CorrectPrecision) {
   NewSingleOrderData order;
   order.symbol = "BTCUSDT";
   order.side = OrderSide::kBuy;
   order.ord_type = OrderType::kLimit;
-  order.order_qty = Qty{1.123456789};  // Should be formatted to 1.12346
-  order.price = Price{50000.00};
+  // Use values compatible with BTCUSDCConfig scale factors
+  // kQtyScale=1000 supports 3 decimal places
+  order.order_qty = QtyType::from_double(1.123);  // 1.123 * 1000 = 1123
+  order.price = PriceType::from_double(50000.0);  // 50000.0 * 10 = 500000
   order.cl_order_id = OrderId{123};
   order.time_in_force = TimeInForce::kGoodTillCancel;
   order.self_trade_prevention_mode = SelfTradePreventionMode::kNone;
 
   std::string result = encoder_->create_order_message(order);
 
-  // Quantity should have exactly 5 decimal places
-  EXPECT_NE(result.find("1.12346"), std::string::npos);
+  // With kQtyScale=1000, qty is stored with 3 decimal place precision
+  EXPECT_NE(result.find("1.123"), std::string::npos);
 }
 
 TEST_F(WsOeEncoderTest, ClientOrderId_ConvertedToString_Present) {
@@ -244,8 +251,8 @@ TEST_F(WsOeEncoderTest, ClientOrderId_ConvertedToString_Present) {
   order.symbol = "BTCUSDT";
   order.side = OrderSide::kBuy;
   order.ord_type = OrderType::kLimit;
-  order.order_qty = Qty{1.0};
-  order.price = Price{50000.00};
+  order.order_qty = QtyType::from_double(1.0);
+  order.price = PriceType::from_double(50000.00);
   order.cl_order_id = OrderId{9876543210};
   order.time_in_force = TimeInForce::kGoodTillCancel;
   order.self_trade_prevention_mode = SelfTradePreventionMode::kNone;
@@ -266,8 +273,8 @@ TEST_F(WsOeEncoderTest, AllOrderMessages_ProduceValidJson_NoParsingErrors) {
   order.symbol = "BTCUSDT";
   order.side = OrderSide::kBuy;
   order.ord_type = OrderType::kLimit;
-  order.order_qty = Qty{1.0};
-  order.price = Price{50000.00};
+  order.order_qty = QtyType::from_double(1.0);
+  order.price = PriceType::from_double(50000.00);
   order.cl_order_id = OrderId{123};
   order.time_in_force = TimeInForce::kGoodTillCancel;
   order.self_trade_prevention_mode = SelfTradePreventionMode::kNone;

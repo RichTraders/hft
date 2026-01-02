@@ -55,6 +55,7 @@ struct BBO {
 constexpr int kDefaultMinPriceInt = 100'000;
 constexpr int kDefaultMaxPriceInt = 30'000'000;
 constexpr int kDefaultTickMultiplierInt = 100;
+constexpr int kMaxBucketPoolSize = 256;
 
 constexpr int kBucketSize = 4096;
 constexpr int kBitsPerWord = 64;
@@ -125,6 +126,7 @@ struct OrderBookConfig {
   int num_levels;
   int bucket_count;
   int summary_words;
+  int bucket_pool_size;
 
   static OrderBookConfig from_ini() {
     const int min_price =
@@ -135,6 +137,7 @@ struct OrderBookConfig {
     const int num_levels = max_price - min_price + 1;
     const int bucket_count = (num_levels + kBucketSize - 1) / kBucketSize;
     const int summary_words = (bucket_count + kBitsPerWord - 1) / kBitsPerWord;
+    const int bucket_pool_size = std::min(bucket_count, kMaxBucketPoolSize);
 
     return OrderBookConfig{
         .min_price_int = min_price,
@@ -142,6 +145,7 @@ struct OrderBookConfig {
         .num_levels = num_levels,
         .bucket_count = bucket_count,
         .summary_words = summary_words,
+        .bucket_pool_size = bucket_pool_size,
     };
   }
 
@@ -419,22 +423,20 @@ void consume_levels_in_bucket(const Bucket* bucket, int bucket_idx, int off,
 
 template <typename Strategy>
 class MarketOrderBook final {
-  static constexpr int kBucketPoolSize = 1024 * 8;
-
  public:
   MarketOrderBook(const common::TickerId& ticker_id,
       const common::Logger::Producer& logger)
       : ticker_id_(std::move(ticker_id)),
         logger_(logger),
         config_(OrderBookConfig::from_ini()),
-        bidBuckets_(config_.bucket_count, nullptr),
-        askBuckets_(config_.bucket_count, nullptr),
-        bidSummary_(config_.summary_words, 0),
-        askSummary_(config_.summary_words, 0),
-        bid_bucket_pool_(
-            std::make_unique<common::MemoryPool<Bucket>>(kBucketPoolSize)),
-        ask_bucket_pool_(
-            std::make_unique<common::MemoryPool<Bucket>>(kBucketPoolSize)) {
+        bid_buckets_(config_.bucket_count, nullptr),
+        ask_buckets_(config_.bucket_count, nullptr),
+        bid_summary_(config_.summary_words, 0),
+        ask_summary_(config_.summary_words, 0),
+        bid_bucket_pool_(std::make_unique<common::MemoryPool<Bucket>>(
+            config_.bucket_pool_size)),
+        ask_bucket_pool_(std::make_unique<common::MemoryPool<Bucket>>(
+            config_.bucket_pool_size)) {
     logger_.info(
         "[Constructor] MarketOrderBook Created - min_price: {}, max_price: {}, "
         "bucket_count: {}, summary_words: {}",
@@ -475,17 +477,17 @@ class MarketOrderBook final {
         break;
       case common::MarketUpdateType::kClear: {
         for (int i = 0; i < config_.bucket_count; ++i) {
-          if (bidBuckets_[i]) {
-            bid_bucket_pool_->deallocate(bidBuckets_[i]);
-            bidBuckets_[i] = nullptr;
+          if (bid_buckets_[i]) {
+            bid_bucket_pool_->deallocate(bid_buckets_[i]);
+            bid_buckets_[i] = nullptr;
           }
-          if (askBuckets_[i]) {
-            ask_bucket_pool_->deallocate(askBuckets_[i]);
-            askBuckets_[i] = nullptr;
+          if (ask_buckets_[i]) {
+            ask_bucket_pool_->deallocate(ask_buckets_[i]);
+            ask_buckets_[i] = nullptr;
           }
         }
-        std::fill(bidSummary_.begin(), bidSummary_.end(), 0);
-        std::fill(askSummary_.begin(), askSummary_.end(), 0);
+        std::fill(bid_summary_.begin(), bid_summary_.end(), 0);
+        std::fill(ask_summary_.begin(), ask_summary_.end(), 0);
         bbo_ = {.bid_price = common::PriceType{},  // kInvalidValue
             .ask_price = common::PriceType{},      // kInvalidValue
             .bid_qty = common::QtyType{},          // kInvalidValue
@@ -536,7 +538,7 @@ class MarketOrderBook final {
 
   [[nodiscard]] std::string print_active_levels(bool is_bid) const {
     std::ostringstream stream;
-    const auto& buckets = is_bid ? bidBuckets_ : askBuckets_;
+    const auto& buckets = is_bid ? bid_buckets_ : ask_buckets_;
 
     for (int bucket_idx = 0; bucket_idx < config_.bucket_count; ++bucket_idx) {
       const Bucket* bucket = buckets[bucket_idx];
@@ -564,11 +566,11 @@ class MarketOrderBook final {
   }
 
   [[nodiscard]] int next_active_bid(int start_idx) const noexcept {
-    return next_active_impl<SearchHighest>(bidSummary_, bidBuckets_, start_idx);
+    return next_active_impl<SearchHighest>(bid_summary_, bid_buckets_, start_idx);
   }
 
   [[nodiscard]] int next_active_ask(int start_idx) const noexcept {
-    return next_active_impl<SearchLowest>(askSummary_, askBuckets_, start_idx);
+    return next_active_impl<SearchLowest>(ask_summary_, ask_buckets_, start_idx);
   }
 
  private:
@@ -677,8 +679,8 @@ class MarketOrderBook final {
     if (level <= 0)
       return 0;
 
-    const auto& summary = is_bid ? bidSummary_ : askSummary_;
-    const auto& buckets = is_bid ? bidBuckets_ : askBuckets_;
+    const auto& summary = is_bid ? bid_summary_ : ask_summary_;
+    const auto& buckets = is_bid ? bid_buckets_ : ask_buckets_;
 
     const int idx = is_bid ? best_bid_idx() : best_ask_idx();
     if (idx < 0)
@@ -739,8 +741,8 @@ class MarketOrderBook final {
     if (want <= 0)
       return -1;
 
-    const auto& summary = is_bid ? bidSummary_ : askSummary_;
-    const auto& buckets = is_bid ? bidBuckets_ : askBuckets_;
+    const auto& summary = is_bid ? bid_summary_ : ask_summary_;
+    const auto& buckets = is_bid ? bid_buckets_ : ask_buckets_;
 
     int filled = 0;
 
@@ -817,10 +819,10 @@ class MarketOrderBook final {
   const common::Logger::Producer& logger_;
   const OrderBookConfig config_;
 
-  std::vector<Bucket*> bidBuckets_;
-  std::vector<Bucket*> askBuckets_;
-  std::vector<uint64_t> bidSummary_;
-  std::vector<uint64_t> askSummary_;
+  std::vector<Bucket*> bid_buckets_;
+  std::vector<Bucket*> ask_buckets_;
+  std::vector<uint64_t> bid_summary_;
+  std::vector<uint64_t> ask_summary_;
 
   mutable int cached_best_bid_idx_ = -1;
   mutable int cached_best_ask_idx_ = -1;
@@ -834,14 +836,14 @@ class MarketOrderBook final {
     const int bucket_idx = idx / kBucketSize;
     const int off = idx & (kBucketSize - 1);
 
-    if (!bidBuckets_[bucket_idx]) {
-      bidBuckets_[bucket_idx] = bid_bucket_pool_->allocate();
-      std::ranges::fill(bidBuckets_[bucket_idx]->bitmap, 0);
-      for (auto& order : bidBuckets_[bucket_idx]->orders) {
+    if (!bid_buckets_[bucket_idx]) {
+      bid_buckets_[bucket_idx] = bid_bucket_pool_->allocate();
+      std::ranges::fill(bid_buckets_[bucket_idx]->bitmap, 0);
+      for (auto& order : bid_buckets_[bucket_idx]->orders) {
         order.qty = common::QtyType::from_raw(0);
       }
     }
-    Bucket* const bucket = bidBuckets_[bucket_idx];
+    Bucket* const bucket = bid_buckets_[bucket_idx];
 
     auto& order = bucket->orders[off];
     order.qty = qty;
@@ -851,13 +853,13 @@ class MarketOrderBook final {
 
     if (order.is_active()) {
       bucket->bitmap[word] |= mask;
-      setSummary(true, bucket_idx);
+      set_summary(true, bucket_idx);
     } else {
       bucket->bitmap[word] &= ~mask;
       if (bucket->empty()) {
         clear_summary(true, bucket_idx);
         bid_bucket_pool_->deallocate(bucket);
-        bidBuckets_[bucket_idx] = nullptr;
+        bid_buckets_[bucket_idx] = nullptr;
       }
     }
   }
@@ -866,14 +868,14 @@ class MarketOrderBook final {
     const int bidx = idx / kBucketSize;
     const int off = idx & (kBucketSize - 1);
 
-    if (!askBuckets_[bidx]) {
-      askBuckets_[bidx] = ask_bucket_pool_->allocate();
-      std::ranges::fill(askBuckets_[bidx]->bitmap, 0);
-      for (auto& order : askBuckets_[bidx]->orders) {
+    if (!ask_buckets_[bidx]) {
+      ask_buckets_[bidx] = ask_bucket_pool_->allocate();
+      std::ranges::fill(ask_buckets_[bidx]->bitmap, 0);
+      for (auto& order : ask_buckets_[bidx]->orders) {
         order.qty = common::QtyType::from_raw(0);
       }
     }
-    Bucket* bucket = askBuckets_[bidx];
+    Bucket* bucket = ask_buckets_[bidx];
 
     auto& order = bucket->orders[off];
     order.qty = qty;
@@ -883,13 +885,13 @@ class MarketOrderBook final {
 
     if (order.is_active()) {
       bucket->bitmap[word] |= mask;
-      setSummary(false, bidx);
+      set_summary(false, bidx);
     } else {
       bucket->bitmap[word] &= ~mask;
       if (bucket->empty()) {
         clear_summary(false, bidx);
         ask_bucket_pool_->deallocate(bucket);
-        askBuckets_[bidx] = nullptr;
+        ask_buckets_[bidx] = nullptr;
       }
     }
   }
@@ -899,7 +901,7 @@ class MarketOrderBook final {
       return false;
     const int bucket_idx = idx / kBucketSize;
     const int offset = idx & (kBucketSize - 1);
-    const Bucket* bucket = bidBuckets_[bucket_idx];
+    const Bucket* bucket = bid_buckets_[bucket_idx];
     return (bucket != nullptr) && bucket->orders[offset].is_active();
   }
 
@@ -908,7 +910,7 @@ class MarketOrderBook final {
       return false;
     const int bucket_idx = idx / kBucketSize;
     const int offset = idx & (kBucketSize - 1);
-    const Bucket* bucket = askBuckets_[bucket_idx];
+    const Bucket* bucket = ask_buckets_[bucket_idx];
     return (bucket != nullptr) && bucket->orders[offset].is_active();
   }
 
@@ -920,13 +922,13 @@ class MarketOrderBook final {
 
     // Slow path: 2-level search via summary
     for (int sw = config_.summary_words - 1; sw >= 0; --sw) {
-      const uint64_t word = bidSummary_[sw];
+      const uint64_t word = bid_summary_[sw];
       if (!word)
         continue;
 
       const int bit = kWordMask - std::countl_zero(word);
       const int bidx = (sw << kWordShift) + bit;
-      Bucket* bucket = bidBuckets_[bidx];
+      Bucket* bucket = bid_buckets_[bidx];
       assert(bucket);
 
       for (int lw = kBucketBitmapWords - 1; lw >= 0; --lw) {
@@ -951,13 +953,13 @@ class MarketOrderBook final {
 
     // Slow path: 2-level search via summary
     for (int sw = 0; sw < config_.summary_words; ++sw) {
-      const uint64_t word = askSummary_[sw];
+      const uint64_t word = ask_summary_[sw];
       if (!word)
         continue;
 
       const int bit = std::countr_zero(word);
       const int bidx = (sw << kWordShift) + bit;
-      Bucket* bucket = askBuckets_[bidx];
+      Bucket* bucket = ask_buckets_[bidx];
       assert(bucket);
 
       for (int lw = 0; lw < kBucketBitmapWords; ++lw) {
@@ -990,7 +992,7 @@ class MarketOrderBook final {
       return common::QtyType{};
     const int bidx = idx / kBucketSize;
     const int off = idx & (kBucketSize - 1);
-    Bucket* bucket = bidBuckets_[bidx];
+    Bucket* bucket = bid_buckets_[bidx];
     return bucket ? bucket->orders[off].qty : common::QtyType::from_raw(0);
   }
 
@@ -1000,7 +1002,7 @@ class MarketOrderBook final {
       return common::QtyType{};
     const int bidx = idx / kBucketSize;
     const int off = idx & (kBucketSize - 1);
-    Bucket* bucket = askBuckets_[bidx];
+    Bucket* bucket = ask_buckets_[bidx];
     return bucket ? bucket->orders[off].qty : common::QtyType::from_raw(0);
   }
 
@@ -1009,7 +1011,7 @@ class MarketOrderBook final {
     const int off = idx & (kBucketSize - 1);
 
     if (market_update->side == common::Side::kBuy) {
-      Bucket* bucket = bidBuckets_[bidx];
+      Bucket* bucket = bid_buckets_[bidx];
       if (bucket && bucket->orders[off].is_active()) {
         bucket->orders[off].qty -= market_update->qty;
         const bool was_depleted = bucket->orders[off].qty.value <= 0;
@@ -1026,7 +1028,7 @@ class MarketOrderBook final {
         }
       }
     } else {
-      Bucket* bucket = askBuckets_[bidx];
+      Bucket* bucket = ask_buckets_[bidx];
       if (bucket && bucket->orders[off].is_active()) {
         bucket->orders[off].qty -= market_update->qty;
         const bool was_depleted = bucket->orders[off].qty.value <= 0;
@@ -1086,13 +1088,13 @@ class MarketOrderBook final {
     }
   }
 
-  void setSummary(bool is_bid, int bid_x) noexcept {
-    auto& summary = is_bid ? bidSummary_ : askSummary_;
+  void set_summary(bool is_bid, int bid_x) noexcept {
+    auto& summary = is_bid ? bid_summary_ : ask_summary_;
     summary[bid_x >> kWordShift] |= (1ULL << (bid_x & kWordMask));
   }
 
   void clear_summary(bool is_bid, int bid_x) noexcept {
-    auto& summary = is_bid ? bidSummary_ : askSummary_;
+    auto& summary = is_bid ? bid_summary_ : ask_summary_;
     summary[bid_x >> kWordShift] &= ~(1ULL << (bid_x & kWordMask));
   }
 };

@@ -20,6 +20,13 @@
 
 namespace trading {
 
+// === Configuration structure ===
+struct RobustZScoreConfig {
+  int window_size{30};
+  int min_samples{20};
+  double min_mad_threshold{5.0};
+};
+
 /**
  * Robust Z-score calculator using Median and MAD (Median Absolute Deviation)
  *
@@ -35,15 +42,16 @@ namespace trading {
 class RobustZScore {
  public:
   /**
-   * @param window_size Number of recent prices to track (e.g., 30 ticks)
-   * @param min_samples Minimum samples required before calculating Z-score
-   * @param min_mad_threshold Minimum MAD threshold to prevent extreme Z-scores (default: 5.0 for BTC)
+   * @param config Configuration for window size, min samples, and MAD threshold
    */
-  RobustZScore(int window_size, int min_samples, double min_mad_threshold = 5.0)
-      : window_size_(window_size),
-        min_samples_(min_samples),
-        min_mad_threshold_(min_mad_threshold) {
+  explicit RobustZScore(const RobustZScoreConfig& config)
+      : window_size_(config.window_size),
+        min_samples_(config.min_samples),
+        min_mad_threshold_(config.min_mad_threshold) {
     // deque does not support reserve()
+    // Pre-allocate sorting buffers to avoid heap allocation on every calculation
+    sorted_prices_.reserve(config.window_size);
+    abs_deviations_.reserve(config.window_size);
   }
 
   /**
@@ -116,20 +124,21 @@ class RobustZScore {
  private:
   /**
    * Calculate median from current price window
-   * Note: This creates a sorted copy, leaving original deque unchanged
+   * Note: Uses pre-allocated buffer to avoid heap allocation
    */
   double calculate_median() const {
     if (prices_.empty())
       return 0.0;
 
-    std::vector<double> sorted(prices_.begin(), prices_.end());
-    std::sort(sorted.begin(), sorted.end());
+    // Reuse pre-allocated buffer (mutable member)
+    sorted_prices_.assign(prices_.begin(), prices_.end());
+    std::sort(sorted_prices_.begin(), sorted_prices_.end());
 
-    size_t mid = sorted.size() / 2;
-    if (sorted.size() % 2 == 0) {
-      return (sorted[mid - 1] + sorted[mid]) / 2.0;
+    size_t mid = sorted_prices_.size() / 2;
+    if (sorted_prices_.size() % 2 == 0) {
+      return (sorted_prices_[mid - 1] + sorted_prices_[mid]) / 2.0;
     }
-    return sorted[mid];
+    return sorted_prices_[mid];
   }
 
   /**
@@ -140,26 +149,29 @@ class RobustZScore {
     if (prices_.size() < 2)
       return 0.0;
 
-    std::vector<double> abs_deviations;
-    abs_deviations.reserve(prices_.size());
-
+    // Reuse pre-allocated buffer (mutable member)
+    abs_deviations_.clear();
     for (double price : prices_) {
-      abs_deviations.push_back(std::abs(price - median));
+      abs_deviations_.push_back(std::abs(price - median));
     }
 
-    std::sort(abs_deviations.begin(), abs_deviations.end());
+    std::sort(abs_deviations_.begin(), abs_deviations_.end());
 
-    size_t mid = abs_deviations.size() / 2;
-    if (abs_deviations.size() % 2 == 0) {
-      return (abs_deviations[mid - 1] + abs_deviations[mid]) / 2.0;
+    size_t mid = abs_deviations_.size() / 2;
+    if (abs_deviations_.size() % 2 == 0) {
+      return (abs_deviations_[mid - 1] + abs_deviations_[mid]) / 2.0;
     }
-    return abs_deviations[mid];
+    return abs_deviations_[mid];
   }
 
   int window_size_;
   int min_samples_;
   double min_mad_threshold_;
   std::deque<double> prices_;
+
+  // Pre-allocated sorting buffers (mutable for use in const methods)
+  mutable std::vector<double> sorted_prices_;
+  mutable std::vector<double> abs_deviations_;
 };
 
 }  // namespace trading

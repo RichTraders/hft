@@ -21,13 +21,15 @@ namespace futures {
 struct ListenKeyExpiredEvent {
   std::string event_type;
   std::uint64_t event_time{};
+  std::string listen_key;
 
   // clang-format off
   struct glaze {
     using T = ListenKeyExpiredEvent;
     static constexpr auto value = glz::object(
       "e", &T::event_type,
-      "E", glz::quoted_num<&T::event_time>
+      "E", glz::quoted_num<&T::event_time>,
+      "listenKey", &T::listen_key
     );
   };
   // clang-format on

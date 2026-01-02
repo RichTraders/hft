@@ -23,6 +23,7 @@ struct AggregateTradeEvent {
   std::int64_t aggregate_trade_id;  // "a"
   double price;                     // "p"
   double quantity;                  // "q"
+  double notional_quantity;         // "nq" (added 2025-12-31)
   std::int64_t first_trade_id;      // "f"
   std::int64_t last_trade_id;       // "l"
   std::int64_t trade_time;          // "T"
@@ -40,6 +41,7 @@ struct AggregateTradeEvent {
         "a", &T::aggregate_trade_id,
         "p", glz::quoted_num<&T::price>,
         "q", glz::quoted_num<&T::quantity>,
+        "nq", glz::quoted_num<&T::notional_quantity>,
         "f", &T::first_trade_id,
         "l", &T::last_trade_id,
         "T", &T::trade_time,

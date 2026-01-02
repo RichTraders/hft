@@ -64,7 +64,9 @@ class OrderManager {
         state_manager_(logger_, tick_converter_),
         expiry_manager_(INI_CONFIG.get_double("orders", "ttl_reserved_ns"),
             INI_CONFIG.get_double("orders", "ttl_live_ns")) {
-    logger_.info("[Constructor] OrderManager Created");
+    logger_.info("[Constructor] OrderManager Created (ttl_reserved_ns:{}, ttl_live_ns:{})",
+        INI_CONFIG.get_double("orders", "ttl_reserved_ns"),
+        INI_CONFIG.get_double("orders", "ttl_live_ns"));
   }
 
   ~OrderManager() { logger_.info("[Destructor] OrderManager Destroy"); }
@@ -96,6 +98,11 @@ class OrderManager {
             response->cl_order_id,
             OMOrderState::kLive,
             now);
+        logger_.info("[TTL] Registered expiry for order_id:{} layer:{} state:LIVE (now:{})",
+            common::toString(response->cl_order_id), layer, now);
+      } else {
+        logger_.warn("[TTL] Failed to register expiry - layer not found for order_id:{}",
+            common::toString(response->cl_order_id));
       }
     } else if (response->ord_status == OrdStatus::kPartiallyFilled) {
       int layer = LayerBook::find_layer_by_id(side_book, response->cl_order_id);
@@ -209,7 +216,7 @@ class OrderManager {
     logger_.info("[OrderRequest]Sent cancel {}", cancel_request.toString());
   }
 
-  void apply(const std::vector<QuoteIntentType>& intents) noexcept {
+  std::vector<common::OrderId> apply(const std::vector<QuoteIntentType>& intents) noexcept {
     START_MEASURE(Trading_OrderManager_apply);
 
     const auto now = fast_clock_.get_timestamp();
@@ -217,7 +224,7 @@ class OrderManager {
     if (intents.empty()) {
       sweep_expired_orders(now);
       END_MEASURE(Trading_OrderManager_apply, logger_);
-      return;
+      return {};
     }
 
     auto actions = reconciler_.diff(intents, layer_book_, fast_clock_);
@@ -226,12 +233,14 @@ class OrderManager {
     venue_policy_.filter_by_venue(ticker, actions, now, layer_book_);
     filter_by_risk(intents, actions);
 
-    process_new_orders(ticker, actions, now);
+    std::vector<common::OrderId> order_ids;
+    process_new_orders(ticker, actions, now, order_ids);
     process_replace_orders(ticker, actions, now);
     process_cancel_orders(ticker, actions, now);
     sweep_expired_orders(now);
 
     END_MEASURE(Trading_OrderManager_apply, logger_);
+    return order_ids;
   }
 
   OrderManager() = delete;
@@ -294,7 +303,7 @@ class OrderManager {
   }
 
   void process_new_orders(const common::TickerId& ticker,
-      order::Actions& actions, uint64_t now) noexcept {
+      order::Actions& actions, uint64_t now, std::vector<common::OrderId>& order_ids) noexcept {
     for (auto& action : actions.news) {
       auto& side_book =
           layer_book_.side_book(ticker, action.side, action.position_side);
@@ -321,6 +330,8 @@ class OrderManager {
           action.cl_order_id,
           action.position_side);
       position_tracker_.add_reserved(action.side, action.qty);
+
+      order_ids.push_back(action.cl_order_id);
 
       logger_.debug(
           "[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}, "
@@ -457,19 +468,38 @@ class OrderManager {
 
   void sweep_expired_orders(uint64_t now) noexcept {
     auto expired = expiry_manager_.sweep_expired(now);
+
+    if (expired.empty()) {
+      return;  // No expired orders
+    }
+
+    logger_.info("[TTL] sweep_expired_orders found {} expired orders", expired.size());
+
     for (const auto& key : expired) {
       auto& side_book =
           layer_book_.side_book(key.symbol, key.side, key.position_side);
-      if (UNLIKELY(key.layer >= side_book.slots.size()))
+      if (UNLIKELY(key.layer >= side_book.slots.size())) {
+        logger_.warn("[TTL] Invalid layer {} for order_id:{}",
+            key.layer, common::toString(key.cl_order_id));
         continue;
+      }
 
       auto& slot = side_book.slots[key.layer];
-      if (slot.cl_order_id != key.cl_order_id)
+      if (slot.cl_order_id != key.cl_order_id) {
+        logger_.warn("[TTL] Order ID mismatch at layer {} - slot:{} vs expired:{}",
+            key.layer,
+            common::toString(slot.cl_order_id),
+            common::toString(key.cl_order_id));
         continue;
+      }
 
       if (slot.state == OMOrderState::kDead ||
-          slot.state == OMOrderState::kCancelReserved)
+          slot.state == OMOrderState::kCancelReserved) {
+        logger_.info("[TTL] Skipping order_id:{} - already in state:{}",
+            common::toString(key.cl_order_id),
+            trading::toString(slot.state));
         continue;
+      }
 
       if (slot.state == OMOrderState::kLive ||
           slot.state == OMOrderState::kReserved) {
@@ -478,7 +508,7 @@ class OrderManager {
 
         cancel_order(key.symbol, slot.cl_order_id);
 
-        logger_.debug(
+        logger_.info(
             "[TTL] Cancel sent (state={}, layer={}, oid={}, "
             "remaining_ns={})",
             trading::toString(slot.state),

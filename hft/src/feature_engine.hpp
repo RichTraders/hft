@@ -22,11 +22,29 @@ namespace trading {
 template <typename Strategy>
 class FeatureEngine {
  public:
+  // Trade history structure
+  struct TradeInfo {
+    common::Side side;
+    double qty;
+    double price;
+    uint64_t timestamp;
+  };
+
+  // Wall detection result structure
+  struct WallInfo {
+    double accumulated_amount{0.0};
+    double distance_pct{0.0};
+    int levels_checked{0};
+    bool is_valid{false};
+  };
+
   explicit FeatureEngine(const common::Logger::Producer& logger)
       : logger_(logger),
+        tick_multiplier_(INI_CONFIG.get_int("orderbook", "tick_multiplier_int")),
         vwap_size_(INI_CONFIG.get_int("strategy", "vwap_size", kVwapSize)),
         vwap_qty_(vwap_size_),
         vwap_price_(vwap_size_) {
+    recent_trades_.resize(kMaxTradeHistory);  // Pre-allocate for circular buffer
     logger_.info("[Constructor] FeatureEngine Created");
   }
 
@@ -59,6 +77,19 @@ class FeatureEngine {
     }
     vwap_index_++;
 
+    // Store trade history (circular buffer - no allocation)
+    recent_trades_[trade_history_index_] = {
+        market_update->side,
+        market_update->qty.value,
+        market_update->price.value,
+        0  // timestamp filled by strategy if needed
+    };
+
+    trade_history_index_ = (trade_history_index_ + 1) % kMaxTradeHistory;
+    if (trade_history_count_ < kMaxTradeHistory) {
+      trade_history_count_++;
+    }
+
     logger_.trace("[Updated] {} mkt-price:{} agg-trade-ratio:{}",
         market_update->toString(),
         mkt_price_,
@@ -85,6 +116,18 @@ class FeatureEngine {
                        bbo->ask_price.value * bbo->bid_qty.value) /
                    (bbo->bid_qty.value + bbo->ask_qty.value);
       spread_ = bbo->ask_price.value - bbo->bid_price.value;
+
+      // Calculate OFI (Order Flow Imbalance)
+      // OFI = Δ(Bid Qty) - Δ(Ask Qty)
+      // Positive: Bid increasing (bullish pressure)
+      // Negative: Bid decreasing (bearish pressure)
+      double delta_bid = bbo->bid_qty.value - prev_bid_qty_;
+      double delta_ask = bbo->ask_qty.value - prev_ask_qty_;
+      ofi_ = delta_bid - delta_ask;
+
+      // Update previous quantities for next calculation
+      prev_bid_qty_ = bbo->bid_qty.value;
+      prev_ask_qty_ = bbo->ask_qty.value;
 
       auto bid_index = book->peek_levels(true, kLevel10);
       auto ask_index = book->peek_levels(false, kLevel10);
@@ -170,6 +213,134 @@ class FeatureEngine {
     return agg_trade_qty_ratio_;
   }
 
+  [[nodiscard]] auto get_ofi() const noexcept { return ofi_; }
+
+  [[nodiscard]] const auto* get_recent_trades() const noexcept {
+    return recent_trades_.data();
+  }
+
+  [[nodiscard]] auto get_trade_history_size() const noexcept {
+    return trade_history_count_;
+  }
+
+  [[nodiscard]] auto get_trade_history_capacity() const noexcept {
+    return kMaxTradeHistory;
+  }
+
+  // ========================================
+  // Trend acceleration detection (parameterized for all strategies)
+  // ========================================
+  [[nodiscard]] bool is_trend_accelerating(common::Side direction,
+      int lookback_ticks, int consecutive_threshold,
+      double volume_multiplier) const noexcept {
+    if (trade_history_count_ < static_cast<size_t>(lookback_ticks)) {
+      return false;
+    }
+
+    // === 1. Direction consistency check ===
+    int consecutive_count = 0;
+    size_t lookback = std::min(trade_history_count_,
+        static_cast<size_t>(lookback_ticks));
+
+    // Check most recent N trades (circular buffer)
+    for (size_t i = 0; i < lookback; ++i) {
+      size_t idx = (trade_history_count_ - lookback + i);
+      if (recent_trades_[idx].side == direction) {
+        consecutive_count++;
+      }
+    }
+
+    if (consecutive_count < consecutive_threshold) {
+      return false;  // Direction not strong enough
+    }
+
+    // === 2. Volume acceleration check (required) ===
+    if (trade_history_count_ >= static_cast<size_t>(lookback_ticks)) {
+      // Get recent trades (newest = highest index)
+      auto get_trade = [&](size_t offset) -> const auto& {
+        return recent_trades_[trade_history_count_ - 1 - offset];
+      };
+
+      // Recent 2 ticks average volume (most recent)
+      double vol_recent = (get_trade(0).qty + get_trade(1).qty) / 2.0;
+
+      // Previous 3 ticks average volume (older)
+      double vol_old =
+          (get_trade(2).qty + get_trade(3).qty + get_trade(4).qty) / 3.0;
+
+      // Volume accelerating (strong trend signal)
+      if (vol_recent > vol_old * volume_multiplier) {
+        return true;  // Strong trend acceleration - BLOCK entry
+      }
+    }
+
+    // Direction consistent but volume NOT accelerating
+    // Allow entry - likely normal market movement, not dangerous trend
+    return false;
+  }
+
+  // ========================================
+  // Wall detection (parameterized for all strategies)
+  // ========================================
+  template <typename OrderBook>
+  [[nodiscard]] WallInfo detect_wall(const OrderBook* order_book,
+      common::Side side, int max_levels, double threshold_amount,
+      double max_distance_pct, int min_price_int,
+      std::vector<double>& level_qty_buffer,
+      std::vector<int>& level_idx_buffer) const noexcept {
+    WallInfo info;
+    const auto* bbo = order_book->get_bbo();
+
+    if (UNLIKELY(!bbo || bbo->bid_price == common::kPriceInvalid ||
+                 bbo->ask_price == common::kPriceInvalid)) {
+      return info;  // Invalid BBO
+    }
+
+    const double base_price = (side == common::Side::kBuy)
+                                  ? bbo->bid_price.value
+                                  : bbo->ask_price.value;
+
+    // Peek orderbook levels
+    int actual_levels = order_book->peek_qty(side == common::Side::kBuy,
+        max_levels, level_qty_buffer, level_idx_buffer);
+
+    double weighted_sum = 0.0;
+
+    for (int i = 0; i < actual_levels; ++i) {
+      if (level_qty_buffer[i] <= 0)
+        break;
+
+      // Calculate actual price from level index
+      // IMPORTANT: price_idx is a RELATIVE index from min_price_int
+      // Correct formula: (min_price_int + price_idx) / tick_multiplier
+      const int64_t price_idx = level_idx_buffer[i];
+      const double price = static_cast<double>(min_price_int + price_idx) / tick_multiplier_;
+
+
+      const double notional = price * level_qty_buffer[i];
+      info.accumulated_amount += notional;
+      weighted_sum += price * notional;
+      info.levels_checked = i + 1;
+
+      // Target amount reached
+      if (info.accumulated_amount >= threshold_amount) {
+        double weighted_avg_price = weighted_sum / info.accumulated_amount;
+        info.distance_pct =
+            std::abs(weighted_avg_price - base_price) / base_price;
+        info.is_valid = (info.distance_pct <= max_distance_pct);
+
+        break;
+      }
+    }
+
+    // Target amount not reached (vacuum)
+    if (info.accumulated_amount < threshold_amount) {
+      info.is_valid = false;
+    }
+
+    return info;
+  }
+
   FeatureEngine() = delete;
 
   FeatureEngine(const FeatureEngine&) = delete;
@@ -183,8 +354,10 @@ class FeatureEngine {
  private:
   static constexpr int kLevel10 = 10;
   static constexpr int kVwapSize = 64;
+  static constexpr size_t kMaxTradeHistory = 100;
   static constexpr double kMidPriceFactor = 0.5;
   const common::Logger::Producer& logger_;
+  const int tick_multiplier_;  // Price conversion (e.g., 10000 for BTC, XRP)
   double mkt_price_ = common::kPriceInvalid;
   double agg_trade_qty_ratio_ = common::kQtyInvalid;
   double spread_ = common::kPriceInvalid;
@@ -201,6 +374,16 @@ class FeatureEngine {
     double ask_price;
     double ask_qty;
   } book_ticker_;
+
+  // OFI (Order Flow Imbalance) tracking
+  double ofi_ = 0.0;
+  double prev_bid_qty_ = 0.0;
+  double prev_ask_qty_ = 0.0;
+
+  // Trade history tracking (circular buffer - allocation-free)
+  std::vector<TradeInfo> recent_trades_;
+  size_t trade_history_index_{0};
+  size_t trade_history_count_{0};
 };
 }  // namespace trading
 

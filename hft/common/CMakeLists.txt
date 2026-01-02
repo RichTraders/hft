@@ -23,6 +23,13 @@ foreach(t IN ITEMS absl_crc_internal absl_crc_cpu_detect)
     endif()
 endforeach()
 
+FetchContent_Declare(
+        concurrentqueue
+        GIT_REPOSITORY https://github.com/cameron314/concurrentqueue.git
+        GIT_TAG        v1.0.4
+)
+FetchContent_MakeAvailable(concurrentqueue)
+
 file(GLOB_RECURSE LIB_SRC_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
@@ -30,9 +37,6 @@ file(GLOB_RECURSE LIB_SRC_FILES
 )
 
 add_library(Common STATIC ${LIB_SRC_FILES})
-add_library(concurrentqueue INTERFACE)
-target_include_directories(concurrentqueue INTERFACE
-        ${CMAKE_SOURCE_DIR}/extern/concurrentqueue)
 
 target_precompile_headers(Common PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
 target_include_directories(Common PUBLIC

@@ -147,8 +147,6 @@ static constexpr double kDoublePowersOf10[] = {
   return static_cast<double>(mantissa) / kDoublePowersOf10[frac_digits];
 }
 
-#include "common/fixed_point_config.hpp"
-
 template <int64_t Scale>
 [[gnu::always_inline]] inline int64_t parse_fixed_inline(
     const char*& ptr) noexcept {
@@ -274,7 +272,7 @@ class OnepassBinanceFuturesMdDecoder {
   // Format: {"stream":"btcusdt@depth","data":{"e":"depthUpdate","E":...,"T":...,"s":"BTCUSDT","U":...,"u":...,"pu":...,"b":[...],"a":[...]}}
   // Used fields: symbol, start_update_id, end_update_id, final_update_id_in_last_stream, bids, asks
   [[nodiscard]] WireMessage decode_depth(std::string_view payload) const {
-    DepthResponse result;
+    DepthResponse result;  // NOLINT(misc-const-correctness)
     const char* ptr = payload.data();
 
     // Skip: stream, event_type, E, T (unused)
@@ -340,7 +338,7 @@ class OnepassBinanceFuturesMdDecoder {
   // Format: {"stream":"btcusdt@aggTrade","data":{"e":"aggTrade","E":...,"a":...,"s":"BTCUSDT","ptr":"...","q":"...","f":...,"l":...,"T":...,"m":...}}
   // Used fields: symbol, price, quantity, is_buyer_market_maker
   [[nodiscard]] WireMessage decode_trade(std::string_view payload) const {
-    TradeEvent result;
+    TradeEvent result;  // NOLINT(misc-const-correctness)
     const char* ptr = payload.data();
 
     // Skip: stream, event_type, E, a (unused)
@@ -386,7 +384,7 @@ class OnepassBinanceFuturesMdDecoder {
   // Format: {"stream":"xrpusdc@bookTicker","data":{"e":"bookTicker","u":...,"s":"XRPUSDC","b":"...","B":"...","a":"...","A":"...","T":...,"E":...}}
   // Used fields: symbol, update_id, best_bid_price, best_bid_qty, best_ask_price, best_ask_qty
   [[nodiscard]] WireMessage decode_book_ticker(std::string_view payload) const {
-    BookTickerEvent result;
+    BookTickerEvent result;  // NOLINT(misc-const-correctness)
     const char* ptr = payload.data();
 
     ptr += ofs::kStreamValueStart;
@@ -424,7 +422,7 @@ class OnepassBinanceFuturesMdDecoder {
   // Format: {"id":"snapshot_BTCUSDT","status":200,"result":{"lastUpdateId":...,"E":...,"T":...,"bids":[...],"asks":[...]}}
   // Used fields: id (for symbol extraction), book_update_id, bids, asks
   [[nodiscard]] WireMessage decode_snapshot(std::string_view view) const {
-    DepthSnapshot result;
+    DepthSnapshot result;  // NOLINT(misc-const-correctness)
     const char* ptr = view.data();
 
     ptr += ofs::kSnapshotIdStart;  // {"id":"

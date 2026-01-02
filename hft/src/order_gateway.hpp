@@ -65,6 +65,7 @@ class OrderGateway {
     logger_.info("[Constructor] OrderGateway Created");
   }
 
+  // NOLINTNEXTLINE(modernize-use-equals-default) - logs destruction
   ~OrderGateway() { std::cout << "[Destructor] OrderGateway Destroy\n"; }
 
   template <typename Engine>
@@ -189,12 +190,12 @@ class OrderGateway {
     const std::string msg = app_->create_order_message(order_data);
     logger_.info("[Message]Send order message:{}", msg);
 
+    // NOLINTNEXTLINE(bugprone-branch-clone) - post_new_order always called
     if (UNLIKELY(!app_->send(msg))) {
       logger_.error("[Message] failed to send new_single_order_data [msg:{}]",
           msg);
-    } else {
-      app_->post_new_order(order_data);
     }
+    app_->post_new_order(order_data);
   }
 
   void order_cancel_request(const RequestCommon& request) {
@@ -206,11 +207,11 @@ class OrderGateway {
     const std::string msg = app_->create_cancel_order_message(cancel_request);
     logger_.debug("[Message]Send cancel order message:{}", msg);
 
+    // NOLINTNEXTLINE(bugprone-branch-clone) - post_cancel_order always called
     if (UNLIKELY(!app_->send(msg))) {
       logger_.error("[Message] failed to send order_cancel_request");
-    } else {
-      app_->post_cancel_order(cancel_request);
     }
+    app_->post_cancel_order(cancel_request);
   }
 
 #ifdef ENABLE_WEBSOCKET
@@ -233,11 +234,11 @@ class OrderGateway {
         app_->create_cancel_and_reorder_message(cancel_and_reorder);
     logger_.debug("[Message]Send cancel and reorder message:{}", msg);
 
+    // NOLINTNEXTLINE(bugprone-branch-clone) - post always called
     if (UNLIKELY(!app_->send(msg))) {
       logger_.error("[Message] failed to create_cancel_and_new_order");
-    } else {
-      app_->post_cancel_and_reorder(cancel_and_reorder);
     }
+    app_->post_cancel_and_reorder(cancel_and_reorder);
   }
 
   void order_modify(const RequestCommon& request) {
@@ -252,11 +253,11 @@ class OrderGateway {
     const std::string msg = app_->create_modify_order_message(modify_request);
     logger_.debug("[Message]Send modify order message:{}", msg);
 
+    // NOLINTNEXTLINE(bugprone-branch-clone) - post always called
     if (UNLIKELY(!app_->send(msg))) {
       logger_.error("[Message] failed to send order_modify");
-    } else {
-      app_->post_modify_order(modify_request);
     }
+    app_->post_modify_order(modify_request);
   }
 #endif
 
@@ -268,11 +269,11 @@ class OrderGateway {
     const std::string msg = app_->create_order_all_cancel(all_cancel_request);
     logger_.debug("[Message]Send cancel all orders message:{}", msg);
 
+    // NOLINTNEXTLINE(bugprone-branch-clone) - post always called
     if (UNLIKELY(!app_->send(msg))) {
       logger_.error("[Message] failed to send order_mass_cancel_request");
-    } else {
-      app_->post_mass_cancel_order(all_cancel_request);
     }
+    app_->post_mass_cancel_order(all_cancel_request);
   }
 
   template <typename Handler>

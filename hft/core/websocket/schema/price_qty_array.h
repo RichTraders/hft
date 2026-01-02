@@ -32,10 +32,11 @@ inline int64_t parse_quoted_decimal_to_int(const char* start,
   int frac_digits = 0;
   bool in_frac = false;
 
+  constexpr int kDecimalBase = 10;
   for (const char* ptr = start; ptr < end; ++ptr) {
     const char chr = *ptr;
     if (chr >= '0' && chr <= '9') {
-      mantissa = mantissa * 10 + (chr - '0');
+      mantissa = mantissa * kDecimalBase + (chr - '0');
       if (in_frac)
         ++frac_digits;
     } else if (chr == '.') {
@@ -73,27 +74,30 @@ inline int64_t parse_quoted_decimal_to_int(const char* start,
 struct PriceQtyArray {
   std::vector<std::array<double, 2>> data;
   PriceQtyArray() = default;
-  explicit PriceQtyArray(std::vector<std::array<double, 2>>&& d)
-      : data(std::move(d)) {}
+  explicit PriceQtyArray(std::vector<std::array<double, 2>>&& arr)
+      : data(std::move(arr)) {}
   [[nodiscard]] auto begin() const { return data.begin(); }
   [[nodiscard]] auto end() const { return data.end(); }
   [[nodiscard]] size_t size() const { return data.size(); }
   [[nodiscard]] bool empty() const { return data.empty(); }
-  const std::array<double, 2>& operator[](size_t i) const { return data[i]; }
+  const std::array<double, 2>& operator[](size_t idx) const { return data[idx]; }
 };
 
 }  // namespace schema
 
 template <>
 struct glz::meta<::schema::PriceQtyArray> {
+  // NOLINTBEGIN(readability-identifier-naming) - glaze library requires these names
   static constexpr auto custom_read = true;
   static constexpr auto custom_write = true;
+  // NOLINTEND(readability-identifier-naming)
 };
 template <>
 struct glz::detail::from<glz::JSON, ::schema::PriceQtyArray> {
   template <glz::opts Opts, typename It, typename End>
   static void op(::schema::PriceQtyArray& value, glz::is_context auto&& /*ctx*/,
-      It&& it, End&& end) noexcept {
+      It&& it,  // NOLINT(readability-identifier-length)
+      End&& end) noexcept {
     value.data.clear();
 
     while (it != end &&
@@ -105,7 +109,8 @@ struct glz::detail::from<glz::JSON, ::schema::PriceQtyArray> {
     }
     ++it;
 
-    value.data.reserve(1024);
+    constexpr size_t kDefaultReserveSize = 1024;
+    value.data.reserve(kDefaultReserveSize);
     while (it != end) {
 
       while (it != end &&
@@ -204,14 +209,14 @@ template <int64_t PriceScale, int64_t QtyScale>
 struct ScaledInt64PriceQtyArray {
   std::vector<std::array<int64_t, 2>> data;
   ScaledInt64PriceQtyArray() = default;
-  explicit ScaledInt64PriceQtyArray(std::vector<std::array<int64_t, 2>>&& d)
-      : data(std::move(d)) {}
+  explicit ScaledInt64PriceQtyArray(std::vector<std::array<int64_t, 2>>&& data)
+      : data(std::move(data)) {}
   [[nodiscard]] auto begin() const { return data.begin(); }
   [[nodiscard]] auto end() const { return data.end(); }
   [[nodiscard]] size_t size() const { return data.size(); }
   [[nodiscard]] bool empty() const { return data.empty(); }
-  const std::array<int64_t, 2>& operator[](size_t i) const { return data[i]; }
-  void reserve(size_t n) { data.reserve(n); }
+  const std::array<int64_t, 2>& operator[](size_t idx) const { return data[idx]; }
+  void reserve(size_t count) { data.reserve(count); }
   void push_back(const std::array<int64_t, 2>& entry) { data.push_back(entry); }
 };
 
@@ -223,8 +228,10 @@ using FixedPriceQtyArray =
 
 template <int64_t PriceScale, int64_t QtyScale>
 struct glz::meta<::schema::ScaledInt64PriceQtyArray<PriceScale, QtyScale>> {
+  // NOLINTBEGIN(readability-identifier-naming) - glaze library requires these names
   static constexpr auto custom_read = true;
   static constexpr auto custom_write = true;
+  // NOLINTEND(readability-identifier-naming)
 };
 
 template <int64_t PriceScale, int64_t QtyScale>
@@ -346,11 +353,13 @@ struct ScaledInt64 {
   int64_t value{0};
 
   ScaledInt64() = default;
+  // NOLINTNEXTLINE(google-explicit-constructor) - intentional implicit conversion
   ScaledInt64(int64_t val)
-      : value(val) {}  // NOLINTNEXTLINE(google-explicit-constructor)
+      : value(val) {}
+  // NOLINTNEXTLINE(google-explicit-constructor) - intentional implicit conversion
   operator int64_t() const {
     return value;
-  }  // NOLINTNEXTLINE(google-explicit-constructor)
+  }
   ScaledInt64& operator=(int64_t val) {
     value = val;
     return *this;
@@ -359,15 +368,18 @@ struct ScaledInt64 {
 
 template <int64_t Scale>
 struct glz::meta<::ScaledInt64<Scale>> {
+  // NOLINTBEGIN(readability-identifier-naming) - glaze library requires these names
   static constexpr auto custom_read = true;
   static constexpr auto custom_write = true;
+  // NOLINTEND(readability-identifier-naming)
 };
 
 template <int64_t Scale>
 struct glz::detail::from<glz::JSON, ::ScaledInt64<Scale>> {
   template <glz::opts Opts, typename It, typename End>
   static void op(::ScaledInt64<Scale>& val, glz::is_context auto&& /*ctx*/,
-      It&& it, End&& end) noexcept {
+      It&& it,  // NOLINT(readability-identifier-length)
+      End&& end) noexcept {
     while (it != end &&
            (*it == ' ' || *it == '\t' || *it == '\n' || *it == '\r')) {
       ++it;

@@ -346,7 +346,7 @@ class WsOrderEntryAppT {
       const std::string sig_b64 = detail::get_signature_base64_impl(cur_timestamp, 0);
       auto log_on_message =
           ws_oe_core_.create_log_on_message(sig_b64, cur_timestamp);
-      api_transport_->write(log_on_message);
+      (void)api_transport_->write(log_on_message);
     }
   }
 
@@ -488,7 +488,7 @@ class WsOrderEntryAppT {
 
         const std::string ping_msg = ws_oe_core_.create_user_data_stream_ping();
         if (!ping_msg.empty()) {
-          api_transport_->write(ping_msg);
+          (void)api_transport_->write(ping_msg);
           logger_.trace("[WsOeApp] Sent userDataStream.ping keepalive");
         }
       }

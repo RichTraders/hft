@@ -76,8 +76,16 @@ struct WebSocketMarketDataPolicy {
       bool& first_depth_after_snapshot, OnMarketDataFn& on_market_data_fn,
       MarketUpdateDataPool* market_update_data_pool,
       MarketDataPool* market_data_pool, Logger& logger, auto recover_fn) {
-    auto* data =
-        market_update_data_pool->allocate(app.create_market_data_message(msg));
+    auto msg_data = app.create_market_data_message(msg);
+    auto* data = market_update_data_pool->allocate(std::move(msg_data));
+
+    // if (UNLIKELY(data == nullptr)) {
+    //   logger.error("[handle_subscribe] Market update data pool exhausted!");
+    //   // Note: msg_data.data is moved, so we cannot clean up here.
+    //   // The MarketData* pointers are lost - this is a known limitation
+    //   // when pool is exhausted. Consider increasing pool size.
+    //   return;
+    // }
 
     if (state == StreamState::kBuffering) {
       if (data->type != kMarket) {

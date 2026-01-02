@@ -24,6 +24,7 @@ constexpr size_t kRxBufferSize = static_cast<size_t>(64) * 1024;
 
 template <FixedString ThreadName>
 struct Protocols {
+  // NOLINTNEXTLINE(modernize-use-equals-default) - non-trivial initialization
   explicit Protocols()
       : entries{lws_protocols{"fix-websocket",
                     WebSocketTransport<ThreadName>::callback,

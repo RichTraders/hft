@@ -73,6 +73,7 @@ class OrderManager {
     logger_.info("[Constructor] OrderManager Created");
   }
 
+  // NOLINTNEXTLINE(modernize-use-equals-default) - logs destruction
   ~OrderManager() { logger_.info("[Destructor] OrderManager Destroy"); }
 
   void on_order_updated(const ExecutionReport* response) noexcept {

@@ -14,10 +14,16 @@
 #include <fstream>
 #include <glaze/glaze.hpp>
 #include "logger.h"
+#include "common/fixed_point_config.hpp"
 #include "core/websocket/market_data/onepass_binance_futures_md_decoder.hpp"
 
 using namespace core;
 using namespace common;
+
+namespace {
+constexpr int64_t kPriceScale = FixedPointConfig::kPriceScale;
+constexpr int64_t kQtyScale = FixedPointConfig::kQtyScale;
+}
 
 namespace onepass_test_utils {
 
@@ -79,7 +85,6 @@ std::unique_ptr<OnepassBinanceFuturesMdDecoder> OnepassMdDecoderTest::decoder_;
 // =============================================================================
 
 TEST_F(OnepassMdDecoderTest, DecodeDepth_UsedFields_ParsedCorrectly) {
-  // Use price values with max 1 decimal place (compatible with kPriceScale=10)
   std::string json = R"({"stream":"btcusdt@depth","data":{"e":"depthUpdate","E":1234567890123,"T":1234567890124,"s":"BTCUSDT","U":100,"u":200,"pu":99,"b":[["50000.5","1.5"],["49999.0","2.0"]],"a":[["50001.0","0.5"],["50002.5","1.0"]]}})";
 
   auto wire_msg = decoder_->decode(json);
@@ -87,25 +92,22 @@ TEST_F(OnepassMdDecoderTest, DecodeDepth_UsedFields_ParsedCorrectly) {
   ASSERT_TRUE(onepass_test_utils::holds_type<schema::futures::DepthResponse>(wire_msg));
   const auto& depth = onepass_test_utils::get_or_fail<schema::futures::DepthResponse>(wire_msg, "Depth");
 
-  // Verify used fields only
   EXPECT_EQ(depth.data.symbol, "BTCUSDT");
   EXPECT_EQ(depth.data.start_update_id, 100u);
   EXPECT_EQ(depth.data.end_update_id, 200u);
   EXPECT_EQ(depth.data.final_update_id_in_last_stream, 99u);
 
-  // Price/qty are now int64 scaled values
-  // kPriceScale=10, kQtyScale=1000
   ASSERT_EQ(depth.data.bids.size(), 2u);
-  EXPECT_EQ(depth.data.bids[0][0], 500005);  // 50000.5 * 10
-  EXPECT_EQ(depth.data.bids[0][1], 1500);    // 1.5 * 1000
-  EXPECT_EQ(depth.data.bids[1][0], 499990);  // 49999.0 * 10
-  EXPECT_EQ(depth.data.bids[1][1], 2000);    // 2.0 * 1000
+  EXPECT_EQ(depth.data.bids[0][0], 500005 * (kPriceScale / 10));
+  EXPECT_EQ(depth.data.bids[0][1], 1500 * (kQtyScale / 1000));
+  EXPECT_EQ(depth.data.bids[1][0], 499990 * (kPriceScale / 10));
+  EXPECT_EQ(depth.data.bids[1][1], 2000 * (kQtyScale / 1000));
 
   ASSERT_EQ(depth.data.asks.size(), 2u);
-  EXPECT_EQ(depth.data.asks[0][0], 500010);  // 50001.0 * 10
-  EXPECT_EQ(depth.data.asks[0][1], 500);     // 0.5 * 1000
-  EXPECT_EQ(depth.data.asks[1][0], 500025);  // 50002.5 * 10
-  EXPECT_EQ(depth.data.asks[1][1], 1000);    // 1.0 * 1000
+  EXPECT_EQ(depth.data.asks[0][0], 500010 * (kPriceScale / 10));
+  EXPECT_EQ(depth.data.asks[0][1], 500 * (kQtyScale / 1000));
+  EXPECT_EQ(depth.data.asks[1][0], 500025 * (kPriceScale / 10));
+  EXPECT_EQ(depth.data.asks[1][1], 1000 * (kQtyScale / 1000));
 }
 
 TEST_F(OnepassMdDecoderTest, DecodeDepth_RealData_ParsedCorrectly) {
@@ -132,7 +134,6 @@ TEST_F(OnepassMdDecoderTest, DecodeDepth_RealData_ParsedCorrectly) {
 // =============================================================================
 
 TEST_F(OnepassMdDecoderTest, DecodeTrade_UsedFields_ParsedCorrectly) {
-  // Use price with max 1 decimal place (compatible with kPriceScale=10)
   std::string json = R"({"stream":"btcusdt@aggTrade","data":{"e":"aggTrade","E":1234567890123,"a":123456789,"s":"BTCUSDT","p":"50123.5","q":"0.123","f":100000,"l":100005,"T":1234567890124,"m":true}})";
 
   auto wire_msg = decoder_->decode(json);
@@ -140,15 +141,13 @@ TEST_F(OnepassMdDecoderTest, DecodeTrade_UsedFields_ParsedCorrectly) {
   ASSERT_TRUE(onepass_test_utils::holds_type<schema::futures::TradeEvent>(wire_msg));
   const auto& trade = onepass_test_utils::get_or_fail<schema::futures::TradeEvent>(wire_msg, "Trade");
 
-  // Verify used fields only - price/qty are now int64 scaled values
   EXPECT_EQ(trade.data.symbol, "BTCUSDT");
-  EXPECT_EQ(trade.data.price, 501235);   // 50123.5 * 10
-  EXPECT_EQ(trade.data.quantity, 123);   // 0.123 * 1000
+  EXPECT_EQ(trade.data.price, 501235 * (kPriceScale / 10));
+  EXPECT_EQ(trade.data.quantity, 123 * (kQtyScale / 1000));
   EXPECT_TRUE(trade.data.is_buyer_market_maker);
 }
 
 TEST_F(OnepassMdDecoderTest, DecodeTrade_IsBuyerMarketMakerFalse) {
-  // Use price with max 1 decimal place (compatible with kPriceScale=10)
   std::string json = R"({"stream":"ethusdt@aggTrade","data":{"e":"aggTrade","E":1234567890123,"a":999,"s":"ETHUSDT","p":"2500.0","q":"5.0","f":1,"l":2,"T":1234567890124,"m":false}})";
 
   auto wire_msg = decoder_->decode(json);
@@ -157,8 +156,8 @@ TEST_F(OnepassMdDecoderTest, DecodeTrade_IsBuyerMarketMakerFalse) {
   const auto& trade = onepass_test_utils::get_or_fail<schema::futures::TradeEvent>(wire_msg, "Trade");
 
   EXPECT_EQ(trade.data.symbol, "ETHUSDT");
-  EXPECT_EQ(trade.data.price, 25000);    // 2500.0 * 10
-  EXPECT_EQ(trade.data.quantity, 5000);  // 5.0 * 1000
+  EXPECT_EQ(trade.data.price, 25000 * (kPriceScale / 10));
+  EXPECT_EQ(trade.data.quantity, 5000 * (kQtyScale / 1000));
   EXPECT_FALSE(trade.data.is_buyer_market_maker);
 }
 
@@ -187,8 +186,6 @@ TEST_F(OnepassMdDecoderTest, DecodeTrade_RealData_ParsedCorrectly) {
 // =============================================================================
 
 TEST_F(OnepassMdDecoderTest, DecodeBookTicker_UsedFields_ParsedCorrectly) {
-  // parse_fixed_inline parses decimal strings and multiplies by scale
-  // kPriceScale=10, kQtyScale=1000
   std::string json = R"({"stream":"btcusdt@bookTicker","data":{"e":"bookTicker","u":123456789,"s":"BTCUSDT","b":"50000.5","B":"10.5","a":"50001","A":"5.25","T":1234567890124,"E":1234567890123}})";
 
   auto wire_msg = decoder_->decode(json);
@@ -196,13 +193,12 @@ TEST_F(OnepassMdDecoderTest, DecodeBookTicker_UsedFields_ParsedCorrectly) {
   ASSERT_TRUE(onepass_test_utils::holds_type<schema::futures::BookTickerEvent>(wire_msg));
   const auto& ticker = onepass_test_utils::get_or_fail<schema::futures::BookTickerEvent>(wire_msg, "BookTicker");
 
-  // Verify used fields only - values are scaled by parse_fixed_inline
   EXPECT_EQ(ticker.data.symbol, "BTCUSDT");
   EXPECT_EQ(ticker.data.update_id, 123456789u);
-  EXPECT_EQ(ticker.data.best_bid_price, 500005);  // 50000.5 * 10
-  EXPECT_EQ(ticker.data.best_bid_qty, 10500);     // 10.5 * 1000
-  EXPECT_EQ(ticker.data.best_ask_price, 500010);  // 50001 * 10
-  EXPECT_EQ(ticker.data.best_ask_qty, 5250);      // 5.25 * 1000
+  EXPECT_EQ(ticker.data.best_bid_price, 500005 * (kPriceScale / 10));
+  EXPECT_EQ(ticker.data.best_bid_qty, 10500 * (kQtyScale / 1000));
+  EXPECT_EQ(ticker.data.best_ask_price, 500010 * (kPriceScale / 10));
+  EXPECT_EQ(ticker.data.best_ask_qty, 5250 * (kQtyScale / 1000));
 }
 
 TEST_F(OnepassMdDecoderTest, DecodeBookTicker_RealData_ParsedCorrectly) {
@@ -231,8 +227,6 @@ TEST_F(OnepassMdDecoderTest, DecodeBookTicker_RealData_ParsedCorrectly) {
 // =============================================================================
 
 TEST_F(OnepassMdDecoderTest, DecodeSnapshot_UsedFields_ParsedCorrectly) {
-  // parse_fixed_inline parses decimal strings and multiplies by scale
-  // kPriceScale=10, kQtyScale=1000
   std::string json = R"({"id":"snapshot_BTCUSDT","status":200,"result":{"lastUpdateId":12345678,"E":1234567890123,"T":1234567890124,"bids":[["50000","1"],["49999.5","2.5"]],"asks":[["50001","0.75"],["50002","1.25"]]}})";
 
   auto wire_msg = decoder_->decode(json);
@@ -240,21 +234,20 @@ TEST_F(OnepassMdDecoderTest, DecodeSnapshot_UsedFields_ParsedCorrectly) {
   ASSERT_TRUE(onepass_test_utils::holds_type<schema::futures::DepthSnapshot>(wire_msg));
   const auto& snapshot = onepass_test_utils::get_or_fail<schema::futures::DepthSnapshot>(wire_msg, "Snapshot");
 
-  // Verify used fields only - values are scaled by parse_fixed_inline
   EXPECT_EQ(snapshot.id, "snapshot_BTCUSDT");
   EXPECT_EQ(snapshot.result.book_update_id, 12345678u);
 
   ASSERT_EQ(snapshot.result.bids.size(), 2u);
-  EXPECT_EQ(snapshot.result.bids[0][0], 500000);   // 50000 * 10
-  EXPECT_EQ(snapshot.result.bids[0][1], 1000);     // 1 * 1000
-  EXPECT_EQ(snapshot.result.bids[1][0], 499995);   // 49999.5 * 10
-  EXPECT_EQ(snapshot.result.bids[1][1], 2500);     // 2.5 * 1000
+  EXPECT_EQ(snapshot.result.bids[0][0], 500000 * (kPriceScale / 10));
+  EXPECT_EQ(snapshot.result.bids[0][1], 1000 * (kQtyScale / 1000));
+  EXPECT_EQ(snapshot.result.bids[1][0], 499995 * (kPriceScale / 10));
+  EXPECT_EQ(snapshot.result.bids[1][1], 2500 * (kQtyScale / 1000));
 
   ASSERT_EQ(snapshot.result.asks.size(), 2u);
-  EXPECT_EQ(snapshot.result.asks[0][0], 500010);   // 50001 * 10
-  EXPECT_EQ(snapshot.result.asks[0][1], 750);      // 0.75 * 1000
-  EXPECT_EQ(snapshot.result.asks[1][0], 500020);   // 50002 * 10
-  EXPECT_EQ(snapshot.result.asks[1][1], 1250);     // 1.25 * 1000
+  EXPECT_EQ(snapshot.result.asks[0][0], 500010 * (kPriceScale / 10));
+  EXPECT_EQ(snapshot.result.asks[0][1], 750 * (kQtyScale / 1000));
+  EXPECT_EQ(snapshot.result.asks[1][0], 500020 * (kPriceScale / 10));
+  EXPECT_EQ(snapshot.result.asks[1][1], 1250 * (kQtyScale / 1000));
 }
 
 TEST_F(OnepassMdDecoderTest, DecodeSnapshot_RealData_ParsedCorrectly) {
@@ -289,8 +282,6 @@ TEST_F(OnepassMdDecoderTest, Decode_TooShortPayload_ReturnsMonostate) {
 }
 
 TEST_F(OnepassMdDecoderTest, DecodeDepth_LargeValues_ParsedCorrectly) {
-  // parse_fixed_inline parses decimal strings and multiplies by scale
-  // Test large price values with decimal places
   std::string json = R"({"stream":"btcusdt@depth","data":{"e":"depthUpdate","E":1,"T":1,"s":"BTCUSDT","U":1,"u":2,"pu":0,"b":[["500001234567.8","123456.789"]],"a":[["500018765432.1","987654.321"]]}})";
 
   auto wire_msg = decoder_->decode(json);
@@ -298,11 +289,10 @@ TEST_F(OnepassMdDecoderTest, DecodeDepth_LargeValues_ParsedCorrectly) {
   ASSERT_TRUE(onepass_test_utils::holds_type<schema::futures::DepthResponse>(wire_msg));
   const auto& depth = onepass_test_utils::get_or_fail<schema::futures::DepthResponse>(wire_msg, "Depth");
 
-  // Values are scaled: price * 10, qty * 1000
-  EXPECT_EQ(depth.data.bids[0][0], 5000012345678LL);  // 500001234567.8 * 10
-  EXPECT_EQ(depth.data.bids[0][1], 123456789LL);      // 123456.789 * 1000
-  EXPECT_EQ(depth.data.asks[0][0], 5000187654321LL);  // 500018765432.1 * 10
-  EXPECT_EQ(depth.data.asks[0][1], 987654321LL);      // 987654.321 * 1000
+  EXPECT_EQ(depth.data.bids[0][0], 5000012345678LL * (kPriceScale / 10));
+  EXPECT_EQ(depth.data.bids[0][1], 123456789LL * (kQtyScale / 1000));
+  EXPECT_EQ(depth.data.asks[0][0], 5000187654321LL * (kPriceScale / 10));
+  EXPECT_EQ(depth.data.asks[0][1], 987654321LL * (kQtyScale / 1000));
 }
 
 TEST_F(OnepassMdDecoderTest, DecodeDepth_EmptyOrderBook_ParsedCorrectly) {
@@ -319,8 +309,6 @@ TEST_F(OnepassMdDecoderTest, DecodeDepth_EmptyOrderBook_ParsedCorrectly) {
 }
 
 TEST_F(OnepassMdDecoderTest, DecodeBookTicker_LongSymbol_ParsedCorrectly) {
-  // parse_fixed_inline parses decimal strings and multiplies by scale
-  // Low price token like 1000SHIB with small decimal prices
   std::string json = R"({"stream":"1000shibusdt@bookTicker","data":{"e":"bookTicker","u":999,"s":"1000SHIBUSDT","b":"0.01234","B":"1000000","a":"0.01235","A":"500000","T":1,"E":1}})";
 
   auto wire_msg = decoder_->decode(json);
@@ -330,7 +318,5 @@ TEST_F(OnepassMdDecoderTest, DecodeBookTicker_LongSymbol_ParsedCorrectly) {
 
   EXPECT_EQ(ticker.data.symbol, "1000SHIBUSDT");
   EXPECT_EQ(ticker.data.update_id, 999u);
-  // 0.01234 * 10 = 0.1234 -> truncates to 0 (kPriceScale=10 is too low for this)
-  // This test verifies long symbol parsing, not precision
-  EXPECT_EQ(ticker.data.best_bid_price, 0);  // 0.01234 * 10 truncates to 0
+  EXPECT_EQ(ticker.data.best_bid_price, 1234 * (kPriceScale / 100000));
 }

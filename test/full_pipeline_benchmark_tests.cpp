@@ -74,7 +74,7 @@ class FullPipelineBenchmark : public ::testing::Test {
     PRECISION_CONFIG.initialize();
 
     logger_ = std::make_unique<Logger>();
-    logger_->setLevel(LogLevel::kDebug);
+    logger_->setLevel(LogLevel::kInfo);
     logger_->clearSink();
     //logger_->addSink(std::make_unique<ConsoleSink>());
     auto log_filename = make_log_filename();

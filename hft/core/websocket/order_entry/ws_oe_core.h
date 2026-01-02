@@ -67,13 +67,13 @@ class WsOeCore {
   [[nodiscard]] std::string create_order_all_cancel(
       const trading::OrderMassCancelRequest& request) const;
 
-  trading::ExecutionReport* create_execution_report_message(
+  [[nodiscard]] trading::ExecutionReport* create_execution_report_message(
       const WireExecutionReport& msg) const;
-  trading::OrderCancelReject* create_order_cancel_reject_message(
+  [[nodiscard]] trading::OrderCancelReject* create_order_cancel_reject_message(
       const WireCancelReject& msg) const;
-  trading::OrderMassCancelReport* create_order_mass_cancel_report_message(
+  [[nodiscard]] trading::OrderMassCancelReport* create_order_mass_cancel_report_message(
       const WireMassCancelReport& msg) const;
-  trading::OrderReject create_reject_message(const WireReject& msg) const;
+  [[nodiscard]] trading::OrderReject create_reject_message(const WireReject& msg) const;
   [[nodiscard]] WireMessage decode(std::string_view payload) const;
 
  private:

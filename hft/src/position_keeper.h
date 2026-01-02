@@ -79,6 +79,7 @@ class PositionKeeper {
         ticker_position_{{INI_CONFIG.get("meta", "ticker"), PositionInfo{}}} {
     logger_.info("[Constructor] PositionKeeper Created");
   }
+  // NOLINTNEXTLINE(modernize-use-equals-default) - logs destruction
   ~PositionKeeper() { logger_.info("[Destructor] PositionKeeper Destroy"); }
 
   void add_fill(const ExecutionReport* report) noexcept;

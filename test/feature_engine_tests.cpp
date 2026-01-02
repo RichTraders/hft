@@ -79,12 +79,18 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
   auto producer = logger.make_producer();
   TestFeatureEngine engine(producer);
   std::string symbol = "BTCUSDT";
-  // BBO 세팅
+
   TestOrderBook book("BTCUSDT", producer);
   book.set_trade_engine(trade_engine);
+
+  const double bid_price = 1.0;
+  const double ask_price = 2.0;
+  const double bid_qty = 20.0;
+  const double ask_qty = 80.0;
+
   {
-    const auto p = PriceType::from_double(100'000.);
-    const auto q = QtyType::from_double(20.0);
+    const auto p = PriceType::from_double(bid_price);
+    const auto q = QtyType::from_double(bid_qty);
     const MarketData md{MarketUpdateType::kAdd,
         OrderId{kOrderIdInvalid},
         symbol,
@@ -94,8 +100,8 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
     book.on_market_data_updated(&md);
   }
   {
-    const auto p = PriceType::from_double(200'000.);
-    const auto q = QtyType::from_double(80.0);
+    const auto p = PriceType::from_double(ask_price);
+    const auto q = QtyType::from_double(ask_qty);
     const MarketData md{MarketUpdateType::kAdd,
         OrderId{kOrderIdInvalid},
         symbol,
@@ -105,16 +111,13 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
     book.on_market_data_updated(&md);
   }
 
-  // expected_mid as double (unscaled): 120000
-  // Scaled by kPriceScale=10: 1200000
-  double expected_mid = (100'000 * 80. + 200'000 * 20.) / (20.0 + 80.0);
+  const double expected_mid = (bid_price * ask_qty + ask_price * bid_qty) / (bid_qty + ask_qty);
 
-  auto price = PriceType::from_double(200'000);
+  auto price = PriceType::from_double(ask_price);
   auto side = Side::kSell;
 
   engine.on_order_book_updated(price, side, &book);
 
-  // get_market_price_double() returns unscaled value
   EXPECT_DOUBLE_EQ(engine.get_market_price_double(), expected_mid);
 }
 
@@ -122,12 +125,11 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
   auto producer = logger.make_producer();
   TestFeatureEngine engine(producer);
   std::string symbol = "BTCUSDT";
-  // BBO 세팅
+
   TestOrderBook book(symbol, producer);
   book.set_trade_engine(trade_engine);
   {
-    std::string symbol = "BTCUSDT";
-    const auto p = PriceType::from_double(100'000.);
+    const auto p = PriceType::from_double(1.0);
     const auto q = QtyType::from_double(20.0);
     const MarketData md{MarketUpdateType::kAdd,
         OrderId{kOrderIdInvalid},
@@ -138,8 +140,7 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
     book.on_market_data_updated(&md);
   }
   {
-    std::string symbol = "BTCUSDT";
-    const auto p = PriceType::from_double(200'000.);
+    const auto p = PriceType::from_double(2.0);
     const auto q = QtyType::from_double(80.0);
     const MarketData md{MarketUpdateType::kAdd,
         OrderId{kOrderIdInvalid},
@@ -150,16 +151,14 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
     book.on_market_data_updated(&md);
   }
 
-  symbol = "BTCUSDT";
   const MarketData md{MarketUpdateType::kTrade,
       OrderId{kOrderIdInvalid},
       symbol,
       Side::kBuy,
-      PriceType::from_double(200'000),
+      PriceType::from_double(2.0),
       QtyType::from_double(10.0)};
   book.on_market_data_updated(&md);
 
-  // Both values are scaled by kQtyScale, ratio is dimensionless
   double expected_ratio = static_cast<double>(md.qty.value) / static_cast<double>(book.get_bbo()->ask_qty.value);
 
   engine.on_trade_updated(&md, &book);

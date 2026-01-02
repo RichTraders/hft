@@ -14,10 +14,16 @@
 #include <fstream>
 #include <glaze/glaze.hpp>
 #include "logger.h"
+#include "common/fixed_point_config.hpp"
 #include "market_data/json_binance_futures_md_decoder.hpp"
 
 using namespace core;
 using namespace common;
+
+namespace {
+constexpr int64_t kPriceScale = FixedPointConfig::kPriceScale;
+constexpr int64_t kQtyScale = FixedPointConfig::kQtyScale;
+}
 
 namespace futures_test_utils {
 
@@ -120,9 +126,8 @@ TEST_F(WsFuturesMdDecoderTest, DecodeDepthUpdate_RealData_ParsesCorrectly) {
   EXPECT_FALSE(depth.data.asks.empty());
 
   if (!depth.data.bids.empty()) {
-    // kPriceScale=10: "1000.00" -> 10000, kQtyScale=1000: "28.319" -> 28319
-    EXPECT_EQ(depth.data.bids[0][0], 10000);
-    EXPECT_EQ(depth.data.bids[0][1], 28319);
+    EXPECT_EQ(depth.data.bids[0][0], 10000 * (kPriceScale / 10));
+    EXPECT_EQ(depth.data.bids[0][1], 28319 * (kQtyScale / 1000));
   }
 }
 
@@ -148,9 +153,8 @@ TEST_F(WsFuturesMdDecoderTest, DecodeTradeEvent_RealData_ParsesCorrectly) {
   EXPECT_EQ(trade.data.symbol, "BTCUSDT");
   EXPECT_EQ(trade.data.event_time, 1765623793856);
   EXPECT_EQ(trade.data.aggregate_trade_id, 3011637835);
-  // kPriceScale=10: "90558.30" -> 905583, kQtyScale=1000: "0.704" -> 704
-  EXPECT_EQ(trade.data.price, 905583);
-  EXPECT_EQ(trade.data.quantity, 704);
+  EXPECT_EQ(trade.data.price, 905583 * (kPriceScale / 10));
+  EXPECT_EQ(trade.data.quantity, 704 * (kQtyScale / 1000));
   EXPECT_EQ(trade.data.first_trade_id, 7007399071);
   EXPECT_EQ(trade.data.last_trade_id, 7007399080);
   EXPECT_EQ(trade.data.trade_time, 1765623793745);
@@ -184,15 +188,13 @@ TEST_F(WsFuturesMdDecoderTest, DecodeSnapshot_RealData_ParsesCorrectly) {
   EXPECT_FALSE(snapshot.result.asks.empty());
 
   if (!snapshot.result.bids.empty()) {
-    // kPriceScale=10: "90545.20" -> 905452, kQtyScale=1000: "0.618" -> 618
-    EXPECT_EQ(snapshot.result.bids[0][0], 905452);
-    EXPECT_EQ(snapshot.result.bids[0][1], 618);
+    EXPECT_EQ(snapshot.result.bids[0][0], 905452 * (kPriceScale / 10));
+    EXPECT_EQ(snapshot.result.bids[0][1], 618 * (kQtyScale / 1000));
   }
 
   if (!snapshot.result.asks.empty()) {
-    // kPriceScale=10: "90545.30" -> 905453, kQtyScale=1000: "23.955" -> 23955
-    EXPECT_EQ(snapshot.result.asks[0][0], 905453);
-    EXPECT_EQ(snapshot.result.asks[0][1], 23955);
+    EXPECT_EQ(snapshot.result.asks[0][0], 905453 * (kPriceScale / 10));
+    EXPECT_EQ(snapshot.result.asks[0][1], 23955 * (kQtyScale / 1000));
   }
 }
 
@@ -276,12 +278,10 @@ TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_RealData_ParsesCorrectly) {
   EXPECT_EQ(book_ticker.data.update_id, 9519725001721);
   EXPECT_EQ(book_ticker.data.event_time, 1766452642241);
   EXPECT_EQ(book_ticker.data.transaction_time, 1766452642240);
-  // kPriceScale=10: "1.9022" -> 19, kQtyScale=1000: "7.3" -> 7300
-  EXPECT_EQ(book_ticker.data.best_bid_price, 19);
-  EXPECT_EQ(book_ticker.data.best_bid_qty, 7300);
-  // kPriceScale=10: "1.9023" -> 19, kQtyScale=1000: "2108.3" -> 2108300
-  EXPECT_EQ(book_ticker.data.best_ask_price, 19);
-  EXPECT_EQ(book_ticker.data.best_ask_qty, 2108300);
+  EXPECT_EQ(book_ticker.data.best_bid_price, 19022 * (kPriceScale / 10000));
+  EXPECT_EQ(book_ticker.data.best_bid_qty, 7300 * (kQtyScale / 1000));
+  EXPECT_EQ(book_ticker.data.best_ask_price, 19023 * (kPriceScale / 10000));
+  EXPECT_EQ(book_ticker.data.best_ask_qty, 2108300 * (kQtyScale / 1000));
 }
 
 TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_InlineData_ParsesCorrectly) {
@@ -297,12 +297,10 @@ TEST_F(WsFuturesMdDecoderTest, DecodeBookTicker_InlineData_ParsesCorrectly) {
   EXPECT_EQ(book_ticker.stream, "ethusdt@bookTicker");
   EXPECT_EQ(book_ticker.data.symbol, "ETHUSDT");
   EXPECT_EQ(book_ticker.data.update_id, 123456789);
-  // kPriceScale=10: "2000.50" -> 20005, kQtyScale=1000: "100.5" -> 100500
-  EXPECT_EQ(book_ticker.data.best_bid_price, 20005);
-  EXPECT_EQ(book_ticker.data.best_bid_qty, 100500);
-  // kPriceScale=10: "2001.00" -> 20010, kQtyScale=1000: "50.25" -> 50250
-  EXPECT_EQ(book_ticker.data.best_ask_price, 20010);
-  EXPECT_EQ(book_ticker.data.best_ask_qty, 50250);
+  EXPECT_EQ(book_ticker.data.best_bid_price, 20005 * (kPriceScale / 10));
+  EXPECT_EQ(book_ticker.data.best_bid_qty, 100500 * (kQtyScale / 1000));
+  EXPECT_EQ(book_ticker.data.best_ask_price, 20010 * (kPriceScale / 10));
+  EXPECT_EQ(book_ticker.data.best_ask_qty, 50250 * (kQtyScale / 1000));
 }
 
 // ============================================================================

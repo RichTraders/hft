@@ -135,3 +135,35 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION "${TEST_RUNTIME_DIR}
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION "${TEST_RUNTIME_DIR}")
+
+# Flat Array OrderBook full pipeline benchmark for comparison
+# Uses HftLib_ws_flat which has USE_FLAT_ORDERBOOK defined
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/full_pipeline_benchmark_tests.cpp")
+    set(FLAT_BENCH_TARGET benchmark_full_pipeline_flat_benchmarks)
+    add_executable(${FLAT_BENCH_TARGET} full_pipeline_benchmark_tests.cpp)
+    target_compile_definitions(${FLAT_BENCH_TARGET} PRIVATE ENABLE_WEBSOCKET USE_FLAT_ORDERBOOK)
+    target_link_libraries(${FLAT_BENCH_TARGET} PRIVATE
+            HftLib_ws_flat
+            GTest::gtest_main
+            GTest::gmock
+            cap
+    )
+    target_precompile_headers(${FLAT_BENCH_TARGET} PRIVATE
+            ${CMAKE_SOURCE_DIR}/include/pch.h)
+    target_include_directories(${FLAT_BENCH_TARGET} PRIVATE
+            ${TEST_STRATEGY_INCLUDE_DIR})
+    target_compile_options(${FLAT_BENCH_TARGET} PRIVATE
+            -Wno-missing-field-initializers
+            -Wno-error=unused-parameter
+            -Wno-error=unused-function
+    )
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(${FLAT_BENCH_TARGET} PRIVATE
+                -Wno-error=return-type-c-linkage
+        )
+    endif()
+    list(APPEND BENCHMARK_TARGETS ${FLAT_BENCH_TARGET})
+endif()
+
+# For unit test comparison, use order_book_tests vs order_book_flat_tests
+# which only test the OrderBook component in isolation.

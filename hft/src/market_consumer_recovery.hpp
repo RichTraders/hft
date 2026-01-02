@@ -105,7 +105,7 @@ class MarketConsumerRecoveryMixin {
             INI_CONFIG.get("meta", "level"),
             INI_CONFIG.get("meta", "ticker"),
             /*subscribe=*/false);
-    self.app_->send(msg_unsub);
+    std::ignore = self.app_->send(msg_unsub);
 
     std::this_thread::sleep_for(std::chrono::seconds(5));
 
@@ -114,7 +114,7 @@ class MarketConsumerRecoveryMixin {
             INI_CONFIG.get("meta", "level"),
             INI_CONFIG.get("meta", "ticker"),
             /*subscribe=*/true);
-    self.app_->send(msg_sub);
+    std::ignore = self.app_->send(msg_sub);
   }
 };
 

@@ -35,7 +35,7 @@ class FeatureEngine {
     logger_.info("[Constructor] FeatureEngine Created");
   }
 
-  ~FeatureEngine() { logger_.info("[Destructor] FeatureEngine Destroy"); }
+  ~FeatureEngine() { std::cout << "[Destructor] FeatureEngine Destroy\n"; }
 
   auto on_trade_updated(const MarketData* market_update,
       MarketOrderBook<Strategy>* book) noexcept -> void {
@@ -94,9 +94,6 @@ class FeatureEngine {
         mkt_price_raw_ = num / den;
       }
       spread_raw_ = bbo->ask_price.value - bbo->bid_price.value;
-
-      auto bid_index = book->peek_levels(true, kLevel10);
-      auto ask_index = book->peek_levels(false, kLevel10);
     }
 
     logger_.trace("[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
@@ -122,7 +119,7 @@ class FeatureEngine {
 
   // OBI range: [-kObiScale, +kObiScale] representing [-1.0, +1.0]
   static constexpr int64_t kObiScale = 10000;
-  int64_t orderbook_imbalance_int64(
+  [[nodiscard]] int64_t orderbook_imbalance_int64(
       const std::vector<int64_t>& bid_levels,
       const std::vector<int64_t>& ask_levels) const {
     const size_t min_size = std::min(bid_levels.size(), ask_levels.size());
@@ -175,7 +172,6 @@ class FeatureEngine {
   }
   [[nodiscard]] int64_t get_vwap() const noexcept { return vwap_raw_; }
 
-  // double 변환 (로깅/디버깅용)
   [[nodiscard]] double get_market_price_double() const noexcept {
     return static_cast<double>(mkt_price_raw_) / common::FixedPointConfig::kPriceScale;
   }
@@ -195,7 +191,6 @@ class FeatureEngine {
   FeatureEngine& operator=(const FeatureEngine&&) = delete;
 
  private:
-  static constexpr int kLevel10 = 10;
   static constexpr int kVwapSize = 64;
   const common::Logger::Producer& logger_;
   double agg_trade_qty_ratio_ = common::kQtyInvalid;

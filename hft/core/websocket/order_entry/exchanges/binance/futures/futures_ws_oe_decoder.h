@@ -41,7 +41,7 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
     if (payload.size() < oe_decode::kMinPayloadLen) [[unlikely]] {
       return WireMessage{};
     }
-    logger_.info("[WsOeCore]payload :{}", payload);
+    logger_.debug("[WsOeCore]payload :{}", payload);
 
     const char event_char = payload[oe_decode::kEventTypeOffset];
 
@@ -49,6 +49,11 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
       return this
           ->decode_or_log<BinanceFuturesOeTraits::ExecutionReportResponse,
               "[executionReport]">(payload);
+    }
+
+    if (event_char == 'T') {
+      // We already process ORDER_TRADE_UPDATE, so ignore this
+      return WireMessage{};
     }
 
     if (event_char == 'A') {

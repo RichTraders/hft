@@ -137,7 +137,7 @@ class WsOrderManager {
       }
     }
 
-    logger_.info(
+    logger_.debug(
         "[WsOrderManager] Created synthetic ExecutionReport: "
         "clientOrderId={}, error_code={}, error={}",
         client_order_id,

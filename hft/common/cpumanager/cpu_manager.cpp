@@ -15,6 +15,7 @@
 #include "../ini_config.hpp"
 
 #include <charconv>
+#include <cstring>
 
 #ifdef __linux__
 #include <sched.h>
@@ -31,7 +32,7 @@
 
 namespace common {
 namespace {
-constexpr int kDecimalBase = 10;
+constexpr auto kDecimalBase = 10;
 }
 // NOLINTBEGIN(unused-parameter)
 CpuManager::CpuManager(const Logger::Producer& logger) : logger_(logger) {

@@ -333,7 +333,7 @@ class OrderManager {
           action.position_side);
       position_tracker_.add_reserved(action.side, action.qty.value);
 
-      logger_.info(
+      logger_.debug(
           "[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}, "
           "reserved_position_={}",
           tick,
@@ -429,7 +429,7 @@ class OrderManager {
 
       const auto delta_qty = action.qty.value - action.last_qty.value;
       position_tracker_.add_reserved(action.side, delta_qty);
-      logger_.info(
+      logger_.debug(
           "[Apply][REPLACE] tick:{}/ layer={}, side:{}, order_id={}, "
           "reserved_position_={}",
           tick,
@@ -456,7 +456,7 @@ class OrderManager {
       slot.state = OMOrderState::kCancelReserved;
       slot.last_used = now;
       cancel_order(ticker, action.original_cl_order_id, action.position_side);
-      logger_.info(
+      logger_.debug(
           "[Apply][CANCEL] layer={}, side:{}, order_id={}, "
           "reserved: {}",
           action.layer,
@@ -489,7 +489,7 @@ class OrderManager {
 
         cancel_order(key.symbol, slot.cl_order_id);
 
-        logger_.info(
+        logger_.debug(
             "[TTL] Cancel sent (state={}, layer={}, oid={}, "
             "remaining_ns={})",
             trading::toString(slot.state),

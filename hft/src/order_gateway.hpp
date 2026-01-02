@@ -188,7 +188,7 @@ class OrderGateway {
         .position_side = request.position_side};
 
     const std::string msg = app_->create_order_message(order_data);
-    logger_.info("[Message]Send order message:{}", msg);
+    logger_.debug("[Message]Send order message:{}", msg);
 
     // NOLINTNEXTLINE(bugprone-branch-clone) - post_new_order always called
     if (UNLIKELY(!app_->send(msg))) {

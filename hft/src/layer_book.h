@@ -12,6 +12,13 @@
 
 #ifndef LAYER_BOOK_H
 #define LAYER_BOOK_H
+
+#include <array>
+#include <iomanip>
+#include <optional>
+#include <sstream>
+#include <string>
+
 #include "absl/container/flat_hash_map.h"
 #include "common/precision_config.hpp"
 #include "orders.h"
@@ -19,8 +26,8 @@
 namespace trading::order {
 struct OrderSlot {
   OMOrderState state{OMOrderState::kInvalid};
-  common::Price price;
-  common::Qty qty;
+  common::PriceType price;
+  common::QtyType qty;
   uint64_t last_used{0};
   common::OrderId cl_order_id;
   OrderSlot() = default;
@@ -30,26 +37,26 @@ inline std::string toString(const OrderSlot& slot) {
   std::ostringstream ostream;
   ostream << std::fixed << std::setprecision(PRECISION_CONFIG.qty_precision());
   ostream << "OrderSlot{" << "state=" << toString(slot.state) << ", "
-          << "price=" << slot.price.value << ", " << "qty=" << slot.qty.value
+          << "price=" << slot.price.to_double() << ", " << "qty=" << slot.qty.to_double()
           << ", " << "last_used=" << slot.last_used << ", "
           << "cl_order_id=" << slot.cl_order_id.value << "}";
   return ostream.str();
 }
 
 struct PendingReplaceInfo {
-  common::Price new_price;
-  common::Qty new_qty;
+  common::PriceType new_price;
+  common::QtyType new_qty;
   uint64_t new_tick;
   common::OrderId new_cl_order_id;
-  common::Qty last_qty;
+  common::QtyType last_qty;
   common::OrderId original_cl_order_id;
-  common::Price original_price;
+  common::PriceType original_price;
   uint64_t original_tick;
   PendingReplaceInfo() = default;
-  PendingReplaceInfo(const common::Price& new_price, const common::Qty& new_qty,
+  PendingReplaceInfo(const common::PriceType& new_price, const common::QtyType& new_qty,
       uint64_t new_tick, const common::OrderId& new_cl_order_id,
-      const common::Qty& last_qty, const common::OrderId& original_cl_order_id,
-      const common::Price& original_price, uint64_t original_tick)
+      const common::QtyType& last_qty, const common::OrderId& original_cl_order_id,
+      const common::PriceType& original_price, uint64_t original_tick)
       : new_price(new_price),
         new_qty(new_qty),
         new_tick(new_tick),
@@ -66,6 +73,7 @@ struct SideBook {
   std::array<std::optional<PendingReplaceInfo>, kSlotsPerSide> pending_repl;
   absl::flat_hash_map<uint64_t, int> orig_id_to_layer;
   absl::flat_hash_map<uint64_t, int> new_id_to_layer;
+  // NOLINTNEXTLINE(modernize-use-equals-default)
   SideBook() { layer_ticks.fill(kTicksInvalid); }
 };
 
@@ -174,7 +182,7 @@ class LayerBook {
     if (const int layer = find_free_layer(side_book); layer >= 0)
       return {.layer = layer, .victim_live_layer = std::nullopt, .tick = tick};
     const int vidx = pick_victim_layer(side_book);
-    std::optional<int> victim{};
+    std::optional<int> victim{};  // NOLINT(misc-const-correctness)
     if (side_book.slots[vidx].state == OMOrderState::kLive)
       victim = vidx;
     return {.layer = vidx, .victim_live_layer = victim, .tick = tick};
@@ -191,7 +199,7 @@ class LayerBook {
     for (size_t pos_idx = 0; pos_idx < 2; ++pos_idx) {
       for (size_t side_idx = 0; side_idx < 2; ++side_idx) {
         const auto& side = books_[symbol][pos_idx].sides[side_idx];
-        uint64_t last = 0;
+        uint64_t last = 0;  // NOLINT(misc-const-correctness)
         for (const auto& slot :
             side.slots | std::ranges::views::filter(is_active)) {
           last = std::max(last, slot.last_used);

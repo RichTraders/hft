@@ -13,6 +13,9 @@
 #ifndef EXCHANGE_TRAITS_H
 #define EXCHANGE_TRAITS_H
 
+#include <concepts>
+#include <string_view>
+
 template <typename T>
 concept ExchangeTraits = requires {
   { T::exchange_name() } -> std::convertible_to<std::string_view>;

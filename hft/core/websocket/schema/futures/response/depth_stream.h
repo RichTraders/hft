@@ -13,8 +13,9 @@
 #ifndef FUTURES_DEPTH_H
 #define FUTURES_DEPTH_H
 #include <glaze/glaze.hpp>
-namespace schema {
-namespace futures {
+#include "schema/price_qty_array.h"
+
+namespace schema::futures {
 struct DepthData {
   std::string event_type;
   std::uint64_t timestamp;
@@ -24,13 +25,14 @@ struct DepthData {
   std::uint64_t end_update_id;
   std::uint64_t final_update_id_in_last_stream;
 
-  std::vector<std::array<double, 2>> bids;
-  std::vector<std::array<double, 2>> asks;
+  FixedPriceQtyArray bids;
+  FixedPriceQtyArray asks;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = DepthData;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       glz::object(
         "e", &T::event_type,
         "E", &T::timestamp,
@@ -39,8 +41,8 @@ struct DepthData {
         "U", &T::start_update_id,
         "u", &T::end_update_id,
         "pu", &T::final_update_id_in_last_stream,
-        "b", glz::quoted_num<&T::bids>,
-        "a", glz::quoted_num<&T::asks>);
+        "b", &T::bids,
+        "a", &T::asks);
   };
   // clang-format on
 };
@@ -49,13 +51,14 @@ struct DepthResponse {
   std::string stream;
   DepthData data;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = DepthResponse;
-    static constexpr auto value =
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("stream", &T::stream, "data", &T::data);
   };
 };
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 
 #endif  //FUTURES_DEPTH_H

@@ -13,6 +13,8 @@
 #ifndef MESSAGE_ADAPTER_POLICY_H
 #define MESSAGE_ADAPTER_POLICY_H
 
+#include <variant>
+
 namespace trading {
 
 struct PointerMessagePolicy {

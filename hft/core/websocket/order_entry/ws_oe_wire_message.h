@@ -13,6 +13,8 @@
 #ifndef WS_OE_WIRE_MESSAGE_H
 #define WS_OE_WIRE_MESSAGE_H
 
+#include <variant>
+
 #include "schema/spot/response/account_position.h"
 #include "schema/spot/response/api_response.h"
 #include "schema/spot/response/execution_report.h"

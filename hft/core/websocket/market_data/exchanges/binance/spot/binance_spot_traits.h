@@ -13,6 +13,10 @@
 #ifndef BINANCE_SPOT_TRAITS_H
 #define BINANCE_SPOT_TRAITS_H
 
+#include <string>
+#include <string_view>
+#include <variant>
+
 #include "binance_md_connection_handler.h"
 #include "binance_sbe_ops.h"
 #include "binance_spot_dispatcher.h"
@@ -75,7 +79,7 @@ struct BinanceSpotTraits {
   }
 
   static std::string get_stream_endpoint_path() {
-    return INI_CONFIG.get("auth",
+    return INI_CONFIG.get("exchange",
         "md_ws_path",
         "/stream?streams=btcusdt@depth@100ms/btcusdt@trade");
   }

@@ -94,21 +94,21 @@ TEST_F(OrderManagerSpotTest, ProcessReplace_PendingReplInfoUsesDifferentIds) {
   const int layer = 0;
   const OrderId orig_id{30001};
   const OrderId new_id{30002};  // Different ID
-  const Price old_price{50000.0};
-  const Price new_price{50100.0};
-  const Qty old_qty{1.0};
-  const Qty new_qty{1.5};
+  const auto old_price = PriceType::from_double(50000.0);
+  const auto new_price = PriceType::from_double(50100.0);
+  const auto old_qty = QtyType::from_double(1.0);
+  const auto new_qty = QtyType::from_double(1.5);
 
   // Create pending replace (Spot style)
   book.pending_repl[layer] = PendingReplaceInfo(
     new_price,
     new_qty,
-    static_cast<uint64_t>(new_price.value / 0.01),
+    static_cast<uint64_t>(new_price.to_double() / 0.01),
     new_id,  // new_cl_order_id != original
     old_qty,
     orig_id,  // original_cl_order_id
     old_price,
-    static_cast<uint64_t>(old_price.value / 0.01)
+    static_cast<uint64_t>(old_price.to_double() / 0.01)
   );
 
   ASSERT_TRUE(book.pending_repl[layer].has_value());
@@ -129,8 +129,8 @@ TEST_F(OrderManagerSpotTest, LayerBook_BuyBook_AccessibleAndIsolated) {
 
   // Set order in BUY book
   buy_book.slots[0].cl_order_id = OrderId{10001};
-  buy_book.slots[0].price = Price{50000.0};
-  buy_book.slots[0].qty = Qty{1.0};
+  buy_book.slots[0].price = PriceType::from_double(50000.0);
+  buy_book.slots[0].qty = QtyType::from_double(1.0);
   buy_book.slots[0].state = OMOrderState::kLive;
 
   // Verify it's in the right book
@@ -143,8 +143,8 @@ TEST_F(OrderManagerSpotTest, LayerBook_SellBook_AccessibleAndIsolated) {
 
   // Set order in SELL book
   sell_book.slots[0].cl_order_id = OrderId{20001};
-  sell_book.slots[0].price = Price{50100.0};
-  sell_book.slots[0].qty = Qty{2.0};
+  sell_book.slots[0].price = PriceType::from_double(50100.0);
+  sell_book.slots[0].qty = QtyType::from_double(2.0);
   sell_book.slots[0].state = OMOrderState::kLive;
 
   // Verify it's in the right book
@@ -156,27 +156,27 @@ TEST_F(OrderManagerSpotTest, LayerBook_BuyAndSell_CompletelyIsolated) {
   // Place order in BUY book
   auto& buy_book = layer_book_->side_book("BTCUSDT", Side::kBuy);
   buy_book.slots[0].cl_order_id = OrderId{10001};
-  buy_book.slots[0].price = Price{50000.0};
-  buy_book.slots[0].qty = Qty{1.0};
+  buy_book.slots[0].price = PriceType::from_double(50000.0);
+  buy_book.slots[0].qty = QtyType::from_double(1.0);
   buy_book.slots[0].state = OMOrderState::kLive;
 
   // Place order in SELL book
   auto& sell_book = layer_book_->side_book("BTCUSDT", Side::kSell);
   sell_book.slots[0].cl_order_id = OrderId{20001};
-  sell_book.slots[0].price = Price{50100.0};
-  sell_book.slots[0].qty = Qty{2.0};
+  sell_book.slots[0].price = PriceType::from_double(50100.0);
+  sell_book.slots[0].qty = QtyType::from_double(2.0);
   sell_book.slots[0].state = OMOrderState::kLive;
 
   // Verify complete isolation
   EXPECT_NE(buy_book.slots[0].cl_order_id, sell_book.slots[0].cl_order_id);
-  EXPECT_NE(buy_book.slots[0].price, sell_book.slots[0].price);
-  EXPECT_NE(buy_book.slots[0].qty, sell_book.slots[0].qty);
+  EXPECT_NE(buy_book.slots[0].price.value, sell_book.slots[0].price.value);
+  EXPECT_NE(buy_book.slots[0].qty.value, sell_book.slots[0].qty.value);
 
   // Modify BUY order
-  buy_book.slots[0].qty = Qty{1.5};
+  buy_book.slots[0].qty = QtyType::from_double(1.5);
 
   // Verify SELL unchanged
-  EXPECT_EQ(sell_book.slots[0].qty.value, 2.0);
+  EXPECT_EQ(sell_book.slots[0].qty.to_double(), 2.0);
 }
 
 // ============================================================================
@@ -233,15 +233,15 @@ TEST_F(OrderManagerSpotTest, Scenario_BuyAndSell_IndependentOperations) {
   // Place BUY order
   auto& buy_book = layer_book_->side_book("BTCUSDT", Side::kBuy);
   buy_book.slots[0].cl_order_id = OrderId{50001};
-  buy_book.slots[0].price = Price{50000.0};
-  buy_book.slots[0].qty = Qty{1.0};
+  buy_book.slots[0].price = PriceType::from_double(50000.0);
+  buy_book.slots[0].qty = QtyType::from_double(1.0);
   buy_book.slots[0].state = OMOrderState::kLive;
 
   // Place SELL order
   auto& sell_book = layer_book_->side_book("BTCUSDT", Side::kSell);
   sell_book.slots[0].cl_order_id = OrderId{50002};
-  sell_book.slots[0].price = Price{50100.0};
-  sell_book.slots[0].qty = Qty{1.0};
+  sell_book.slots[0].price = PriceType::from_double(50100.0);
+  sell_book.slots[0].qty = QtyType::from_double(1.0);
   sell_book.slots[0].state = OMOrderState::kLive;
 
   // Verify both exist independently

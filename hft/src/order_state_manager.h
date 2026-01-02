@@ -13,6 +13,8 @@
 #ifndef ORDER_STATE_MANAGER_H
 #define ORDER_STATE_MANAGER_H
 
+#include <cstdint>
+
 #include "layer_book.h"
 #include "logger.h"
 #include "market_data.h"
@@ -61,7 +63,7 @@ class OrderStateManager {
       ReservedPositionTracker& position_tracker) noexcept;
 
   [[nodiscard]] int find_layer(const order::SideBook& side_book,
-      const common::OrderId& order_id, common::Price price) const noexcept;
+      const common::OrderId& order_id, common::PriceType price) const noexcept;
 
   const common::Logger::Producer& logger_;
   order::TickConverter& tick_converter_;

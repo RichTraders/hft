@@ -13,6 +13,19 @@
 #ifndef INI_READER_H
 #define INI_READER_H
 
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
+#include <format>
+#include <fstream>
+#include <iostream>
+#include <ranges>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
+
 #include "singleton.h"
 
 namespace common {
@@ -116,6 +129,18 @@ class IniConfig : public Singleton<IniConfig> {
       std::erase(value, '\'');
       std::erase(value, ',');
       return std::stoull(value);
+    } catch (...) {
+      return def;
+    }
+  }
+
+  int64_t get_int64(const std::string_view section,
+      const std::string_view key, const int64_t def = 0) const {
+    try {
+      auto value = get(section, key);
+      std::erase(value, '\'');
+      std::erase(value, ',');
+      return std::stoll(value);
     } catch (...) {
       return def;
     }

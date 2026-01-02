@@ -22,9 +22,10 @@ struct DepthSnapshotResult {
   std::vector<std::array<double, 2>> bids;
   std::vector<std::array<double, 2>> asks;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = DepthSnapshotResult;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "lastUpdateId", &T::last_update_id,
         "bids", glz::quoted_num<&T::bids>,
         "asks", glz::quoted_num<&T::asks>
@@ -38,9 +39,10 @@ struct DepthSnapshot {
   DepthSnapshotResult result;
   std::vector<RateLimit> rate_limits;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = DepthSnapshot;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "id", &T::id,
         "status", &T::status,
         "result", &T::result,
@@ -48,5 +50,5 @@ struct DepthSnapshot {
     );
   };
 };
-}
+}  // namespace schema
 #endif  //SNAPSHOT_H

@@ -13,6 +13,8 @@
 #ifndef WS_MD_WIRE_MESSAGE_H
 #define WS_MD_WIRE_MESSAGE_H
 
+#include <variant>
+
 #include "schema/response/api_response.h"
 #include "schema/response/depth_stream.h"
 #include "schema/response/exchange_info_response.h"

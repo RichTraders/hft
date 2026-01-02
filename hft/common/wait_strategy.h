@@ -13,6 +13,13 @@
 #ifndef WAIT_STRATEGY_H
 #define WAIT_STRATEGY_H
 
+#include <chrono>
+#include <thread>
+
+#if defined(__x86_64__) || defined(_M_X64)
+#include <emmintrin.h>
+#endif
+
 namespace common {
 struct WaitStrategy {
   static constexpr int kBusySpinIters = 1'000;  // 완전 바쁜-스핀

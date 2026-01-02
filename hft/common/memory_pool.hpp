@@ -13,6 +13,16 @@
 #ifndef COMMON_MEMORY_POOL_H
 #define COMMON_MEMORY_POOL_H
 
+#include <array>
+#include <atomic>
+#include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <type_traits>
+#include <vector>
+
 namespace common {
 template <typename T>
 class MemoryPool {
@@ -23,7 +33,7 @@ class MemoryPool {
       free_nodes_[i].next = (i == num_elems - 1) ? kInvalidIndex : (i + 1);
     }
 
-    StackHead initial_head{0, 0};
+    const StackHead initial_head{0, 0};
     free_head_.store(pack(initial_head), std::memory_order_relaxed);
   }
 
@@ -33,7 +43,7 @@ class MemoryPool {
     // Lock-free pop from stack
     while (true) {
       std::uint64_t old_raw = free_head_.load(std::memory_order_acquire);
-      StackHead old_head = unpack(old_raw);
+      const StackHead old_head = unpack(old_raw);
 
       if (old_head.index == kInvalidIndex) {
         return nullptr;
@@ -97,7 +107,7 @@ class MemoryPool {
     while (true) {
       StackHead new_head;
       std::uint64_t old_raw = free_head_.load(std::memory_order_acquire);
-      StackHead old_head = unpack(old_raw);
+      const StackHead old_head = unpack(old_raw);
 
       free_nodes_[idx].next = old_head.index;
 
@@ -159,7 +169,7 @@ class MemoryPool {
            static_cast<std::uint64_t>(head.index);
   }
 
-  StackHead unpack(std::uint64_t val) const noexcept {
+  [[nodiscard]] StackHead unpack(std::uint64_t val) const noexcept {
     StackHead head;
     head.index = static_cast<std::uint32_t>(val & kIndexMask);
     head.counter = static_cast<std::uint32_t>(val >> kCounterShift);

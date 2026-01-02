@@ -13,6 +13,10 @@
 #ifndef CONNECTION_HANDLER_H
 #define CONNECTION_HANDLER_H
 
+#include <concepts>
+#include <cstdint>
+#include <string>
+
 namespace core {
 
 enum class TransportId : uint8_t { kApi = 0, kStream = 1 };

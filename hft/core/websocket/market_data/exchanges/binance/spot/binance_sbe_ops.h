@@ -12,6 +12,15 @@
 
 #ifndef BINANCE_SBE_OPS_H
 #define BINANCE_SBE_OPS_H
+
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <format>
+#include <string>
+#include <vector>
+
 #include <common/logger.h>
 #include "schema/spot/sbe/best_bid_ask_sbe.h"
 #include "schema/spot/sbe/depth_stream_sbe.h"

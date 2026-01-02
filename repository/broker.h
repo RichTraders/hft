@@ -18,7 +18,7 @@
 #include "src/stream_state.h"
 
 #ifdef ENABLE_WEBSOCKET
-#include "core/websocket/market_data/ws_md_app.h"
+#include "core/websocket/market_data/ws_md_app.hpp"
 using SelectedMarketApp = core::WsMarketDataApp;
 #else
 #include "core/fix/fix_md_app.h"

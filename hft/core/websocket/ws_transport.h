@@ -12,11 +12,17 @@
 #ifndef WS_TRANSPORT_H
 #define WS_TRANSPORT_H
 
+#include <atomic>
+#include <functional>
+#include <memory>
+#include <string>
+#include <string_view>
+
+#include <libwebsockets.h>
+
 #include "common/spsc_queue.h"
 #include "common/thread.hpp"
 #include "global.h"
-
-#include <libwebsockets.h>
 
 namespace core {
 template <FixedString ThreadName>
@@ -38,7 +44,7 @@ class WebSocketTransport {
   WebSocketTransport& operator=(const WebSocketTransport&) = delete;
 
   void register_message_callback(MessageCallback callback);
-  int write(const std::string& buffer) const;
+  [[nodiscard]] int write(const std::string& buffer) const;
   void interrupt();
 
   static int callback(struct lws* wsi, enum lws_callback_reasons reason,

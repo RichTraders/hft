@@ -12,6 +12,12 @@
 
 #ifndef BINANCE_SPOT_DISPATCHER_H
 #define BINANCE_SPOT_DISPATCHER_H
+
+#include <optional>
+#include <string_view>
+#include <type_traits>
+#include <variant>
+
 #include "schema/spot/response/depth_stream.h"
 #include "schema/spot/response/exchange_info_response.h"
 #include "schema/spot/response/snapshot.h"

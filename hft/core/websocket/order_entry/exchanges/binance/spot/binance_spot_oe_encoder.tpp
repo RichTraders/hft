@@ -111,11 +111,11 @@ inline std::string BinanceSpotOeEncoder::create_order_message(
   payload.params.new_client_order_id = std::to_string(order.cl_order_id.value);
   payload.params.side = std::string(toString(order.side));
   payload.params.type = std::string(toString(order.ord_type));
-  payload.params.quantity = common::to_fixed(order.order_qty.value, qty_precision_);
+  payload.params.quantity = common::to_fixed(common::qty_to_actual_double(order.order_qty), qty_precision_);
 
   if (order.ord_type == trading::OrderType::kLimit) {
     payload.params.time_in_force = std::string(toString(order.time_in_force));
-    payload.params.price = common::to_fixed(order.price.value, price_precision_);
+    payload.params.price = common::to_fixed(common::price_to_actual_double(order.price), price_precision_);
   }
   payload.params.self_trade_prevention_mode =
       toString(order.self_trade_prevention_mode);
@@ -155,10 +155,10 @@ inline std::string BinanceSpotOeEncoder::create_cancel_and_reorder_message(
       std::to_string(replace.cancel_new_order_id.value);
   payload.params.new_client_order_id =
       std::to_string(replace.cl_new_order_id.value);
-  payload.params.quantity = common::to_fixed(replace.order_qty.value, qty_precision_);
+  payload.params.quantity = common::to_fixed(common::qty_to_actual_double(replace.order_qty), qty_precision_);
   if (replace.ord_type == trading::OrderType::kLimit) {
     payload.params.time_in_force = std::string(toString(replace.time_in_force));
-    payload.params.price = common::to_fixed(replace.price.value, price_precision_);
+    payload.params.price = common::to_fixed(common::price_to_actual_double(replace.price), price_precision_);
   }
   payload.params.self_trade_prevention_mode =
       toString(replace.self_trade_prevention_mode);

@@ -13,6 +13,9 @@
 #ifndef PROTOCOL_DECODER_H
 #define PROTOCOL_DECODER_H
 
+#include <concepts>
+#include <string_view>
+
 template <typename T>
 concept ProtocolDecoder = requires(const T& decoder, std::string_view payload) {
   typename T::WireMessage;

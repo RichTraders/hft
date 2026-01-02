@@ -13,6 +13,9 @@
 #ifndef FIX_SSL_TRANSPORT_H
 #define FIX_SSL_TRANSPORT_H
 
+#include <memory>
+#include <string>
+
 #include "core/ssl_socket.h"
 
 namespace core {

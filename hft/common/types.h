@@ -13,6 +13,25 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <array>
+#include <cstdint>
+#include <limits>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+
+#include "precision_config.hpp"
+#include "fixed_point.hpp"
+
+#ifndef LIKELY
+#define LIKELY(x) __builtin_expect(!!(x), 1)
+#endif
+#ifndef UNLIKELY
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#endif
+
 namespace common {
 struct OrderId {
   uint64_t value{std::numeric_limits<uint64_t>::max()};
@@ -75,6 +94,8 @@ constexpr auto kClientIdInvalid = std::numeric_limits<uint32_t>::max();
 struct Price {
   double value{std::numeric_limits<double>::max()};
 
+  [[nodiscard]] double to_double() const noexcept { return value; }
+
   Price() noexcept = default;
   explicit constexpr Price(double data) noexcept : value(data) {}
 
@@ -130,6 +151,8 @@ struct Qty {
 
   Qty() noexcept = default;
   constexpr explicit Qty(double data) noexcept : value(data) {}
+
+  [[nodiscard]] double to_double() const noexcept { return value; }
 
   [[nodiscard]] bool is_valid() const {
     return value != std::numeric_limits<double>::max();
@@ -207,6 +230,9 @@ inline auto toString(Qty qty) -> std::string {
 }
 
 constexpr auto kQtyInvalid = std::numeric_limits<double>::max();
+
+using PriceType = FixedPrice;
+using QtyType = FixedQty;
 
 struct Priority {
   uint64_t value{std::numeric_limits<uint64_t>::max()};
@@ -360,18 +386,27 @@ inline std::string_view toString(MarketUpdateType type) noexcept {
 }
 
 struct RiskCfg {
-  Qty max_order_size_ = Qty{0};
-  Qty max_position_ = Qty{0};
-  Qty min_position_ = Qty{0};
-  double max_loss_ = 0;
+  QtyType max_order_size_;
+  QtyType max_position_;
+  QtyType min_position_;
+  int64_t max_loss_ = 0;
+
+  RiskCfg() = default;
+
+  RiskCfg(QtyType max_order, QtyType max_pos, QtyType min_pos, int64_t max_loss)
+      : max_order_size_(max_order),
+        max_position_(max_pos),
+        min_position_(min_pos),
+        max_loss_(max_loss)
+  {}
 
   [[nodiscard]] auto toString() const {
     std::ostringstream stream;
 
     stream << "RiskCfg{"
-           << "max-order-size:" << common::toString(max_order_size_) << " "
-           << "max-position:" << common::toString(max_position_) << " "
-           << "min-position:" << common::toString(min_position_) << " "
+           << "max-order-size:" << max_order_size_.value << " "
+           << "max-position:" << max_position_.value << " "
+           << "min-position:" << min_position_.value << " "
            << "max-loss:" << max_loss_ << "}";
 
     return stream.str();
@@ -379,13 +414,13 @@ struct RiskCfg {
 };
 
 struct TradeEngineCfg {
-  Qty clip_ = Qty{0};
-  double threshold_ = 0;
+  QtyType clip_;
+  int64_t threshold_ = 0;
   RiskCfg risk_cfg_;
 
   [[nodiscard]] auto toString() const {
     std::ostringstream stream;
-    stream << "TradeEngineCfg{" << "clip:" << common::toString(clip_) << " "
+    stream << "TradeEngineCfg{" << "clip:" << clip_.value << " "
            << "thresh:" << threshold_ << " " << "risk:" << risk_cfg_.toString()
            << "}";
 

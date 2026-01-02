@@ -26,7 +26,7 @@ struct ListenKeyResponse {
 template <>
 struct glz::meta<schema::futures::ListenKeyResponse> {
   using T = schema::futures::ListenKeyResponse;
-  static constexpr auto value = object("listenKey", &T::listenKey);
+  static constexpr auto value = object("listenKey", &T::listenKey);  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
 };
 
 #endif  // LISTEN_KEY_RESPONSE_H

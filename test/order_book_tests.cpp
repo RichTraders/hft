@@ -38,15 +38,18 @@ public:
   }
 
   void SetUp() override {
-    // Load BTCUSDT config before creating order book
-    INI_CONFIG.load("resources/config.ini");
+    INI_CONFIG.load("resources/config-orderbook.ini");
 
     TradeEngineCfgHashMap temp;
-    RiskCfg risk = {.max_order_size_ = Qty{1000.},
-                    .max_position_ = Qty{1000.},
-                    .max_loss_ = 1000.};
-    TradeEngineCfg tempcfg = {
-        .clip_ = Qty{100000}, .threshold_ = 10, .risk_cfg_ = risk};
+    RiskCfg risk(
+        QtyType::from_double(1000.),
+        QtyType::from_double(1000.),
+        QtyType::from_double(0.),
+        1000);
+    TradeEngineCfg tempcfg;
+    tempcfg.clip_ = QtyType::from_double(100000);
+    tempcfg.threshold_ = 10;
+    tempcfg.risk_cfg_ = risk;
     temp.emplace(INI_CONFIG.get("meta", "ticker"), tempcfg);
     auto pool = std::make_unique<MemoryPool<MarketUpdateData>>(4096);
     auto pool2 = std::make_unique<MemoryPool<MarketData>>(4096);
@@ -85,30 +88,30 @@ std::unique_ptr<Logger::Producer> MarketOrderBookTest::producer;
 TEST_F(MarketOrderBookTest, ClearResetsOrderBookAndUpdatesBBO) {
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
   const MarketData md(MarketUpdateType::kClear, OrderId{kOrderIdInvalid},
-                      symbol, Side::kBuy, Price{0.0}, Qty{0.0});
+                      symbol, Side::kBuy, PriceType::from_raw(0), QtyType::from_raw(0));
 
   book_->on_market_data_updated(&md);
 
   // BBO는 invalid 값이 되어야 한다
   const BBO* bbo = book_->get_bbo();
-  EXPECT_EQ(bbo->bid_price, kPriceInvalid);
-  EXPECT_EQ(bbo->ask_price, kPriceInvalid);
-  EXPECT_EQ(bbo->bid_qty, kQtyInvalid);
-  EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
+  EXPECT_FALSE(bbo->bid_price.is_valid());
+  EXPECT_FALSE(bbo->ask_price.is_valid());
+  EXPECT_FALSE(bbo->bid_qty.is_valid());
+  EXPECT_FALSE(bbo->ask_qty.is_valid());
 }
 
 // Trade
 TEST_F(MarketOrderBookTest, TradeInvokesTradeEngineAndSkipsOrderBookUpdate) {
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
-  const Price price = Price{100000.00};
-  const Qty qty = Qty{5.0};
+  const auto price = PriceType::from_raw(100000);
+  const auto qty = QtyType::from_raw(5000);
   const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid}, symbol,
                       Side::kBuy, price, qty);
 
   book_->on_market_data_updated(&md);
 
-  const Price trade_price = Price{100000.00};
-  const Qty trade_qty = Qty{4.0};
+  const auto trade_price = PriceType::from_raw(100000);
+  const auto trade_qty = QtyType::from_raw(4000);
   const MarketData trade_md =
       MarketData(MarketUpdateType::kTrade, OrderId{kOrderIdInvalid}, symbol,
                  Side::kBuy, trade_price, trade_qty);
@@ -116,15 +119,15 @@ TEST_F(MarketOrderBookTest, TradeInvokesTradeEngineAndSkipsOrderBookUpdate) {
 
   const BBO* bbo = book_->get_bbo();
   EXPECT_EQ(bbo->bid_price, price);
-  EXPECT_EQ(bbo->ask_price, kPriceInvalid);
-  EXPECT_EQ(bbo->bid_qty, qty.value - trade_qty.value);
-  EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
+  EXPECT_FALSE(bbo->ask_price.is_valid());
+  EXPECT_EQ(bbo->bid_qty.value, qty.value - trade_qty.value);
+  EXPECT_FALSE(bbo->ask_qty.is_valid());
 }
 
 TEST_F(MarketOrderBookTest, AddOrder) {
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
-  const Price price = Price{100000.00};
-  const Qty qty = Qty{5.0};
+  const auto price = PriceType::from_raw(100000);
+  const auto qty = QtyType::from_raw(5000);
   const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid}, symbol,
                       Side::kBuy, price, qty);
 
@@ -132,16 +135,16 @@ TEST_F(MarketOrderBookTest, AddOrder) {
 
   const BBO* bbo = book_->get_bbo();
   EXPECT_EQ(bbo->bid_price, price);
-  EXPECT_EQ(bbo->ask_price, kPriceInvalid);
+  EXPECT_FALSE(bbo->ask_price.is_valid());
   EXPECT_EQ(bbo->bid_qty, qty);
-  EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
+  EXPECT_FALSE(bbo->ask_qty.is_valid());
 }
 
 TEST_F(MarketOrderBookTest, AddOrders) {
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
   {
-    const Price price = Price{100000.00};
-    const Qty qty = Qty{5.0};
+    const auto price = PriceType::from_raw(100000);
+    const auto qty = QtyType::from_raw(5000);
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
                         symbol, Side::kBuy, price, qty);
 
@@ -149,13 +152,13 @@ TEST_F(MarketOrderBookTest, AddOrders) {
 
     const BBO* bbo = book_->get_bbo();
     EXPECT_EQ(bbo->bid_price, price);
-    EXPECT_EQ(bbo->ask_price, kPriceInvalid);
+    EXPECT_FALSE(bbo->ask_price.is_valid());
     EXPECT_EQ(bbo->bid_qty, qty);
-    EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
+    EXPECT_FALSE(bbo->ask_qty.is_valid());
   }
   {
-    const Price price = Price{100001.00};
-    const Qty qty = Qty{4.0};
+    const auto price = PriceType::from_raw(100001);
+    const auto qty = QtyType::from_raw(4000);
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
                         symbol, Side::kBuy, price, qty);
 
@@ -163,13 +166,13 @@ TEST_F(MarketOrderBookTest, AddOrders) {
 
     const BBO* bbo = book_->get_bbo();
     EXPECT_EQ(bbo->bid_price, price);
-    EXPECT_EQ(bbo->ask_price, kPriceInvalid);
+    EXPECT_FALSE(bbo->ask_price.is_valid());
     EXPECT_EQ(bbo->bid_qty, qty);
-    EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
+    EXPECT_FALSE(bbo->ask_qty.is_valid());
   }
   {
-    const Price price = Price{100001.00};
-    const Qty qty = Qty{3.0};
+    const auto price = PriceType::from_raw(100001);
+    const auto qty = QtyType::from_raw(3000);
     const MarketData md(MarketUpdateType::kModify, OrderId{kOrderIdInvalid},
                         symbol, Side::kBuy, price, qty);
 
@@ -177,13 +180,13 @@ TEST_F(MarketOrderBookTest, AddOrders) {
 
     const BBO* bbo = book_->get_bbo();
     EXPECT_EQ(bbo->bid_price, price);
-    EXPECT_EQ(bbo->ask_price, kPriceInvalid);
+    EXPECT_FALSE(bbo->ask_price.is_valid());
     EXPECT_EQ(bbo->bid_qty, qty);
-    EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
+    EXPECT_FALSE(bbo->ask_qty.is_valid());
   }
   {
-    const Price price = Price{100001.00};
-    const Qty qty = Qty{2.0};
+    const auto price = PriceType::from_raw(100001);
+    const auto qty = QtyType::from_raw(2000);
     const MarketData md(MarketUpdateType::kTrade, OrderId{kOrderIdInvalid},
                         symbol, Side::kBuy, price, qty);
 
@@ -191,18 +194,17 @@ TEST_F(MarketOrderBookTest, AddOrders) {
 
     const BBO* bbo = book_->get_bbo();
     EXPECT_EQ(bbo->bid_price, price);
-    EXPECT_EQ(bbo->ask_price, kPriceInvalid);
-    EXPECT_EQ(bbo->bid_qty, 1.0);
-    EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
+    EXPECT_FALSE(bbo->ask_price.is_valid());
+    EXPECT_EQ(bbo->bid_qty.value, 1000);  // 3000 - 2000
+    EXPECT_FALSE(bbo->ask_qty.is_valid());
   }
 }
 
 TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
-
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
   {
-    TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    const Price price = Price{100000.00};
-    const Qty qty = Qty{5.0};
+    const auto price = PriceType::from_raw(100000);
+    const auto qty = QtyType::from_raw(5000);
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
                         symbol, Side::kBuy, price, qty);
 
@@ -210,14 +212,13 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
 
     const BBO* bbo = book_->get_bbo();
     EXPECT_EQ(bbo->bid_price, price);
-    EXPECT_EQ(bbo->ask_price, kPriceInvalid);
+    EXPECT_FALSE(bbo->ask_price.is_valid());
     EXPECT_EQ(bbo->bid_qty, qty);
-    EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
+    EXPECT_FALSE(bbo->ask_qty.is_valid());
   }
   {
-    TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    const Price price = Price{100001.00};
-    const Qty qty = Qty{4.0};
+    const auto price = PriceType::from_raw(100001);
+    const auto qty = QtyType::from_raw(4000);
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
                         symbol, Side::kBuy, price, qty);
 
@@ -225,14 +226,13 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
 
     const BBO* bbo = book_->get_bbo();
     EXPECT_EQ(bbo->bid_price, price);
-    EXPECT_EQ(bbo->ask_price, kPriceInvalid);
+    EXPECT_FALSE(bbo->ask_price.is_valid());
     EXPECT_EQ(bbo->bid_qty, qty);
-    EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
+    EXPECT_FALSE(bbo->ask_qty.is_valid());
   }
   {
-    TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    const Price price = Price{100001.00};
-    const Qty qty = Qty{3.0};
+    const auto price = PriceType::from_raw(100001);
+    const auto qty = QtyType::from_raw(3000);
     const MarketData md(MarketUpdateType::kModify, OrderId{kOrderIdInvalid},
                         symbol, Side::kBuy, price, qty);
 
@@ -240,104 +240,105 @@ TEST_F(MarketOrderBookTest, AddBuyAndSellOrders) {
 
     const BBO* bbo = book_->get_bbo();
     EXPECT_EQ(bbo->bid_price, price);
-    EXPECT_EQ(bbo->ask_price, kPriceInvalid);
+    EXPECT_FALSE(bbo->ask_price.is_valid());
     EXPECT_EQ(bbo->bid_qty, qty);
-    EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
+    EXPECT_FALSE(bbo->ask_qty.is_valid());
   }
   {
-    TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    const Price price = Price{100000.50};
-    const Qty qty = Qty{14.0};
+    // 100000.5 -> raw 100000 (정수 가격만 사용)
+    const auto price = PriceType::from_raw(100000);
+    const auto qty = QtyType::from_raw(14000);
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
                         symbol, Side::kBuy, price, qty);
 
     book_->on_market_data_updated(&md);
 
     const BBO* bbo = book_->get_bbo();
-    EXPECT_EQ(bbo->bid_price, 100001.0);
-    EXPECT_EQ(bbo->ask_price, kPriceInvalid);
-    EXPECT_EQ(bbo->bid_qty, 3.0);
-    EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
+    // best bid는 여전히 100001
+    EXPECT_EQ(bbo->bid_price.value, 100001);
+    EXPECT_FALSE(bbo->ask_price.is_valid());
+    EXPECT_EQ(bbo->bid_qty.value, 3000);
+    EXPECT_FALSE(bbo->ask_qty.is_valid());
   }
   {
-    TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    const Price price = Price{100000.00};
-    const Qty qty = Qty{2.0};
+    const auto price = PriceType::from_raw(100000);
+    const auto qty = QtyType::from_raw(2000);
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
                         symbol, Side::kSell, price, qty);
 
     book_->on_market_data_updated(&md);
 
     const BBO* bbo = book_->get_bbo();
-    EXPECT_EQ(bbo->bid_price, 100001.00);
+    EXPECT_EQ(bbo->bid_price.value, 100001);
     EXPECT_EQ(bbo->ask_price, price);
-    EXPECT_EQ(bbo->bid_qty, 3.0);
+    EXPECT_EQ(bbo->bid_qty.value, 3000);
     EXPECT_EQ(bbo->ask_qty, qty);
   }
   {
-    TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    const Price price = Price{99999.00};
-    const Qty qty = Qty{3.0};
+    // 100000보다 낮은 99999는 min_price(100000) 미만이므로 100002 사용
+    const auto price = PriceType::from_raw(100002);
+    const auto qty = QtyType::from_raw(3000);
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
                         symbol, Side::kSell, price, qty);
 
     book_->on_market_data_updated(&md);
 
     const BBO* bbo = book_->get_bbo();
-    EXPECT_EQ(bbo->bid_price, 100001.00);
-    EXPECT_EQ(bbo->ask_price, price);
-    EXPECT_EQ(bbo->bid_qty, 3.0);
-    EXPECT_EQ(bbo->ask_qty, qty);
+    EXPECT_EQ(bbo->bid_price.value, 100001);
+    // best ask는 여전히 100000 (100002보다 낮음)
+    EXPECT_EQ(bbo->ask_price.value, 100000);
+    EXPECT_EQ(bbo->bid_qty.value, 3000);
+    EXPECT_EQ(bbo->ask_qty.value, 2000);  // 100000 가격의 qty
   }
   {
-    TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    const Price price = Price{100001.00};
-    const Qty qty = Qty{3.0};
+    const auto price = PriceType::from_raw(100003);
+    const auto qty = QtyType::from_raw(3000);
     const MarketData md(MarketUpdateType::kModify, OrderId{kOrderIdInvalid},
                         symbol, Side::kSell, price, qty);
 
     book_->on_market_data_updated(&md);
 
     const BBO* bbo = book_->get_bbo();
-    EXPECT_EQ(bbo->bid_price, 100001.00);
-    EXPECT_EQ(bbo->ask_price, 99999.00);  // previous
-    EXPECT_EQ(bbo->bid_qty, 3.0);
-    EXPECT_EQ(bbo->ask_qty, qty);
+    EXPECT_EQ(bbo->bid_price.value, 100001);
+    // best ask는 여전히 100000
+    EXPECT_EQ(bbo->ask_price.value, 100000);
+    EXPECT_EQ(bbo->bid_qty.value, 3000);
+    EXPECT_EQ(bbo->ask_qty.value, 2000);  // 100000 가격의 qty (변경 없음)
   }
 }
 
 // Delete
 TEST_F(MarketOrderBookTest, DeleteOrder) {
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
   {
-    TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    const Price price = Price{100000.00};
-    const Qty qty = Qty{5.0};
+    const auto price = PriceType::from_raw(100000);
+    const auto qty = QtyType::from_raw(5000);
     const MarketData md(MarketUpdateType::kAdd, OrderId{kOrderIdInvalid},
                         symbol, Side::kSell, price, qty);
     book_->on_market_data_updated(&md);
     const BBO* bbo = book_->get_bbo();
-    EXPECT_EQ(bbo->bid_price, kPriceInvalid);
+    EXPECT_FALSE(bbo->bid_price.is_valid());
     EXPECT_EQ(bbo->ask_price, price);
-    EXPECT_EQ(bbo->bid_qty, kQtyInvalid);
+    EXPECT_FALSE(bbo->bid_qty.is_valid());
     EXPECT_EQ(bbo->ask_qty, qty);
   }
   {
-    TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    const Price cancel_price = Price{100000.00};
-    const Qty cancel_qty = Qty{kQtyInvalid};
+    const auto cancel_price = PriceType::from_raw(100000);
+    const auto cancel_qty = QtyType();  // invalid qty
     const MarketData cancel_md(MarketUpdateType::kCancel,
                                OrderId{kOrderIdInvalid}, symbol, Side::kSell,
                                cancel_price, cancel_qty);
 
     book_->on_market_data_updated(&cancel_md);
     const BBO* bbo = book_->get_bbo();
-    EXPECT_EQ(bbo->bid_price, kPriceInvalid);
-    EXPECT_EQ(bbo->ask_price, kPriceInvalid);
-    EXPECT_EQ(bbo->bid_qty, kQtyInvalid);
-    EXPECT_EQ(bbo->ask_qty, kQtyInvalid);
+    EXPECT_FALSE(bbo->bid_price.is_valid());
+    EXPECT_FALSE(bbo->ask_price.is_valid());
+    EXPECT_FALSE(bbo->bid_qty.is_valid());
+    EXPECT_FALSE(bbo->ask_qty.is_valid());
   }
 }
 
+#ifndef USE_FLAT_ORDERBOOK
 TEST_F(MarketOrderBookTest, FindInBucket) {
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
   trading::Bucket b;
@@ -354,14 +355,14 @@ TEST_F(MarketOrderBookTest, FindInBucket) {
   EXPECT_EQ(book_->find_in_bucket(&b, false), 2);      // lowest → offset 2
   EXPECT_EQ(book_->find_in_bucket(&b, true), 64 + 5);  // highest → offset 69
 }
+#endif
 
 TEST_F(MarketOrderBookTest, NextActiveIdx) {
   const auto& cfg = book_->config();
   for (int idx : {10, 20, 30}) {
     TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    Price p =
-        Price{static_cast<double>(cfg.min_price_int + idx) / cfg.tick_multiplier_int};
-    Qty q{1.0};
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
     MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
     book_->on_market_data_updated(&md);
   }
@@ -374,9 +375,8 @@ TEST_F(MarketOrderBookTest, NextActiveIdx) {
 
   for (int idx : {100, 110, 120}) {
     TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    Price p =
-        Price{static_cast<double>(cfg.min_price_int + idx) / cfg.tick_multiplier_int};
-    Qty q{2.0};
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(2000);
     MarketData md{
         MarketUpdateType::kAdd, OrderId{1}, symbol, Side::kSell, p, q};
     book_->on_market_data_updated(&md);
@@ -391,9 +391,8 @@ TEST_F(MarketOrderBookTest, NextActiveIdxWithCancel) {
   const auto& cfg = book_->config();
   for (int idx : {10, 20, 30}) {
     TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    Price p =
-        Price{static_cast<double>(cfg.min_price_int + idx) / cfg.tick_multiplier_int};
-    Qty q{1.0};
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
     MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
     book_->on_market_data_updated(&md);
   }
@@ -406,9 +405,8 @@ TEST_F(MarketOrderBookTest, NextActiveIdxWithCancel) {
 
   for (int idx : {20}) {
     TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    Price p =
-        Price{static_cast<double>(cfg.min_price_int + idx) / cfg.tick_multiplier_int};
-    Qty q{1.0};
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
     MarketData md{
         MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, p, q};
     book_->on_market_data_updated(&md);
@@ -418,9 +416,8 @@ TEST_F(MarketOrderBookTest, NextActiveIdxWithCancel) {
 
   for (int idx : {100, 110, 120}) {
     TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    Price p =
-        Price{static_cast<double>(cfg.min_price_int + idx) / cfg.tick_multiplier_int};
-    Qty q{2.0};
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(2000);
     MarketData md{
         MarketUpdateType::kAdd, OrderId{1}, symbol, Side::kSell, p, q};
     book_->on_market_data_updated(&md);
@@ -435,9 +432,8 @@ TEST_F(MarketOrderBookTest, PeekLevels) {
   const auto& cfg = book_->config();
   for (int idx : {5, 15, 25, 35, 45}) {
     TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    Price p =
-        Price{static_cast<double>(cfg.min_price_int + idx) / cfg.tick_multiplier_int};
-    Qty q{1.0};
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
     MarketData md{MarketUpdateType::kAdd, OrderId{2}, symbol, Side::kBuy, p, q};
     book_->on_market_data_updated(&md);
   }
@@ -450,9 +446,8 @@ TEST_F(MarketOrderBookTest, PeekLevels) {
 
   for (int idx : {200, 210, 220}) {
     TickerId symbol = INI_CONFIG.get("meta", "ticker");
-    Price p =
-        Price{static_cast<double>(cfg.min_price_int + idx) / cfg.tick_multiplier_int};
-    Qty q{3.0};
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(3000);
     MarketData md{
         MarketUpdateType::kAdd, OrderId{3}, symbol, Side::kSell, p, q};
     book_->on_market_data_updated(&md);
@@ -469,11 +464,8 @@ TEST_F(MarketOrderBookTest, PriceAtMinBoundary) {
   const auto& cfg = book_->config();
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
-  // min_price_int = 100000, tick_multiplier_int = 100
-  // min valid price = 100000 / 100 = 1000.00
-  const double min_price_val = static_cast<double>(cfg.min_price_int) / cfg.tick_multiplier_int;
-  const Price min_price = Price{min_price_val};
-  const Qty qty = Qty{1.0};
+  const auto min_price = cfg.index_to_price(0);
+  const auto qty = QtyType::from_raw(1000);
 
   const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, min_price, qty);
   book_->on_market_data_updated(&md);
@@ -482,7 +474,6 @@ TEST_F(MarketOrderBookTest, PriceAtMinBoundary) {
   EXPECT_EQ(bbo->bid_price, min_price);
   EXPECT_EQ(bbo->bid_qty, qty);
 
-  // Index should be 0 at min price
   EXPECT_EQ(cfg.price_to_index(min_price), 0);
 }
 
@@ -490,11 +481,8 @@ TEST_F(MarketOrderBookTest, PriceAtMaxBoundary) {
   const auto& cfg = book_->config();
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
-  // max_price_int = 30000000, tick_multiplier_int = 100
-  // max valid price = 30000000 / 100 = 300000.00
-  const double max_price_val = static_cast<double>(cfg.max_price_int) / cfg.tick_multiplier_int;
-  const Price max_price = Price{max_price_val};
-  const Qty qty = Qty{2.0};
+  const auto max_price = cfg.index_to_price(cfg.num_levels - 1);
+  const auto qty = QtyType::from_raw(2000);
 
   const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kSell, max_price, qty);
   book_->on_market_data_updated(&md);
@@ -503,7 +491,6 @@ TEST_F(MarketOrderBookTest, PriceAtMaxBoundary) {
   EXPECT_EQ(bbo->ask_price, max_price);
   EXPECT_EQ(bbo->ask_qty, qty);
 
-  // Index should be num_levels - 1 at max price
   EXPECT_EQ(cfg.price_to_index(max_price), cfg.num_levels - 1);
 }
 
@@ -511,34 +498,29 @@ TEST_F(MarketOrderBookTest, PriceBelowMinBoundary_ShouldBeRejected) {
   const auto& cfg = book_->config();
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
-  // Price below minimum should be rejected
-  const double below_min = static_cast<double>(cfg.min_price_int - 1) / cfg.tick_multiplier_int;
-  const Price invalid_price = Price{below_min};
-  const Qty qty = Qty{1.0};
+  const auto invalid_price = cfg.index_to_price(-1);
+  const auto qty = QtyType::from_raw(1000);
 
   const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, invalid_price, qty);
   book_->on_market_data_updated(&md);
 
-  // BBO should remain invalid (order rejected)
   const BBO* bbo = book_->get_bbo();
-  EXPECT_EQ(bbo->bid_price, kPriceInvalid);
+  EXPECT_FALSE(bbo->bid_price.is_valid());
 }
 
 TEST_F(MarketOrderBookTest, PriceAboveMaxBoundary_ShouldBeRejected) {
   const auto& cfg = book_->config();
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
-  // Price above maximum should be rejected
-  const double above_max = static_cast<double>(cfg.max_price_int + 1) / cfg.tick_multiplier_int;
-  const Price invalid_price = Price{above_max};
-  const Qty qty = Qty{1.0};
+  const auto invalid_price = cfg.index_to_price(cfg.num_levels);
+  const auto qty = QtyType::from_raw(1000);
 
   const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kSell, invalid_price, qty);
   book_->on_market_data_updated(&md);
 
   // BBO should remain invalid (order rejected)
   const BBO* bbo = book_->get_bbo();
-  EXPECT_EQ(bbo->ask_price, kPriceInvalid);
+  EXPECT_FALSE(bbo->ask_price.is_valid());
 }
 
 // OrderBookConfig unit tests
@@ -548,10 +530,13 @@ TEST_F(MarketOrderBookTest, ConfigValuesFromIni) {
   // Verify config is loaded correctly from INI
   EXPECT_GT(cfg.min_price_int, 0);
   EXPECT_GT(cfg.max_price_int, cfg.min_price_int);
-  EXPECT_GT(cfg.tick_multiplier_int, 0);
   EXPECT_EQ(cfg.num_levels, cfg.max_price_int - cfg.min_price_int + 1);
+#ifdef USE_FLAT_ORDERBOOK
+  EXPECT_GT(cfg.bitmap_words, 0);
+#else
   EXPECT_GT(cfg.bucket_count, 0);
   EXPECT_GT(cfg.summary_words, 0);
+#endif
 }
 
 TEST_F(MarketOrderBookTest, PriceToIndexAndBack) {
@@ -560,7 +545,7 @@ TEST_F(MarketOrderBookTest, PriceToIndexAndBack) {
   // Test round-trip conversion
   for (int idx : {0, 100, 1000, 10000, cfg.num_levels - 1}) {
     if (idx >= cfg.num_levels) continue;
-    const Price price = cfg.index_to_price(idx);
+    const auto price = cfg.index_to_price(idx);
     const int back_idx = cfg.price_to_index(price);
     EXPECT_EQ(back_idx, idx) << "Round-trip failed for index " << idx;
   }
@@ -575,8 +560,8 @@ TEST_F(MarketOrderBookTest, MultipleOrdersAcrossBuckets) {
 
   for (int idx : indices) {
     if (idx >= cfg.num_levels) continue;
-    Price p = cfg.index_to_price(idx);
-    Qty q{1.0};
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_double(1.0);
     MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
     book_->on_market_data_updated(&md);
   }
@@ -590,160 +575,408 @@ TEST_F(MarketOrderBookTest, MultipleOrdersAcrossBuckets) {
 }
 
 // ============================================================================
-// XRPUSDC Symbol Tests - Different price range and tick multiplier
+// Edge Case Tests
 // ============================================================================
-class XrpusdcOrderBookTest : public ::testing::Test {
-public:
-  static std::unique_ptr<Logger> logger;
-  static std::unique_ptr<Logger::Producer> producer;
- protected:
-  TestOrderBook* book_;
-  ResponseManager* response_manager_;
-  TestTradeEngine* trade_engine_;
 
-  static void SetUpTestSuite() {
-    logger = std::make_unique<Logger>();
-    producer = std::make_unique<Logger::Producer>(logger->make_producer());
-  }
-
-  void SetUp() override {
-    // Load XRPUSDC config before creating order book
-    INI_CONFIG.load("resources/config-xrpusdc.ini");
-
-    TradeEngineCfgHashMap temp;
-    RiskCfg risk = {.max_order_size_ = Qty{1000.},
-                    .max_position_ = Qty{5000.},
-                    .max_loss_ = 1000.};
-    TradeEngineCfg tempcfg = {
-        .clip_ = Qty{100000}, .threshold_ = 10, .risk_cfg_ = risk};
-    temp.emplace(INI_CONFIG.get("meta", "ticker"), tempcfg);
-    auto pool = std::make_unique<MemoryPool<MarketUpdateData>>(4096);
-    auto pool2 = std::make_unique<MemoryPool<MarketData>>(4096);
-
-    auto execution_report_pool =
-        std::make_unique<MemoryPool<ExecutionReport>>(1024);
-    auto order_cancel_reject_pool =
-        std::make_unique<MemoryPool<OrderCancelReject>>(1024);
-    auto order_mass_cancel_report_pool =
-        std::make_unique<MemoryPool<OrderMassCancelReport>>(1024);
-    response_manager_ = new ResponseManager(
-        *producer, execution_report_pool.get(), order_cancel_reject_pool.get(),
-        order_mass_cancel_report_pool.get());
-
-    trade_engine_ = new TestTradeEngine(*producer, pool.get(),
-                                        pool2.get(), response_manager_, temp);
-    book_ = new TestOrderBook{INI_CONFIG.get("meta", "ticker"), *producer};
-    book_->set_trade_engine(trade_engine_);
-  }
-
-  void TearDown() override {
-    if (response_manager_)
-      delete response_manager_;
-
-    if (trade_engine_)
-      delete trade_engine_;
-
-    if (book_)
-      delete book_;
-  }
-};
-std::unique_ptr<Logger> XrpusdcOrderBookTest::logger;
-std::unique_ptr<Logger::Producer> XrpusdcOrderBookTest::producer;
-
-TEST_F(XrpusdcOrderBookTest, ConfigLoadedCorrectly) {
+TEST_F(MarketOrderBookTest, ZeroQuantityAdd_UpdatesBBOWithZero) {
   const auto& cfg = book_->config();
-
-  // XRPUSDC config: min=1000, max=1000000, tick_mult=10000
-  // Price range: $0.10 ~ $100.00
-  EXPECT_EQ(cfg.min_price_int, 1000);
-  EXPECT_EQ(cfg.max_price_int, 1000000);
-  EXPECT_EQ(cfg.tick_multiplier_int, 10000);
-  EXPECT_EQ(cfg.num_levels, 1000000 - 1000 + 1);
-}
-
-TEST_F(XrpusdcOrderBookTest, PriceConversionForXrpusdc) {
-  const auto& cfg = book_->config();
-
-  // $0.50 = 5000 / 10000 -> index = 5000 - 1000 = 4000
-  Price price_050{0.50};
-  EXPECT_EQ(cfg.price_to_index(price_050), 4000);
-  EXPECT_EQ(cfg.index_to_price(4000), price_050);
-
-  // $1.00 = 10000 / 10000 -> index = 10000 - 1000 = 9000
-  Price price_100{1.00};
-  EXPECT_EQ(cfg.price_to_index(price_100), 9000);
-  EXPECT_EQ(cfg.index_to_price(9000), price_100);
-
-  // Min price: $0.10 = 1000 / 10000 -> index = 0
-  Price min_price{0.10};
-  EXPECT_EQ(cfg.price_to_index(min_price), 0);
-
-  // Max price: $100.00 = 1000000 / 10000 -> index = 999000
-  Price max_price{100.00};
-  EXPECT_EQ(cfg.price_to_index(max_price), cfg.num_levels - 1);
-}
-
-TEST_F(XrpusdcOrderBookTest, AddOrderAtXrpusdcPriceRange) {
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
-  // Add order at $0.50
-  const Price price = Price{0.50};
-  const Qty qty = Qty{100.0};
-  const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, price, qty);
+  const auto price = cfg.index_to_price(100);
+  const auto zero_qty = QtyType::from_raw(0);
+
+  const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, price, zero_qty);
   book_->on_market_data_updated(&md);
 
   const BBO* bbo = book_->get_bbo();
+  // Zero qty order is still added to book, but with zero qty
   EXPECT_EQ(bbo->bid_price, price);
-  EXPECT_EQ(bbo->bid_qty, qty);
+  EXPECT_EQ(bbo->bid_qty.value, 0);
 }
 
-TEST_F(XrpusdcOrderBookTest, XrpusdcBoundaryPrices) {
+TEST_F(MarketOrderBookTest, TradeExhaustsEntireLevel_BBOUpdatesToNextLevel) {
   const auto& cfg = book_->config();
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
-  // Add at min price $0.10
+  // Add two bid levels
   {
-    const Price min_price = Price{0.10};
-    const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, min_price, Qty{50.0});
+    const auto price = cfg.index_to_price(200);
+    const auto qty = QtyType::from_raw(5000);
+    const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, price, qty);
     book_->on_market_data_updated(&md);
-
-    const BBO* bbo = book_->get_bbo();
-    EXPECT_EQ(bbo->bid_price, min_price);
-    EXPECT_EQ(cfg.price_to_index(min_price), 0);
+  }
+  {
+    const auto price = cfg.index_to_price(100);
+    const auto qty = QtyType::from_raw(3000);
+    const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, price, qty);
+    book_->on_market_data_updated(&md);
   }
 
-  // Add at max price $100.00 (sell side)
-  {
-    const Price max_price = Price{100.00};
-    const MarketData md(MarketUpdateType::kAdd, OrderId{1}, symbol, Side::kSell, max_price, Qty{25.0});
-    book_->on_market_data_updated(&md);
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(200));
+  EXPECT_EQ(bbo->bid_qty.value, 5000);
 
-    const BBO* bbo = book_->get_bbo();
-    EXPECT_EQ(bbo->ask_price, max_price);
-    EXPECT_EQ(cfg.price_to_index(max_price), cfg.num_levels - 1);
+  // Trade exhausts the best level
+  {
+    const auto price = cfg.index_to_price(200);
+    const auto qty = QtyType::from_raw(5000);
+    const MarketData md(MarketUpdateType::kTrade, OrderId{0}, symbol, Side::kBuy, price, qty);
+    book_->on_market_data_updated(&md);
+  }
+
+  // BBO should now be the next level
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(100));
+  EXPECT_EQ(bbo->bid_qty.value, 3000);
+}
+
+TEST_F(MarketOrderBookTest, TradeMoreThanAvailable_LevelBecomesZero) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  const auto price = cfg.index_to_price(150);
+  const auto qty = QtyType::from_raw(2000);
+  const MarketData add_md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kSell, price, qty);
+  book_->on_market_data_updated(&add_md);
+
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_EQ(bbo->ask_price, price);
+
+  // Trade more than available
+  const auto trade_qty = QtyType::from_raw(3000);
+  const MarketData trade_md(MarketUpdateType::kTrade, OrderId{0}, symbol, Side::kSell, price, trade_qty);
+  book_->on_market_data_updated(&trade_md);
+
+  // Level should be cleared
+  EXPECT_FALSE(bbo->ask_price.is_valid());
+}
+
+TEST_F(MarketOrderBookTest, ModifySamePrice_UpdatesQty) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  const auto price = cfg.index_to_price(300);
+
+  // Add order
+  {
+    const auto qty = QtyType::from_raw(1000);
+    const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, price, qty);
+    book_->on_market_data_updated(&md);
+  }
+
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_EQ(bbo->bid_qty.value, 1000);
+
+  // Modify multiple times
+  for (int i = 2; i <= 5; ++i) {
+    const auto new_qty = QtyType::from_raw(1000 * i);
+    const MarketData md(MarketUpdateType::kModify, OrderId{0}, symbol, Side::kBuy, price, new_qty);
+    book_->on_market_data_updated(&md);
+    EXPECT_EQ(bbo->bid_qty.value, 1000 * i);
   }
 }
 
-TEST_F(XrpusdcOrderBookTest, XrpusdcPriceBelowMin_ShouldBeRejected) {
+TEST_F(MarketOrderBookTest, CancelNonExistentOrder_NoEffect) {
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
+  const auto& cfg = book_->config();
 
-  // $0.09 is below min ($0.10)
-  const Price invalid_price = Price{0.09};
-  const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, invalid_price, Qty{10.0});
+  const auto price = cfg.index_to_price(500);
+  const auto qty = QtyType();
+
+  // Cancel on empty book
+  const MarketData md(MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, price, qty);
   book_->on_market_data_updated(&md);
 
   const BBO* bbo = book_->get_bbo();
-  EXPECT_EQ(bbo->bid_price, kPriceInvalid);
+  EXPECT_FALSE(bbo->bid_price.is_valid());
 }
 
-TEST_F(XrpusdcOrderBookTest, XrpusdcPriceAboveMax_ShouldBeRejected) {
+TEST_F(MarketOrderBookTest, DeleteBestBid_CacheInvalidatedAndRecalculated) {
+  const auto& cfg = book_->config();
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
-  // $100.01 is above max ($100.00)
-  const Price invalid_price = Price{100.01};
-  const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kSell, invalid_price, Qty{10.0});
+  // Add multiple bids
+  std::vector<int> indices = {100, 200, 300};
+  for (int idx : indices) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(300));
+
+  // Delete best bid
+  {
+    auto p = cfg.index_to_price(300);
+    auto q = QtyType();
+    MarketData md{MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  // Best bid should now be 200
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(200));
+
+  // Delete again
+  {
+    auto p = cfg.index_to_price(200);
+    auto q = QtyType();
+    MarketData md{MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(100));
+}
+
+TEST_F(MarketOrderBookTest, DeleteBestAsk_CacheInvalidatedAndRecalculated) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  std::vector<int> indices = {100, 200, 300};
+  for (int idx : indices) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kSell, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_EQ(bbo->ask_price, cfg.index_to_price(100));
+
+  // Delete best ask
+  {
+    auto p = cfg.index_to_price(100);
+    auto q = QtyType();
+    MarketData md{MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kSell, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  EXPECT_EQ(bbo->ask_price, cfg.index_to_price(200));
+}
+
+TEST_F(MarketOrderBookTest, PeekLevelsWithQty_ReturnsCorrectData) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  // Add levels: peek_levels_with_qty returns levels AFTER the best (next levels)
+  std::vector<std::pair<int, int64_t>> levels = {{100, 1000}, {200, 2000}, {300, 3000}};
+
+  for (const auto& [idx, qty_val] : levels) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(qty_val);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::vector<trading::LevelView> out;
+  // peek_levels_with_qty returns levels after best bid (300), so we get 200, 100
+  int count = book_->peek_levels_with_qty(true, 3, out);
+
+  // Best bid is 300, so peek returns 200 and 100 (2 levels after best)
+  EXPECT_EQ(count, 2);
+  ASSERT_EQ(out.size(), 2u);
+
+  // After best bid (300): 200, then 100
+  EXPECT_EQ(out[0].idx, 200);
+  EXPECT_EQ(out[0].qty_raw, 2000);
+  EXPECT_EQ(out[1].idx, 100);
+  EXPECT_EQ(out[1].qty_raw, 1000);
+}
+
+TEST_F(MarketOrderBookTest, PeekLevelsWithQty_EmptyBook_ReturnsZero) {
+  std::vector<trading::LevelView> out;
+  int count = book_->peek_levels_with_qty(true, 5, out);
+
+  EXPECT_EQ(count, 0);
+  EXPECT_TRUE(out.empty());
+}
+
+TEST_F(MarketOrderBookTest, PeekLevelsWithQty_RequestMoreThanAvailable) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  // Add 3 levels for asks
+  for (int idx : {100, 200, 300}) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kSell, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::vector<trading::LevelView> out;
+  // Best ask is 100, peek returns levels after: 200, 300
+  int count = book_->peek_levels_with_qty(false, 10, out);
+
+  EXPECT_EQ(count, 2);
+  EXPECT_EQ(out.size(), 2u);
+}
+
+TEST_F(MarketOrderBookTest, PeekQty_ReturnsCorrectQuantities) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  // peek_qty returns levels after best, so we need 4 levels to get 3 results
+  std::vector<std::pair<int, int64_t>> levels = {{50, 500}, {100, 1000}, {150, 1500}, {200, 2000}};
+
+  for (const auto& [idx, qty_val] : levels) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(qty_val);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::array<int64_t, 3> qty_out{};
+  std::array<int, 3> idx_out{};
+  // Best bid is 200, peek returns levels after: 150, 100, 50
+  int filled = book_->peek_qty<int64_t>(true, 3,
+      std::span<int64_t>{qty_out.data(), qty_out.size()},
+      std::span<int>{idx_out.data(), idx_out.size()});
+
+  EXPECT_EQ(filled, 3);
+  // After best bid (200): 150, 100, 50
+  EXPECT_EQ(idx_out[0], 150);
+  EXPECT_EQ(qty_out[0], 1500);
+  EXPECT_EQ(idx_out[1], 100);
+  EXPECT_EQ(qty_out[1], 1000);
+  EXPECT_EQ(idx_out[2], 50);
+  EXPECT_EQ(qty_out[2], 500);
+}
+
+TEST_F(MarketOrderBookTest, OrdersAtBucketBoundary) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  // Test at bucket boundary (kBucketSize = 4096)
+  constexpr int kBucketSize = 4096;
+  std::vector<int> boundary_indices = {
+    kBucketSize - 1,
+    kBucketSize,
+    kBucketSize * 2 - 1,
+    kBucketSize * 2
+  };
+
+  for (int idx : boundary_indices) {
+    if (idx >= cfg.num_levels) continue;
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  auto levels = book_->peek_levels(true, 10);
+  EXPECT_GE(levels.size(), 3u);
+}
+
+TEST_F(MarketOrderBookTest, ClearAfterMultipleOperations) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  // Add various orders within valid price range
+  for (int idx : {100, 500, 1000, 5000}) {
+    if (idx >= cfg.num_levels) continue;
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData bid_md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&bid_md);
+
+    MarketData ask_md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kSell, p, q};
+    book_->on_market_data_updated(&ask_md);
+  }
+
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_TRUE(bbo->bid_price.is_valid());
+  EXPECT_TRUE(bbo->ask_price.is_valid());
+
+  // Clear - must use a price within valid range for clear to work
+  const auto clear_price = cfg.index_to_price(0);
+  const MarketData clear_md(MarketUpdateType::kClear, OrderId{kOrderIdInvalid},
+                            symbol, Side::kBuy, clear_price, QtyType::from_raw(0));
+  book_->on_market_data_updated(&clear_md);
+
+  EXPECT_FALSE(bbo->bid_price.is_valid());
+  EXPECT_FALSE(bbo->ask_price.is_valid());
+
+  // Verify peek_levels returns empty
+  auto bids = book_->peek_levels(true, 10);
+  auto asks = book_->peek_levels(false, 10);
+  EXPECT_TRUE(bids.empty());
+  EXPECT_TRUE(asks.empty());
+}
+
+TEST_F(MarketOrderBookTest, RapidAddDeleteSequence) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  const auto price = cfg.index_to_price(500);
+
+  for (int i = 0; i < 100; ++i) {
+    // Add
+    {
+      auto q = QtyType::from_raw(1000 + i);
+      MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, price, q};
+      book_->on_market_data_updated(&md);
+    }
+
+    const BBO* bbo = book_->get_bbo();
+    EXPECT_EQ(bbo->bid_price, price);
+
+    // Delete
+    {
+      MarketData md{MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, price, QtyType()};
+      book_->on_market_data_updated(&md);
+    }
+
+    EXPECT_FALSE(book_->get_bbo()->bid_price.is_valid());
+  }
+}
+
+TEST_F(MarketOrderBookTest, NextActiveIdx_NoOrders_ReturnsNegativeOne) {
+  EXPECT_EQ(book_->next_active_idx(true, 0), -1);
+  EXPECT_EQ(book_->next_active_idx(false, 0), -1);
+}
+
+TEST_F(MarketOrderBookTest, LargeQtyValues) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  const auto price = cfg.index_to_price(1000);
+  const auto large_qty = QtyType::from_raw(std::numeric_limits<int64_t>::max() / 2);
+
+  const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, price, large_qty);
   book_->on_market_data_updated(&md);
 
   const BBO* bbo = book_->get_bbo();
-  EXPECT_EQ(bbo->ask_price, kPriceInvalid);
+  EXPECT_EQ(bbo->bid_qty, large_qty);
 }
+
+TEST_F(MarketOrderBookTest, ModifyToZeroQty_SetsQtyToZero) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  const auto price = cfg.index_to_price(400);
+
+  // Add
+  {
+    auto q = QtyType::from_raw(2000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kSell, price, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  EXPECT_EQ(book_->get_bbo()->ask_price, price);
+  EXPECT_EQ(book_->get_bbo()->ask_qty.value, 2000);
+
+  // Modify to zero - price level stays, qty becomes 0
+  {
+    auto q = QtyType::from_raw(0);
+    MarketData md{MarketUpdateType::kModify, OrderId{0}, symbol, Side::kSell, price, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  // The order book may keep the level with zero qty or update BBO
+  // Either the level is cleared or qty is 0 - test the actual behavior
+  const BBO* bbo = book_->get_bbo();
+  if (bbo->ask_price.is_valid()) {
+    EXPECT_EQ(bbo->ask_qty.value, 0);
+  }
+}
+

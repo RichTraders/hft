@@ -17,9 +17,10 @@
 namespace schema {
 struct Symbol {
   std::vector<std::string> symbols;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = Symbol;
-    static constexpr auto value = glz::object("symbols", &T::symbols);
+    static constexpr auto value = glz::object("symbols", &T::symbols);  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
   };
 };
 struct ExchangeInfoRequest {
@@ -27,9 +28,10 @@ struct ExchangeInfoRequest {
   const std::string method = "exchangeInfo";
   Symbol params;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = ExchangeInfoRequest;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("id", &T::id, "method", &T::method, "params", &T::params);
   };
 };

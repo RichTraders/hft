@@ -15,8 +15,7 @@
 
 #include <glaze/glaze.hpp>
 #include "api_response.h"
-namespace schema {
-namespace futures {
+namespace schema::futures {
 struct CancelOrderResult {
   std::uint64_t order_id{};
   std::string client_order_id;
@@ -50,9 +49,10 @@ struct CancelOrderResult {
   std::int64_t good_till_date{};
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
         using T = CancelOrderResult;
-        static constexpr auto value = glz::object(
+        static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
             "orderId",                  &T::order_id,
             "clientOrderId",            &T::client_order_id,
             "symbol",                   &T::symbol,
@@ -94,9 +94,10 @@ struct CancelOrderResponse {
   std::optional<std::vector<RateLimit>> rate_limits;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
         using T = CancelOrderResponse;
-        static constexpr auto value = glz::object(
+        static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
             "id",           &T::id,
             "status",       &T::status,
             "result",       &T::result,
@@ -105,6 +106,5 @@ struct CancelOrderResponse {
     };
   // clang-format on
 };
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 #endif  //CANCEL_ORDER_RESPONSE_H

@@ -13,6 +13,8 @@
 #ifndef PERFORMANCE_H
 #define PERFORMANCE_H
 
+#include <cstdint>
+
 #if defined(__APPLE__)
 #include <mach/mach_time.h>
 #endif

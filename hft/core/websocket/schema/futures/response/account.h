@@ -48,10 +48,11 @@ struct FuturesAccountInfoResponse {
       std::string maxWithdrawAmount;
       std::int64_t updateTime;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
       struct glaze {
         using T = Asset;
         // clang-format off
-        static constexpr auto value = glz::object(
+        static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
           "asset", &T::asset,
           "walletBalance", &T::walletBalance,
           "unrealizedProfit", &T::unrealizedProfit,
@@ -82,10 +83,11 @@ struct FuturesAccountInfoResponse {
       std::string maintMargin;
       std::int64_t updateTime;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
       struct glaze {
         using T = Position;
         // clang-format off
-        static constexpr auto value = glz::object(
+        static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
           "symbol", &T::symbol,
           "positionSide", &T::positionSide,
           "positionAmt", &T::positionAmt,
@@ -104,10 +106,11 @@ struct FuturesAccountInfoResponse {
     std::vector<Asset> assets;
     std::vector<Position> positions;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
       using T = AccountResult;
       // clang-format off
-      static constexpr auto value = glz::object(
+      static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "totalInitialMargin", &T::totalInitialMargin,
         "totalMaintMargin", &T::totalMaintMargin,
         "totalWalletBalance", &T::totalWalletBalance,
@@ -129,10 +132,11 @@ struct FuturesAccountInfoResponse {
   AccountResult event;
   std::optional<std::vector<RateLimit>> rate_limits;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = FuturesAccountInfoResponse;
     // clang-format off
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "id", &T::id,
       "status", &T::status,
       "result", &T::event,

@@ -13,6 +13,13 @@
 #ifndef MARKET_CONSUMER_HPP
 #define MARKET_CONSUMER_HPP
 
+#include <chrono>
+#include <deque>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <thread>
+
 #include "common/ini_config.hpp"
 #include "logger.h"
 #include "market_data.h"
@@ -29,13 +36,12 @@ class TradeEngine;
 template <typename Derived>
 class MarketConsumerRecoveryMixin;
 
-template <typename Strategy>
+template <typename Strategy, typename MdApp = protocol_impl::MarketDataApp>
 class MarketConsumer
-    : public MarketConsumerRecoveryMixin<MarketConsumer<Strategy>> {
+    : public MarketConsumerRecoveryMixin<MarketConsumer<Strategy, MdApp>> {
   friend class MarketConsumerRecoveryMixin<MarketConsumer>;
 
  public:
-  using MdApp = protocol_impl::MarketDataApp;
   using AppType = MdApp;
   using ProtocolPolicy = typename MarketDataProtocolPolicySelector<MdApp>::type;
   using WireMessage = MdApp::WireMessage;
@@ -57,6 +63,7 @@ class MarketConsumer
             market_data_pool_)) {
 
     using WireMessage = MdApp::WireMessage;
+    // NOLINTNEXTLINE(bugprone-branch-clone) - different parameter passing semantics
     auto register_handler = [this](const std::string& type, auto&& callback) {
       if constexpr (std::is_pointer_v<WireMessage>) {
         app_->register_callback(type,
@@ -86,7 +93,18 @@ class MarketConsumer
     }
   }
 
-  ~MarketConsumer() { std::cout << "[Destructor] MarketConsumer Destroy\n"; }
+  ~MarketConsumer() {
+#ifdef ENABLE_WEBSOCKET
+    for (auto* buffered : buffered_events_) {
+      for (auto* market_data : buffered->data) {
+        market_data_pool_->deallocate(market_data);
+      }
+      market_update_data_pool_->deallocate(buffered);
+    }
+    buffered_events_.clear();
+#endif
+    std::cout << "[Destructor] MarketConsumer Destroy\n";
+  }
 
   void stop() { app_->stop(); }
 
@@ -147,7 +165,7 @@ class MarketConsumer
       const std::string snapshot_req = app_->create_snapshot_request_message(
           INI_CONFIG.get("meta", "ticker"),
           INI_CONFIG.get("meta", "level"));
-      app_->send(snapshot_req);
+      std::ignore = app_->send(snapshot_req);
 #endif
       return;
     }
@@ -181,7 +199,7 @@ class MarketConsumer
         const std::string snapshot_req = app_->create_snapshot_request_message(
             INI_CONFIG.get("meta", "ticker"),
             INI_CONFIG.get("meta", "level"));
-        app_->send(snapshot_req);
+        std::ignore = app_->send(snapshot_req);
         return;
       }
 
@@ -198,7 +216,7 @@ class MarketConsumer
     }
 
 #ifdef ENABLE_WEBSOCKET
-    bool first_buffered = true;
+    bool first_buffered = true;  // NOLINT(misc-const-correctness)
     constexpr auto kMarketType =
         get_market_type<typename MdApp::ExchangeTraits>();
 
@@ -330,6 +348,9 @@ class MarketConsumer
     this->erase_buffer_lower_than_snapshot_impl(snapshot_update_id);
   }
   void resubscribe() { this->resubscribe_impl(); }
+
+  MdApp& app() { return *app_; }
+  [[nodiscard]] const MdApp& app() const { return *app_; }
 
  private:
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;

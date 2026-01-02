@@ -15,8 +15,7 @@
 
 #include <glaze/glaze.hpp>
 
-namespace schema {
-namespace futures {
+namespace schema::futures {
 struct CancelOrderParams {
   std::string symbol;
   std::optional<std::string> client_order_id;
@@ -27,9 +26,10 @@ struct CancelOrderParams {
   std::optional<std::string> signature;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = CancelOrderParams;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "symbol",         &T::symbol,
       "timestamp",      &T::timestamp,
 
@@ -48,9 +48,10 @@ struct OrderCancelRequest {
   CancelOrderParams params;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = OrderCancelRequest;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "id",     &T::id,
       "method", &T::method,
       "params", &T::params
@@ -58,6 +59,5 @@ struct OrderCancelRequest {
   };
   // clang-format on
 };
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 #endif  //CANCEL_ORDER_H

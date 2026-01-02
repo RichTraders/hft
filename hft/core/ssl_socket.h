@@ -13,7 +13,10 @@
 #ifndef SSL_SOCKET_H
 #define SSL_SOCKET_H
 
+#include <string>
+
 #include <openssl/err.h>
+#include <openssl/ssl.h>
 
 namespace core {
 class SSLSocket {

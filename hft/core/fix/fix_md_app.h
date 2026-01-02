@@ -13,6 +13,9 @@
 #ifndef FIX_MD_APP_H
 #define FIX_MD_APP_H
 
+#include <memory>
+#include <string>
+
 #include "common/memory_pool.hpp"
 #include "core/market_data.h"
 #include "core/protocol_concepts.h"

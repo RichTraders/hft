@@ -13,7 +13,12 @@
 #ifndef SIGNATURE_H
 #define SIGNATURE_H
 
+#include <string>
+#include <utility>
+#include <vector>
+
 #include <openssl/err.h>
+#include <openssl/evp.h>
 
 namespace core {
 constexpr char SOH = '\x01';  // NOLINT(readability-identifier-naming)

@@ -83,9 +83,10 @@ struct ShortError {
   int code{};
   std::string msg;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = ShortError;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "code", &T::code,
       "msg", &T::msg
     );
@@ -94,10 +95,10 @@ struct ShortError {
 struct CancelSuccess {
   std::string symbol;
   std::string orig_client_order_id;
-  long long order_id{};
-  long long order_list_id{};
+  std::int64_t order_id{};
+  std::int64_t order_list_id{};
   std::string client_order_id;
-  long long transact_time{};
+  std::int64_t transact_time{};
   std::string price;
   std::string orig_qty;
   std::string executed_qty;
@@ -110,9 +111,10 @@ struct CancelSuccess {
   std::string self_trade_prevention_mode;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = CancelSuccess;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "symbol", &T::symbol,
       "origClientOrderId", &T::orig_client_order_id,
       "orderId", &T::order_id,
@@ -144,9 +146,10 @@ struct CancelAndReorderErrorResponse {
   NewOrderResponseVariant new_order_response;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = CancelAndReorderErrorResponse;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "cancelResult", &T::cancel_result,
       "newOrderResult", &T::new_order_result,
       "cancelResponse", &T::cancel_response,
@@ -230,13 +233,14 @@ using CancelAndReorderResponse =
 using PlaceOrderResponse = WsApiResponse<PlaceOrderResult, PlaceOrderResult>;
 using CancelAllOrdersResponse =
     WsApiResponse<std::vector<CancelAllOrdersEntry>, CancelAllOrdersEntry>;
+
 }  // namespace schema
 
 namespace glz {
 template <>
 struct meta<::schema::OrderFill> {
   using T = ::schema::OrderFill;
-  static constexpr auto value = glz::object("price", glz::quoted_num<&T::price>,
+  static constexpr auto value = glz::object("price", glz::quoted_num<&T::price>,  // NOLINT(readability-identifier-naming)
       "qty", glz::quoted_num<&T::quantity>, "commission",
       glz::quoted_num<&T::commission>, "commissionAsset", &T::commission_asset,
       "tradeId", &T::trade_id);
@@ -245,7 +249,7 @@ struct meta<::schema::OrderFill> {
 template <>
 struct meta<::schema::CancelOrderResult> {
   using T = ::schema::CancelOrderResult;
-  static constexpr auto value = glz::object("symbol", &T::symbol,
+  static constexpr auto value = glz::object("symbol", &T::symbol,  // NOLINT(readability-identifier-naming)
       "origClientOrderId", &T::original_client_order_id, "orderId",
       &T::order_id, "orderListId", &T::order_list_id, "clientOrderId",
       &T::client_order_id, "transactTime", &T::transact_time, "price",
@@ -266,7 +270,7 @@ struct meta<::schema::CancelOrderResult> {
 template <>
 struct meta<::schema::PlaceOrderResult> {
   using T = ::schema::PlaceOrderResult;
-  static constexpr auto value = glz::object("symbol", &T::symbol, "orderId",
+  static constexpr auto value = glz::object("symbol", &T::symbol, "orderId",  // NOLINT(readability-identifier-naming)
       &T::order_id, "orderListId", &T::order_list_id, "clientOrderId",
       &T::client_order_id, "transactTime", &T::transact_time,
 
@@ -283,7 +287,7 @@ struct meta<::schema::PlaceOrderResult> {
 template <>
 struct meta<::schema::CancelAndReorderResult> {
   using T = ::schema::CancelAndReorderResult;
-  static constexpr auto value = glz::object("cancelResult", &T::cancel_result,
+  static constexpr auto value = glz::object("cancelResult", &T::cancel_result,  // NOLINT(readability-identifier-naming)
       "newOrderResult", &T::new_order_result, "cancelResponse",
       &T::cancel_response, "newOrderResponse", &T::new_order_response);
 };
@@ -291,14 +295,14 @@ struct meta<::schema::CancelAndReorderResult> {
 template <>
 struct meta<::schema::CancelAllOrdersEntryOrder> {
   using T = ::schema::CancelAllOrdersEntryOrder;
-  static constexpr auto value = glz::object("symbol", &T::symbol, "orderId",
+  static constexpr auto value = glz::object("symbol", &T::symbol, "orderId",  // NOLINT(readability-identifier-naming)
       &T::order_id, "clientOrderId", &T::client_order_id);
 };
 
 template <>
 struct meta<::schema::CancelAllOrdersEntryOrderReport> {
   using T = ::schema::CancelAllOrdersEntryOrderReport;
-  static constexpr auto value = glz::object("symbol", &T::symbol,
+  static constexpr auto value = glz::object("symbol", &T::symbol,  // NOLINT(readability-identifier-naming)
       "origClientOrderId", &T::original_client_order_id, "orderId",
       &T::order_id, "orderListId", &T::order_list_id, "clientOrderId",
       &T::client_order_id, "transactTime", &T::transact_time, "price",
@@ -315,7 +319,7 @@ struct meta<::schema::CancelAllOrdersEntryOrderReport> {
 template <>
 struct meta<::schema::CancelAllOrdersEntry> {
   using T = ::schema::CancelAllOrdersEntry;
-  static constexpr auto value = glz::object("symbol", &T::symbol,
+  static constexpr auto value = glz::object("symbol", &T::symbol,  // NOLINT(readability-identifier-naming)
       "origClientOrderId", &T::original_client_order_id, "orderId",
       &T::order_id, "orderListId", &T::order_list_id, "clientOrderId",
       &T::client_order_id, "transactTime", &T::transact_time, "price",
@@ -341,7 +345,7 @@ struct meta<::schema::CancelAllOrdersEntry> {
 template <typename ResultT, typename ErrorDataT>
 struct meta<::schema::WsApiResponse<ResultT, ErrorDataT>> {
   using T = ::schema::WsApiResponse<ResultT, ErrorDataT>;
-  static constexpr auto value = glz::object("id", &T::id, "status", &T::status,
+  static constexpr auto value = glz::object("id", &T::id, "status", &T::status,  // NOLINT(readability-identifier-naming)
       "result", &T::result, "rateLimits", &T::rate_limits, "error", &T::error);
 };
 }  // namespace glz

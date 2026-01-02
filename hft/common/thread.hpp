@@ -18,6 +18,15 @@
 
 #pragma once
 
+#include <array>
+#include <memory>
+#include <pthread.h>
+#include <sched.h>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <type_traits>
+
 #include "global.h"
 #ifdef __APPLE__
 #include <mach/mach.h>
@@ -66,7 +75,7 @@ class Thread {
     auto* ctx = new ThreadContext<F, Args...>(std::forward<F>(func),
                                               std::forward<Args>(args)...);
 
-    int err =
+    const int err =
         pthread_create(&tid_, nullptr, &ThreadContext<F, Args...>::entry, ctx);
     if (err) {
       delete ctx;

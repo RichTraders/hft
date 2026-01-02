@@ -14,8 +14,7 @@
 #define MODIFY_ORDER_H
 #include <glaze/glaze.hpp>
 
-namespace schema {
-namespace futures {
+namespace schema::futures {
 struct ModifyOrderParams {
   std::string symbol;
   std::string side;
@@ -34,9 +33,10 @@ struct ModifyOrderParams {
   std::optional<std::string> signature;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = ModifyOrderParams;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "symbol",                 &T::symbol,
       "side",                   &T::side,
       "origClientOrderId",      &T::origin_client_order_id,
@@ -62,9 +62,10 @@ struct OrderModifyRequest {
   ModifyOrderParams params;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = OrderModifyRequest;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "id",     &T::id,
       "method", &T::method,
       "params", &T::params
@@ -72,6 +73,5 @@ struct OrderModifyRequest {
   };
   // clang-format on
 };
-}
-}
-#endif //MODIFY_ORDER_H
+}  // namespace schema::futures
+#endif  // MODIFY_ORDER_H

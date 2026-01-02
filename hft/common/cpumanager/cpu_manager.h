@@ -13,6 +13,9 @@
 #ifndef CPU_MANAGER_H
 #define CPU_MANAGER_H
 
+#include <map>
+#include <string>
+
 #include "../logger.h"
 
 #if __linux__

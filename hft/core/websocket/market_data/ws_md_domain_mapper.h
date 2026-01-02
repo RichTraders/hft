@@ -13,6 +13,9 @@
 #ifndef WS_MD_MAPPER_H
 #define WS_MD_MAPPER_H
 
+#include <type_traits>
+#include <variant>
+
 #include "common/logger.h"
 #include "common/memory_pool.hpp"
 #include "core/market_data.h"
@@ -37,7 +40,7 @@ class WsMdDomainMapper {
       (void)msg;
       return MarketUpdateData();  // Not implemented for this exchange
     } else {
-      Converter converter(logger_, market_data_pool_);
+      const Converter converter(logger_, market_data_pool_);
       return std::visit(converter.make_market_data_visitor(), msg);
     }
   }
@@ -47,7 +50,7 @@ class WsMdDomainMapper {
       (void)msg;
       return MarketUpdateData();  // Not implemented for this exchange
     } else {
-      Converter converter(logger_, market_data_pool_);
+      const Converter converter(logger_, market_data_pool_);
       return std::visit(converter.make_snapshot_visitor(), msg);
     }
   }

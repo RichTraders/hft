@@ -13,6 +13,10 @@
 #ifndef FIX_MD_CORE_H
 #define FIX_MD_CORE_H
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "common/memory_pool.hpp"
 #include "core/market_data.h"
 #include "logger.h"

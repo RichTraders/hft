@@ -10,8 +10,15 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "http_client.h"
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include <curl/curl.h>
+
+#include "http_client.h"
 
 namespace core::http {
 

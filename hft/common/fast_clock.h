@@ -13,7 +13,11 @@
 #ifndef FAST_CLOCK_H
 #define FAST_CLOCK_H
 
+#include <chrono>
 #include <cmath>
+#include <cstdint>
+#include <mutex>
+
 #include "performance.h"
 #include "types.h"
 

@@ -13,8 +13,18 @@
 #ifndef FIX_PROTOCOL_H
 #define FIX_PROTOCOL_H
 
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+
 #include <common/spsc_queue.h>
 #include <common/thread.hpp>
+
 #include "fix_ssl_transport.h"
 #include "logger.h"
 

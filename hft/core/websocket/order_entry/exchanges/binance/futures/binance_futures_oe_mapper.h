@@ -13,6 +13,11 @@
 #ifndef BINANCE_FUTURES_OE_MAPPER_H
 #define BINANCE_FUTURES_OE_MAPPER_H
 
+#include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <string>
+
 #include "common/logger.h"
 #include "core/response_manager.h"
 #include "schema/futures/response/api_response.h"
@@ -44,11 +49,11 @@ class BinanceFuturesOeMapper {
     report->symbol = event.symbol;
     report->exec_type = trading::toType(event.execution_type);
     report->ord_status = trading::toOrderStatus(event.order_status);
-    report->cum_qty = common::Qty{event.cumulative_filled_quantity};
-    report->leaves_qty = common::Qty{
-        std::max(0.0, event.order_quantity - event.cumulative_filled_quantity)};
-    report->last_qty = common::Qty{event.last_executed_quantity};
-    report->price = common::Price{event.order_price};
+    report->cum_qty = common::QtyType::from_double(event.cumulative_filled_quantity);
+    report->leaves_qty = common::QtyType::from_double(
+        std::max(0.0, event.order_quantity - event.cumulative_filled_quantity));
+    report->last_qty = common::QtyType::from_double(event.last_executed_quantity);
+    report->price = common::PriceType::from_double(event.order_price);
     report->side = common::toSide(event.side);
     report->text = event.reject_reason;
     report->error_code = 0;

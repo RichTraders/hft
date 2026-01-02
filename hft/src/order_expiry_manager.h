@@ -13,6 +13,12 @@
 #ifndef ORDER_EXPIRY_MANAGER_H
 #define ORDER_EXPIRY_MANAGER_H
 
+#include <cstdint>
+#include <optional>
+#include <ostream>
+#include <queue>
+#include <vector>
+
 #include "orders.h"
 #include "types.h"
 

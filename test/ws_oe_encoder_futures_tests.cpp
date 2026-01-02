@@ -20,6 +20,8 @@
 using namespace core;
 using namespace trading;
 using namespace common;
+using PriceType = common::PriceType;
+using QtyType = common::QtyType;
 
 bool is_valid_json(std::string_view json) {
   if (json.empty()) return false;
@@ -124,8 +126,8 @@ TEST_F(WsOeFuturesEncoderTest, CreateOrderMessage_LimitOrder_ContainsAllFields) 
   order.symbol = "BTCUSDT";
   order.side = OrderSide::kBuy;
   order.ord_type = OrderType::kLimit;
-  order.order_qty = Qty{1.50000};
-  order.price = Price{50000.00};
+  order.order_qty = QtyType::from_double(1.50000);
+  order.price = PriceType::from_double(50000.00);
   order.cl_order_id = OrderId{1234567890};
   order.time_in_force = TimeInForce::kGoodTillCancel;
   order.self_trade_prevention_mode = SelfTradePreventionMode::kNone;
@@ -146,7 +148,7 @@ TEST_F(WsOeFuturesEncoderTest, CreateOrderMessage_MarketOrder_ProducesValidJson)
   order.symbol = "ETHUSDT";
   order.side = OrderSide::kSell;
   order.ord_type = OrderType::kMarket;
-  order.order_qty = Qty{2.0};
+  order.order_qty = QtyType::from_double(2.0);
   order.cl_order_id = OrderId{9876543210};
   order.self_trade_prevention_mode = SelfTradePreventionMode::kExpireTaker;
   order.position_side = PositionSide::kShort;
@@ -165,8 +167,8 @@ TEST_F(WsOeFuturesEncoderTest, CreateOrderMessage_PositionSideLong_IncludedInJso
   order.symbol = "BTCUSDT";
   order.side = OrderSide::kBuy;
   order.ord_type = OrderType::kLimit;
-  order.order_qty = Qty{0.001};
-  order.price = Price{50000.00};
+  order.order_qty = QtyType::from_double(0.001);
+  order.price = PriceType::from_double(50000.00);
   order.cl_order_id = OrderId{123};
   order.time_in_force = TimeInForce::kGoodTillCancel;
   order.self_trade_prevention_mode = SelfTradePreventionMode::kNone;
@@ -183,8 +185,8 @@ TEST_F(WsOeFuturesEncoderTest, CreateOrderMessage_PositionSideShort_IncludedInJs
   order.symbol = "BTCUSDT";
   order.side = OrderSide::kSell;
   order.ord_type = OrderType::kLimit;
-  order.order_qty = Qty{0.001};
-  order.price = Price{50000.00};
+  order.order_qty = QtyType::from_double(0.001);
+  order.price = PriceType::from_double(50000.00);
   order.cl_order_id = OrderId{123};
   order.time_in_force = TimeInForce::kGoodTillCancel;
   order.self_trade_prevention_mode = SelfTradePreventionMode::kNone;
@@ -228,8 +230,8 @@ TEST_F(WsOeFuturesEncoderTest, CreateModifyOrderMessage_ValidRequest_ContainsAll
   modify.symbol = "BTCUSDT";
   modify.orig_client_order_id = OrderId{1111111111};
   modify.side = OrderSide::kBuy;
-  modify.order_qty = Qty{0.75};
-  modify.price = Price{51000.00};
+  modify.order_qty = QtyType::from_double(0.75);
+  modify.price = PriceType::from_double(51000.00);
   modify.position_side = PositionSide::kLong;
 
   std::string result = encoder_->create_modify_order_message(modify);
@@ -248,8 +250,8 @@ TEST_F(WsOeFuturesEncoderTest, CreateCancelAndReorderMessage_FuturesUsesModify) 
   replace.cl_new_order_id = OrderId{3333333333};
   replace.side = OrderSide::kBuy;
   replace.ord_type = OrderType::kLimit;
-  replace.order_qty = Qty{0.75};
-  replace.price = Price{51000.00};
+  replace.order_qty = QtyType::from_double(0.75);
+  replace.price = PriceType::from_double(51000.00);
   replace.time_in_force = TimeInForce::kGoodTillCancel;
   replace.self_trade_prevention_mode = SelfTradePreventionMode::kNone;
   replace.position_side = PositionSide::kLong;
@@ -271,8 +273,8 @@ TEST_F(WsOeFuturesEncoderTest, CreateOrderMessage_MatchesTestData) {
   order.symbol = "BTCUSDT";
   order.side = OrderSide::kSell;
   order.ord_type = OrderType::kLimit;
-  order.order_qty = Qty{0.00112};
-  order.price = Price{89671.10};
+  order.order_qty = QtyType::from_double(0.00112);
+  order.price = PriceType::from_double(89671.10);
   order.cl_order_id = OrderId{1765798804108450726};
   order.time_in_force = TimeInForce::kGoodTillCancel;
   order.self_trade_prevention_mode = SelfTradePreventionMode::kExpireTaker;
@@ -311,8 +313,8 @@ TEST_F(WsOeFuturesEncoderTest, AllOrderMessages_ProduceValidJson_NoParsingErrors
   order.symbol = "BTCUSDT";
   order.side = OrderSide::kBuy;
   order.ord_type = OrderType::kLimit;
-  order.order_qty = Qty{1.0};
-  order.price = Price{50000.00};
+  order.order_qty = QtyType::from_double(1.0);
+  order.price = PriceType::from_double(50000.00);
   order.cl_order_id = OrderId{123};
   order.time_in_force = TimeInForce::kGoodTillCancel;
   order.self_trade_prevention_mode = SelfTradePreventionMode::kNone;
@@ -331,8 +333,8 @@ TEST_F(WsOeFuturesEncoderTest, AllOrderMessages_ProduceValidJson_NoParsingErrors
   modify.symbol = "BTCUSDT";
   modify.orig_client_order_id = OrderId{789};
   modify.side = OrderSide::kBuy;
-  modify.order_qty = Qty{1.0};
-  modify.price = Price{50000.00};
+  modify.order_qty = QtyType::from_double(1.0);
+  modify.price = PriceType::from_double(50000.00);
   modify.position_side = PositionSide::kLong;
   EXPECT_TRUE(is_valid_json(encoder_->create_modify_order_message(modify)));
 }

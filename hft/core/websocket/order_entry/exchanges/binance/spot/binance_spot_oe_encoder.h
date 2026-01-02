@@ -13,6 +13,9 @@
 #ifndef BINANCE_SPOT_OE_ENCODER_H
 #define BINANCE_SPOT_OE_ENCODER_H
 
+#include <string>
+
+#include "common/fixed_point.hpp"
 #include "common/logger.h"
 #include "common/precision_config.hpp"
 #include "order_entry.h"

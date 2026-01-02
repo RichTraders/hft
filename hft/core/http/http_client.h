@@ -13,7 +13,10 @@
 #ifndef HTTP_CLIENT_H
 #define HTTP_CLIENT_H
 
-#include "pch.h"
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace core::http {
 

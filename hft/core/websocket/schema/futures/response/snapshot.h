@@ -14,25 +14,26 @@
 #define DEPTH_SNAPSHOT_H
 #include <glaze/glaze.hpp>
 #include "api_response.h"
+#include "schema/price_qty_array.h"
 
-namespace schema {
-namespace futures {
+namespace schema::futures {
 struct DepthSnapshotResult {
   std::uint64_t book_update_id;
   std::uint64_t message_output_time;
   std::uint64_t transaction_time;
-  std::vector<std::array<double, 2>> bids;
-  std::vector<std::array<double, 2>> asks;
+  ::schema::FixedPriceQtyArray bids;
+  ::schema::FixedPriceQtyArray asks;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = DepthSnapshotResult;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
         "lastUpdateId", &T::book_update_id,
         "E", &T::message_output_time,
         "T",&T::transaction_time,
-        "bids", glz::quoted_num<&T::bids>,
-        "asks", glz::quoted_num<&T::asks>
+        "bids", &T::bids,
+        "asks", &T::asks
     );
   };
   // clang-format on
@@ -45,9 +46,10 @@ struct DepthSnapshot {
   std::optional<std::vector<RateLimit>> rateLimits;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = DepthSnapshot;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
         "id", &T::id,
         "status", &T::status,
         "result", &T::result,
@@ -56,6 +58,5 @@ struct DepthSnapshot {
   };
   // clang-format on
 };
-}
-}
+}  // namespace schema::futures
 #endif //DEPTH_SNAPSHOT_H

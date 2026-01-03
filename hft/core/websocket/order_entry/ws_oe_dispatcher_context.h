@@ -16,21 +16,20 @@
 #include "common/logger.h"
 #include "ws_order_manager.hpp"
 namespace core {
-class WsOrderEntryApp;
 
-template <typename ExchangeTraits>
+template <typename ExchangeTraits, typename AppType>
 struct WsOeDispatchContext {
   using WireMessage = typename ExchangeTraits::WireMessage;
 
   const common::Logger::Producer* logger;
   WsOrderManager<ExchangeTraits>* order_manager;
-  WsOrderEntryApp* app;
+  AppType* app;
 
   WsOeDispatchContext()
       : logger(nullptr), order_manager(nullptr), app(nullptr) {}
 
   WsOeDispatchContext(const common::Logger::Producer* log,
-      WsOrderManager<ExchangeTraits>* mgr, WsOrderEntryApp* application)
+      WsOrderManager<ExchangeTraits>* mgr, AppType* application)
       : logger(log), order_manager(mgr), app(application) {}
 };
 

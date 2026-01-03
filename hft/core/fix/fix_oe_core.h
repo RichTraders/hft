@@ -13,6 +13,9 @@
 #ifndef FIX_OE_CORE_H
 #define FIX_OE_CORE_H
 
+#include <cstdint>
+#include <string>
+
 #include "common/memory_pool.hpp"
 #include "core/order_entry.h"
 #include "logger.h"

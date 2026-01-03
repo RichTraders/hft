@@ -12,20 +12,22 @@
 #ifndef ORDER_GATEWAY_HPP
 #define ORDER_GATEWAY_HPP
 
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <string>
+
 #include "logger.h"
 #include "message_adapter_policy.h"
 #include "order_entry.h"
 #include "protocol_impl.h"
 
 namespace trading {
-template <typename Strategy>
-class TradeEngine;
 class ResponseManager;
 
-template <typename Strategy>
+template <typename OeApp = protocol_impl::OrderEntryApp>
 class OrderGateway {
  public:
-  using OeApp = protocol_impl::OrderEntryApp;
   using AppType = OeApp;
   using MessagePolicy = typename MessagePolicySelector<OeApp>::type;
   using WireMessage = typename OeApp::WireMessage;
@@ -63,10 +65,14 @@ class OrderGateway {
     logger_.info("[Constructor] OrderGateway Created");
   }
 
+  // NOLINTNEXTLINE(modernize-use-equals-default) - logs destruction
   ~OrderGateway() { std::cout << "[Destructor] OrderGateway Destroy\n"; }
 
-  void init_trade_engine(TradeEngine<Strategy>* trade_engine) {
-    trade_engine_ = trade_engine;
+  template <typename Engine>
+  void init_trade_engine(Engine* trade_engine) {
+    enqueue_response_fn_ = [trade_engine](const ResponseCommon& res) {
+      return trade_engine->enqueue_response(res);
+    };
   }
 
   void stop() const { app_->stop(); }
@@ -85,7 +91,7 @@ class OrderGateway {
     res.res_type = ResponseType::kExecutionReport;
     res.execution_report = app_->create_execution_report_message(msg);
 
-    if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
+    if (UNLIKELY(!enqueue_response_fn_(res))) {
       logger_.error("[OrderGateway][Message] failed to send execution_report");
     }
   }
@@ -95,7 +101,7 @@ class OrderGateway {
     res.res_type = ResponseType::kOrderCancelReject;
     res.order_cancel_reject = app_->create_order_cancel_reject_message(msg);
 
-    if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
+    if (UNLIKELY(!enqueue_response_fn_(res))) {
       logger_.error(
           "[OrderGateway][Message] failed to send order_cancel_reject");
     }
@@ -107,7 +113,7 @@ class OrderGateway {
     res.order_mass_cancel_report =
         app_->create_order_mass_cancel_report_message(msg);
 
-    if (UNLIKELY(!trade_engine_->enqueue_response(res))) {
+    if (UNLIKELY(!enqueue_response_fn_(res))) {
       logger_.error("[OrderGateway][Message] failed to send order_mass_cancel");
     }
   }
@@ -139,6 +145,9 @@ class OrderGateway {
       logger_.error("[OrderGateway][Message] failed to send heartbeat");
     }
   }
+
+  OeApp& app() { return *app_; }
+  [[nodiscard]] const OeApp& app() const { return *app_; }
 
   void order_request(const RequestCommon& request) {
     switch (request.req_type) {
@@ -181,12 +190,12 @@ class OrderGateway {
     const std::string msg = app_->create_order_message(order_data);
     logger_.debug("[Message]Send order message:{}", msg);
 
+    // NOLINTNEXTLINE(bugprone-branch-clone) - post_new_order always called
     if (UNLIKELY(!app_->send(msg))) {
       logger_.error("[Message] failed to send new_single_order_data [msg:{}]",
           msg);
-    } else {
-      app_->post_new_order(order_data);
     }
+    app_->post_new_order(order_data);
   }
 
   void order_cancel_request(const RequestCommon& request) {
@@ -198,11 +207,11 @@ class OrderGateway {
     const std::string msg = app_->create_cancel_order_message(cancel_request);
     logger_.debug("[Message]Send cancel order message:{}", msg);
 
+    // NOLINTNEXTLINE(bugprone-branch-clone) - post_cancel_order always called
     if (UNLIKELY(!app_->send(msg))) {
       logger_.error("[Message] failed to send order_cancel_request");
-    } else {
-      app_->post_cancel_order(cancel_request);
     }
+    app_->post_cancel_order(cancel_request);
   }
 
 #ifdef ENABLE_WEBSOCKET
@@ -225,11 +234,11 @@ class OrderGateway {
         app_->create_cancel_and_reorder_message(cancel_and_reorder);
     logger_.debug("[Message]Send cancel and reorder message:{}", msg);
 
+    // NOLINTNEXTLINE(bugprone-branch-clone) - post always called
     if (UNLIKELY(!app_->send(msg))) {
       logger_.error("[Message] failed to create_cancel_and_new_order");
-    } else {
-      app_->post_cancel_and_reorder(cancel_and_reorder);
     }
+    app_->post_cancel_and_reorder(cancel_and_reorder);
   }
 
   void order_modify(const RequestCommon& request) {
@@ -244,11 +253,11 @@ class OrderGateway {
     const std::string msg = app_->create_modify_order_message(modify_request);
     logger_.debug("[Message]Send modify order message:{}", msg);
 
+    // NOLINTNEXTLINE(bugprone-branch-clone) - post always called
     if (UNLIKELY(!app_->send(msg))) {
       logger_.error("[Message] failed to send order_modify");
-    } else {
-      app_->post_modify_order(modify_request);
     }
+    app_->post_modify_order(modify_request);
   }
 #endif
 
@@ -260,11 +269,11 @@ class OrderGateway {
     const std::string msg = app_->create_order_all_cancel(all_cancel_request);
     logger_.debug("[Message]Send cancel all orders message:{}", msg);
 
+    // NOLINTNEXTLINE(bugprone-branch-clone) - post always called
     if (UNLIKELY(!app_->send(msg))) {
       logger_.error("[Message] failed to send order_mass_cancel_request");
-    } else {
-      app_->post_mass_cancel_order(all_cancel_request);
     }
+    app_->post_mass_cancel_order(all_cancel_request);
   }
 
   template <typename Handler>
@@ -277,13 +286,13 @@ class OrderGateway {
   template <typename TargetType, typename Handler>
   void register_typed_callback(const std::string& type, Handler&& handler) {
     app_->register_callback(type,
-        [func = std::forward<Handler>(handler)](
-            auto&& msg) { func(MessagePolicy::extract<TargetType>(msg)); });
+        [func = std::forward<Handler>(handler)](auto&& msg) {
+          func(MessagePolicy::template extract<TargetType>(msg));
+        });
   }
 
   const common::Logger::Producer& logger_;
-  TradeEngine<Strategy>* trade_engine_;
-
+  std::function<bool(const ResponseCommon&)> enqueue_response_fn_;
   std::unique_ptr<OeApp> app_;
 };
 

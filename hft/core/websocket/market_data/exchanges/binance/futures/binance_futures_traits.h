@@ -13,6 +13,10 @@
 #ifndef BINANCE_FUTURES_TRAITS_H
 #define BINANCE_FUTURES_TRAITS_H
 
+#include <string>
+#include <string_view>
+#include <variant>
+
 #include "binance_future_domain_converter.hpp"
 #include "binance_futures_dispatcher.h"
 #include "binance_futures_encoder.hpp"
@@ -20,7 +24,7 @@
 #include "binance_futures_md_connection_handler.h"
 #include "common/ini_config.hpp"
 #include "core/websocket/market_data/exchange_traits.h"
-#include "core/websocket/market_data/json_binance_futures_md_decoder.hpp"
+#include "core/websocket/market_data/onepass_binance_futures_md_decoder.hpp"
 #include "schema/futures/response/api_response.h"
 #include "schema/futures/response/book_ticker.h"
 #include "schema/futures/response/depth_stream.h"
@@ -36,7 +40,7 @@ struct BinanceFuturesTraits {
   using Encoder = BinanceFuturesEncoder;
   using MdDomainConverter = BinanceFuturesMdMessageConverter;
   using DispatchRouter = BinanceDispatchRouter;
-  using Decoder = core::JsonBinanceFuturesMdDecoder;
+  using Decoder = core::OnepassBinanceFuturesMdDecoder;
 
   using SbeDepthResponse = std::monostate;
   using SbeTradeEvent = std::monostate;
@@ -80,7 +84,7 @@ struct BinanceFuturesTraits {
   }
 
   static std::string get_stream_endpoint_path() {
-    return INI_CONFIG.get_with_symbol("auth",
+    return INI_CONFIG.get_with_symbol("exchange",
         "md_ws_path",
         "/stream?streams=btcusdt@depth/btcusdt@aggTrade");
   }

@@ -1,59 +1,65 @@
 /*
  * MIT License
- * 
+ *
  * Copyright (c) 2025 NewOro Corporation
- * 
- * Permission is hereby granted, free of charge, to use, copy, modify, and distribute 
- * this software for any purpose with or without fee, provided that the above 
+ *
+ * Permission is hereby granted, free of charge, to use, copy, modify, and distribute
+ * this software for any purpose with or without fee, provided that the above
  * copyright notice appears in all copies.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#include "risk_manager.h"
+#include <string>
+
 #include "ini_config.hpp"
 #include "logger.h"
+#include "risk_manager.h"
 
 namespace trading {
+
 RiskCheckResult RiskInfo::checkPreTradeRisk(const common::Side side,
-    const common::Qty qty, common::Qty reserved_position,
+    const common::QtyType qty, common::QtyType reserved_position,
     const common::Logger::Producer& logger) noexcept {
   if (qty.value > risk_cfg_.max_order_size_.value) {
-    logger.debug(std::format("[Risk]Order is too large [Desired:{}][Allow:{}]",
+    logger.debug("[Risk]Order is too large [Desired:{}][Allow:{}]",
         qty.value,
-        risk_cfg_.max_order_size_.value));
+        risk_cfg_.max_order_size_.value);
     return RiskCheckResult::kOrderTooLarge;
   }
-  if (position_info_->position_ + reserved_position.value +
+  const int64_t current_position = position_info_->get_position();
+  const int64_t current_total_pnl = position_info_->get_total_pnl();
+
+  if (current_position + reserved_position.value +
           sideToValue(side) * qty.value >
       risk_cfg_.max_position_.value) {
     logger.debug(
-        std::format("[Risk]Maximum position allowed has been reached."
-                    "[Desired:{}][Current:{}][Working:{}][Allow:{}]",
-            sideToValue(side) * qty.value,
-            position_info_->position_,
-            reserved_position.value,
-            risk_cfg_.max_position_.value));
+        "[Risk]Maximum position allowed has been reached."
+        "[Desired:{}][Current:{}][Working:{}][Allow:{}]",
+        sideToValue(side) * qty.value,
+        current_position,
+        reserved_position.value,
+        risk_cfg_.max_position_.value);
     return RiskCheckResult::kPositionTooLarge;
   }
-  if (position_info_->position_ + reserved_position.value +
+  if (current_position + reserved_position.value +
           sideToValue(side) * qty.value <
       risk_cfg_.min_position_.value) {
     logger.debug(
-        std::format("[Risk]Minimum position allowed has been reached."
-                    "[Desired:{}][Current:{}][Working:{}][Allow:{}]",
-            sideToValue(side) * qty.value,
-            position_info_->position_,
-            reserved_position.value,
-            risk_cfg_.min_position_.value));
+        "[Risk]Minimum position allowed has been reached."
+        "[Desired:{}][Current:{}][Working:{}][Allow:{}]",
+        sideToValue(side) * qty.value,
+        current_position,
+        reserved_position.value,
+        risk_cfg_.min_position_.value);
     return RiskCheckResult::kPositionTooSmall;
   }
-  if (position_info_->total_pnl_ < risk_cfg_.max_loss_) {
+  if (current_total_pnl < risk_cfg_.max_loss_) {
     logger.debug(
-        std::format("[Risk]Maximum PnL allowed has been reached."
-                    "[Current:{}][Allow:{}]",
-            position_info_->total_pnl_,
-            risk_cfg_.max_loss_));
+        "[Risk]Maximum PnL allowed has been reached."
+        "[Current:{}][Allow:{}]",
+        current_total_pnl,
+        risk_cfg_.max_loss_);
     return RiskCheckResult::kLossTooLarge;
   }
 

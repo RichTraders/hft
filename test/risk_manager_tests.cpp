@@ -41,9 +41,16 @@ class RiskManagerTest : public ::testing::Test {
     keeper_ = new PositionKeeper(*producer);
 
     TradeEngineCfg cfg;
-    cfg.risk_cfg_.max_order_size_ = Qty{10};
-    cfg.risk_cfg_.max_position_ = Qty{9};
-    cfg.risk_cfg_.max_loss_ = -1000;
+    cfg.risk_cfg_.max_order_size_ = QtyType::from_double(10);
+    // max_position_ needs to be larger than test fill sizes (45 qty)
+    // so that position check passes and we can test loss check
+    cfg.risk_cfg_.max_position_ = QtyType::from_double(100);
+    // min_position_ defaults to kInvalidValue (MAX_INT64), need to set explicitly
+    cfg.risk_cfg_.min_position_ = QtyType::from_double(-100);
+    // max_loss_ is compared against total_pnl which is scaled by kPQScale
+    // kPQScale = kPriceScale * kQtyScale = 10 * 1000 = 10000
+    // So -1000 in original units = -1000 * kPQScale = -10,000,000
+    cfg.risk_cfg_.max_loss_ = -10000000;
 
     ticker_cfg_ =
         new TradeEngineCfgHashMap{{INI_CONFIG.get("meta", "ticker"), cfg}};
@@ -64,95 +71,92 @@ std::unique_ptr<Logger::Producer> RiskManagerTest::producer;
 TEST_F(RiskManagerTest, OrderTooLarge) {
   auto result = rm_->check_pre_trade_risk(INI_CONFIG.get("meta", "ticker"),
       Side::kBuy,
-      Qty{20},
-      Qty{0});
+      QtyType::from_double(20),
+      QtyType::from_double(0));
   EXPECT_EQ(result, RiskCheckResult::kOrderTooLarge);
 }
 
 TEST_F(RiskManagerTest, PositionTooLarge) {
-  ExecutionReport report{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{45.0},
-      .last_qty = Qty{45.0},
-      .price = Price{45.0},
-      .side = Side::kBuy,
-  };
+  // Fill with 95 qty so position = 95, then try to add 10 more
+  // max_position = 100, so 95 + 10 = 105 > 100 → position too large
+  ExecutionReport report;
+  report.cl_order_id = OrderId{1};
+  report.symbol = INI_CONFIG.get("meta", "ticker");
+  report.ord_status = OrdStatus::kFilled;
+  report.cum_qty = QtyType::from_double(95.0);
+  report.last_qty = QtyType::from_double(95.0);
+  report.price = PriceType::from_double(45.0);
+  report.side = Side::kBuy;
 
   keeper_->add_fill(&report);
 
   auto result = rm_->check_pre_trade_risk(INI_CONFIG.get("meta", "ticker"),
       Side::kBuy,
-      Qty{10},
-      Qty{0});
+      QtyType::from_double(10),
+      QtyType::from_double(0));
   EXPECT_EQ(result, RiskCheckResult::kPositionTooLarge);
 }
 
 TEST_F(RiskManagerTest, LossTooLarge) {
   {
-    ExecutionReport report{
-        .cl_order_id = OrderId{1},
-        .symbol = INI_CONFIG.get("meta", "ticker"),
-        .ord_status = OrdStatus::kFilled,
-        .cum_qty = Qty{45.0},
-        .last_qty = Qty{45.0},
-        .price = Price{2000.0},
-        .side = Side::kBuy,
-    };
+    ExecutionReport report;
+    report.cl_order_id = OrderId{1};
+    report.symbol = INI_CONFIG.get("meta", "ticker");
+    report.ord_status = OrdStatus::kFilled;
+    report.cum_qty = QtyType::from_double(45.0);
+    report.last_qty = QtyType::from_double(45.0);
+    report.price = PriceType::from_double(2000.0);
+    report.side = Side::kBuy;
     keeper_->add_fill(&report);
   }
   {
-    ExecutionReport report{
-        .cl_order_id = OrderId{2},
-        .symbol = INI_CONFIG.get("meta", "ticker"),
-        .ord_status = OrdStatus::kFilled,
-        .cum_qty = Qty{45.0},
-        .last_qty = Qty{45.0},
-        .price = Price{900.0},
-        .side = Side::kSell,
-    };
+    ExecutionReport report;
+    report.cl_order_id = OrderId{2};
+    report.symbol = INI_CONFIG.get("meta", "ticker");
+    report.ord_status = OrdStatus::kFilled;
+    report.cum_qty = QtyType::from_double(45.0);
+    report.last_qty = QtyType::from_double(45.0);
+    report.price = PriceType::from_double(900.0);
+    report.side = Side::kSell;
 
     keeper_->add_fill(&report);
   }
 
   auto result = rm_->check_pre_trade_risk(INI_CONFIG.get("meta", "ticker"),
       Side::kBuy,
-      Qty{5},
-      Qty{0});
+      QtyType::from_double(5),
+      QtyType::from_double(0));
   EXPECT_EQ(result, RiskCheckResult::kLossTooLarge);
 }
 
 TEST_F(RiskManagerTest, AllowedTrade) {
   {
-    ExecutionReport report{
-        .cl_order_id = OrderId{1},
-        .symbol = INI_CONFIG.get("meta", "ticker"),
-        .ord_status = OrdStatus::kFilled,
-        .cum_qty = Qty{45.0},
-        .last_qty = Qty{45.0},
-        .price = Price{900.0},
-        .side = Side::kBuy,
-    };
+    ExecutionReport report;
+    report.cl_order_id = OrderId{1};
+    report.symbol = INI_CONFIG.get("meta", "ticker");
+    report.ord_status = OrdStatus::kFilled;
+    report.cum_qty = QtyType::from_double(45.0);
+    report.last_qty = QtyType::from_double(45.0);
+    report.price = PriceType::from_double(900.0);
+    report.side = Side::kBuy;
 
     keeper_->add_fill(&report);
   }
   {
-    ExecutionReport report{
-        .cl_order_id = OrderId{2},
-        .symbol = INI_CONFIG.get("meta", "ticker"),
-        .ord_status = OrdStatus::kFilled,
-        .cum_qty = Qty{45.0},
-        .last_qty = Qty{45.0},
-        .price = Price{9000.0},
-        .side = Side::kSell,
-    };
+    ExecutionReport report;
+    report.cl_order_id = OrderId{2};
+    report.symbol = INI_CONFIG.get("meta", "ticker");
+    report.ord_status = OrdStatus::kFilled;
+    report.cum_qty = QtyType::from_double(45.0);
+    report.last_qty = QtyType::from_double(45.0);
+    report.price = PriceType::from_double(9000.0);
+    report.side = Side::kSell;
 
     keeper_->add_fill(&report);
   }
   auto result = rm_->check_pre_trade_risk(INI_CONFIG.get("meta", "ticker"),
       Side::kBuy,
-      Qty{5},
-      Qty{0});
+      QtyType::from_double(5),
+      QtyType::from_double(0));
   EXPECT_EQ(result, RiskCheckResult::kAllowed);
 }

@@ -15,21 +15,19 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <ostream>
 #include <string>
 #include <string_view>
 
 template <std::size_t Size>
 struct FixedString {
-  // NOLINTBEGIN(modernize-avoid-c-arrays)
-
-  char name[Size];  // NOLINT(modernize-avoid-c-arrays)
+  // NOLINNEXTLINE(modernize-avoid-c-arrays)
+  char name[Size];
 
   // NOLINTNEXTLINE(google-explicit-constructor)
   constexpr FixedString(const char (&str)[Size]) {
     std::copy_n(str, Size, name);
   }
-
-  // NOLINTEND(modernize-avoid-c-arrays)
 
   constexpr bool operator==(const FixedString&) const = default;
 

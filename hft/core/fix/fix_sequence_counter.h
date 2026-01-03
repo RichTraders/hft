@@ -12,6 +12,11 @@
 
 #ifndef FIX_SEQUENCE_COUNTER_H
 #define FIX_SEQUENCE_COUNTER_H
+
+#include <cstddef>
+#include <cstdint>
+#include <string>
+
 namespace core {
 class FixSequenceCounter {
  public:

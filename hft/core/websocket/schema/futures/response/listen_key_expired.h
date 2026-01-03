@@ -15,8 +15,7 @@
 
 #include <glaze/glaze.hpp>
 
-namespace schema {
-namespace futures {
+namespace schema::futures {
 
 struct ListenKeyExpiredEvent {
   std::string event_type;
@@ -24,9 +23,10 @@ struct ListenKeyExpiredEvent {
   std::string listen_key;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = ListenKeyExpiredEvent;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "e", &T::event_type,
       "E", glz::quoted_num<&T::event_time>,
       "listenKey", &T::listen_key
@@ -35,7 +35,6 @@ struct ListenKeyExpiredEvent {
   // clang-format on
 };
 
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 
 #endif  // LISTEN_KEY_EXPIRED_H

@@ -13,30 +13,54 @@
 #ifndef POSITION_KEEPER_H
 #define POSITION_KEEPER_H
 
+#include <array>
+#include <string>
+
 #include "absl/container/flat_hash_map.h"
 #include "common/ini_config.hpp"
 #include "common/logger.h"
 #include "common/types.h"
+#include "common/fixed_point_config.hpp"
 
 namespace trading {
 struct BBO;
 struct ExecutionReport;
 
 struct PositionInfo {
-  double position_ = 0;
-  double long_position_ = 0;
-  double short_position_ = 0;
-  double long_cost_ = 0;
-  double short_cost_ = 0;
-  double long_real_pnl_ = 0;
-  double long_unreal_pnl_ = 0;
-  double short_real_pnl_ = 0;
-  double short_unreal_pnl_ = 0;
-  double real_pnl_ = 0;
-  double unreal_pnl_ = 0;
-  double total_pnl_ = 0;
-  std::array<double, common::sideToIndex(common::Side::kTrade)> open_vwap_;
-  common::Qty volume_ = common::Qty{0};
+  // All values stored as int64 with qty_scale
+  // position = qty (scaled by kQtyScale)
+  // cost = price * qty (scaled by kPriceScale * kQtyScale)
+  // pnl = price * qty (scaled by kPriceScale * kQtyScale)
+  int64_t position_ = 0;
+  int64_t long_position_raw_ = 0;
+  int64_t short_position_raw_ = 0;
+  int64_t long_cost_ = 0;      // price * qty scale
+  int64_t short_cost_ = 0;     // price * qty scale
+  int64_t long_real_pnl_ = 0;  // price * qty scale
+  int64_t long_unreal_pnl_ = 0;
+  int64_t short_real_pnl_ = 0;
+  int64_t short_unreal_pnl_ = 0;
+  int64_t real_pnl_ = 0;
+  int64_t unreal_pnl_ = 0;
+  int64_t total_pnl_ = 0;
+  std::array<int64_t, common::sideToIndex(common::Side::kTrade)> open_vwap_{};
+  int64_t volume_ = 0;
+
+  [[nodiscard]] int64_t get_position() const noexcept {
+    return position_;
+  }
+  [[nodiscard]] int64_t get_total_pnl() const noexcept {
+    return total_pnl_;
+  }
+
+  [[nodiscard]] double get_position_double() const noexcept {
+    return static_cast<double>(position_) / common::FixedPointConfig::kQtyScale;
+  }
+  [[nodiscard]] double get_total_pnl_double() const noexcept {
+    return static_cast<double>(total_pnl_) /
+           (common::FixedPointConfig::kPriceScale * common::FixedPointConfig::kQtyScale);
+  }
+
   const BBO* bbo_ = nullptr;
 
   [[nodiscard]] std::string toString() const;
@@ -55,6 +79,7 @@ class PositionKeeper {
         ticker_position_{{INI_CONFIG.get("meta", "ticker"), PositionInfo{}}} {
     logger_.info("[Constructor] PositionKeeper Created");
   }
+  // NOLINTNEXTLINE(modernize-use-equals-default) - logs destruction
   ~PositionKeeper() { logger_.info("[Destructor] PositionKeeper Destroy"); }
 
   void add_fill(const ExecutionReport* report) noexcept;

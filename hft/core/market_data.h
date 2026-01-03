@@ -13,8 +13,16 @@
 #ifndef MARKET_DATA_H
 #define MARKET_DATA_H
 
-#include <common/types.h>
+#include <cstdint>
+#include <iomanip>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include <common/ini_config.hpp>
+#include <common/types.h>
 
 constexpr int kNoRelatedSym = 146;
 
@@ -59,25 +67,25 @@ struct MarketData {
   common::OrderId order_id = common::OrderId{common::kOrderIdInvalid};
   common::TickerId ticker_id = common::kTickerIdInvalid;
   common::Side side = common::Side::kInvalid;
-  common::Price price = common::Price{common::kPriceInvalid};
-  common::Qty qty = common::Qty{common::kQtyInvalid};
+  common::PriceType price = common::PriceType::from_raw(0);
+  common::QtyType qty = common::QtyType::from_raw(0);
 
   MarketData() noexcept = default;
 
   MarketData(const char _type, const common::OrderId _order_id,
-      common::TickerId _ticker_id, const char _side, const common::Price _price,
-      const common::Qty _qty) noexcept
-      : type(common::charToMarketUpdateType(_type)),  //279
+      common::TickerId _ticker_id, const char _side,
+      const common::PriceType _price, const common::QtyType _qty) noexcept
+      : type(common::charToMarketUpdateType(_type)),
         order_id(_order_id),
         ticker_id(std::move(_ticker_id)),
-        side(common::charToSide(_side)),  //269
+        side(common::charToSide(_side)),
         price(_price),
         qty(_qty) {}
 
   MarketData(const common::MarketUpdateType _type,
       const common::OrderId _order_id, common::TickerId _ticker_id,
-      const common::Side _side, const common::Price _price,
-      const common::Qty _qty) noexcept
+      const common::Side _side, const common::PriceType _price,
+      const common::QtyType _qty) noexcept
       : type(_type),
         order_id(_order_id),
         ticker_id(std::move(_ticker_id)),
@@ -87,8 +95,8 @@ struct MarketData {
 
   MarketData(const common::MarketUpdateType type,
       const common::OrderId order_id, common::TickerId ticker_id,
-      const char side, const common::Price price,
-      const common::Qty qty) noexcept
+      const char side, const common::PriceType price,
+      const common::QtyType qty) noexcept
       : type(type),
         order_id(order_id),
         ticker_id(std::move(ticker_id)),

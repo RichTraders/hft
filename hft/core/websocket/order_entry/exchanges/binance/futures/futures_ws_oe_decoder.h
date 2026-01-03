@@ -13,11 +13,21 @@
 #ifndef FUTURES_WS_OE_DECODER_H
 #define FUTURES_WS_OE_DECODER_H
 
+#include <cstddef>
+#include <string_view>
+
 #include <glaze/glaze.hpp>
 #include "binance_futures_oe_traits.h"
+#include "oe_id_constants.h"
 #include "websocket/order_entry/ws_oe_decoder_base.hpp"
 
 namespace core {
+
+namespace oe_decode {
+constexpr size_t kEventTypeOffset = sizeof(R"({"e":")") - 1;
+constexpr size_t kIdOffset = sizeof(R"({"id":")") - 1;
+constexpr size_t kMinPayloadLen = 8;
+}  // namespace oe_decode
 
 class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
   friend class WsOeDecoderBase<FuturesWsOeDecoder>;
@@ -28,74 +38,84 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
 
  private:
   [[nodiscard]] WireMessage decode_impl(std::string_view payload) const {
-    if (payload.empty()) {
+    if (payload.size() < oe_decode::kMinPayloadLen) [[unlikely]] {
       return WireMessage{};
     }
     logger_.debug("[WsOeCore]payload :{}", payload);
 
-    if (payload.contains("ORDER_TRADE_UPDATE")) {
+    const char event_char = payload[oe_decode::kEventTypeOffset];
+
+    if (event_char == 'O') {
       return this
           ->decode_or_log<BinanceFuturesOeTraits::ExecutionReportResponse,
               "[executionReport]">(payload);
     }
 
-    if (payload.contains("TRADE_LITE")) {
-      // TRADE_LITE is a lightweight duplicate of ORDER_TRADE_UPDATE
+    if (event_char == 'T') {
       // We already process ORDER_TRADE_UPDATE, so ignore this
       return WireMessage{};
     }
 
-    if (payload.contains("ACCOUNT_UPDATE")) {
+    if (event_char == 'A') {
       return this->decode_or_log<BinanceFuturesOeTraits::BalanceUpdateEnvelope,
           "[accountUpdate]">(payload);
     }
 
-    if (payload.contains("listenKeyExpired")) {
+    if (event_char == 'l') {
       return this->decode_or_log<BinanceFuturesOeTraits::ListenKeyExpiredEvent,
           "[listenKeyExpired]">(payload);
     }
 
-    schema::WsHeader header{};
-    const auto error_code =
-        glz::read<glz::opts{.error_on_unknown_keys = 0, .partial_read = 1}>(
-            header,
+    if (payload[2] == 'i') {
+      return decode_id_response(payload);
+    }
+
+    return this
+        ->decode_or_log<BinanceFuturesOeTraits::ApiResponse, "[API response]">(
             payload);
-    if (error_code != glz::error_code::none) {
-      logger_.error("Failed to decode payload");
-      return WireMessage{};
-    }
-    logger_.debug("[WsOeCore]header id :{}", header.id);
+  }
 
-    if (header.id.starts_with("subscribe")) {
-      return this->decode_or_log<
-          BinanceFuturesOeTraits::SessionUserSubscriptionResponse,
-          "[userDataStream.subscribe]">(payload);
-    }
+  [[nodiscard]] WireMessage decode_id_response(std::string_view payload) const {
+    const char id_char = payload[oe_decode::kIdOffset];
 
-    if (header.id.starts_with("unsubscribe")) {
-      return this->decode_or_log<
-          BinanceFuturesOeTraits::SessionUserUnsubscriptionResponse,
-          "[userDataStream.unsubscribe]">(payload);
-    }
+    // NOLINTBEGIN(bugprone-branch-clone) - each case decodes a different type
+    switch (id_char) {
+      case oe_id::kSubscribe:
+        return this->decode_or_log<
+            BinanceFuturesOeTraits::SessionUserSubscriptionResponse,
+            "[userDataStream.subscribe]">(payload);
 
-    if (header.id.starts_with("login_")) {
-      return this->decode_or_log<BinanceFuturesOeTraits::SessionLogonResponse,
-          "[session.logon]">(payload);
-    }
+      case oe_id::kUnsubscribe:
+        return this->decode_or_log<
+            BinanceFuturesOeTraits::SessionUserUnsubscriptionResponse,
+            "[userDataStream.unsubscribe]">(payload);
 
-    if (header.id.starts_with("order")) {
-      if (header.id.starts_with("orderreplace")) {
+      case oe_id::kLogin:
+        return this->decode_or_log<BinanceFuturesOeTraits::SessionLogonResponse,
+            "[session.logon]">(payload);
+
+      case oe_id::kOrderPlace:
+        return this->decode_or_log<BinanceFuturesOeTraits::PlaceOrderResponse,
+            "[orderPlace]">(payload);
+
+      case oe_id::kOrderCancel:
+        return this->decode_or_log<BinanceFuturesOeTraits::CancelOrderResponse,
+            "[orderCancel]">(payload);
+
+      case oe_id::kOrderReplace:
         return this
             ->decode_or_log<BinanceFuturesOeTraits::CancelAndReorderResponse,
                 "[cancelReplace]">(payload);
-      }
-      if (header.id.starts_with("ordercancel")) {
-        return this->decode_or_log<BinanceFuturesOeTraits::CancelOrderResponse,
-            "[orderCancel]">(payload);
-      }
-      return this->decode_or_log<BinanceFuturesOeTraits::PlaceOrderResponse,
-          "[orderPlace]">(payload);
+
+      case oe_id::kOrderModify:
+        return this
+            ->decode_or_log<BinanceFuturesOeTraits::CancelAndReorderResponse,
+                "[orderModify]">(payload);
+
+      default:
+        break;
     }
+    // NOLINTEND(bugprone-branch-clone)
 
     return this
         ->decode_or_log<BinanceFuturesOeTraits::ApiResponse, "[API response]">(

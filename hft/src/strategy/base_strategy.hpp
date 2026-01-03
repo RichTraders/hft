@@ -14,8 +14,8 @@
 #define BASE_STRATEGY_H
 
 #include "common/logger.h"
-
 #include "feature_engine.hpp"
+#include "inventory_manager.h"
 #include "market_consumer.hpp"
 #include "order_book.hpp"
 #include "order_gateway.hpp"

@@ -13,6 +13,17 @@
 #ifndef SPSCQUEUE_H
 #define SPSCQUEUE_H
 
+#include <array>
+#include <atomic>
+#include <concepts>
+#include <cstddef>
+#include <thread>
+
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || \
+    defined(_M_IX86)
+#include <emmintrin.h>
+#endif
+
 namespace common {
 constexpr std::size_t kCachelineSize = 64;
 

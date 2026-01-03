@@ -26,7 +26,7 @@ using namespace trading;
 
 using TestStrategy = SelectedStrategy;
 using TestTradeEngine = TradeEngine<TestStrategy>;
-using TestOrderGateway = OrderGateway<TestStrategy>;
+using TestOrderGateway = OrderGateway<>;
 
 constexpr int cl_order_id = 2075;
 
@@ -59,8 +59,8 @@ class OrderGatewayTest : public ::testing::Test {
         order_cancel_reject_pool_.get(),
         order_mass_cancel_report_pool_.get());
 
-    order_gateway_ = std::make_unique<TestOrderGateway>(*producer,
-        response_manager_.get());
+    order_gateway_ =
+        std::make_unique<TestOrderGateway>(*producer, response_manager_.get());
     trade_engine_ = std::make_unique<TestTradeEngine>(*producer,
         market_update_data_pool_.get(),
         market_data_pool_.get(),
@@ -74,6 +74,19 @@ class OrderGatewayTest : public ::testing::Test {
     order_gateway_->stop();
     sleep(3);
     std::cout << "TearDown OrderGatewayTest" << std::endl;
+
+    // Explicit destruction in reverse order to avoid use-after-free
+    // TradeEngine/OrderGateway use logger in destructors
+    trade_engine_.reset();
+    order_gateway_.reset();
+    response_manager_.reset();
+    order_mass_cancel_report_pool_.reset();
+    order_cancel_reject_pool_.reset();
+    execution_report_pool_.reset();
+    market_data_pool_.reset();
+    market_update_data_pool_.reset();
+    producer.reset();
+    logger.reset();
   }
 
  public:
@@ -99,7 +112,7 @@ TEST_F(OrderGatewayTest, NewOrderSingle) {
   request.cl_order_id.value = cl_order_id;
   request.symbol = INI_CONFIG.get("meta", "ticker");
   request.side = common::Side::kSell;
-  request.order_qty.value = 0.01;
+  request.order_qty = QtyType::from_double(0.01);
   request.price.value = 120000;
   request.ord_type = trading::OrderType::kLimit;
   request.time_in_force = trading::TimeInForce::kGoodTillCancel;
@@ -126,7 +139,8 @@ TEST_F(OrderGatewayTest, OrderCancel) {
 
 TEST_F(OrderGatewayTest, DISABLED_OrderMassCancel) {
   auto local_logger = std::make_unique<Logger>();
-  auto local_producer = std::make_unique<Logger::Producer>(local_logger->make_producer());
+  auto local_producer =
+      std::make_unique<Logger::Producer>(local_logger->make_producer());
 
   TradeEngineCfgHashMap temp;
   TradeEngineCfg tempcfg;

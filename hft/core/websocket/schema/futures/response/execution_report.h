@@ -14,8 +14,7 @@
 #define FUTURES_EXECUTION_REPORT_H
 #include <glaze/glaze.hpp>
 
-namespace schema {
-namespace futures {
+namespace schema::futures {
 struct OrderUpdateInfo {
   std::string symbol;         // "s"
   uint64_t client_order_id;   // "c"
@@ -72,9 +71,10 @@ struct OrderUpdateInfo {
   std::string reject_reason;            // "er"
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
         using T = OrderUpdateInfo;
-        static constexpr auto value = glz::object(
+        static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
             "s",  &T::symbol,
             "c",  glz::quoted_num<&T::client_order_id>,
             "S",  &T::side,
@@ -136,9 +136,10 @@ struct ExecutionReportResponse {
   OrderUpdateInfo event;  // "o"
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
         using T = ExecutionReportResponse;
-        static constexpr auto value = glz::object(
+        static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
             "e", &T::event_type,
             "E", &T::event_time,
             "T", &T::transaction_time,
@@ -147,6 +148,5 @@ struct ExecutionReportResponse {
     };
   // clang-format on
 };
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 #endif  //FUTURES_EXECUTION_REPORT_H

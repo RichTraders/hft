@@ -23,15 +23,17 @@ struct UserDataStreamStartRequest {
   struct Params {
     std::string apiKey;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
       using T = Params;
-      static constexpr auto value = glz::object("apiKey", &T::apiKey);
+      static constexpr auto value = glz::object("apiKey", &T::apiKey);  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
     };
   } params;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = UserDataStreamStartRequest;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("id", &T::id, "method", &T::method, "params", &T::params);
   };
 };
@@ -42,15 +44,17 @@ struct UserDataStreamPingRequest {
   struct Params {
     std::string apiKey;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
       using T = Params;
-      static constexpr auto value = glz::object("apiKey", &T::apiKey);
+      static constexpr auto value = glz::object("apiKey", &T::apiKey);  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
     };
   } params;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = UserDataStreamPingRequest;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("id", &T::id, "method", &T::method, "params", &T::params);
   };
 };
@@ -61,15 +65,17 @@ struct UserDataStreamStopRequest {
   struct Params {
     std::string apiKey;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
       using T = Params;
-      static constexpr auto value = glz::object("apiKey", &T::apiKey);
+      static constexpr auto value = glz::object("apiKey", &T::apiKey);  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
     };
   } params;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = UserDataStreamStopRequest;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("id", &T::id, "method", &T::method, "params", &T::params);
   };
 };

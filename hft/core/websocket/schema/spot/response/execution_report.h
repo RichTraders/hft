@@ -65,9 +65,10 @@ struct ExecutionReportData {
   std::string self_trade_prevention_mode = "NONE";  // "V"
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = ExecutionReportData;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "e", &T::event_type,
       "E", &T::event_time,
 
@@ -120,9 +121,10 @@ struct ExecutionReportResponse {
   int subscription_id;
   ExecutionReportData event;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = ExecutionReportResponse;
-    static constexpr auto value =
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("subscriptionId", &T::subscription_id, "event", &T::event);
   };
 };

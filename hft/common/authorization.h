@@ -13,6 +13,8 @@
 #ifndef COMMON_AUTHROIZATION_H
 #define COMMON_AUTHROIZATION_H
 
+#include <string>
+
 #include "singleton.h"
 
 namespace common {

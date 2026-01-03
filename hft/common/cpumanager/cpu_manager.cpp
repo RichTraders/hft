@@ -15,6 +15,7 @@
 #include "../ini_config.hpp"
 
 #include <charconv>
+#include <cstring>
 
 #ifdef __linux__
 #include <sched.h>
@@ -30,6 +31,9 @@
 #endif
 
 namespace common {
+namespace {
+constexpr auto kDecimalBase = 10;
+}
 // NOLINTBEGIN(unused-parameter)
 CpuManager::CpuManager(const Logger::Producer& logger) : logger_(logger) {
   const int cpu_use_count = INI_CONFIG.get_int("cpu_id", "count");
@@ -161,20 +165,19 @@ bool CpuManager::init_cpu_to_tid() {
     if (tid == 0) {
 #ifdef __APPLE__
       logger_.error(
-          std::format("[CpuManager] macOS does not support finding threads by "
-                      "name externally: '{}'",
-              thread_name));
+          "[CpuManager] macOS does not support finding threads by "
+          "name externally: '{}'",
+          thread_name);
 #else
-      logger_.error(
-          std::format("[CpuManager] Thread '{}' not found", thread_name));
+      logger_.error("[CpuManager] Thread '{}' not found", thread_name);
 #endif
       continue;
     }
 
     info.second.tid = tid;
-    logger_.info(std::format("[CpuManager] Found thread '{}' with TID {}",
+    logger_.info("[CpuManager] Found thread '{}' with TID {}",
         thread_name,
-        tid));
+        tid);
 
     const auto& cpu_info = cpu_info_list_.find(cpu_id);
     if (cpu_info == cpu_info_list_.end())
@@ -258,11 +261,10 @@ int CpuManager::set_cpu_to_tid(uint8_t cpu_id, ThreadId tid) {
   CPU_ZERO(&cpu_set);
   CPU_SET(cpu_id, &cpu_set);
   if (sched_setaffinity(tid, sizeof(cpu_set), &cpu_set) != 0) {
-    logger_.error(
-        std::format("[CpuManager] failed to set cpu({}) to tid({}): {}",
-            cpu_id,
-            tid,
-            strerror(errno)));
+    logger_.error("[CpuManager] failed to set cpu({}) to tid({}): {}",
+        cpu_id,
+        tid,
+        strerror(errno));
     return -1;
   }
   // 확인 로직
@@ -270,8 +272,7 @@ int CpuManager::set_cpu_to_tid(uint8_t cpu_id, ThreadId tid) {
   if (sched_getaffinity(tid, sizeof(cpu_set), &cpu_set) == -1) {
     return -1;
   }
-  logger_.info(
-      std::format("[CpuManager] tid {} allowed CPU : {}", tid, cpu_id));
+  logger_.info("[CpuManager] tid {} allowed CPU : {}", tid, cpu_id);
   return 0;
 
 #elif __APPLE__
@@ -303,8 +304,7 @@ int CpuManager::set_rt(const uint8_t cpu_id, ThreadId tid, SchedPolicy policy,
   (void)policy;
   // Apple: RT 정책 대신 User Interactive QoS 적용 권장
   // 리눅스 코드 구조를 맞추기 위해 흉내만 냄
-  logger_.info(
-      std::format("[CpuManager] Setting High Priority (QoS) for TID {}", tid));
+  logger_.info("[CpuManager] Setting High Priority (QoS) for TID {}", tid);
 
   // Apple에서는 pthread_t 핸들이 없으면 외부 스레드 QoS 설정이 불가함.
   // 여기서는 Nice 값(Priority)을 최대로 낮춰서(-20) 우선순위를 높임
@@ -333,8 +333,7 @@ int CpuManager::set_cfs(const uint8_t cpu_id, ThreadId tid, SchedPolicy policy,
 #endif
   (void)policy;
   if (setpriority(PRIO_PROCESS, tid, nicev) != 0) {
-    logger_.error(
-        std::format("[CpuManager] failed to set nicev: {}", strerror(errno)));
+    logger_.error("[CpuManager] failed to set nicev: {}", strerror(errno));
     return -1;
   }
   return 0;
@@ -388,8 +387,7 @@ int CpuManager::set_scheduler(ThreadId tid, int priority,
 #ifdef __linux__
   const sched_param sched_params{.sched_priority = priority};
   if (sched_setscheduler(tid, scheduler_policy, &sched_params) != 0) {
-    logger_.error(std::format("[CpuManager] failed to setscheduler: {}",
-        strerror(errno)));
+    logger_.error("[CpuManager] failed to setscheduler: {}", strerror(errno));
     return -1;
   }
   if (sched_getscheduler(tid) < 0) {
@@ -421,13 +419,11 @@ int CpuManager::set_affinity(const AffinityInfo& info) {
   CPU_SET(info.cpu_id_, &cpu_info);
 
   if (sched_setaffinity(info.tid_, sizeof(cpu_info), &cpu_info) != 0) {
-    logger_.error(
-        std::format("[CpuManager] sched_setaffinity :{}", strerror(errno)));
+    logger_.error("[CpuManager] sched_setaffinity :{}", strerror(errno));
     return -1;
   }
   if (sched_getaffinity(info.tid_, sizeof(cpu_info), &cpu_info) == -1) {
-    logger_.error(
-        std::format("[CpuManager] sched_getaffinity :{}", strerror(errno)));
+    logger_.error("[CpuManager] sched_getaffinity :{}", strerror(errno));
     return -1;
   }
   return 0;

@@ -14,8 +14,7 @@
 #define FUTURES_ACCOUNT_UPDATE_H
 #include <glaze/glaze.hpp>
 
-namespace schema {
-namespace futures {
+namespace schema::futures {
 
 struct AccountUpdateBalance {
   std::string asset;           // "a"
@@ -24,9 +23,10 @@ struct AccountUpdateBalance {
   double balance_change{};     // "bc"
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = AccountUpdateBalance;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "a",  &T::asset,
       "wb", glz::quoted_num<&T::wallet_balance>,
       "cw", glz::quoted_num<&T::cross_wallet>,
@@ -49,9 +49,10 @@ struct AccountUpdatePosition {
   double break_even_price{};     // "bep"
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = AccountUpdatePosition;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "s",   &T::symbol,
       "pa",  glz::quoted_num<&T::position_amount>,
       "ep",  glz::quoted_num<&T::entry_price>,
@@ -73,9 +74,10 @@ struct AccountUpdateData {
   std::string reason;                           // "m" (event reason)
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = AccountUpdateData;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "B", &T::balances,
       "P", &T::positions,
       "m", &T::reason
@@ -91,9 +93,10 @@ struct AccountUpdateResponse {
   AccountUpdateData data;           // "a"
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = AccountUpdateResponse;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "e", &T::event_type,
       "T", &T::transaction_time,
       "E", &T::event_time,
@@ -103,6 +106,5 @@ struct AccountUpdateResponse {
   // clang-format on
 };
 
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 #endif  // FUTURES_ACCOUNT_UPDATE_H

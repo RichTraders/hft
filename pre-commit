@@ -16,10 +16,19 @@ if ! command -v "$CLANG_TIDY" > /dev/null; then
   exit 1
 fi
 
-EXTENSIONS="h cpp cc cxx c hpp"
+EXTENSIONS="cpp cc cxx c"
 FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -Ev "test|NewOroFix44MD_|NewOroFix44OE_|fix_[?:app|md_app|oe_app]|fix_*_[core]|schema|pch\.h" | grep -E "\.(${EXTENSIONS// /|})$")
 
-if [ -z "$FILES" ]; then
+# 헤더 파일이 변경되면 main.cpp를 체크 대상에 추가 (마지막에 별도 처리)
+HEADERS=$(git diff --cached --name-only --diff-filter=ACM | grep -Ev "test|schema|pch\.h" | grep -E "\.(h|hpp)$")
+CHECK_MAIN=0
+if [ -n "$HEADERS" ]; then
+  CHECK_MAIN=1
+  # FILES에서 main.cpp 제거 (나중에 마지막으로 체크)
+  FILES=$(echo "$FILES" | grep -v "^main.cpp$")
+fi
+
+if [ -z "$FILES" ] && [ "$CHECK_MAIN" -eq 0 ]; then
   exit 0
 fi
 
@@ -43,7 +52,7 @@ if [ ! -e "${BUILD_DIR}/compile_commands.json" ]; then
     -DCMAKE_OSX_DEPLOYMENT_TARGET=13.3
     cmake --build ${BUILD_DIR} --target websockets || exit 1
   elif [[ "${OS_NAME}" == "Linux" ]]; then
-    cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DENABLE_WEBSOCKET=ON ; cmake --build build --target websockets || exit 1
+    cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DENABLE_WEBSOCKET=ON -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON ; cmake --build ${BUILD_DIR} --target websockets || exit 1
   fi
 
 fi
@@ -85,6 +94,25 @@ done
 if [ "$FAIL" -ne 0 ]; then
   echo "Commit blocked due to clang-tidy errors."
   exit 1
+fi
+
+# 헤더 변경 시 main.cpp를 마지막에 체크 (캐싱 안 함)
+if [ "$CHECK_MAIN" -eq 1 ]; then
+  echo "• main.cpp (header changes detected)"
+  $CLANG_FORMAT -i "main.cpp"
+  git add "main.cpp"
+  echo "formatted: main.cpp"
+
+  if [[ "${OS_NAME}" == "Darwin" ]]; then
+    "$CLANG_TIDY" "main.cpp" -p "$BUILD_DIR" --extra-arg="-include" --extra-arg="${SCRIPT_DIR}/include/pch.h"
+  elif [[ "${OS_NAME}" == "Linux" ]]; then
+    "$CLANG_TIDY" "main.cpp" -p "$BUILD_DIR"
+  fi
+
+  if [ $? -ne 0 ]; then
+    echo "clang-tidy found issues in main.cpp (triggered by header changes)"
+    exit 1
+  fi
 fi
 
 exit 0

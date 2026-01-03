@@ -12,9 +12,16 @@
 
 #ifndef ORDER_ENTRY_H
 #define ORDER_ENTRY_H
-#include <common/types.h>
 
-#include "common/precision_config.hpp"
+#include <cstdint>
+#include <iomanip>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <string_view>
+
+#include <common/precision_config.hpp>
+#include <common/types.h>
 
 namespace trading {
 
@@ -156,9 +163,9 @@ struct NewSingleOrderData {
   common::OrderId cl_order_id;
   std::string symbol;
   OrderSide side;
-  common::Qty order_qty;
+  common::QtyType order_qty;
   OrderType ord_type;
-  common::Price price;
+  common::PriceType price;
   TimeInForce time_in_force;
   SelfTradePreventionMode self_trade_prevention_mode =
       SelfTradePreventionMode::kExpireTaker;
@@ -334,9 +341,9 @@ struct RequestCommon {
   common::OrderId orig_cl_order_id{common::OrderId{common::kOrderIdInvalid}};
   std::string symbol{"BTCUSDT"};
   common::Side side{common::Side::kInvalid};
-  common::Qty order_qty{0.};
+  common::QtyType order_qty{common::QtyType::from_raw(0)};
   OrderType ord_type{OrderType::kInvalid};
-  common::Price price{0.};
+  common::PriceType price{common::PriceType::from_raw(0)};
   TimeInForce time_in_force{TimeInForce::kInvalid};
   SelfTradePreventionMode self_trade_prevention_mode{
       SelfTradePreventionMode::kExpireTaker};
@@ -350,12 +357,9 @@ struct RequestCommon {
            << ", cl_order_id=" << cl_order_id.value
            << ", orig_cl_order_id=" << orig_cl_order_id.value
            << ", symbol=" << symbol << ", side=" << common::toString(side)
-           << ", order_qty="
-           << std::setprecision(PRECISION_CONFIG.qty_precision())
-           << order_qty.value << ", ord_type=" << trading::toString(ord_type)
-           << ", price="
-           << std::setprecision(PRECISION_CONFIG.price_precision())
-           << price.value
+           << ", order_qty=" << order_qty.to_double()
+           << ", ord_type=" << trading::toString(ord_type)
+           << ", price=" << price.to_double()
            << ", time_in_force=" << trading::toString(time_in_force)
            << ", self_trade_prevention_mode="
            << trading::toString(self_trade_prevention_mode);
@@ -381,9 +385,9 @@ struct OrderCancelAndNewOrderSingle {
   common::OrderId cl_origin_order_id;
   std::string symbol;
   OrderSide side;
-  common::Qty order_qty;
+  common::QtyType order_qty;
   OrderType ord_type;
-  common::Price price;
+  common::PriceType price;
   TimeInForce time_in_force;
   SelfTradePreventionMode self_trade_prevention_mode =
       SelfTradePreventionMode::kExpireTaker;
@@ -400,8 +404,8 @@ struct OrderModifyRequest {
   common::OrderId orig_client_order_id;
   std::string symbol;
   OrderSide side;
-  common::Price price;
-  common::Qty order_qty;
+  common::PriceType price;
+  common::QtyType order_qty;
   std::optional<common::PositionSide> position_side;
 };
 
@@ -410,11 +414,11 @@ struct ExecutionReport {
   std::string symbol;
   ExecType exec_type;
   OrdStatus ord_status;
-  common::Qty cum_qty = common::Qty{.0f};
-  common::Qty leaves_qty = common::Qty{.0f};
-  common::Qty last_qty = common::Qty{.0f};
+  common::QtyType cum_qty = common::QtyType::from_raw(0);
+  common::QtyType leaves_qty = common::QtyType::from_raw(0);
+  common::QtyType last_qty = common::QtyType::from_raw(0);
   int error_code;
-  common::Price price = common::Price{.0f};
+  common::PriceType price = common::PriceType::from_raw(0);
   common::Side side;
   std::string text;
   std::optional<common::PositionSide> position_side;  // For futures trading
@@ -435,15 +439,11 @@ struct ExecutionReport {
     stream << "ExecutionReport{" << "order_id=" << cl_order_id.value
            << ", symbol=" << symbol
            << ", exec_type=" << trading::toString(exec_type)
-           << ", ord_status=" << trading::toString(ord_status) << ", cum_qty="
-           << std::setprecision(PRECISION_CONFIG.qty_precision())
-           << cum_qty.value << ", leaves_qty="
-           << std::setprecision(PRECISION_CONFIG.qty_precision())
-           << leaves_qty.value << ", last_qty="
-           << std::setprecision(PRECISION_CONFIG.qty_precision())
-           << last_qty.value << ", error_code=" << error_code << ", price="
-           << std::setprecision(PRECISION_CONFIG.price_precision())
-           << price.value << ", side=" << common::toString(side)
+           << ", ord_status=" << trading::toString(ord_status)
+           << ", cum_qty=" << cum_qty.to_double()
+           << ", leaves_qty=" << leaves_qty.to_double()
+           << ", last_qty=" << last_qty.to_double() << ", error_code=" << error_code
+           << ", price=" << price.to_double() << ", side=" << common::toString(side)
            << ", text=" << text;
     if (position_side) {
       stream << ", position_side=" << common::toString(*position_side);

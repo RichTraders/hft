@@ -13,6 +13,8 @@
 #ifndef STREAM_STATE_H
 #define STREAM_STATE_H
 
+#include <cstdint>
+
 namespace trading {
 
 enum class StreamState : uint8_t {

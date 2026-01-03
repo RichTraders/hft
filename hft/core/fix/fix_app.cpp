@@ -10,7 +10,20 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
+#include <array>
+#include <atomic>
+#include <cerrno>
+#include <chrono>
+#include <condition_variable>
+#include <cstdio>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <thread>
+
 #include <fix8/f8includes.hpp>
+
 #include "authorization.h"
 #include "fix_md_app.h"
 #include "fix_oe_app.h"

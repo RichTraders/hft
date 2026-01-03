@@ -30,10 +30,11 @@ struct AccountBalanceResponse {
     bool marginAvailable;
     std::uint64_t updateTime;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
       using T = AssetBalance;
       // clang-format off
-      static constexpr auto value = glz::object(
+      static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "accountAlias", &T::accountAlias,
         "asset", &T::asset,
         "balance", &T::balance,
@@ -50,10 +51,11 @@ struct AccountBalanceResponse {
   std::vector<AssetBalance> event;
   std::optional<std::vector<RateLimit>> rate_limits;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = AccountBalanceResponse;
     // clang-format off
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "id", &T::id,
       "status", &T::status,
       "result", &T::event,

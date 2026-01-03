@@ -39,7 +39,8 @@ class OrderStateManagerTest : public ::testing::Test {
 
   void SetUp() override {
     producer_ = std::make_unique<Logger::Producer>(logger_->make_producer());
-    tick_converter_ = std::make_unique<TickConverter>(0.01);  // 0.01 tick size
+    // tick_size must match kPriceScale: kPriceScale=10 -> tick_size=0.1
+    tick_converter_ = std::make_unique<TickConverter>(0.1);
     state_manager_ = std::make_unique<OrderStateManager>(*producer_, *tick_converter_);
     position_tracker_ = std::make_unique<ReservedPositionTracker>();
 
@@ -73,19 +74,19 @@ TEST_F(OrderStateManagerTest, HandlePendingNew_TransitionsToCorrectState) {
   // Setup: Reserve a slot
   const int layer = 0;
   const OrderId order_id{12345};
-  const Price price{100.50};
+  const auto price = PriceType::from_double(100.50);
 
   side_book_->slots[layer].state = OMOrderState::kReserved;
   side_book_->slots[layer].cl_order_id = order_id;
   side_book_->slots[layer].price = price;
-  side_book_->slots[layer].qty = Qty{1.0};
-  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.value);
+  side_book_->slots[layer].qty = QtyType::from_double(1.0);
+  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.to_double());
 
   // Create execution report
   ExecutionReport report;
   report.ord_status = OrdStatus::kPendingNew;
   report.cl_order_id = order_id;
-  report.price = price;
+  report.price = PriceType{price};
   report.side = Side::kBuy;
 
   // Execute
@@ -103,20 +104,20 @@ TEST_F(OrderStateManagerTest, HandleNew_SimpleNewOrder_TransitionsToLive) {
   // Setup
   const int layer = 0;
   const OrderId order_id{12345};
-  const Price price{100.50};
-  const Qty qty{1.5};
+  const auto price = PriceType::from_double(100.50);
+  const auto qty = QtyType::from_double(1.5);
 
   side_book_->slots[layer].state = OMOrderState::kReserved;
   side_book_->slots[layer].cl_order_id = order_id;
   side_book_->slots[layer].price = price;
   side_book_->slots[layer].qty = qty;
-  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.value);
+  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.to_double());
 
   // Create execution report
   ExecutionReport report;
   report.ord_status = OrdStatus::kNew;
   report.cl_order_id = order_id;
-  report.price = price;
+  report.price = PriceType{price};
   report.leaves_qty = qty;
   report.side = Side::kBuy;
 
@@ -125,7 +126,7 @@ TEST_F(OrderStateManagerTest, HandleNew_SimpleNewOrder_TransitionsToLive) {
 
   // Verify
   EXPECT_EQ(side_book_->slots[layer].state, OMOrderState::kLive);
-  EXPECT_EQ(side_book_->slots[layer].qty, qty);
+  EXPECT_EQ(side_book_->slots[layer].qty.value, qty.value);
 }
 
 TEST_F(OrderStateManagerTest, HandleNew_CancelAndReorder_ProcessesPendingReplace) {
@@ -133,10 +134,10 @@ TEST_F(OrderStateManagerTest, HandleNew_CancelAndReorder_ProcessesPendingReplace
   const int layer = 0;
   const OrderId old_id{12345};
   const OrderId new_id{12346};
-  const Price old_price{100.50};
-  const Price new_price{101.00};
-  const Qty old_qty{1.0};
-  const Qty new_qty{2.0};
+  const auto old_price = PriceType::from_double(100.50);
+  const auto new_price = PriceType::from_double(101.00);
+  const auto old_qty = QtyType::from_double(1.0);
+  const auto new_qty = QtyType::from_double(2.0);
 
   side_book_->slots[layer].state = OMOrderState::kCancelReserved;
   side_book_->slots[layer].cl_order_id = old_id;
@@ -147,12 +148,12 @@ TEST_F(OrderStateManagerTest, HandleNew_CancelAndReorder_ProcessesPendingReplace
   side_book_->pending_repl[layer] = PendingReplaceInfo(
     new_price,
     new_qty,
-    tick_converter_->to_ticks(new_price.value),
+    tick_converter_->to_ticks(new_price.to_double()),
     new_id,
     old_qty,
     old_id,
     old_price,
-    tick_converter_->to_ticks(old_price.value)
+    tick_converter_->to_ticks(old_price.to_double())
   );
 
   side_book_->new_id_to_layer[new_id.value] = layer;
@@ -170,8 +171,8 @@ TEST_F(OrderStateManagerTest, HandleNew_CancelAndReorder_ProcessesPendingReplace
 
   // Verify
   EXPECT_EQ(side_book_->slots[layer].state, OMOrderState::kLive);
-  EXPECT_EQ(side_book_->slots[layer].price, new_price);
-  EXPECT_EQ(side_book_->slots[layer].qty, new_qty);
+  EXPECT_EQ(side_book_->slots[layer].price.value, new_price.value);
+  EXPECT_EQ(side_book_->slots[layer].qty.value, new_qty.value);
   EXPECT_EQ(side_book_->slots[layer].cl_order_id, new_id);
   EXPECT_FALSE(side_book_->pending_repl[layer].has_value());
 }
@@ -184,23 +185,23 @@ TEST_F(OrderStateManagerTest, HandlePartiallyFilled_UpdatesQuantityAndPosition) 
   // Setup
   const int layer = 0;
   const OrderId order_id{12345};
-  const Price price{100.50};
-  const Qty initial_qty{10.0};
-  const Qty remaining_qty{6.0};
+  const auto price = PriceType::from_double(100.50);
+  const auto initial_qty = QtyType::from_double(10.0);
+  const auto remaining_qty = QtyType::from_double(6.0);
 
   side_book_->slots[layer].state = OMOrderState::kLive;
   side_book_->slots[layer].cl_order_id = order_id;
   side_book_->slots[layer].price = price;
   side_book_->slots[layer].qty = initial_qty;
-  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.value);
+  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.to_double());
 
-  position_tracker_->add_reserved(Side::kBuy, initial_qty);
+  position_tracker_->add_reserved(Side::kBuy, initial_qty.value);
 
   // Create execution report
   ExecutionReport report;
   report.ord_status = OrdStatus::kPartiallyFilled;
   report.cl_order_id = order_id;
-  report.price = price;
+  report.price = PriceType{price};
   report.leaves_qty = remaining_qty;
   report.side = Side::kBuy;
 
@@ -211,33 +212,33 @@ TEST_F(OrderStateManagerTest, HandlePartiallyFilled_UpdatesQuantityAndPosition) 
 
   // Verify
   EXPECT_EQ(side_book_->slots[layer].state, OMOrderState::kLive);
-  EXPECT_EQ(side_book_->slots[layer].qty, remaining_qty);
+  EXPECT_EQ(side_book_->slots[layer].qty.value, remaining_qty.value);
 
   // Reserved position should decrease by filled amount (4.0)
-  const Qty filled_qty = initial_qty - remaining_qty;
-  EXPECT_DOUBLE_EQ(position_tracker_->get_reserved().value,
-                   initial_reserved.value - filled_qty.value);
+  const int64_t filled_qty = initial_qty.value - remaining_qty.value;
+  EXPECT_EQ(position_tracker_->get_reserved(),
+                   initial_reserved - filled_qty);
 }
 
 TEST_F(OrderStateManagerTest, HandlePartiallyFilled_FullyFilled_TransitionsToDead) {
   // Setup
   const int layer = 0;
   const OrderId order_id{12345};
-  const Price price{100.50};
-  const Qty initial_qty{10.0};
-  const Qty remaining_qty{0.0};
+  const auto price = PriceType::from_double(100.50);
+  const auto initial_qty = QtyType::from_double(10.0);
+  const auto remaining_qty = QtyType::from_double(0.0);
 
   side_book_->slots[layer].state = OMOrderState::kLive;
   side_book_->slots[layer].cl_order_id = order_id;
   side_book_->slots[layer].price = price;
   side_book_->slots[layer].qty = initial_qty;
-  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.value);
+  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.to_double());
 
   // Create execution report
   ExecutionReport report;
   report.ord_status = OrdStatus::kPartiallyFilled;
   report.cl_order_id = order_id;
-  report.price = price;
+  report.price = PriceType{price};
   report.leaves_qty = remaining_qty;
   report.side = Side::kBuy;
 
@@ -256,23 +257,23 @@ TEST_F(OrderStateManagerTest, HandleFilled_TransitionsToDeadAndClearsReserved) {
   // Setup
   const int layer = 0;
   const OrderId order_id{12345};
-  const Price price{100.50};
-  const Qty qty{5.0};
+  const auto price = PriceType::from_double(100.50);
+  const auto qty = QtyType::from_double(5.0);
 
   side_book_->slots[layer].state = OMOrderState::kLive;
   side_book_->slots[layer].cl_order_id = order_id;
   side_book_->slots[layer].price = price;
   side_book_->slots[layer].qty = qty;
-  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.value);
+  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.to_double());
 
-  position_tracker_->add_reserved(Side::kBuy, qty);
+  position_tracker_->add_reserved(Side::kBuy, qty.value);
 
   // Create execution report
   ExecutionReport report;
   report.ord_status = OrdStatus::kFilled;
   report.cl_order_id = order_id;
-  report.price = price;
-  report.leaves_qty = Qty{0.0};
+  report.price = PriceType{price};
+  report.leaves_qty = QtyType::from_double(0.0);
   report.side = Side::kBuy;
 
   // Execute
@@ -280,7 +281,7 @@ TEST_F(OrderStateManagerTest, HandleFilled_TransitionsToDeadAndClearsReserved) {
 
   // Verify
   EXPECT_EQ(side_book_->slots[layer].state, OMOrderState::kDead);
-  EXPECT_DOUBLE_EQ(position_tracker_->get_reserved().value, 0.0);
+  EXPECT_EQ(position_tracker_->get_reserved(), 0);
 }
 
 // ============================================================================
@@ -291,19 +292,19 @@ TEST_F(OrderStateManagerTest, HandlePendingCancel_TransitionsToCorrectState) {
   // Setup
   const int layer = 0;
   const OrderId order_id{12345};
-  const Price price{100.50};
+  const auto price = PriceType::from_double(100.50);
 
   side_book_->slots[layer].state = OMOrderState::kLive;
   side_book_->slots[layer].cl_order_id = order_id;
   side_book_->slots[layer].price = price;
-  side_book_->slots[layer].qty = Qty{1.0};
-  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.value);
+  side_book_->slots[layer].qty = QtyType::from_double(1.0);
+  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.to_double());
 
   // Create execution report
   ExecutionReport report;
   report.ord_status = OrdStatus::kPendingCancel;
   report.cl_order_id = order_id;
-  report.price = price;
+  report.price = PriceType{price};
   report.side = Side::kBuy;
 
   // Execute
@@ -321,22 +322,22 @@ TEST_F(OrderStateManagerTest, HandleCanceled_SimpleCancelTransitionsToDead) {
   // Setup
   const int layer = 0;
   const OrderId order_id{12345};
-  const Price price{100.50};
-  const Qty qty{3.0};
+  const auto price = PriceType::from_double(100.50);
+  const auto qty = QtyType::from_double(3.0);
 
   side_book_->slots[layer].state = OMOrderState::kPendingCancel;
   side_book_->slots[layer].cl_order_id = order_id;
   side_book_->slots[layer].price = price;
   side_book_->slots[layer].qty = qty;
-  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.value);
+  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.to_double());
 
-  position_tracker_->add_reserved(Side::kBuy, qty);
+  position_tracker_->add_reserved(Side::kBuy, qty.value);
 
   // Create execution report
   ExecutionReport report;
   report.ord_status = OrdStatus::kCanceled;
   report.cl_order_id = order_id;
-  report.price = price;
+  report.price = PriceType{price};
   report.side = Side::kBuy;
 
   // Execute
@@ -344,7 +345,7 @@ TEST_F(OrderStateManagerTest, HandleCanceled_SimpleCancelTransitionsToDead) {
 
   // Verify
   EXPECT_EQ(side_book_->slots[layer].state, OMOrderState::kDead);
-  EXPECT_DOUBLE_EQ(position_tracker_->get_reserved().value, 0.0);
+  EXPECT_EQ(position_tracker_->get_reserved(), 0);
 }
 
 TEST_F(OrderStateManagerTest, HandleCanceled_CancelForReplace_TransitionsToReserved) {
@@ -354,8 +355,8 @@ TEST_F(OrderStateManagerTest, HandleCanceled_CancelForReplace_TransitionsToReser
 
   side_book_->slots[layer].state = OMOrderState::kCancelReserved;
   side_book_->slots[layer].cl_order_id = old_id;
-  side_book_->slots[layer].price = Price{100.0};
-  side_book_->slots[layer].qty = Qty{1.0};
+  side_book_->slots[layer].price = PriceType::from_double(100.0);
+  side_book_->slots[layer].qty = QtyType::from_double(1.0);
 
   // Map this order as being replaced
   side_book_->orig_id_to_layer[old_id.value] = layer;
@@ -364,7 +365,7 @@ TEST_F(OrderStateManagerTest, HandleCanceled_CancelForReplace_TransitionsToReser
   ExecutionReport report;
   report.ord_status = OrdStatus::kCanceled;
   report.cl_order_id = old_id;
-  report.price = Price{100.0};
+  report.price = PriceType::from_double(100.0);
   report.side = Side::kBuy;
 
   // Execute
@@ -383,22 +384,22 @@ TEST_F(OrderStateManagerTest, HandleRejected_SimpleReject_TransitionsToDead) {
   // Setup
   const int layer = 0;
   const OrderId order_id{12345};
-  const Price price{100.50};
-  const Qty qty{2.0};
+  const auto price = PriceType::from_double(100.50);
+  const auto qty = QtyType::from_double(2.0);
 
   side_book_->slots[layer].state = OMOrderState::kReserved;
   side_book_->slots[layer].cl_order_id = order_id;
-  side_book_->slots[layer].price = price;
-  side_book_->slots[layer].qty = qty;
-  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.value);
+  side_book_->slots[layer].price = PriceType::from_double(100.50);
+  side_book_->slots[layer].qty = QtyType::from_double(2.0);
+  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.to_double());
 
-  position_tracker_->add_reserved(Side::kBuy, qty);
+  position_tracker_->add_reserved(Side::kBuy, qty.value);
 
   // Create execution report
   ExecutionReport report;
   report.ord_status = OrdStatus::kRejected;
   report.cl_order_id = order_id;
-  report.price = price;
+  report.price = PriceType{price};
   report.side = Side::kBuy;
 
   // Execute
@@ -406,7 +407,7 @@ TEST_F(OrderStateManagerTest, HandleRejected_SimpleReject_TransitionsToDead) {
 
   // Verify
   EXPECT_EQ(side_book_->slots[layer].state, OMOrderState::kDead);
-  EXPECT_DOUBLE_EQ(position_tracker_->get_reserved().value, 0.0);
+  EXPECT_EQ(position_tracker_->get_reserved(), 0);
 }
 
 TEST_F(OrderStateManagerTest, HandleRejected_ReplaceRejected_RestoresOriginalState) {
@@ -414,10 +415,10 @@ TEST_F(OrderStateManagerTest, HandleRejected_ReplaceRejected_RestoresOriginalSta
   const int layer = 0;
   const OrderId old_id{12345};
   const OrderId new_id{12346};
-  const Price old_price{100.0};
-  const Price new_price{101.0};
-  const Qty old_qty{5.0};
-  const Qty new_qty{7.0};
+  const auto old_price = PriceType::from_double(100.0);
+  const auto new_price = PriceType::from_double(101.0);
+  const auto old_qty = QtyType::from_double(5.0);
+  const auto new_qty = QtyType::from_double(7.0);
 
   side_book_->slots[layer].state = OMOrderState::kCancelReserved;
   side_book_->slots[layer].cl_order_id = new_id;
@@ -428,25 +429,25 @@ TEST_F(OrderStateManagerTest, HandleRejected_ReplaceRejected_RestoresOriginalSta
   side_book_->pending_repl[layer] = PendingReplaceInfo(
     new_price,
     new_qty,
-    tick_converter_->to_ticks(new_price.value),
+    tick_converter_->to_ticks(new_price.to_double()),
     new_id,
     old_qty,
     old_id,
     old_price,
-    tick_converter_->to_ticks(old_price.value)
+    tick_converter_->to_ticks(old_price.to_double())
   );
 
   side_book_->new_id_to_layer[new_id.value] = layer;
 
-  const Qty delta_qty = new_qty - old_qty;
-  position_tracker_->add_reserved(Side::kBuy, old_qty);
+  const int64_t delta_qty = new_qty.value - old_qty.value;
+  position_tracker_->add_reserved(Side::kBuy, old_qty.value);
   position_tracker_->add_reserved(Side::kBuy, delta_qty);
 
   // Create execution report
   ExecutionReport report;
   report.ord_status = OrdStatus::kRejected;
   report.cl_order_id = new_id;
-  report.price = new_price;
+  report.price = PriceType{new_price};
   report.side = Side::kBuy;
 
   // Execute
@@ -455,33 +456,33 @@ TEST_F(OrderStateManagerTest, HandleRejected_ReplaceRejected_RestoresOriginalSta
   // Verify: Order should be restored to original state
   EXPECT_EQ(side_book_->slots[layer].state, OMOrderState::kLive);
   EXPECT_EQ(side_book_->slots[layer].cl_order_id, old_id);
-  EXPECT_EQ(side_book_->slots[layer].price, old_price);
-  EXPECT_EQ(side_book_->slots[layer].qty, old_qty);
+  EXPECT_EQ(side_book_->slots[layer].price.value, old_price.value);
+  EXPECT_EQ(side_book_->slots[layer].qty.value, old_qty.value);
   EXPECT_FALSE(side_book_->pending_repl[layer].has_value());
   EXPECT_EQ(side_book_->new_id_to_layer.count(new_id.value), 0);
-  EXPECT_DOUBLE_EQ(position_tracker_->get_reserved().value, old_qty.value);
+  EXPECT_EQ(position_tracker_->get_reserved(), old_qty.value);
 }
 
 TEST_F(OrderStateManagerTest, HandleExpired_TransitionsToDead) {
   // Setup
   const int layer = 0;
   const OrderId order_id{12345};
-  const Price price{100.50};
-  const Qty qty{2.5};
+  const auto price = PriceType::from_double(100.50);
+  const auto qty = QtyType::from_double(2.5);
 
   side_book_->slots[layer].state = OMOrderState::kLive;
   side_book_->slots[layer].cl_order_id = order_id;
   side_book_->slots[layer].price = price;
   side_book_->slots[layer].qty = qty;
-  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.value);
+  side_book_->layer_ticks[layer] = tick_converter_->to_ticks(price.to_double());
 
-  position_tracker_->add_reserved(Side::kBuy, qty);
+  position_tracker_->add_reserved(Side::kBuy, qty.value);
 
   // Create execution report
   ExecutionReport report;
   report.ord_status = OrdStatus::kExpired;
   report.cl_order_id = order_id;
-  report.price = price;
+  report.price = PriceType::from_double(price.value);
   report.side = Side::kBuy;
 
   // Execute
@@ -489,5 +490,5 @@ TEST_F(OrderStateManagerTest, HandleExpired_TransitionsToDead) {
 
   // Verify
   EXPECT_EQ(side_book_->slots[layer].state, OMOrderState::kDead);
-  EXPECT_DOUBLE_EQ(position_tracker_->get_reserved().value, 0.0);
+  EXPECT_EQ(position_tracker_->get_reserved(), 0);
 }

@@ -12,6 +12,11 @@
 
 #ifndef RISK_MANAGER_H
 #define RISK_MANAGER_H
+
+#include <sstream>
+#include <string>
+#include <unordered_map>
+
 #include "common/types.h"
 #include "position_keeper.h"
 
@@ -51,7 +56,7 @@ struct RiskInfo {
   common::RiskCfg risk_cfg_;
 
   [[nodiscard]] RiskCheckResult checkPreTradeRisk(common::Side side,
-      common::Qty qty, common::Qty reserved_position,
+      common::QtyType qty, common::QtyType reserved_position,
       const common::Logger::Producer& logger) noexcept;
 
   [[nodiscard]] auto toString() const {
@@ -72,9 +77,10 @@ class RiskManager {
       const common::TradeEngineCfgHashMap& ticker_cfg);
 
   ~RiskManager();
+
   [[nodiscard]] auto check_pre_trade_risk(const common::TickerId& ticker_id,
-      const common::Side side, const common::Qty qty,
-      const common::Qty reserved_qty) noexcept {
+      const common::Side side, const common::QtyType qty,
+      const common::QtyType reserved_qty) noexcept {
     return ticker_risk_.at(ticker_id).checkPreTradeRisk(side,
         qty,
         reserved_qty,

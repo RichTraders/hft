@@ -25,8 +25,8 @@
 #include "trade_engine.hpp"
 
 #ifdef ENABLE_WEBSOCKET
-#include "core/websocket/market_data/ws_md_app.h"
-#include "core/websocket/order_entry/ws_oe_app.h"
+#include "core/websocket/market_data/ws_md_app.hpp"
+#include "core/websocket/order_entry/ws_oe_app.hpp"
 using SelectedMarketApp = core::WsMarketDataApp;
 using SelectedOrderApp = core::WsOrderEntryApp;
 #else

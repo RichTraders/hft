@@ -13,6 +13,14 @@
 #ifndef BINANCE_SPOT_DOMAIN_CONVERTER_H
 #define BINANCE_SPOT_DOMAIN_CONVERTER_H
 
+#include <cstdlib>
+#include <optional>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
+
 #include <common/logger.h>
 #include <common/memory_pool.hpp>
 #include "market_data.h"
@@ -27,17 +35,17 @@
 #include "types.h"
 
 inline MarketData* make_entry(common::MemoryPool<MarketData>* pool,
-    const std::string& symbol, common::Side side, double price, double qty,
+    const std::string& symbol, common::Side side, int64_t price, int64_t qty,
     common::MarketUpdateType update_type) {
 
   const auto update =
-      qty <= 0.0 ? common::MarketUpdateType::kCancel : update_type;
+      qty <= 0 ? common::MarketUpdateType::kCancel : update_type;
   auto* entry = pool->allocate(update,
       common::OrderId{0},
       common::TickerId{symbol},
       side,
-      common::Price{price},
-      common::Qty{qty});
+      common::PriceType::from_raw(price),
+      common::QtyType::from_raw(qty));
   if (LIKELY(entry)) {
     return entry;
   }
@@ -186,8 +194,8 @@ struct BinanceSpotMdMessageConverter {
           common::OrderId{},
           common::TickerId{symbol},
           common::Side::kInvalid,
-          common::Price{},
-          common::Qty{}));
+          common::PriceType::from_raw(0),
+          common::QtyType::from_raw(0)));
 
       for (const auto& [price, qty] : msg.bids) {
         entries.push_back(make_entry(pool_,
@@ -251,16 +259,16 @@ struct BinanceSpotMdMessageConverter {
         : logger_(converter.logger_), pool_(converter.pool_) {}
 
     [[nodiscard]] MarketData* make_entry(const std::string& symbol,
-        common::Side side, double price, double qty,
+        common::Side side, int64_t price, int64_t qty,
         common::MarketUpdateType update_type) const {
       const auto update =
-          qty <= 0.0 ? common::MarketUpdateType::kCancel : update_type;
+          qty <= 0 ? common::MarketUpdateType::kCancel : update_type;
       auto* entry = pool_->allocate(update,
           common::OrderId{0},
           common::TickerId{symbol},
           side,
-          common::Price{price},
-          common::Qty{qty});
+          common::PriceType::from_raw(price),
+          common::QtyType::from_raw(qty));
       if (!entry) {
         logger_.error("Market data pool exhausted");
       }
@@ -288,8 +296,8 @@ struct BinanceSpotMdMessageConverter {
           common::OrderId{},
           common::TickerId{symbol},
           common::Side::kInvalid,
-          common::Price{},
-          common::Qty{}));
+          common::PriceType::from_raw(0),
+          common::QtyType::from_raw(0)));
 
       for (const auto& bid : msg.result.bids) {
         entries.push_back(make_entry(symbol,
@@ -325,8 +333,8 @@ struct BinanceSpotMdMessageConverter {
           common::OrderId{},
           common::TickerId{symbol},
           common::Side::kInvalid,
-          common::Price{},
-          common::Qty{}));
+          common::PriceType::from_raw(0),
+          common::QtyType::from_raw(0)));
 
       for (const auto& [price, qty] : msg.bids) {
         entries.push_back(make_entry(symbol,

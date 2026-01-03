@@ -13,6 +13,14 @@
 #ifndef BINANCE_MD_ENCODER_H
 #define BINANCE_MD_ENCODER_H
 
+#include <algorithm>
+#include <cctype>
+#include <format>
+#include <optional>
+#include <ranges>
+#include <string>
+#include <string_view>
+
 #include <glaze/glaze.hpp>
 #include "schema/spot/request/exchange_info.h"
 struct BinanceSpotEncoder {

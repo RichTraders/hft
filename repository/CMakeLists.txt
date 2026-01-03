@@ -127,8 +127,6 @@ if(ENABLE_WEBSOCKET)
 
     set(BROKER_WS_SRC
             ${CMAKE_SOURCE_DIR}/hft/core/websocket/ws_transport.tpp
-            ${CMAKE_SOURCE_DIR}/hft/core/websocket/market_data/ws_md_app.cpp
-            ${CMAKE_SOURCE_DIR}/hft/core/websocket/order_entry/ws_oe_app.cpp
             ${CMAKE_SOURCE_DIR}/hft/core/ssl_socket.cpp
             ${CMAKE_SOURCE_DIR}/hft/core/signature.cpp
             ${CMAKE_SOURCE_DIR}/hft/core/response_manager.cpp

@@ -10,6 +10,9 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
+#include <memory>
+#include <string>
+
 #include "fix_md_app.h"
 #include "authorization.h"
 #include "fix_md_core.h"

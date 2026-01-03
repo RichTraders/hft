@@ -52,9 +52,10 @@ struct CancelReplaceOrderParams {
   std::optional<double> recv_window;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = CancelReplaceOrderParams;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "symbol",           &T::symbol,
       "cancelReplaceMode",&T::cancel_replace_mode,
       "side",             &T::side,
@@ -98,9 +99,10 @@ struct OrderCancelReplaceRequest {
   CancelReplaceOrderParams params;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = OrderCancelReplaceRequest;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
       "id",     &T::id,
       "method", &T::method,
       "params", &T::params

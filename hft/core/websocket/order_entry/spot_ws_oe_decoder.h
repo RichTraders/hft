@@ -13,6 +13,8 @@
 #ifndef SPOT_WS_OE_DECODER_H
 #define SPOT_WS_OE_DECODER_H
 
+#include <string_view>
+
 #include <glaze/glaze.hpp>
 #include "exchanges/binance/spot/binance_spot_oe_traits.h"
 #include "schema/spot/response/account_position.h"
@@ -48,7 +50,7 @@ class SpotWsOeDecoder : public WsOeDecoderBase<SpotWsOeDecoder> {
               payload);
     }
 
-    schema::WsHeader header{};
+    schema::WsHeader header{};  // NOLINT(misc-const-correctness)
     const auto error_code =
         glz::read<glz::opts{.error_on_unknown_keys = 0, .partial_read = 1}>(
             header,

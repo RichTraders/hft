@@ -54,16 +54,16 @@ TEST_F(LayerBookIntegrationTest, Futures_LongAndShortPositions_AreIsolated) {
   // Place LONG BUY order
   auto& long_buy = layer_book_->side_book("BTCUSDT", Side::kBuy, PositionSide::kLong);
   long_buy.slots[0].cl_order_id = OrderId{10001};
-  long_buy.slots[0].price = Price{50000.00};
-  long_buy.slots[0].qty = Qty{1.0};
+  long_buy.slots[0].price = PriceType::from_double(50000.00);
+  long_buy.slots[0].qty = QtyType::from_double(1.0);
   long_buy.slots[0].state = OMOrderState::kLive;
   long_buy.layer_ticks[0] = static_cast<uint64_t>(50000.00 / 0.01);
 
   // Place SHORT SELL order (different position)
   auto& short_sell = layer_book_->side_book("BTCUSDT", Side::kSell, PositionSide::kShort);
   short_sell.slots[0].cl_order_id = OrderId{20001};
-  short_sell.slots[0].price = Price{50100.00};
-  short_sell.slots[0].qty = Qty{2.0};
+  short_sell.slots[0].price = PriceType::from_double(50100.00);
+  short_sell.slots[0].qty = QtyType::from_double(2.0);
   short_sell.slots[0].state = OMOrderState::kLive;
   short_sell.layer_ticks[0] = static_cast<uint64_t>(50100.00 / 0.01);
 
@@ -73,25 +73,25 @@ TEST_F(LayerBookIntegrationTest, Futures_LongAndShortPositions_AreIsolated) {
   EXPECT_NE(long_buy.slots[0].qty.value, short_sell.slots[0].qty.value);
 
   // Modify LONG position
-  long_buy.slots[0].qty = Qty{1.5};
+  long_buy.slots[0].qty = QtyType::from_double(1.5);
 
   // Verify SHORT position is unaffected
-  EXPECT_EQ(short_sell.slots[0].qty.value, 2.0);
+  EXPECT_EQ(short_sell.slots[0].qty.to_double(), 2.0);
 }
 
 TEST_F(LayerBookIntegrationTest, Futures_LongExitAndShortExit_UseDifferentBooks) {
   // LONG exit (SELL)
   auto& long_sell = layer_book_->side_book("BTCUSDT", Side::kSell, PositionSide::kLong);
   long_sell.slots[0].cl_order_id = OrderId{10002};
-  long_sell.slots[0].price = Price{50200.00};
-  long_sell.slots[0].qty = Qty{1.0};
+  long_sell.slots[0].price = PriceType::from_double(50200.00);
+  long_sell.slots[0].qty = QtyType::from_double(1.0);
   long_sell.slots[0].state = OMOrderState::kLive;
 
   // SHORT exit (BUY)
   auto& short_buy = layer_book_->side_book("BTCUSDT", Side::kBuy, PositionSide::kShort);
   short_buy.slots[0].cl_order_id = OrderId{20002};
-  short_buy.slots[0].price = Price{49800.00};
-  short_buy.slots[0].qty = Qty{2.0};
+  short_buy.slots[0].price = PriceType::from_double(49800.00);
+  short_buy.slots[0].qty = QtyType::from_double(2.0);
   short_buy.slots[0].state = OMOrderState::kLive;
 
   // They should be in different books
@@ -169,10 +169,10 @@ TEST_F(LayerBookIntegrationTest, PendingReplace_TracksOriginalAndNewState) {
   const int layer = 0;
   const OrderId orig_id{50001};
   const OrderId new_id{50002};
-  const Price orig_price{50000.00};
-  const Price new_price{50100.00};
-  const Qty orig_qty{1.0};
-  const Qty new_qty{1.5};
+  const auto orig_price = PriceType::from_double(50000.00);
+  const auto new_price = PriceType::from_double(50100.00);
+  const auto orig_qty = QtyType::from_double(1.0);
+  const auto new_qty = QtyType::from_double(1.5);
 
   // Set original state
   book.slots[layer].cl_order_id = orig_id;
@@ -184,12 +184,12 @@ TEST_F(LayerBookIntegrationTest, PendingReplace_TracksOriginalAndNewState) {
   book.pending_repl[layer] = PendingReplaceInfo(
     new_price,
     new_qty,
-    static_cast<uint64_t>(new_price.value / 0.01),
+    static_cast<uint64_t>(new_price.to_double() / 0.01),
     new_id,
     orig_qty,
     orig_id,
     orig_price,
-    static_cast<uint64_t>(orig_price.value / 0.01)
+    static_cast<uint64_t>(orig_price.to_double() / 0.01)
   );
 
   // Verify pending replace info
@@ -198,10 +198,10 @@ TEST_F(LayerBookIntegrationTest, PendingReplace_TracksOriginalAndNewState) {
 
   EXPECT_EQ(repl.original_cl_order_id, orig_id);
   EXPECT_EQ(repl.new_cl_order_id, new_id);
-  EXPECT_EQ(repl.original_price, orig_price);
-  EXPECT_EQ(repl.new_price, new_price);
-  EXPECT_EQ(repl.last_qty, orig_qty);
-  EXPECT_EQ(repl.new_qty, new_qty);
+  EXPECT_EQ(repl.original_price.value, orig_price.value);
+  EXPECT_EQ(repl.new_price.value, new_price.value);
+  EXPECT_EQ(repl.last_qty.value, orig_qty.value);
+  EXPECT_EQ(repl.new_qty.value, new_qty.value);
 }
 
 // ============================================================================
@@ -244,7 +244,7 @@ TEST_F(LayerBookIntegrationTest, UnmapLayer_ClearsAllAssociatedData) {
   // Setup complete layer state
   book.slots[layer].cl_order_id = order_id;
   book.slots[layer].state = OMOrderState::kLive;
-  book.slots[layer].price = Price{50000.00};
+  book.slots[layer].price = PriceType::from_double(50000.00);
   book.layer_ticks[layer] = tick;
   book.new_id_to_layer[order_id.value] = layer;
   book.orig_id_to_layer[order_id.value] = layer;

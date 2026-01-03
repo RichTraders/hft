@@ -12,11 +12,13 @@
 
 #include "hft_lib.h"
 
+#include <pthread.h>
 #include <csignal>
+#include "common/fixed_point_config.hpp"
 #include "precision_config.hpp"
 #include "strategy_config.hpp"
 
-using SelectedOrderGateway = trading::OrderGateway<SelectedStrategy>;
+using SelectedOrderGateway = trading::OrderGateway<>;
 using SelectedTradeEngine = trading::TradeEngine<SelectedStrategy>;
 using SelectedMarketConsumer = trading::MarketConsumer<SelectedStrategy>;
 
@@ -25,6 +27,7 @@ void block_all_signals(sigset_t& set) {
   pthread_sigmask(SIG_BLOCK, &set, nullptr);
 }
 int main() {
+  pthread_setname_np(pthread_self(), "hft_main");
   sigset_t set;
   block_all_signals(set);
 
@@ -59,13 +62,18 @@ int main() {
             k_response_memory_pool_size);
 
     common::TradeEngineCfgHashMap config_map;
-    config_map[INI_CONFIG.get("meta", "ticker")] = {.clip_ = common::Qty{0},
+    config_map[INI_CONFIG.get("meta", "ticker")] = {
+        .clip_ = common::QtyType::from_raw(0),
         .threshold_ = 0,
-        .risk_cfg_ = common::RiskCfg(
-            common::Qty{INI_CONFIG.get_double("risk", "max_order_size")},
-            common::Qty{INI_CONFIG.get_double("risk", "max_position")},
-            common::Qty{INI_CONFIG.get_double("risk", "min_position", 0.)},
-            INI_CONFIG.get_double("risk", "max_loss"))};
+        .risk_cfg_ =
+            common::RiskCfg(common::QtyType::from_int64(
+                                INI_CONFIG.get_int64("risk", "max_order_size")),
+                common::QtyType::from_int64(
+                    INI_CONFIG.get_int64("risk", "max_position")),
+                common::QtyType::from_int64(
+                    INI_CONFIG.get_int64("risk", "min_position", 0)),
+                INI_CONFIG.get_int64("risk", "max_loss") *
+                    common::FixedPointConfig::kPnlScale)};
 
     auto log = logger->make_producer();
 

@@ -13,6 +13,9 @@
 #ifndef WS_MD_CORE_H
 #define WS_MD_CORE_H
 
+#include <string>
+#include <string_view>
+
 #include "common/logger.h"
 #include "common/memory_pool.hpp"
 #include "core/market_data.h"

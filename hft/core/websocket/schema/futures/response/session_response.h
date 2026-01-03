@@ -16,8 +16,7 @@
 #include <glaze/glaze.hpp>
 #include "api_response.h"
 
-namespace schema {
-namespace futures {
+namespace schema::futures {
 
 struct SessionLogonResponse {
   std::string id;
@@ -31,9 +30,10 @@ struct SessionLogonResponse {
     bool returnRateLimits;
     std::uint64_t serverTime;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
     struct glaze {
       using T = Result;
-      static constexpr auto value = glz::object(
+      static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
         "apiKey", &T::apiKey,
         "authorizedSince", &T::authorizedSince,
         "connectedSince", &T::connectedSince,
@@ -46,9 +46,10 @@ struct SessionLogonResponse {
   std::optional<Result> result;
   std::optional<std::vector<RateLimit>> rate_limits;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = SessionLogonResponse;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       "id", &T::id,
       "status", &T::status,
       "error", &T::error,
@@ -57,7 +58,6 @@ struct SessionLogonResponse {
   };
 };
 
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 
 #endif  //FUTURES_SESSION_RESPONSE_H

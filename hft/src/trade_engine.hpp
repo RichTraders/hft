@@ -13,7 +13,12 @@
 #ifndef TRADE_ENGINE_HPP
 #define TRADE_ENGINE_HPP
 
+#include <atomic>
 #include <functional>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <string>
 
 #include "common/logger.h"
 #include "common/memory_pool.hpp"
@@ -30,7 +35,6 @@
 #include "order_manager.hpp"
 #include "performance.h"
 #include "position_keeper.h"
-#include "protocol_impl.h"
 #include "risk_manager.h"
 #include "wait_strategy.h"
 
@@ -45,14 +49,16 @@ class OrderManager;
 class ResponseManager;
 
 template <typename Strategy>
-class OrderGateway;
-template <typename Strategy>
 class MarketOrderBook;
 template <typename Strategy>
 using MarketOrderBookHashMap =
     std::map<std::string, std::unique_ptr<MarketOrderBook<Strategy>>>;
 
+#ifdef UNIT_TEST
+constexpr std::size_t kMarketDataCapacity = 262144;  // 256K for tests
+#else
 constexpr std::size_t kMarketDataCapacity = 128;
+#endif
 constexpr int kResponseQueueSize = 64;
 
 template <typename Strategy>
@@ -103,20 +109,13 @@ class TradeEngine {
     std::cout << "[Destructor] TradeEngine Destroy\n";
   }
 
-  void init_order_gateway(OrderGateway<Strategy>* order_gateway) {
-    order_gateway_ = order_gateway;
-    order_request_handler_ = [this](const RequestCommon& req) {
-      order_gateway_->order_request(req);
+  template <typename Gateway>
+  void init_order_gateway(Gateway* order_gateway) {
+    order_request_handler_ = [order_gateway](const RequestCommon& req) {
+      order_gateway->order_request(req);
     };
   }
 
-  // For testing with mock order gateways
-  template <typename MockGateway>
-  void init_order_gateway_mock(MockGateway* mock_gateway) {
-    order_request_handler_ = [mock_gateway](const RequestCommon& req) {
-      mock_gateway->order_request(req);
-    };
-  }
 
   void stop() { running_.store(false, std::memory_order_release); }
 
@@ -124,7 +123,7 @@ class TradeEngine {
     return queue_->enqueue(data);
   }
 
-  void on_orderbook_updated(const common::TickerId& ticker, common::Price price,
+  void on_orderbook_updated(const common::TickerId& ticker, common::PriceType price,
       common::Side side, MarketOrderBook<Strategy>* market_order_book) {
     START_MEASURE(ORDERBOOK_UPDATED);
     feature_engine_->on_order_book_updated(price, side, market_order_book);
@@ -187,7 +186,6 @@ class TradeEngine {
   [[nodiscard]] double get_qty_increment() const { return qty_increment_; }
 
  private:
-  using OeApp = protocol_impl::OrderEntryApp;
   static constexpr int kMarketDataBatchLimit = 128;
   static constexpr int kResponseBatchLimit = 64;
   static constexpr double kQtyDefault = 0.00001;
@@ -195,7 +193,6 @@ class TradeEngine {
   common::MemoryPool<MarketUpdateData>* market_update_data_pool_;
   common::MemoryPool<MarketData>* market_data_pool_;
   ResponseManager* response_manager_;
-  OrderGateway<Strategy>* order_gateway_ = nullptr;
   std::function<void(const RequestCommon&)> order_request_handler_;
   std::unique_ptr<common::SPSCQueue<MarketUpdateData*, kMarketDataCapacity>>
       queue_;

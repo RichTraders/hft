@@ -9,8 +9,21 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
-#include "logger.h"
+
+#include <atomic>
+#include <cstdio>
+#include <ctime>
+#include <exception>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <system_error>
+#include <unordered_map>
+
 #include "concurrentqueue.h"
+#include "logger.h"
 #include "wait_strategy.h"
 
 namespace common {
@@ -93,6 +106,11 @@ Logger::~Logger() noexcept {
         file_sink->flush();
       }
     }
+
+#ifdef LOGGER_PERF_TRACE
+    g_log_perf_stats.summary();
+    g_log_perf_stats.dump();
+#endif
   } catch (const std::exception& e) {
     std::fprintf(stderr, "Logger dtor suppressed: %s\n", e.what());
   }
@@ -250,6 +268,10 @@ void Logger::Producer::log(LogLevel lvl, std::string_view text,
   if (impl_->level->load(std::memory_order_relaxed) > lvl)
     return;
 
+#ifdef LOGGER_PERF_TRACE
+  const auto t0 = rdtsc();
+#endif
+
   thread_local std::unordered_map<const void*, std::unique_ptr<ProducerToken>>
       tls;
   auto& token = tls[impl_->logger];
@@ -268,5 +290,10 @@ void Logger::Producer::log(LogLevel lvl, std::string_view text,
   msg.text = text;
 
   impl_->logger->queue.enqueue(*token, std::move(msg));
+
+#ifdef LOGGER_PERF_TRACE
+  const auto t1 = rdtsc();
+  g_log_perf_stats.record(0, t1 - t0, t1 - t0);  // format=0 (no vformat)
+#endif
 }
 }  // namespace common

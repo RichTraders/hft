@@ -14,8 +14,7 @@
 #define FUTURES_API_RESPONSE_H
 #include <glaze/glaze.hpp>
 
-namespace schema {
-namespace futures {
+namespace schema::futures {
 struct RateLimit {
   std::string rate_limit_type;
   std::string interval;
@@ -24,9 +23,10 @@ struct RateLimit {
   std::optional<int> count;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = RateLimit;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       "rateLimitType", &T::rate_limit_type,
       "interval", &T::interval,
       "intervalNum", &T::intervalNum,
@@ -42,9 +42,11 @@ struct ErrorResponse {
   std::string message;
   std::optional<DataT> data;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = ErrorResponse;
-    static constexpr auto value =
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("code", &T::code, "msg", &T::message, "data", &T::data);
   };
 };
@@ -56,9 +58,10 @@ struct ApiResponse {
   std::optional<std::vector<RateLimit>> rate_limits;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = ApiResponse;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
       "id", &T::id,
       "status", &T::status,
       "error", &T::error,
@@ -71,12 +74,13 @@ struct WsHeader {
   std::string id;
   std::uint32_t status;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = WsHeader;
-    static constexpr auto value =
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static constexpr auto value =  // NOLINT(readability-identifier-naming)
         glz::object("id", &T::id, "status", &T::status);
   };
 };
-}  // namespace futures
-}  // namespace schema
+}  // namespace schema::futures
 #endif  //FUTURES_API_RESPONSE_H

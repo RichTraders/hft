@@ -20,9 +20,10 @@ struct UserDataStreamStartResult {
   std::string listen_key;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = UserDataStreamStartResult;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "listenKey", &T::listen_key
     );
   };
@@ -36,9 +37,10 @@ struct UserDataStreamStartResponse {
   std::optional<std::vector<RateLimit>> rate_limits;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = UserDataStreamStartResponse;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "id", &T::id,
         "status", &T::status,
         "result", &T::result,
@@ -50,9 +52,10 @@ struct UserDataStreamStartResponse {
 
 struct UserDataStreamStopResult {
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = UserDataStreamStopResult;
-    static constexpr auto value = glz::object();
+    static constexpr auto value = glz::object();  // NOLINT(readability-identifier-naming)  // NOLINT(readability-identifier-naming)
   };
   // clang-format on
 };
@@ -64,9 +67,10 @@ struct UserDataStreamStopResponse {
   std::optional<std::vector<RateLimit>> rate_limits;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = UserDataStreamStopResponse;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "id", &T::id,
         "status", &T::status,
         "result", &T::result,
@@ -80,9 +84,10 @@ struct UserDataStreamPingResult {
   std::string listen_key;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = UserDataStreamPingResult;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "listenKey", &T::listen_key
     );
   };
@@ -96,9 +101,10 @@ struct UserDataStreamPingResponse {
   std::optional<std::vector<RateLimit>> rate_limits;
 
   // clang-format off
+  // NOLINTNEXTLINE(readability-identifier-naming)
   struct glaze {
     using T = UserDataStreamPingResponse;
-    static constexpr auto value = glz::object(
+    static constexpr auto value = glz::object(  // NOLINT(readability-identifier-naming)
         "id", &T::id,
         "status", &T::status,
         "result", &T::result,
@@ -107,6 +113,5 @@ struct UserDataStreamPingResponse {
   };
   // clang-format on
 };
-}
-
-#endif  //FUTURES_USERDATA_STREAM_RESPONSE_H
+}  // namespace schema::futures
+#endif  // FUTURES_USERDATA_STREAM_RESPONSE_H

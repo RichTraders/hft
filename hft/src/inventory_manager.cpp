@@ -12,6 +12,7 @@
 
 #include "inventory_manager.h"
 
+#include "common/fixed_point_config.hpp"
 #include "ini_config.hpp"
 
 namespace trading {
@@ -22,13 +23,15 @@ InventoryManager::InventoryManager(const common::Logger::Producer& logger,
       position_keeper_(position_keeper),
       model_(INI_CONFIG.get_double("inventory", "skew_coefficient",
           kModelDefaultParameter)),
-      target_position_(
-          INI_CONFIG.get_double("inventory", "target_position", 0.0)) {
+      target_position_(static_cast<int64_t>(
+          INI_CONFIG.get_double("inventory", "target_position", 0.0) *
+          common::FixedPointConfig::kQtyScale)) {
   logger_.info(
-      std::format("InventoryManager initialized with skew_coefficient={}, "
-                  "target_position={}",
-          model_.get_skew_coefficient(),
-          target_position_));
+      "InventoryManager initialized with skew_coefficient={}, "
+      "target_position={}",
+      model_.get_skew_coefficient(),
+      static_cast<double>(target_position_) /
+          common::FixedPointConfig::kQtyScale);
 }
 
 InventoryManager::~InventoryManager() {
@@ -36,9 +39,9 @@ InventoryManager::~InventoryManager() {
 }
 
 auto InventoryManager::get_quote_adjustment(common::Side side,
-    const common::TickerId& ticker_id) const noexcept -> double {
+    const common::TickerId& ticker_id) const noexcept -> int64_t {
   const auto* position_info = position_keeper_->get_position_info(ticker_id);
-  const double current_position = position_info->position_;
+  const int64_t current_position = position_info->get_position();
 
   return model_.calculate_quote_adjustment(side,
       current_position,
@@ -50,9 +53,9 @@ auto InventoryManager::get_skew_coefficient() const noexcept -> double {
 }
 
 void InventoryManager::set_skew_coefficient(double coefficient) noexcept {
-  logger_.info(std::format("Updating skew_coefficient from {} to {}",
+  logger_.info("Updating skew_coefficient from {} to {}",
       model_.get_skew_coefficient(),
-      coefficient));
+      coefficient);
   model_.set_skew_coefficient(coefficient);
 }
 

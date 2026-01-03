@@ -13,6 +13,9 @@
 #ifndef OE_EXCHANGE_TRAITS_H
 #define OE_EXCHANGE_TRAITS_H
 
+#include <concepts>
+#include <string_view>
+
 template <typename T>
 concept OeExchangeTraits = requires {
   { T::exchange_name() } -> std::convertible_to<std::string_view>;

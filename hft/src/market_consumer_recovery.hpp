@@ -13,6 +13,11 @@
 #ifndef MARKET_CONSUMER_RECOVERY_HPP
 #define MARKET_CONSUMER_RECOVERY_HPP
 
+#include <atomic>
+#include <chrono>
+#include <string>
+#include <thread>
+
 #include "common/ini_config.hpp"
 #include "stream_state.h"
 
@@ -40,7 +45,7 @@ class MarketConsumerRecoveryMixin {
     const std::string snapshot_req = self.app_->create_snapshot_request_message(
         INI_CONFIG.get("meta", "ticker"),
         INI_CONFIG.get("meta", "level"));
-    self.app_->send(snapshot_req);
+    std::ignore = self.app_->send(snapshot_req);
 
     self.logger_.info("Gap detected, resubscribing");
   }
@@ -100,7 +105,7 @@ class MarketConsumerRecoveryMixin {
             INI_CONFIG.get("meta", "level"),
             INI_CONFIG.get("meta", "ticker"),
             /*subscribe=*/false);
-    self.app_->send(msg_unsub);
+    std::ignore = self.app_->send(msg_unsub);
 
     std::this_thread::sleep_for(std::chrono::seconds(5));
 
@@ -109,7 +114,7 @@ class MarketConsumerRecoveryMixin {
             INI_CONFIG.get("meta", "level"),
             INI_CONFIG.get("meta", "ticker"),
             /*subscribe=*/true);
-    self.app_->send(msg_sub);
+    std::ignore = self.app_->send(msg_sub);
   }
 };
 

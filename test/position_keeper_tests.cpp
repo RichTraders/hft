@@ -22,6 +22,11 @@
 using namespace trading;
 using namespace common;
 
+// Scale factors for position values
+static constexpr int64_t kQtyScale = FixedPointConfig::kQtyScale;
+static constexpr int64_t kPriceScale = FixedPointConfig::kPriceScale;
+static constexpr int64_t kPQScale = kPriceScale * kQtyScale;  // price * qty scale
+
 class PositionKeeperTest : public ::testing::Test {
  public:
   static Logger* logger;
@@ -47,21 +52,22 @@ class PositionKeeperTest : public ::testing::Test {
 Logger* PositionKeeperTest::logger;
 
 TEST_F(PositionKeeperTest, AddFillIncreasesPosition) {
-  ExecutionReport report{.cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{1.0},
-      .last_qty = Qty{1.0},
-      .price = Price{100000.0},
-      .side = Side::kBuy};
+  ExecutionReport report;
+  report.cl_order_id = OrderId{1};
+  report.symbol = INI_CONFIG.get("meta", "ticker");
+  report.ord_status = OrdStatus::kFilled;
+  report.cum_qty = QtyType::from_double(1.0);
+  report.last_qty = QtyType::from_double(1.0);
+  report.price = PriceType::from_double(100000.0);
+  report.side = Side::kBuy;
 
   keeper->add_fill(&report);
 
   const PositionInfo* pos_info = keeper->get_position_info(report.symbol);
   ASSERT_NE(pos_info, nullptr);
-  EXPECT_DOUBLE_EQ(pos_info->position_, 1.0);
-  EXPECT_DOUBLE_EQ(pos_info->volume_.value, 1.0);
-  EXPECT_GE(pos_info->total_pnl_, 0.0);
+  EXPECT_EQ(pos_info->get_position(), 1 * kQtyScale);
+  EXPECT_EQ(pos_info->volume_, 1 * kQtyScale);
+  EXPECT_GE(pos_info->total_pnl_, 0);
 }
 
 TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
@@ -69,38 +75,39 @@ TEST_F(PositionKeeperTest, AddFill_CrossFlipPosition) {
   auto log = logger->make_producer();
 
   // 1. Long 2 BTC @ 100
-  ExecutionReport buy1{.cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{100},
-      .side = Side::kBuy
+  ExecutionReport buy1;
+  buy1.cl_order_id = OrderId{1};
+  buy1.symbol = INI_CONFIG.get("meta", "ticker");
+  buy1.ord_status = OrdStatus::kFilled;
+  buy1.cum_qty = QtyType::from_double(2);
+  buy1.last_qty = QtyType::from_double(2);
+  buy1.price = PriceType::from_double(100);
+  buy1.side = Side::kBuy;
 
-  };
   pos.add_fill(&buy1, log);
-  EXPECT_DOUBLE_EQ(pos.position_, 2.0);
-  EXPECT_DOUBLE_EQ(pos.real_pnl_, 0.0);
+  EXPECT_EQ(pos.position_, 2 * kQtyScale);
+  EXPECT_EQ(pos.real_pnl_, 0);
 
   // 2. Sell 3 BTC @ 110
-  ExecutionReport sell1{
-      .cl_order_id = OrderId{2},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{3},
-      .last_qty = Qty{3},
-      .price = Price{110},
-      .side = Side::kSell,
+  ExecutionReport sell1;
+  sell1.cl_order_id = OrderId{2};
+  sell1.symbol = INI_CONFIG.get("meta", "ticker");
+  sell1.ord_status = OrdStatus::kFilled;
+  sell1.cum_qty = QtyType::from_double(3);
+  sell1.last_qty = QtyType::from_double(3);
+  sell1.price = PriceType::from_double(110);
+  sell1.side = Side::kSell;
 
-  };
   pos.add_fill(&sell1, log);
 
-  EXPECT_DOUBLE_EQ(pos.position_, -1.0);
+  EXPECT_EQ(pos.position_, -1 * kQtyScale);
 
-  EXPECT_NEAR(pos.real_pnl_, 20.0, 1e-6);
+  // real_pnl = (110 - 100) * 2 = 20, scaled by kPQScale
+  EXPECT_EQ(pos.real_pnl_, 20 * kPQScale);
 
-  EXPECT_NEAR(pos.open_vwap_[sideToIndex(Side::kSell)], 110.0, 1e-6);
-  EXPECT_DOUBLE_EQ(pos.open_vwap_[sideToIndex(Side::kBuy)], 0.0);
+  // open_vwap = price * qty, so 110 * 1 = 110, scaled by kPQScale
+  EXPECT_EQ(pos.open_vwap_[sideToIndex(Side::kSell)], 110 * kPQScale);
+  EXPECT_EQ(pos.open_vwap_[sideToIndex(Side::kBuy)], 0);
 }
 
 TEST_F(PositionKeeperTest, UnrealPnL_PositiveCase) {
@@ -108,27 +115,29 @@ TEST_F(PositionKeeperTest, UnrealPnL_PositiveCase) {
   auto log = logger->make_producer();
 
   // 1. 2 BTC 매수 @ 100
-  ExecutionReport buy1{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{100},
-      .side = Side::kBuy,
+  ExecutionReport buy1;
+  buy1.cl_order_id = OrderId{1};
+  buy1.symbol = INI_CONFIG.get("meta", "ticker");
+  buy1.ord_status = OrdStatus::kFilled;
+  buy1.cum_qty = QtyType::from_double(2);
+  buy1.last_qty = QtyType::from_double(2);
+  buy1.price = PriceType::from_double(100);
+  buy1.side = Side::kBuy;
 
-  };
   pos.add_fill(&buy1, log);
 
-  EXPECT_DOUBLE_EQ(pos.position_, 2.0);
-  EXPECT_DOUBLE_EQ(pos.real_pnl_, 0.0);
-  EXPECT_DOUBLE_EQ(pos.unreal_pnl_, 0.0);
+  EXPECT_EQ(pos.position_, 2 * kQtyScale);
+  EXPECT_EQ(pos.real_pnl_, 0);
+  EXPECT_EQ(pos.unreal_pnl_, 0);
 
-  BBO bbo{.bid_price = Price{110}, .ask_price = Price{112}};
+  BBO bbo;
+  bbo.bid_price = PriceType::from_double(110);
+  bbo.ask_price = PriceType::from_double(112);
   pos.update_bbo(&bbo, log);
 
-  EXPECT_NEAR(pos.unreal_pnl_, (111.0 - 100.0) * 2.0, 1e-6);
-  EXPECT_NEAR(pos.total_pnl_, pos.unreal_pnl_ + pos.real_pnl_, 1e-6);
+  // unreal_pnl = (mid - vwap) * position = (111 - 100) * 2 = 22, scaled by kPQScale
+  EXPECT_EQ(pos.unreal_pnl_, 22 * kPQScale);
+  EXPECT_EQ(pos.total_pnl_, pos.unreal_pnl_ + pos.real_pnl_);
 }
 
 TEST_F(PositionKeeperTest, AddFill_AvgPriceCalculation) {
@@ -137,33 +146,33 @@ TEST_F(PositionKeeperTest, AddFill_AvgPriceCalculation) {
 
   auto log = logger.make_producer();
   // 1. Buy 1 BTC @ 100
-  const ExecutionReport buy1{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{1},
-      .last_qty = Qty{1},
-      .price = Price{100},
-      .side = Side::kBuy,
-  };
+  ExecutionReport buy1;
+  buy1.cl_order_id = OrderId{1};
+  buy1.symbol = INI_CONFIG.get("meta", "ticker");
+  buy1.ord_status = OrdStatus::kFilled;
+  buy1.cum_qty = QtyType::from_double(1);
+  buy1.last_qty = QtyType::from_double(1);
+  buy1.price = PriceType::from_double(100);
+  buy1.side = Side::kBuy;
   pos.add_fill(&buy1, log);
 
   // 2. Buy 3 BTC @ 110
-  const ExecutionReport buy2{
-      .cl_order_id = OrderId{2},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{3},
-      .last_qty = Qty{3},
-      .price = Price{110},
-      .side = Side::kBuy,
+  ExecutionReport buy2;
+  buy2.cl_order_id = OrderId{2};
+  buy2.symbol = INI_CONFIG.get("meta", "ticker");
+  buy2.ord_status = OrdStatus::kFilled;
+  buy2.cum_qty = QtyType::from_double(3);
+  buy2.last_qty = QtyType::from_double(3);
+  buy2.price = PriceType::from_double(110);
+  buy2.side = Side::kBuy;
 
-  };
   pos.add_fill(&buy2, log);
 
-  EXPECT_DOUBLE_EQ(pos.position_, 4.0);
-  EXPECT_NEAR(pos.open_vwap_[sideToIndex(Side::kBuy)] / 4.0, 107.5, 1e-6);
-  EXPECT_DOUBLE_EQ(pos.real_pnl_, 0.0);
+  EXPECT_EQ(pos.position_, 4 * kQtyScale);
+  // open_vwap = (1 * 100 + 3 * 110) = 430, scaled by kPQScale
+  // vwap = open_vwap / 4 = 107.5
+  EXPECT_EQ(pos.open_vwap_[sideToIndex(Side::kBuy)], 430 * kPQScale);
+  EXPECT_EQ(pos.real_pnl_, 0);
 }
 
 TEST_F(PositionKeeperTest, AddFill_FullCloseRealizesPnL) {
@@ -171,70 +180,67 @@ TEST_F(PositionKeeperTest, AddFill_FullCloseRealizesPnL) {
   auto log = logger->make_producer();
 
   // 1. Buy 2 BTC @ 50
-  ExecutionReport buy{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{50},
-      .side = Side::kBuy,
-  };
+  ExecutionReport buy;
+  buy.cl_order_id = OrderId{1};
+  buy.symbol = INI_CONFIG.get("meta", "ticker");
+  buy.ord_status = OrdStatus::kFilled;
+  buy.cum_qty = QtyType::from_double(2);
+  buy.last_qty = QtyType::from_double(2);
+  buy.price = PriceType::from_double(50);
+  buy.side = Side::kBuy;
   pos.add_fill(&buy, log);
 
   // 2. Sell 2 BTC @ 70
-  ExecutionReport sell{
-      .cl_order_id = OrderId{2},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{70},
-      .side = Side::kSell,
-  };
+  ExecutionReport sell;
+  sell.cl_order_id = OrderId{2};
+  sell.symbol = INI_CONFIG.get("meta", "ticker");
+  sell.ord_status = OrdStatus::kFilled;
+  sell.cum_qty = QtyType::from_double(2);
+  sell.last_qty = QtyType::from_double(2);
+  sell.price = PriceType::from_double(70);
+  sell.side = Side::kSell;
   pos.add_fill(&sell, log);
 
-  EXPECT_DOUBLE_EQ(pos.position_, 0.0);
-  EXPECT_NEAR(pos.real_pnl_, 40.0, 1e-6);
-  EXPECT_DOUBLE_EQ(pos.unreal_pnl_, 0.0);
+  EXPECT_EQ(pos.position_, 0);
+  // real_pnl = (70 - 50) * 2 = 40, scaled by kPQScale
+  EXPECT_EQ(pos.real_pnl_, 40 * kPQScale);
+  EXPECT_EQ(pos.unreal_pnl_, 0);
 }
 
 TEST_F(PositionKeeperTest, UpdateBboUpdatesUnrealPnl) {
 
-  ExecutionReport report{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{1.0},
-      .last_qty = Qty{1.0},
-      .price = Price{100000.0},
-      .side = Side::kBuy,
-  };
+  ExecutionReport report;
+  report.cl_order_id = OrderId{1};
+  report.symbol = INI_CONFIG.get("meta", "ticker");
+  report.ord_status = OrdStatus::kFilled;
+  report.cum_qty = QtyType::from_double(1.0);
+  report.last_qty = QtyType::from_double(1.0);
+  report.price = PriceType::from_double(100000.0);
+  report.side = Side::kBuy;
 
   keeper->add_fill(&report);
 
   BBO bbo;
-  bbo.bid_price = Price{101000.0};
-  bbo.ask_price = Price{102000.0};
+  bbo.bid_price = PriceType::from_double(101000.0);
+  bbo.ask_price = PriceType::from_double(102000.0);
 
   keeper->update_bbo(report.symbol, &bbo);
 
   auto pos_info = keeper->get_position_info(report.symbol);
   ASSERT_NE(pos_info, nullptr);
-  EXPECT_GT(pos_info->unreal_pnl_, 0.0);
+  EXPECT_GT(pos_info->unreal_pnl_, 0);
 }
 
 TEST_F(PositionKeeperTest, ToStringPrintsPositions) {
 
-  ExecutionReport report{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{1.0},
-      .last_qty = Qty{1.0},
-      .price = Price{100000.0},
-      .side = Side::kBuy,
-  };
+  ExecutionReport report;
+  report.cl_order_id = OrderId{1};
+  report.symbol = INI_CONFIG.get("meta", "ticker");
+  report.ord_status = OrdStatus::kFilled;
+  report.cum_qty = QtyType::from_double(1.0);
+  report.last_qty = QtyType::from_double(1.0);
+  report.price = PriceType::from_double(100000.0);
+  report.side = Side::kBuy;
 
   keeper->add_fill(&report);
 
@@ -250,38 +256,38 @@ TEST_F(PositionKeeperTest, LongPositionSide_OpenAndClose) {
   auto log = logger->make_producer();
 
   // Open Long: Buy 2 @ 100
-  ExecutionReport buy{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{100},
-      .side = Side::kBuy,
-      .position_side = PositionSide::kLong,
-  };
+  ExecutionReport buy;
+  buy.cl_order_id = OrderId{1};
+  buy.symbol = INI_CONFIG.get("meta", "ticker");
+  buy.ord_status = OrdStatus::kFilled;
+  buy.cum_qty = QtyType::from_double(2);
+  buy.last_qty = QtyType::from_double(2);
+  buy.price = PriceType::from_double(100);
+  buy.side = Side::kBuy;
+  buy.position_side = PositionSide::kLong;
   pos.add_fill(&buy, log);
 
-  EXPECT_DOUBLE_EQ(pos.long_position_, 2.0);
-  EXPECT_DOUBLE_EQ(pos.long_cost_, 200.0);
-  EXPECT_DOUBLE_EQ(pos.long_real_pnl_, 0.0);
+  EXPECT_EQ(pos.long_position_raw_, 2 * kQtyScale);
+  // long_cost = price * qty = 100 * 2 = 200, scaled by kPQScale
+  EXPECT_EQ(pos.long_cost_, 200 * kPQScale);
+  EXPECT_EQ(pos.long_real_pnl_, 0);
 
   // Close Long: Sell 2 @ 120
-  ExecutionReport sell{
-      .cl_order_id = OrderId{2},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{120},
-      .side = Side::kSell,
-      .position_side = PositionSide::kLong,
-  };
+  ExecutionReport sell;
+  sell.cl_order_id = OrderId{2};
+  sell.symbol = INI_CONFIG.get("meta", "ticker");
+  sell.ord_status = OrdStatus::kFilled;
+  sell.cum_qty = QtyType::from_double(2);
+  sell.last_qty = QtyType::from_double(2);
+  sell.price = PriceType::from_double(120);
+  sell.side = Side::kSell;
+  sell.position_side = PositionSide::kLong;
   pos.add_fill(&sell, log);
 
-  EXPECT_DOUBLE_EQ(pos.long_position_, 0.0);
-  EXPECT_DOUBLE_EQ(pos.long_cost_, 0.0);
-  EXPECT_NEAR(pos.long_real_pnl_, 40.0, 1e-6);  // (120 - 100) * 2
+  EXPECT_EQ(pos.long_position_raw_, 0);
+  EXPECT_EQ(pos.long_cost_, 0);
+  // long_real_pnl = (120 - 100) * 2 = 40, scaled by kPQScale
+  EXPECT_EQ(pos.long_real_pnl_, 40 * kPQScale);
 }
 
 TEST_F(PositionKeeperTest, LongPositionSide_PartialClose) {
@@ -289,34 +295,34 @@ TEST_F(PositionKeeperTest, LongPositionSide_PartialClose) {
   auto log = logger->make_producer();
 
   // Open Long: Buy 4 @ 100
-  ExecutionReport buy{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{4},
-      .last_qty = Qty{4},
-      .price = Price{100},
-      .side = Side::kBuy,
-      .position_side = PositionSide::kLong,
-  };
+  ExecutionReport buy;
+  buy.cl_order_id = OrderId{1};
+  buy.symbol = INI_CONFIG.get("meta", "ticker");
+  buy.ord_status = OrdStatus::kFilled;
+  buy.cum_qty = QtyType::from_double(4);
+  buy.last_qty = QtyType::from_double(4);
+  buy.price = PriceType::from_double(100);
+  buy.side = Side::kBuy;
+  buy.position_side = PositionSide::kLong;
   pos.add_fill(&buy, log);
 
   // Partial Close Long: Sell 1 @ 110
-  ExecutionReport sell{
-      .cl_order_id = OrderId{2},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{1},
-      .last_qty = Qty{1},
-      .price = Price{110},
-      .side = Side::kSell,
-      .position_side = PositionSide::kLong,
-  };
+  ExecutionReport sell;
+  sell.cl_order_id = OrderId{2};
+  sell.symbol = INI_CONFIG.get("meta", "ticker");
+  sell.ord_status = OrdStatus::kFilled;
+  sell.cum_qty = QtyType::from_double(1);
+  sell.last_qty = QtyType::from_double(1);
+  sell.price = PriceType::from_double(110);
+  sell.side = Side::kSell;
+  sell.position_side = PositionSide::kLong;
   pos.add_fill(&sell, log);
 
-  EXPECT_DOUBLE_EQ(pos.long_position_, 3.0);
-  EXPECT_NEAR(pos.long_cost_, 300.0, 1e-6);  // 3 * 100
-  EXPECT_NEAR(pos.long_real_pnl_, 10.0, 1e-6);  // (110 - 100) * 1
+  EXPECT_EQ(pos.long_position_raw_, 3 * kQtyScale);
+  // long_cost = 3 * 100 = 300, scaled by kPQScale
+  EXPECT_EQ(pos.long_cost_, 300 * kPQScale);
+  // long_real_pnl = (110 - 100) * 1 = 10, scaled by kPQScale
+  EXPECT_EQ(pos.long_real_pnl_, 10 * kPQScale);
 }
 
 // ============ Short Position Side Tests ============
@@ -326,38 +332,38 @@ TEST_F(PositionKeeperTest, ShortPositionSide_OpenAndClose) {
   auto log = logger->make_producer();
 
   // Open Short: Sell 2 @ 100
-  ExecutionReport sell{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{100},
-      .side = Side::kSell,
-      .position_side = PositionSide::kShort,
-  };
+  ExecutionReport sell;
+  sell.cl_order_id = OrderId{1};
+  sell.symbol = INI_CONFIG.get("meta", "ticker");
+  sell.ord_status = OrdStatus::kFilled;
+  sell.cum_qty = QtyType::from_double(2);
+  sell.last_qty = QtyType::from_double(2);
+  sell.price = PriceType::from_double(100);
+  sell.side = Side::kSell;
+  sell.position_side = PositionSide::kShort;
   pos.add_fill(&sell, log);
 
-  EXPECT_DOUBLE_EQ(pos.short_position_, 2.0);
-  EXPECT_DOUBLE_EQ(pos.short_cost_, 200.0);
-  EXPECT_DOUBLE_EQ(pos.short_real_pnl_, 0.0);
+  EXPECT_EQ(pos.short_position_raw_, 2 * kQtyScale);
+  // short_cost = 100 * 2 = 200, scaled by kPQScale
+  EXPECT_EQ(pos.short_cost_, 200 * kPQScale);
+  EXPECT_EQ(pos.short_real_pnl_, 0);
 
   // Close Short: Buy 2 @ 80
-  ExecutionReport buy{
-      .cl_order_id = OrderId{2},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{80},
-      .side = Side::kBuy,
-      .position_side = PositionSide::kShort,
-  };
+  ExecutionReport buy;
+  buy.cl_order_id = OrderId{2};
+  buy.symbol = INI_CONFIG.get("meta", "ticker");
+  buy.ord_status = OrdStatus::kFilled;
+  buy.cum_qty = QtyType::from_double(2);
+  buy.last_qty = QtyType::from_double(2);
+  buy.price = PriceType::from_double(80);
+  buy.side = Side::kBuy;
+  buy.position_side = PositionSide::kShort;
   pos.add_fill(&buy, log);
 
-  EXPECT_DOUBLE_EQ(pos.short_position_, 0.0);
-  EXPECT_DOUBLE_EQ(pos.short_cost_, 0.0);
-  EXPECT_NEAR(pos.short_real_pnl_, 40.0, 1e-6);  // (100 - 80) * 2
+  EXPECT_EQ(pos.short_position_raw_, 0);
+  EXPECT_EQ(pos.short_cost_, 0);
+  // short_real_pnl = (100 - 80) * 2 = 40, scaled by kPQScale
+  EXPECT_EQ(pos.short_real_pnl_, 40 * kPQScale);
 }
 
 TEST_F(PositionKeeperTest, ShortPositionSide_PartialClose) {
@@ -365,34 +371,34 @@ TEST_F(PositionKeeperTest, ShortPositionSide_PartialClose) {
   auto log = logger->make_producer();
 
   // Open Short: Sell 4 @ 100
-  ExecutionReport sell{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{4},
-      .last_qty = Qty{4},
-      .price = Price{100},
-      .side = Side::kSell,
-      .position_side = PositionSide::kShort,
-  };
+  ExecutionReport sell;
+  sell.cl_order_id = OrderId{1};
+  sell.symbol = INI_CONFIG.get("meta", "ticker");
+  sell.ord_status = OrdStatus::kFilled;
+  sell.cum_qty = QtyType::from_double(4);
+  sell.last_qty = QtyType::from_double(4);
+  sell.price = PriceType::from_double(100);
+  sell.side = Side::kSell;
+  sell.position_side = PositionSide::kShort;
   pos.add_fill(&sell, log);
 
   // Partial Close Short: Buy 1 @ 90
-  ExecutionReport buy{
-      .cl_order_id = OrderId{2},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{1},
-      .last_qty = Qty{1},
-      .price = Price{90},
-      .side = Side::kBuy,
-      .position_side = PositionSide::kShort,
-  };
+  ExecutionReport buy;
+  buy.cl_order_id = OrderId{2};
+  buy.symbol = INI_CONFIG.get("meta", "ticker");
+  buy.ord_status = OrdStatus::kFilled;
+  buy.cum_qty = QtyType::from_double(1);
+  buy.last_qty = QtyType::from_double(1);
+  buy.price = PriceType::from_double(90);
+  buy.side = Side::kBuy;
+  buy.position_side = PositionSide::kShort;
   pos.add_fill(&buy, log);
 
-  EXPECT_DOUBLE_EQ(pos.short_position_, 3.0);
-  EXPECT_NEAR(pos.short_cost_, 300.0, 1e-6);  // 3 * 100
-  EXPECT_NEAR(pos.short_real_pnl_, 10.0, 1e-6);  // (100 - 90) * 1
+  EXPECT_EQ(pos.short_position_raw_, 3 * kQtyScale);
+  // short_cost = 3 * 100 = 300, scaled by kPQScale
+  EXPECT_EQ(pos.short_cost_, 300 * kPQScale);
+  // short_real_pnl = (100 - 90) * 1 = 10, scaled by kPQScale
+  EXPECT_EQ(pos.short_real_pnl_, 10 * kPQScale);
 }
 
 // ============ Long/Short Unrealized PnL Tests ============
@@ -402,23 +408,25 @@ TEST_F(PositionKeeperTest, LongUnrealizedPnL_UpdateBbo) {
   auto log = logger->make_producer();
 
   // Open Long: Buy 2 @ 100
-  ExecutionReport buy{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{100},
-      .side = Side::kBuy,
-      .position_side = PositionSide::kLong,
-  };
+  ExecutionReport buy;
+  buy.cl_order_id = OrderId{1};
+  buy.symbol = INI_CONFIG.get("meta", "ticker");
+  buy.ord_status = OrdStatus::kFilled;
+  buy.cum_qty = QtyType::from_double(2);
+  buy.last_qty = QtyType::from_double(2);
+  buy.price = PriceType::from_double(100);
+  buy.side = Side::kBuy;
+  buy.position_side = PositionSide::kLong;
   pos.add_fill(&buy, log);
 
   // BBO update: mid = 115
-  BBO bbo{.bid_price = Price{110}, .ask_price = Price{120}};
+  BBO bbo;
+  bbo.bid_price = PriceType::from_double(110);
+  bbo.ask_price = PriceType::from_double(120);
   pos.update_bbo(&bbo, log);
 
-  EXPECT_NEAR(pos.long_unreal_pnl_, 30.0, 1e-6);  // (115 - 100) * 2
+  // long_unreal_pnl = (115 - 100) * 2 = 30, scaled by kPQScale
+  EXPECT_EQ(pos.long_unreal_pnl_, 30 * kPQScale);
 }
 
 TEST_F(PositionKeeperTest, ShortUnrealizedPnL_UpdateBbo) {
@@ -426,23 +434,25 @@ TEST_F(PositionKeeperTest, ShortUnrealizedPnL_UpdateBbo) {
   auto log = logger->make_producer();
 
   // Open Short: Sell 2 @ 100
-  ExecutionReport sell{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{100},
-      .side = Side::kSell,
-      .position_side = PositionSide::kShort,
-  };
+  ExecutionReport sell;
+  sell.cl_order_id = OrderId{1};
+  sell.symbol = INI_CONFIG.get("meta", "ticker");
+  sell.ord_status = OrdStatus::kFilled;
+  sell.cum_qty = QtyType::from_double(2);
+  sell.last_qty = QtyType::from_double(2);
+  sell.price = PriceType::from_double(100);
+  sell.side = Side::kSell;
+  sell.position_side = PositionSide::kShort;
   pos.add_fill(&sell, log);
 
   // BBO update: mid = 85
-  BBO bbo{.bid_price = Price{80}, .ask_price = Price{90}};
+  BBO bbo;
+  bbo.bid_price = PriceType::from_double(80);
+  bbo.ask_price = PriceType::from_double(90);
   pos.update_bbo(&bbo, log);
 
-  EXPECT_NEAR(pos.short_unreal_pnl_, 30.0, 1e-6);  // (100 - 85) * 2
+  // short_unreal_pnl = (100 - 85) * 2 = 30, scaled by kPQScale
+  EXPECT_EQ(pos.short_unreal_pnl_, 30 * kPQScale);
 }
 
 // ============ Combined Long/Short Tests ============
@@ -452,41 +462,44 @@ TEST_F(PositionKeeperTest, HedgeMode_LongAndShortSimultaneous) {
   auto log = logger->make_producer();
 
   // Open Long: Buy 2 @ 100
-  ExecutionReport buy_long{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{100},
-      .side = Side::kBuy,
-      .position_side = PositionSide::kLong,
-  };
+  ExecutionReport buy_long;
+  buy_long.cl_order_id = OrderId{1};
+  buy_long.symbol = INI_CONFIG.get("meta", "ticker");
+  buy_long.ord_status = OrdStatus::kFilled;
+  buy_long.cum_qty = QtyType::from_double(2);
+  buy_long.last_qty = QtyType::from_double(2);
+  buy_long.price = PriceType::from_double(100);
+  buy_long.side = Side::kBuy;
+  buy_long.position_side = PositionSide::kLong;
   pos.add_fill(&buy_long, log);
 
   // Open Short: Sell 1 @ 105
-  ExecutionReport sell_short{
-      .cl_order_id = OrderId{2},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{1},
-      .last_qty = Qty{1},
-      .price = Price{105},
-      .side = Side::kSell,
-      .position_side = PositionSide::kShort,
-  };
+  ExecutionReport sell_short;
+  sell_short.cl_order_id = OrderId{2};
+  sell_short.symbol = INI_CONFIG.get("meta", "ticker");
+  sell_short.ord_status = OrdStatus::kFilled;
+  sell_short.cum_qty = QtyType::from_double(1);
+  sell_short.last_qty = QtyType::from_double(1);
+  sell_short.price = PriceType::from_double(105);
+  sell_short.side = Side::kSell;
+  sell_short.position_side = PositionSide::kShort;
   pos.add_fill(&sell_short, log);
 
-  EXPECT_DOUBLE_EQ(pos.long_position_, 2.0);
-  EXPECT_DOUBLE_EQ(pos.short_position_, 1.0);
-  EXPECT_DOUBLE_EQ(pos.position_, 1.0);  // net: 2 - 1 = 1
+  EXPECT_EQ(pos.long_position_raw_, 2 * kQtyScale);
+  EXPECT_EQ(pos.short_position_raw_, 1 * kQtyScale);
+  // net position = 2 - 1 = 1, scaled by kQtyScale
+  EXPECT_EQ(pos.position_, 1 * kQtyScale);
 
   // BBO update: mid = 110
-  BBO bbo{.bid_price = Price{108}, .ask_price = Price{112}};
+  BBO bbo;
+  bbo.bid_price = PriceType::from_double(108);
+  bbo.ask_price = PriceType::from_double(112);
   pos.update_bbo(&bbo, log);
 
-  EXPECT_NEAR(pos.long_unreal_pnl_, 20.0, 1e-6);   // (110 - 100) * 2
-  EXPECT_NEAR(pos.short_unreal_pnl_, -5.0, 1e-6); // (105 - 110) * 1
+  // long_unreal_pnl = (110 - 100) * 2 = 20, scaled by kPQScale
+  EXPECT_EQ(pos.long_unreal_pnl_, 20 * kPQScale);
+  // short_unreal_pnl = (105 - 110) * 1 = -5, scaled by kPQScale
+  EXPECT_EQ(pos.short_unreal_pnl_, -5 * kPQScale);
 }
 
 TEST_F(PositionKeeperTest, RealPnL_IsSumOfLongAndShort) {
@@ -494,56 +507,55 @@ TEST_F(PositionKeeperTest, RealPnL_IsSumOfLongAndShort) {
   auto log = logger->make_producer();
 
   // Long trade: profit 20
-  ExecutionReport buy_long{
-      .cl_order_id = OrderId{1},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{100},
-      .side = Side::kBuy,
-      .position_side = PositionSide::kLong,
-  };
+  ExecutionReport buy_long;
+  buy_long.cl_order_id = OrderId{1};
+  buy_long.symbol = INI_CONFIG.get("meta", "ticker");
+  buy_long.ord_status = OrdStatus::kFilled;
+  buy_long.cum_qty = QtyType::from_double(2);
+  buy_long.last_qty = QtyType::from_double(2);
+  buy_long.price = PriceType::from_double(100);
+  buy_long.side = Side::kBuy;
+  buy_long.position_side = PositionSide::kLong;
   pos.add_fill(&buy_long, log);
 
-  ExecutionReport sell_long{
-      .cl_order_id = OrderId{2},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{2},
-      .last_qty = Qty{2},
-      .price = Price{110},
-      .side = Side::kSell,
-      .position_side = PositionSide::kLong,
-  };
+  ExecutionReport sell_long;
+  sell_long.cl_order_id = OrderId{2};
+  sell_long.symbol = INI_CONFIG.get("meta", "ticker");
+  sell_long.ord_status = OrdStatus::kFilled;
+  sell_long.cum_qty = QtyType::from_double(2);
+  sell_long.last_qty = QtyType::from_double(2);
+  sell_long.price = PriceType::from_double(110);
+  sell_long.side = Side::kSell;
+  sell_long.position_side = PositionSide::kLong;
   pos.add_fill(&sell_long, log);
 
   // Short trade: profit 15
-  ExecutionReport sell_short{
-      .cl_order_id = OrderId{3},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{3},
-      .last_qty = Qty{3},
-      .price = Price{100},
-      .side = Side::kSell,
-      .position_side = PositionSide::kShort,
-  };
+  ExecutionReport sell_short;
+  sell_short.cl_order_id = OrderId{3};
+  sell_short.symbol = INI_CONFIG.get("meta", "ticker");
+  sell_short.ord_status = OrdStatus::kFilled;
+  sell_short.cum_qty = QtyType::from_double(3);
+  sell_short.last_qty = QtyType::from_double(3);
+  sell_short.price = PriceType::from_double(100);
+  sell_short.side = Side::kSell;
+  sell_short.position_side = PositionSide::kShort;
   pos.add_fill(&sell_short, log);
 
-  ExecutionReport buy_short{
-      .cl_order_id = OrderId{4},
-      .symbol = INI_CONFIG.get("meta", "ticker"),
-      .ord_status = OrdStatus::kFilled,
-      .cum_qty = Qty{3},
-      .last_qty = Qty{3},
-      .price = Price{95},
-      .side = Side::kBuy,
-      .position_side = PositionSide::kShort,
-  };
+  ExecutionReport buy_short;
+  buy_short.cl_order_id = OrderId{4};
+  buy_short.symbol = INI_CONFIG.get("meta", "ticker");
+  buy_short.ord_status = OrdStatus::kFilled;
+  buy_short.cum_qty = QtyType::from_double(3);
+  buy_short.last_qty = QtyType::from_double(3);
+  buy_short.price = PriceType::from_double(95);
+  buy_short.side = Side::kBuy;
+  buy_short.position_side = PositionSide::kShort;
   pos.add_fill(&buy_short, log);
 
-  EXPECT_NEAR(pos.long_real_pnl_, 20.0, 1e-6);   // (110 - 100) * 2
-  EXPECT_NEAR(pos.short_real_pnl_, 15.0, 1e-6); // (100 - 95) * 3
-  EXPECT_NEAR(pos.real_pnl_, 35.0, 1e-6);       // 20 + 15
+  // long_real_pnl = (110 - 100) * 2 = 20, scaled by kPQScale
+  EXPECT_EQ(pos.long_real_pnl_, 20 * kPQScale);
+  // short_real_pnl = (100 - 95) * 3 = 15, scaled by kPQScale
+  EXPECT_EQ(pos.short_real_pnl_, 15 * kPQScale);
+  // real_pnl = 20 + 15 = 35, scaled by kPQScale
+  EXPECT_EQ(pos.real_pnl_, 35 * kPQScale);
 }

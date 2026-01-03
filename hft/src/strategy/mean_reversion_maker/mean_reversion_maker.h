@@ -227,6 +227,18 @@ class MeanReversionMakerStrategy
         zscore_min_mad_threshold_(
             INI_CONFIG.get_double("robust_zscore", "min_mad_threshold", 5.0)),
 
+        // === Multi-timeframe Z-score config ===
+        zscore_fast_window_(
+            INI_CONFIG.get_int("robust_zscore_fast", "window_size", 10)),
+        zscore_fast_min_samples_(
+            INI_CONFIG.get_int("robust_zscore_fast", "min_samples", 8)),
+        zscore_slow_window_(
+            INI_CONFIG.get_int("robust_zscore_slow", "window_size", 100)),
+        zscore_slow_min_samples_(
+            INI_CONFIG.get_int("robust_zscore_slow", "min_samples", 60)),
+        zscore_slow_threshold_(INI_CONFIG.get_double("robust_zscore_slow",
+            "entry_threshold", 1.5)),
+
         // === OBI calculation buffers ===
         bid_qty_(entry_cfg_.obi_levels),
         ask_qty_(entry_cfg_.obi_levels),
@@ -254,8 +266,20 @@ class MeanReversionMakerStrategy
                 INI_CONFIG.get_double("wall_defense", "orderbook_weight", 0.3),
                 INI_CONFIG.get_double("wall_defense", "min_quantity", 50.0)})),
 
-        // === Robust Z-score module ===
-        robust_zscore_(std::make_unique<RobustZScore>(RobustZScoreConfig{
+        // === Robust Z-score modules (multi-timeframe) ===
+        robust_zscore_fast_(std::make_unique<RobustZScore>(RobustZScoreConfig{
+            zscore_fast_window_,
+            zscore_fast_min_samples_,
+            zscore_min_mad_threshold_,
+            INI_CONFIG.get_int("robust_zscore_fast", "baseline_window", 100),
+            INI_CONFIG.get_double("robust_zscore_fast", "min_vol_scalar", 0.7),
+            INI_CONFIG.get_double("robust_zscore_fast", "max_vol_scalar", 1.3),
+            INI_CONFIG.get_double("robust_zscore_fast", "vol_ratio_low", 0.5),
+            INI_CONFIG.get_double("robust_zscore_fast", "vol_ratio_high", 2.0),
+            INI_CONFIG.get_int("robust_zscore_fast", "baseline_min_history",
+                30)})),
+
+        robust_zscore_mid_(std::make_unique<RobustZScore>(RobustZScoreConfig{
             zscore_window_size_,
             zscore_min_samples_,
             zscore_min_mad_threshold_,
@@ -264,7 +288,19 @@ class MeanReversionMakerStrategy
             INI_CONFIG.get_double("robust_zscore", "max_vol_scalar", 1.3),
             INI_CONFIG.get_double("robust_zscore", "vol_ratio_low", 0.5),
             INI_CONFIG.get_double("robust_zscore", "vol_ratio_high", 2.0),
-            INI_CONFIG.get_int("robust_zscore", "baseline_min_history", 30)})) {
+            INI_CONFIG.get_int("robust_zscore", "baseline_min_history", 30)})),
+
+        robust_zscore_slow_(std::make_unique<RobustZScore>(RobustZScoreConfig{
+            zscore_slow_window_,
+            zscore_slow_min_samples_,
+            zscore_min_mad_threshold_,
+            INI_CONFIG.get_int("robust_zscore_slow", "baseline_window", 100),
+            INI_CONFIG.get_double("robust_zscore_slow", "min_vol_scalar", 0.7),
+            INI_CONFIG.get_double("robust_zscore_slow", "max_vol_scalar", 1.3),
+            INI_CONFIG.get_double("robust_zscore_slow", "vol_ratio_low", 0.5),
+            INI_CONFIG.get_double("robust_zscore_slow", "vol_ratio_high", 2.0),
+            INI_CONFIG.get_int("robust_zscore_slow", "baseline_min_history",
+                30)})) {
     this->logger_.info(
         "[MeanReversionMaker] Initialized | min_quantity:{:.2f} BTC | "
         "simultaneous:{}",
@@ -340,57 +376,102 @@ class MeanReversionMakerStrategy
       return;
     }
 
-    // === 1. Hot path: Z-score and mean reversion tracking ===
-    // Update Robust Z-score
-    robust_zscore_->on_price(market_data->price.value);
+    // === 1. Hot path: Multi-timeframe Z-score tracking ===
+    // Update all timeframes
+    robust_zscore_fast_->on_price(market_data->price.value);
+    robust_zscore_mid_->on_price(market_data->price.value);
+    robust_zscore_slow_->on_price(market_data->price.value);
 
-    // Calculate Z-score once (performance optimization)
-    double current_z =
-        robust_zscore_->calculate_zscore(market_data->price.value);
+    // Calculate Z-scores for all timeframes
+    double z_fast =
+        robust_zscore_fast_->calculate_zscore(market_data->price.value);
+    double z_mid =
+        robust_zscore_mid_->calculate_zscore(market_data->price.value);
+    double z_slow =
+        robust_zscore_slow_->calculate_zscore(market_data->price.value);
 
-    // Update mean reversion phase (ALWAYS, regardless of wall)
-    update_long_phase(current_z);
-    update_short_phase(current_z);
+    // Multi-timeframe alignment check
+    // Long: Fast & Mid oversold, but Slow NOT in strong downtrend
+    bool long_timeframe_aligned = (z_fast < -zscore_entry_threshold_) &&
+                                  (z_mid < -zscore_entry_threshold_) &&
+                                  (z_slow > -zscore_slow_threshold_);
 
-    // === 2. Long entry check (Phase-Based Mean Reversion) ===
-    // NEW ORDER: Check reversal signal FIRST, then check wall
+    // Short: Fast & Mid overbought, but Slow NOT in strong uptrend
+    bool short_timeframe_aligned = (z_fast > zscore_entry_threshold_) &&
+                                   (z_mid > zscore_entry_threshold_) &&
+                                   (z_slow < zscore_slow_threshold_);
+
+    // Update mean reversion phase using mid-term Z-score (ALWAYS, regardless of wall)
+    update_long_phase(z_mid);
+    update_short_phase(z_mid);
+
+    // === 2. Long entry check (Phase-Based Mean Reversion + Multi-Timeframe) ===
+    // NEW ORDER: Check reversal signal FIRST, then timeframe alignment, then wall
     if (is_long_reversal_signal(market_data)) {
-      // Check wall AFTER reversal detected
-      if (bid_wall_info_.is_valid && validate_defense_realtime(market_data,
-                                         prev_bbo_,
-                                         current_bbo,
-                                         common::Side::kBuy)) {
-        check_long_entry(market_data, order_book, current_bbo, current_z);
+      // Check timeframe alignment
+      if (long_timeframe_aligned) {
+        // Check wall AFTER reversal and alignment
+        if (bid_wall_info_.is_valid && validate_defense_realtime(market_data,
+                                           prev_bbo_,
+                                           current_bbo,
+                                           common::Side::kBuy)) {
+          check_long_entry(market_data, order_book, current_bbo, z_mid);
+        } else {
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Entry Skip] Reversal aligned but no wall | z_mid:{:.2f} "
+                "z_slow:{:.2f}",
+                z_mid,
+                z_slow);
+          }
+        }
       } else {
         if (debug_cfg_.log_entry_exit) {
           this->logger_.info(
-              "[Entry Skip] Reversal detected but no wall | z:{:.2f}",
-              current_z);
+              "[Entry Skip] Reversal detected but timeframes NOT aligned | "
+              "z_fast:{:.2f} z_mid:{:.2f} z_slow:{:.2f}",
+              z_fast,
+              z_mid,
+              z_slow);
         }
       }
     }
 
-    // === 3. Short entry check (Phase-Based Mean Reversion) ===
-    // NEW ORDER: Check reversal signal FIRST, then check wall
+    // === 3. Short entry check (Phase-Based Mean Reversion + Multi-Timeframe) ===
+    // NEW ORDER: Check reversal signal FIRST, then timeframe alignment, then wall
     if (is_short_reversal_signal(market_data)) {
-      // Check wall AFTER reversal detected
-      if (ask_wall_info_.is_valid && validate_defense_realtime(market_data,
-                                         prev_bbo_,
-                                         current_bbo,
-                                         common::Side::kSell)) {
-        check_short_entry(market_data, order_book, current_bbo, current_z);
+      // Check timeframe alignment
+      if (short_timeframe_aligned) {
+        // Check wall AFTER reversal and alignment
+        if (ask_wall_info_.is_valid && validate_defense_realtime(market_data,
+                                           prev_bbo_,
+                                           current_bbo,
+                                           common::Side::kSell)) {
+          check_short_entry(market_data, order_book, current_bbo, z_mid);
+        } else {
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Entry Skip] Reversal aligned but no wall | z_mid:{:.2f} "
+                "z_slow:{:.2f}",
+                z_mid,
+                z_slow);
+          }
+        }
       } else {
         if (debug_cfg_.log_entry_exit) {
           this->logger_.info(
-              "[Entry Skip] Reversal detected but no wall | z:{:.2f}",
-              current_z);
+              "[Entry Skip] Reversal detected but timeframes NOT aligned | "
+              "z_fast:{:.2f} z_mid:{:.2f} z_slow:{:.2f}",
+              z_fast,
+              z_mid,
+              z_slow);
         }
       }
     }
 
     // === 4. Save state for next tick ===
     prev_bbo_ = *current_bbo;
-    prev_z_score_ = current_z;
+    prev_z_score_ = z_mid;
 
     // === 5. Cold path: Background updates ===
     // Accumulate trade volume for wall threshold (EMA update)
@@ -758,8 +839,8 @@ class MeanReversionMakerStrategy
       this->logger_.info(
           "[RobustZ] price:{} | median:{:.4f} | MAD:{:.4f} | z:{:.4f}",
           trade->price.value,
-          robust_zscore_->get_median(),
-          robust_zscore_->get_mad(),
+          robust_zscore_mid_->get_median(),
+          robust_zscore_mid_->get_mad(),
           z_robust);
     }
 
@@ -1085,7 +1166,7 @@ class MeanReversionMakerStrategy
 
     // Calculate once, use twice (avoid redundant computation)
     double mid_price = (bbo->bid_price.value + bbo->ask_price.value) * 0.5;
-    double current_z = robust_zscore_->calculate_zscore(mid_price);
+    double current_z = robust_zscore_mid_->calculate_zscore(mid_price);
     double current_obi = calculate_orderbook_imbalance(order_book);
 
     check_long_exit(bbo, mid_price, current_z, current_obi);
@@ -1370,9 +1451,9 @@ class MeanReversionMakerStrategy
   // Mean Reversion Phase Tracking (5-State + Volatility-Adaptive)
   // ========================================
   void update_long_phase(double current_z) {
-    // Calculate adaptive threshold
+    // Calculate adaptive threshold (using mid-term timeframe)
     double adaptive_threshold =
-        robust_zscore_->get_adaptive_threshold(zscore_entry_threshold_);
+        robust_zscore_mid_->get_adaptive_threshold(zscore_entry_threshold_);
 
     double z_abs = std::abs(current_z);
 
@@ -1537,9 +1618,9 @@ class MeanReversionMakerStrategy
   }
 
   void update_short_phase(double current_z) {
-    // Calculate adaptive threshold
+    // Calculate adaptive threshold (using mid-term timeframe)
     double adaptive_threshold =
-        robust_zscore_->get_adaptive_threshold(zscore_entry_threshold_);
+        robust_zscore_mid_->get_adaptive_threshold(zscore_entry_threshold_);
 
     double z_abs = std::abs(current_z);
 
@@ -1726,6 +1807,13 @@ class MeanReversionMakerStrategy
   const int zscore_min_samples_;
   const double zscore_min_mad_threshold_;
 
+  // Multi-timeframe Z-score config
+  const int zscore_fast_window_;
+  const int zscore_fast_min_samples_;
+  const int zscore_slow_window_;
+  const int zscore_slow_min_samples_;
+  const double zscore_slow_threshold_;
+
   // Dynamic state
   common::TickerId ticker_;
   FeatureEngineT::WallInfo bid_wall_info_;
@@ -1746,8 +1834,10 @@ class MeanReversionMakerStrategy
   double current_wall_threshold_;
   std::unique_ptr<DynamicWallThreshold> dynamic_threshold_;
 
-  // Robust Z-score module
-  std::unique_ptr<RobustZScore> robust_zscore_;
+  // Robust Z-score modules (multi-timeframe)
+  std::unique_ptr<RobustZScore> robust_zscore_fast_;  // ~1 sec (10 ticks)
+  std::unique_ptr<RobustZScore> robust_zscore_mid_;   // ~5 sec (30 ticks)
+  std::unique_ptr<RobustZScore> robust_zscore_slow_;  // ~30 sec (100 ticks)
 
   // Note: Trade history is now managed by FeatureEngine::recent_trades_
 

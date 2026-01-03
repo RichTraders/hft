@@ -77,21 +77,9 @@ struct ExitConfig {
   bool cancel_on_wall_decay{true};
 
   // Active exit conditions (profit-taking)
-  int64_t zscore_exit_threshold{5000};   // 0.5 * kZScoreScale
-  int64_t obi_exit_threshold{3000};      // 0.3 * kObiScale
-  bool reversal_momentum_exit{true};     // Enable volume reversal exit
-  int exit_lookback_ticks{10};           // Exit momentum lookback
-  int exit_min_directional_ticks{7};     // 70% directional ticks required
-  int64_t exit_min_volume_ratio{15000};  // 1.5 * kSignalScale
+  int64_t zscore_exit_threshold{5000};  // 0.5 * kZScoreScale
+  int64_t obi_exit_threshold{3000};     // 0.3 * kObiScale
 };
-
-struct ReversalMomentumConfig {
-  bool enabled{true};
-  int lookback_ticks{5};
-  int min_directional_ticks{3};
-  int64_t min_volume_ratio{12000};  // 1.2 * kSignalScale
-};
-
 struct DebugLoggingConfig {
   bool log_wall_detection{false};
   bool log_defense_check{false};
@@ -423,21 +411,7 @@ class MeanReversionMakerStrategy
                 common::kZScoreScale),
             static_cast<int64_t>(
                 INI_CONFIG.get_double("exit", "obi_exit_threshold", 0.3) *
-                common::kObiScale),
-            INI_CONFIG.get("exit", "reversal_momentum_exit", "true") == "true",
-            INI_CONFIG.get_int("exit", "exit_lookback_ticks", 10),
-            INI_CONFIG.get_int("exit", "exit_min_directional_ticks", 7),
-            static_cast<int64_t>(
-                INI_CONFIG.get_double("exit", "exit_min_volume_ratio", 1.5) *
-                common::kSignalScale)},
-
-        reversal_cfg_{
-            INI_CONFIG.get("reversal_momentum", "enabled", "true") == "true",
-            INI_CONFIG.get_int("reversal_momentum", "lookback_ticks", 5),
-            INI_CONFIG.get_int("reversal_momentum", "min_directional_ticks", 3),
-            static_cast<int64_t>(INI_CONFIG.get_double("reversal_momentum",
-                                     "min_volume_ratio", 1.2) *
-                                 common::kSignalScale)},
+                common::kObiScale)},
 
         debug_cfg_{
             INI_CONFIG.get("debug", "log_wall_detection", "false") == "true",
@@ -1135,88 +1109,6 @@ class MeanReversionMakerStrategy
   }
 
   // ========================================
-  // Reversal momentum check (volume-based)
-  // ========================================
-  bool check_reversal_momentum(common::Side expected_direction) const {
-    if (!reversal_cfg_.enabled) {
-      return true;  // Always pass if disabled
-    }
-
-    const auto* trades = this->feature_engine_->get_recent_trades();
-    const size_t trade_count = this->feature_engine_->get_trade_history_size();
-
-    if (trade_count < static_cast<size_t>(reversal_cfg_.lookback_ticks)) {
-      return false;  // Insufficient data
-    }
-
-    size_t count = std::min(trade_count,
-        static_cast<size_t>(reversal_cfg_.lookback_ticks));
-    int directional_count = 0;
-    double directional_volume = 0.0;
-    double opposite_volume = 0.0;
-
-    // Analyze recent N ticks
-    for (size_t i = trade_count - count; i < trade_count; ++i) {
-      if (trades[i].side == expected_direction) {
-        directional_count++;
-        directional_volume += trades[i].qty_raw;
-      } else {
-        opposite_volume += trades[i].qty_raw;
-      }
-    }
-
-    // Check 1: Minimum directional ticks (e.g., 3 out of 5 = 60%)
-    bool tick_condition =
-        (directional_count >= reversal_cfg_.min_directional_ticks);
-
-    // Check 2: Volume ratio (e.g., sell volume > buy volume * 1.2)
-    bool volume_condition =
-        (directional_volume > opposite_volume * reversal_cfg_.min_volume_ratio);
-
-    return tick_condition && volume_condition;
-  }
-
-  // ========================================
-  // Reversal momentum check for EXIT (stricter than entry)
-  // ========================================
-  bool check_reversal_momentum_exit(common::Side opposite_direction) const {
-    if (!exit_cfg_.reversal_momentum_exit) {
-      return false;  // Disabled
-    }
-
-    const auto* trades = this->feature_engine_->get_recent_trades();
-    const size_t trade_count = this->feature_engine_->get_trade_history_size();
-
-    if (trade_count < static_cast<size_t>(exit_cfg_.exit_lookback_ticks)) {
-      return false;  // Insufficient data
-    }
-
-    size_t count = std::min(trade_count,
-        static_cast<size_t>(exit_cfg_.exit_lookback_ticks));
-    int opposite_count = 0;
-    double opposite_volume = 0.0;
-    double current_volume = 0.0;
-
-    // Analyze recent N ticks for opposite direction pressure
-    for (size_t i = trade_count - count; i < trade_count; ++i) {
-      if (trades[i].side == opposite_direction) {
-        opposite_count++;
-        opposite_volume += trades[i].qty_raw;
-      } else {
-        current_volume += trades[i].qty_raw;
-      }
-    }
-
-    // Stricter than entry: 70% ticks, 1.5x volume (vs entry 50%, 1.3x)
-    bool tick_condition =
-        (opposite_count >= exit_cfg_.exit_min_directional_ticks);
-    bool volume_condition =
-        (opposite_volume > current_volume * exit_cfg_.exit_min_volume_ratio);
-
-    return tick_condition && volume_condition;
-  }
-
-  // ========================================
   // Long entry
   // ========================================
   void check_long_entry(const MarketData* trade, MarketOrderBookT* order_book,
@@ -1327,16 +1219,6 @@ class MeanReversionMakerStrategy
             z_robust,
             obi,
             entry_cfg_.obi_threshold);
-      }
-      return;
-    }
-
-    // 5.5. Reversal momentum check (buy pressure building?)
-    if (!check_reversal_momentum(common::Side::kBuy)) {
-      if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
-            "[Entry Block] Long | Insufficient buy momentum | z:{:.2f}",
-            z_robust);
       }
       return;
     }
@@ -1509,16 +1391,6 @@ class MeanReversionMakerStrategy
       return;
     }
 
-    // 5.5. Reversal momentum check (sell pressure building?)
-    if (!check_reversal_momentum(common::Side::kSell)) {
-      if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
-            "[Entry Block] Short | Insufficient sell momentum | z:{:.2f}",
-            z_robust);
-      }
-      return;
-    }
-
     // 6. Spread filter (in bps: 10000 = 100%)
     int64_t spread_bps =
         ((bbo->ask_price.value - bbo->bid_price.value) * common::kBpsScale) /
@@ -1658,19 +1530,13 @@ class MeanReversionMakerStrategy
       reason = "Bid wall vanished";
     }
 
-    // Priority 2: Volume reversal (sell pressure resuming)
-    else if (check_reversal_momentum_exit(common::Side::kSell)) {
-      should_exit = true;
-      reason = "Sell pressure resuming";
-    }
-
-    // Priority 3: OBI reversal (orderbook turned bearish)
+    // Priority 2: OBI reversal (orderbook turned bearish)
     else if (current_obi < -exit_cfg_.obi_exit_threshold) {
       should_exit = true;
       reason = "OBI bearish reversal";
     }
 
-    // Priority 4: Z-score mean reversion (profit target)
+    // Priority 3: Z-score mean reversion (profit target)
     // Override entries (risky) → tighter exit threshold (-0.5 → -1.0)
     // zscore_exit_threshold is scaled by kZScoreScale
     int64_t exit_threshold =
@@ -1685,7 +1551,7 @@ class MeanReversionMakerStrategy
                    : "Z-score mean reversion";
     }
 
-    // Priority 5: Wall decay
+    // Priority 4: Wall decay
     // current < entry * ratio / kSignalScale
     else if (bid_wall_info_.accumulated_notional * common::kSignalScale <
              long_position_.entry_wall_info.accumulated_notional *
@@ -1694,7 +1560,7 @@ class MeanReversionMakerStrategy
       reason = "Bid wall decayed";
     }
 
-    // Priority 6: Wall distance expansion
+    // Priority 5: Wall distance expansion
     // current > entry * ratio / kSignalScale
     else if (bid_wall_info_.distance_bps * common::kSignalScale >
              long_position_.entry_wall_info.distance_bps *
@@ -1754,19 +1620,13 @@ class MeanReversionMakerStrategy
       reason = "Ask wall vanished";
     }
 
-    // Priority 2: Volume reversal (buy pressure resuming)
-    else if (check_reversal_momentum_exit(common::Side::kBuy)) {
-      should_exit = true;
-      reason = "Buy pressure resuming";
-    }
-
-    // Priority 3: OBI reversal (orderbook turned bullish)
+    // Priority 2: OBI reversal (orderbook turned bullish)
     else if (current_obi > exit_cfg_.obi_exit_threshold) {
       should_exit = true;
       reason = "OBI bullish reversal";
     }
 
-    // Priority 4: Z-score mean reversion (profit target)
+    // Priority 3: Z-score mean reversion (profit target)
     // Override entries (risky) → tighter exit threshold (+0.5 → +1.0)
     // zscore_exit_threshold is scaled by kZScoreScale
     int64_t exit_threshold =
@@ -1781,7 +1641,7 @@ class MeanReversionMakerStrategy
                    : "Z-score mean reversion";
     }
 
-    // Priority 5: Wall decay
+    // Priority 4: Wall decay
     // ask_wall * kSignalScale < entry_wall * decay_ratio
     else if (ask_wall_info_.accumulated_notional * common::kSignalScale <
              short_position_.entry_wall_info.accumulated_notional *
@@ -1790,7 +1650,7 @@ class MeanReversionMakerStrategy
       reason = "Ask wall decayed";
     }
 
-    // Priority 6: Wall distance expansion
+    // Priority 5: Wall distance expansion
     // ask_distance * kSignalScale > entry_distance * expand_ratio
     else if (ask_wall_info_.distance_bps * common::kSignalScale >
              short_position_.entry_wall_info.distance_bps *
@@ -2502,7 +2362,6 @@ class MeanReversionMakerStrategy
   const WallDetectionConfig wall_cfg_;
   const EntryConfig entry_cfg_;
   const ExitConfig exit_cfg_;
-  const ReversalMomentumConfig reversal_cfg_;
   const DebugLoggingConfig debug_cfg_;
   const MeanReversionConfig mean_reversion_cfg_;
   const AdverseSelectionConfig adverse_selection_cfg_;

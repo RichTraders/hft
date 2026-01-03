@@ -97,6 +97,16 @@ struct DebugLoggingConfig {
   bool log_entry_exit{false};
 };
 
+struct AdverseSelectionConfig {
+  int max_fill_history{20};
+  uint64_t measurement_window_ns{1000000000};    // 1 second
+  uint64_t measurement_tolerance_ns{100000000};  // ±100ms
+  double adverse_threshold_pct{0.0002};          // 0.02%
+  int min_samples{10};
+  double ratio_threshold{0.5};  // 50%
+  double margin_multiplier{1.5};
+};
+
 struct MeanReversionConfig {
   // Legacy parameters (backwards compatibility)
   double oversold_start_threshold{1.5};    // Deprecated
@@ -163,6 +173,98 @@ struct SignalScore {
     if (score > 0.5)
       return Quality::MARGINAL;
     return Quality::POOR;
+  }
+};
+
+// ==========================================
+// Adverse Selection Detection (Markout Analysis)
+// ==========================================
+/**
+ * @brief Tracks fill-to-price movement to detect adverse selection
+ *
+ * Monitors whether strategy is being "picked off" by informed traders.
+ * Pattern: Long filled → price drops immediately = adverse selection
+ */
+struct AdverseSelectionTracker {
+  struct FillRecord {
+    uint64_t fill_time{0};       // Fill timestamp (ns)
+    double fill_price{0.0};      // Fill price
+    common::Side side;           // Buy or Sell
+    double price_1s_later{0.0};  // Price 1 second after fill
+    bool measured{false};        // Measurement complete flag
+  };
+
+  std::deque<FillRecord> recent_fills;
+  int adverse_count{0};
+  int total_measured{0};
+
+  /**
+   * @brief Record a new fill
+   */
+  void on_fill(uint64_t time, double price, common::Side side,
+      int max_history) {
+    recent_fills.push_back({time, price, side, 0.0, false});
+    if (static_cast<int>(recent_fills.size()) > max_history) {
+      recent_fills.pop_front();
+    }
+  }
+
+  /**
+   * @brief Update fill records with current price (measure markout)
+   */
+  void on_price_update(uint64_t now, double current_price,
+      const AdverseSelectionConfig& cfg) {
+    for (auto& fill : recent_fills) {
+      if (fill.measured)
+        continue;
+
+      uint64_t elapsed = now - fill.fill_time;
+
+      // Measure 1 second (±100ms) after fill
+      if (elapsed >= cfg.measurement_window_ns - cfg.measurement_tolerance_ns &&
+          elapsed < cfg.measurement_window_ns + cfg.measurement_tolerance_ns) {
+        fill.price_1s_later = current_price;
+        fill.measured = true;
+
+        // Check if adverse
+        double ret = (current_price - fill.fill_price) / fill.fill_price;
+        total_measured++;
+
+        if (fill.side == common::Side::kBuy &&
+            ret < -cfg.adverse_threshold_pct) {
+          adverse_count++;  // Bought then dropped = adverse
+        } else if (fill.side == common::Side::kSell &&
+                   ret > cfg.adverse_threshold_pct) {
+          adverse_count++;  // Sold then rose = adverse
+        }
+      }
+    }
+  }
+
+  /**
+   * @brief Get adverse selection ratio
+   * @return Ratio of adverse fills (0.0-1.0)
+   */
+  double get_ratio(int min_samples) const {
+    if (total_measured < min_samples)
+      return 0.0;
+    return static_cast<double>(adverse_count) / total_measured;
+  }
+
+  /**
+   * @brief Check if strategy is being picked off
+   */
+  bool is_being_picked_off(const AdverseSelectionConfig& cfg) const {
+    return get_ratio(cfg.min_samples) > cfg.ratio_threshold;
+  }
+
+  /**
+   * @brief Reset counters (optional, for periodic recalibration)
+   */
+  void reset() {
+    adverse_count = 0;
+    total_measured = 0;
+    recent_fills.clear();
   }
 };
 
@@ -304,6 +406,19 @@ class MeanReversionMakerStrategy
             INI_CONFIG.get_double("mean_reversion", "false_reversal_ratio",
                 0.5)},
 
+        adverse_selection_cfg_{
+            INI_CONFIG.get_int("adverse_selection", "max_fill_history", 20),
+            static_cast<uint64_t>(INI_CONFIG.get_double("adverse_selection",
+                "measurement_window_ns", 1'000'000'000)),
+            static_cast<uint64_t>(INI_CONFIG.get_double("adverse_selection",
+                "measurement_tolerance_ns", 100'000'000)),
+            INI_CONFIG.get_double("adverse_selection", "adverse_threshold_pct",
+                0.0002),
+            INI_CONFIG.get_int("adverse_selection", "min_samples", 10),
+            INI_CONFIG.get_double("adverse_selection", "ratio_threshold", 0.5),
+            INI_CONFIG.get_double("adverse_selection", "margin_multiplier",
+                1.5)},
+
         // === Z-score config ===
         zscore_window_size_(
             INI_CONFIG.get_int("robust_zscore", "window_size", 30)),
@@ -385,7 +500,10 @@ class MeanReversionMakerStrategy
             INI_CONFIG.get_double("robust_zscore_slow", "vol_ratio_low", 0.5),
             INI_CONFIG.get_double("robust_zscore_slow", "vol_ratio_high", 2.0),
             INI_CONFIG.get_int("robust_zscore_slow", "baseline_min_history",
-                30)})) {
+                30)})),
+
+        // === Adverse selection tracking ===
+        original_safety_margin_(entry_cfg_.safety_margin) {
     this->logger_.info(
         "[MeanReversionMaker] Initialized | min_quantity:{:.2f} BTC | "
         "simultaneous:{}",
@@ -497,6 +615,33 @@ class MeanReversionMakerStrategy
         robust_zscore_mid_->calculate_zscore(market_data->price.value);
     double z_slow =
         robust_zscore_slow_->calculate_zscore(market_data->price.value);
+
+    // === 1.1. Adverse Selection Detection (Markout Analysis) ===
+    uint64_t now = get_current_time_ns();
+    adverse_selection_tracker_.on_price_update(now,
+        market_data->price.value,
+        adverse_selection_cfg_);
+
+    // Adaptive response: widen safety_margin if being picked off
+    if (adverse_selection_tracker_.is_being_picked_off(
+            adverse_selection_cfg_)) {
+      const_cast<EntryConfig&>(entry_cfg_).safety_margin =
+          original_safety_margin_ * adverse_selection_cfg_.margin_multiplier;
+
+      if (debug_cfg_.log_entry_exit) {
+        this->logger_.warn(
+            "[Adverse Selection] Being picked off | ratio:{:.2f} | "
+            "widening margin: {:.6f} → {:.6f}",
+            adverse_selection_tracker_.get_ratio(
+                adverse_selection_cfg_.min_samples),
+            original_safety_margin_,
+            entry_cfg_.safety_margin);
+      }
+    } else {
+      // Reset to original if not being picked off
+      const_cast<EntryConfig&>(entry_cfg_).safety_margin =
+          original_safety_margin_;
+    }
 
     // Multi-timeframe alignment check
     // Long: Fast & Mid oversold, but Slow NOT in strong downtrend
@@ -627,6 +772,12 @@ class MeanReversionMakerStrategy
             long_position_.state_time = get_current_time_ns();
             long_position_.pending_order_id.reset();
 
+            // Track fill for adverse selection detection
+            adverse_selection_tracker_.on_fill(long_position_.state_time,
+                report->avg_price.value,
+                report->side,
+                adverse_selection_cfg_.max_fill_history);
+
             if (debug_cfg_.log_entry_exit) {
               this->logger_.info(
                   "[Entry Filled] LONG | qty:{} | price:{} | "
@@ -692,6 +843,12 @@ class MeanReversionMakerStrategy
                 ask_wall_info_;  // Update wall at fill time
             short_position_.state_time = get_current_time_ns();
             short_position_.pending_order_id.reset();
+
+            // Track fill for adverse selection detection
+            adverse_selection_tracker_.on_fill(short_position_.state_time,
+                report->avg_price.value,
+                report->side,
+                adverse_selection_cfg_.max_fill_history);
 
             if (debug_cfg_.log_entry_exit) {
               this->logger_.info(
@@ -2249,6 +2406,7 @@ class MeanReversionMakerStrategy
   const ReversalMomentumConfig reversal_cfg_;
   const DebugLoggingConfig debug_cfg_;
   const MeanReversionConfig mean_reversion_cfg_;
+  const AdverseSelectionConfig adverse_selection_cfg_;
 
   // Z-score config (kept separate for module initialization)
   const int zscore_window_size_;
@@ -2290,6 +2448,10 @@ class MeanReversionMakerStrategy
   std::unique_ptr<RobustZScore> robust_zscore_fast_;  // ~1 sec (10 ticks)
   std::unique_ptr<RobustZScore> robust_zscore_mid_;   // ~5 sec (30 ticks)
   std::unique_ptr<RobustZScore> robust_zscore_slow_;  // ~30 sec (100 ticks)
+
+  // Adverse selection tracking
+  double original_safety_margin_;  // Backup for restoration
+  AdverseSelectionTracker adverse_selection_tracker_;
 
   // Note: Trade history is now managed by FeatureEngine::recent_trades_
 

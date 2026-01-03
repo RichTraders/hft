@@ -1194,8 +1194,10 @@ class MeanReversionMakerStrategy
       // Long defense: check Bid after sell impact
       bool price_held =
           (current_bbo->bid_price.value == prev_bbo.bid_price.value);
-      bool qty_sufficient = (current_bbo->bid_qty.value >=
-                             trade->qty.value * defense_qty_multiplier_);
+      // defense_qty_multiplier_ is scaled by kSignalScale, need to divide
+      int64_t required_qty =
+          (trade->qty.value * defense_qty_multiplier_) / common::kSignalScale;
+      bool qty_sufficient = (current_bbo->bid_qty.value >= required_qty);
 
       if (debug_cfg_.log_defense_check) {
         this->logger_.debug(
@@ -1215,8 +1217,10 @@ class MeanReversionMakerStrategy
       // Short defense: check Ask after buy impact
       bool price_held =
           (current_bbo->ask_price.value == prev_bbo.ask_price.value);
-      bool qty_sufficient = (current_bbo->ask_qty.value >=
-                             trade->qty.value * defense_qty_multiplier_);
+      // defense_qty_multiplier_ is scaled by kSignalScale, need to divide
+      int64_t required_qty =
+          (trade->qty.value * defense_qty_multiplier_) / common::kSignalScale;
+      bool qty_sufficient = (current_bbo->ask_qty.value >= required_qty);
 
       if (debug_cfg_.log_defense_check) {
         this->logger_.debug(
@@ -1309,7 +1313,8 @@ class MeanReversionMakerStrategy
    * @return true if wall quality is sufficient, false otherwise
    */
   [[nodiscard]] bool check_wall_quality(
-      const DynamicWallThreshold& wall_tracker, const char* side_name) const {
+      const typename FeatureEngineT::WallTracker& wall_tracker,
+      const char* side_name) const {
 
     constexpr double kMinWallQuality = 0.6;  // 60% minimum threshold
     double wall_quality = wall_tracker.composite_quality();
@@ -1445,8 +1450,9 @@ class MeanReversionMakerStrategy
 
     // 3. Calculate Multi-Factor Signal Score
     int64_t obi = calculate_orderbook_imbalance_int64(order_book);
+    int64_t mid_price = (bbo->bid_price.value + bbo->ask_price.value) / 2;
     SignalScore signal =
-        calculate_long_signal_score(z_robust, bid_wall_info_, obi);
+        calculate_long_signal_score(z_robust, bid_wall_info_, obi, mid_price);
     int64_t composite = signal.composite(entry_cfg_);
 
     if (composite < entry_cfg_.min_signal_quality) {
@@ -1493,6 +1499,7 @@ class MeanReversionMakerStrategy
     place_entry_order(common::Side::kBuy, bbo->bid_price.value);
 
     if (debug_cfg_.log_entry_exit) {
+      double wall_quality = bid_wall_tracker_.composite_quality();
       this->logger_.info(
           "[Entry Signal] LONG | quality:{} ({}) | wall_quality:{} | "
           "z_robust:{} | "
@@ -1533,8 +1540,9 @@ class MeanReversionMakerStrategy
 
     // 3. Calculate Multi-Factor Signal Score
     int64_t obi = calculate_orderbook_imbalance_int64(order_book);
+    int64_t mid_price = (bbo->bid_price.value + bbo->ask_price.value) / 2;
     SignalScore signal =
-        calculate_short_signal_score(z_robust, ask_wall_info_, obi);
+        calculate_short_signal_score(z_robust, ask_wall_info_, obi, mid_price);
     int64_t composite = signal.composite(entry_cfg_);
 
     if (composite < entry_cfg_.min_signal_quality) {
@@ -1592,6 +1600,7 @@ class MeanReversionMakerStrategy
     place_entry_order(common::Side::kSell, bbo->ask_price.value);
 
     if (debug_cfg_.log_entry_exit) {
+      double wall_quality = ask_wall_tracker_.composite_quality();
       this->logger_.info(
           "[Entry Signal] SHORT | quality:{} ({}) | wall_quality:{} | "
           "z_robust:{} | "
@@ -2419,10 +2428,12 @@ class MeanReversionMakerStrategy
    * @param z Z-score value (scaled by kZScoreScale)
    * @param wall Wall information
    * @param obi Orderbook imbalance (scaled by kObiScale)
+   * @param mid_price Mid price in raw scale (for wall target calculation)
    * @return SignalScore with all components normalized to [0, kSignalScale]
    */
   SignalScore calculate_long_signal_score(int64_t z,
-      const FeatureEngineT::WallInfo& wall, int64_t obi) const {
+      const FeatureEngineT::WallInfo& wall, int64_t obi,
+      int64_t mid_price) const {
     SignalScore score;
 
     // === 1. Z-score component: normalize to [0, kSignalScale] ===
@@ -2438,11 +2449,13 @@ class MeanReversionMakerStrategy
     }
 
     // === 2. Wall strength: compare to dynamic threshold ===
-    // wall_target = min_qty * multiplier / kSignalScale
-    // strength = wall_notional * kSignalScale / wall_target
-    int64_t wall_target = (dynamic_threshold_->get_min_quantity() *
-                              entry_cfg_.wall_norm_multiplier) /
-                          common::kSignalScale;
+    // Convert min_quantity to notional first: min_qty * mid_price / kQtyScale
+    // Then apply multiplier: notional * multiplier / kSignalScale
+    int64_t min_notional =
+        (dynamic_threshold_->get_min_quantity() * mid_price) /
+        common::FixedPointConfig::kQtyScale;
+    int64_t wall_target =
+        (min_notional * entry_cfg_.wall_norm_multiplier) / common::kSignalScale;
     if (wall_target > 0) {
       int64_t wall_normalized =
           (wall.accumulated_notional * common::kSignalScale) / wall_target;
@@ -2472,10 +2485,12 @@ class MeanReversionMakerStrategy
    * @param z Z-score value
    * @param wall Wall information
    * @param obi Orderbook imbalance
+   * @param mid_price Mid price in raw scale (for wall target calculation)
    * @return SignalScore with all components normalized to 0-1
    */
   SignalScore calculate_short_signal_score(int64_t z,
-      const FeatureEngineT::WallInfo& wall, int64_t obi) const {
+      const FeatureEngineT::WallInfo& wall, int64_t obi,
+      int64_t mid_price) const {
     SignalScore score;
 
     // === 1. Z-score component: normalize to [0, kSignalScale] ===
@@ -2489,9 +2504,13 @@ class MeanReversionMakerStrategy
     }
 
     // === 2. Wall strength: compare to dynamic threshold ===
-    int64_t wall_target = (dynamic_threshold_->get_min_quantity() *
-                              entry_cfg_.wall_norm_multiplier) /
-                          common::kSignalScale;
+    // Convert min_quantity to notional first: min_qty * mid_price / kQtyScale
+    // Then apply multiplier: notional * multiplier / kSignalScale
+    int64_t min_notional =
+        (dynamic_threshold_->get_min_quantity() * mid_price) /
+        common::FixedPointConfig::kQtyScale;
+    int64_t wall_target =
+        (min_notional * entry_cfg_.wall_norm_multiplier) / common::kSignalScale;
     if (wall_target > 0) {
       int64_t wall_normalized =
           (wall.accumulated_notional * common::kSignalScale) / wall_target;
@@ -2588,8 +2607,8 @@ class MeanReversionMakerStrategy
    * @return Strength [0, kSignalScale]
    */
   [[nodiscard]] int64_t calculate_wall_decay_strength(
-      const WallInfo& current_wall_info,
-      const WallInfo& entry_wall_info) const {
+      const typename FeatureEngineT::WallInfo& current_wall_info,
+      const typename FeatureEngineT::WallInfo& entry_wall_info) const {
 
     if (entry_wall_info.accumulated_notional <= 0)
       return 0;

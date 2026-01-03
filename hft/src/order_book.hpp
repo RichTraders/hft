@@ -278,7 +278,7 @@ bool consume_following_words(const Bucket* bucket, int bidx, int start_off,
     }
   } else {
     for (int idx = word_idx + 1; idx < kBucketBitmapWords && filled < want;
-        ++idx) {
+         ++idx) {
       if (scan_word<false>(bucket->bitmap[idx], idx, on_off))
         return true;
     }
@@ -404,15 +404,15 @@ void consume_levels_in_bucket(const Bucket* bucket, int bucket_idx, int off,
 
   if constexpr (IsBid) {
     for (int workd_idx = word_index - 1;
-        workd_idx >= 0 && static_cast<int>(out.size()) < level;
-        --workd_idx) {
+         workd_idx >= 0 && static_cast<int>(out.size()) < level;
+         --workd_idx) {
       if (scan_word<true>(bucket->bitmap[workd_idx], workd_idx, on_off))
         return;
     }
   } else {
     for (int word_idx = word_index + 1;
-        word_idx < kBucketBitmapWords && static_cast<int>(out.size()) < level;
-        ++word_idx) {
+         word_idx < kBucketBitmapWords && static_cast<int>(out.size()) < level;
+         ++word_idx) {
       if (scan_word<false>(bucket->bitmap[word_idx], word_idx, on_off))
         return;
     }
@@ -437,7 +437,7 @@ class MarketOrderBook final {
             config_.bucket_pool_size)),
         ask_bucket_pool_(std::make_unique<common::MemoryPool<Bucket>>(
             config_.bucket_pool_size)) {
-    logger_.info(
+    LOG_INFO(logger_,
         "[Constructor] MarketOrderBook Created - min_price: {}, max_price: {}, "
         "bucket_count: {}, summary_words: {}",
         config_.min_price_int,
@@ -451,15 +451,16 @@ class MarketOrderBook final {
     trade_engine_ = nullptr;
   }
 
-  auto on_market_data_updated(const MarketData* market_update) noexcept
-      -> void {
+  auto on_market_data_updated(
+      const MarketData* market_update) noexcept -> void {
 
     const int64_t max_price_raw = config_.max_price_int;
     const int64_t min_price_raw = config_.min_price_int;
 
     if (market_update->price.value > max_price_raw ||
         market_update->price.value < min_price_raw) {
-      logger_.error("common::Price[{}] is invalid (range: {} ~ {})",
+      LOG_ERROR(logger_,
+          "common::Price[{}] is invalid (range: {} ~ {})",
           market_update->price.to_double(),
           static_cast<double>(min_price_raw) /
               common::FixedPointConfig::kPriceScale,
@@ -473,7 +474,7 @@ class MarketOrderBook final {
 
     switch (market_update->type) {
       case common::MarketUpdateType::kInvalid:
-        logger_.error("error in market update data");
+        LOG_ERROR(logger_, "error in market update data");
         break;
       case common::MarketUpdateType::kClear: {
         for (int i = 0; i < config_.bucket_count; ++i) {
@@ -520,7 +521,8 @@ class MarketOrderBook final {
       }
     }
 
-    logger_.trace("[Updated] {} {}",
+    LOG_TRACE(logger_,
+        "[Updated] {} {}",
         market_update->toString(),
         bbo_.toString());
 
@@ -566,11 +568,15 @@ class MarketOrderBook final {
   }
 
   [[nodiscard]] int next_active_bid(int start_idx) const noexcept {
-    return next_active_impl<SearchHighest>(bid_summary_, bid_buckets_, start_idx);
+    return next_active_impl<SearchHighest>(bid_summary_,
+        bid_buckets_,
+        start_idx);
   }
 
   [[nodiscard]] int next_active_ask(int start_idx) const noexcept {
-    return next_active_impl<SearchLowest>(ask_summary_, ask_buckets_, start_idx);
+    return next_active_impl<SearchLowest>(ask_summary_,
+        ask_buckets_,
+        start_idx);
   }
 
  private:
@@ -786,7 +792,7 @@ class MarketOrderBook final {
     if (consume_bucket(bidx, off))
       return filled;
 
-    // NOLINTNEXTLINE(bugprone-infinite-loop) - filled is modified via reference in consume_bucket lambda
+    // NOLINTNEXTLINE(bugprone-infinite-loop)
     while (filled < want) {
       bidx = jump_next_bucket(bidx);
       if (bidx < 0)

@@ -16,15 +16,13 @@ if ! command -v "$CLANG_TIDY" > /dev/null; then
   exit 1
 fi
 
-EXTENSIONS="cpp cc cxx c"
+EXTENSIONS="cpp cc cxx c h hpp tpp"
 FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -Ev "test|NewOroFix44MD_|NewOroFix44OE_|fix_[?:app|md_app|oe_app]|fix_*_[core]|schema|pch\.h" | grep -E "\.(${EXTENSIONS// /|})$")
 
-# 헤더 파일이 변경되면 main.cpp를 체크 대상에 추가 (마지막에 별도 처리)
 HEADERS=$(git diff --cached --name-only --diff-filter=ACM | grep -Ev "test|schema|pch\.h" | grep -E "\.(h|hpp)$")
 CHECK_MAIN=0
 if [ -n "$HEADERS" ]; then
   CHECK_MAIN=1
-  # FILES에서 main.cpp 제거 (나중에 마지막으로 체크)
   FILES=$(echo "$FILES" | grep -v "^main.cpp$")
 fi
 
@@ -65,6 +63,10 @@ for file in $FILES; do
   git add "$file"
   echo "formatted: $file"
 
+  if [[ "$file" == *.h || "$file" == *.hpp ]]; then
+    continue
+  fi
+
   HASH=$(git hash-object "$file")
   CACHED=$(grep "$file $HASH" "$CACHE_FILE")
 
@@ -96,7 +98,6 @@ if [ "$FAIL" -ne 0 ]; then
   exit 1
 fi
 
-# 헤더 변경 시 main.cpp를 마지막에 체크 (캐싱 안 함)
 if [ "$CHECK_MAIN" -eq 1 ]; then
   echo "• main.cpp (header changes detected)"
   $CLANG_FORMAT -i "main.cpp"

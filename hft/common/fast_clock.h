@@ -16,7 +16,6 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <mutex>
 
 #include "performance.h"
 #include "types.h"
@@ -30,28 +29,24 @@ struct FastClock {
   double inv_f;
   uint64_t last_cycle;
   uint64_t last_epoch;
-  std::mutex mtx;
 
   FastClock(double cpu_hz, unsigned interval_h)
       : recal_cycles(
             static_cast<uint64_t>(cpu_hz * kHourToSeconds * interval_h)),
-        inv_f(kGhz / cpu_hz) {
-    const std::lock_guard lock_guard(mtx);
-    last_cycle = rdtsc();
-    last_epoch = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                     std::chrono::system_clock::now().time_since_epoch())
-                     .count();
-  }
+        inv_f(kGhz / cpu_hz),
+        last_cycle(rdtsc()),
+        last_epoch(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+                       .count()) {}
 
-  uint64_t get_timestamp() {
+  uint64_t get_timestamp() noexcept {
     const uint64_t current_cycle = rdtsc();
     uint64_t cycle_diff = current_cycle - last_cycle;
 
     if (UNLIKELY(cycle_diff >= recal_cycles)) {
-      const std::lock_guard lock_guard(mtx);
       last_cycle = rdtsc();
       last_epoch = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                       std::chrono::system_clock::now().time_since_epoch())
+          std::chrono::system_clock::now().time_since_epoch())
                        .count();
       cycle_diff = 0;
     }

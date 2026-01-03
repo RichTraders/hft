@@ -28,7 +28,7 @@ class WsMdDecoderBase {
     auto parsed = glz::read_json<T>(payload);
     if (!parsed) {
       auto error_msg = glz::format_error(parsed.error(), payload);
-      logger_.error(
+      LOG_ERROR(logger_,
           "\x1b[31m Failed to decode {} response: "
           "{}. payload:{} \x1b[0m",
           Label.view(),

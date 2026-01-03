@@ -270,7 +270,7 @@ struct BinanceSpotMdMessageConverter {
           common::PriceType::from_raw(price),
           common::QtyType::from_raw(qty));
       if (!entry) {
-        logger_.error("Market data pool exhausted");
+        LOG_ERROR(logger_, "Market data pool exhausted");
       }
       return entry;
     }
@@ -360,7 +360,7 @@ struct BinanceSpotMdMessageConverter {
 
     template <typename T>
     MarketUpdateData operator()(const T&) const {
-      logger_.error("Snapshot requested from non-depth wire message");
+      LOG_ERROR(logger_, "Snapshot requested from non-depth wire message");
       return MarketUpdateData{};
     }
 

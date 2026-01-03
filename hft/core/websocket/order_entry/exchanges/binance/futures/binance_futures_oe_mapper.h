@@ -40,7 +40,7 @@ class BinanceFuturesOeMapper {
       const WireExecutionReport& msg) const {
     auto* report = allocate_execution_report();
     if (!report) {
-      logger_.error("Failed to allocate execution report");
+      LOG_ERROR(logger_, "Failed to allocate execution report");
       return nullptr;
     }
 
@@ -49,10 +49,12 @@ class BinanceFuturesOeMapper {
     report->symbol = event.symbol;
     report->exec_type = trading::toType(event.execution_type);
     report->ord_status = trading::toOrderStatus(event.order_status);
-    report->cum_qty = common::QtyType::from_double(event.cumulative_filled_quantity);
+    report->cum_qty =
+        common::QtyType::from_double(event.cumulative_filled_quantity);
     report->leaves_qty = common::QtyType::from_double(
         std::max(0.0, event.order_quantity - event.cumulative_filled_quantity));
-    report->last_qty = common::QtyType::from_double(event.last_executed_quantity);
+    report->last_qty =
+        common::QtyType::from_double(event.last_executed_quantity);
     report->price = common::PriceType::from_double(event.order_price);
     report->side = common::toSide(event.side);
     report->text = event.reject_reason;
@@ -82,7 +84,7 @@ class BinanceFuturesOeMapper {
       const WireCancelReject& msg) const {
     auto* reject = allocate_cancel_reject();
     if (!reject) {
-      logger_.error("Failed to allocate cancel reject");
+      LOG_ERROR(logger_, "Failed to allocate cancel reject");
       return nullptr;
     }
     reject->cl_order_id = common::OrderId{msg.event.client_order_id};
@@ -96,7 +98,7 @@ class BinanceFuturesOeMapper {
       const WireMassCancelReport& msg) const {
     auto* report = allocate_mass_cancel_report();
     if (!report) {
-      logger_.error("Failed to allocate mass cancel report");
+      LOG_ERROR(logger_, "Failed to allocate mass cancel report");
       return nullptr;
     }
     report->cl_order_id =

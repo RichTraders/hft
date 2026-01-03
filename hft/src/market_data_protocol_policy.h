@@ -31,14 +31,14 @@ struct WebSocketMarketDataPolicy {
       StreamState& state, std::deque<MarketUpdateData*>& buffered_events,
       uint64_t& first_buffered_update_id, Logger& logger,
       OnInstrumentInfoFn& on_instrument_info_fn) {
-    logger.info("[MarketConsumer][Login] Market consumer successful");
+    LOG_INFO(logger, "[MarketConsumer][Login] Market consumer successful");
 
     const std::string message =
         app.create_snapshot_request_message(INI_CONFIG.get("meta", "ticker"),
             INI_CONFIG.get("meta", "level"));
 
     if (UNLIKELY(!app.send(message))) {
-      logger.error("[MarketConsumer][Message] failed to send login");
+      LOG_ERROR(logger, "[MarketConsumer][Message] failed to send login");
     }
     state = StreamState::kBuffering;
     buffered_events.clear();
@@ -53,7 +53,7 @@ struct WebSocketMarketDataPolicy {
         if (instrument_info) {
           on_instrument_info_fn(*instrument_info);
         } else {
-          logger.error(
+          LOG_ERROR(logger,
               "[MarketConsumer][Message] failed to fetch instrument info via "
               "HTTP");
         }
@@ -62,7 +62,7 @@ struct WebSocketMarketDataPolicy {
       const std::string instrument_message =
           app.request_instrument_list_message(INI_CONFIG.get("meta", "ticker"));
       if (UNLIKELY(!app.send(instrument_message))) {
-        logger.error(
+        LOG_ERROR(logger,
             "[MarketConsumer][Message] failed to send instrument list");
       }
     }
@@ -80,7 +80,7 @@ struct WebSocketMarketDataPolicy {
     auto* data = market_update_data_pool->allocate(std::move(msg_data));
 
     // if (UNLIKELY(data == nullptr)) {
-    //   logger.error("[handle_subscribe] Market update data pool exhausted!");
+    //   LOG_ERROR(logger, "[handle_subscribe] Market update data pool exhausted!");
     //   // Note: msg_data.data is moved, so we cannot clean up here.
     //   // The MarketData* pointers are lost - this is a known limitation
     //   // when pool is exhausted. Consider increasing pool size.
@@ -118,7 +118,8 @@ struct WebSocketMarketDataPolicy {
     }
 
     if (data->type == kMarket) {
-      logger.trace("current update index:{}, data start :{}, data end:{}",
+      LOG_TRACE(logger,
+          "current update index:{}, data start :{}, data end:{}",
           update_index,
           data->start_idx,
           data->end_idx);
@@ -141,7 +142,8 @@ struct WebSocketMarketDataPolicy {
       }
 
       if (!validation_result.valid) {
-        logger.error("Gap detected: expected {}, got start:{}, end:{}",
+        LOG_ERROR(logger,
+            "Gap detected: expected {}, got start:{}, end:{}",
             update_index + 1,
             data->start_idx,
             data->end_idx);
@@ -165,7 +167,7 @@ struct FixMarketDataPolicy {
       std::deque<MarketUpdateData*>& /*buffered_events*/,
       uint64_t& /*first_buffered_update_id*/, Logger& logger,
       OnInstrumentInfoFn& on_instrument_info_fn) {
-    logger.info("[MarketConsumer][Login] Market consumer successful");
+    LOG_INFO(logger, "[MarketConsumer][Login] Market consumer successful");
 
     const std::string message =
         app.create_market_data_subscription_message("DEPTH_STREAM",
@@ -174,7 +176,7 @@ struct FixMarketDataPolicy {
             true);
 
     if (UNLIKELY(!app.send(message))) {
-      logger.error("[MarketConsumer][Message] failed to send login");
+      LOG_ERROR(logger, "[MarketConsumer][Message] failed to send login");
     }
 
     if constexpr (App::ExchangeTraits::uses_http_exchange_info()) {
@@ -186,7 +188,7 @@ struct FixMarketDataPolicy {
         if (instrument_info) {
           on_instrument_info_fn(*instrument_info);
         } else {
-          logger.error(
+          LOG_ERROR(logger,
               "[MarketConsumer][Message] failed to fetch instrument info via "
               "HTTP");
         }
@@ -195,7 +197,7 @@ struct FixMarketDataPolicy {
       const std::string instrument_message =
           app.request_instrument_list_message(INI_CONFIG.get("meta", "ticker"));
       if (UNLIKELY(!app.send(instrument_message))) {
-        logger.error(
+        LOG_ERROR(logger,
             "[MarketConsumer][Message] failed to send instrument list");
       }
     }
@@ -213,7 +215,7 @@ struct FixMarketDataPolicy {
         market_update_data_pool->allocate(app.create_market_data_message(msg));
 
     if (UNLIKELY(data == nullptr)) {
-      logger.error(
+      LOG_ERROR(logger,
           "[Error] Failed to allocate market data message, but log is here");
 #ifdef NDEBUG
       app.stop();
@@ -223,7 +225,7 @@ struct FixMarketDataPolicy {
     }
 
     if (UNLIKELY(state == StreamState::kAwaitingSnapshot)) {
-      logger.info("Waiting for making snapshot");
+      LOG_INFO(logger, "Waiting for making snapshot");
       return;
     }
 
@@ -231,7 +233,8 @@ struct FixMarketDataPolicy {
             (data->type == kNone) ||
             (data->type == kMarket && data->start_idx != update_index + 1 &&
                 update_index != 0ULL))) {
-      logger.error("Update index is outdated. current index :{}, new index :{}",
+      LOG_ERROR(logger,
+          "Update index is outdated. current index :{}, new index :{}",
           update_index,
           data->start_idx);
 
@@ -246,7 +249,7 @@ struct FixMarketDataPolicy {
 
     update_index = data->end_idx;
     if (UNLIKELY(!on_market_data_fn(data))) {
-      logger.error("[Message] failed to send subscribe");
+      LOG_ERROR(logger, "[Message] failed to send subscribe");
     }
   }
 };

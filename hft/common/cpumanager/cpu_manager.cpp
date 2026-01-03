@@ -32,7 +32,7 @@
 
 namespace common {
 namespace {
-constexpr auto kDecimalBase = 10;
+[[maybe_unused]] constexpr auto kDecimalBase = 10;
 }
 // NOLINTBEGIN(unused-parameter)
 CpuManager::CpuManager(const Logger::Producer& logger) : logger_(logger) {

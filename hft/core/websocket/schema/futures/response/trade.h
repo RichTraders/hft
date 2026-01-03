@@ -9,8 +9,8 @@
  * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
- 
- #ifndef TRADE_H
+
+#ifndef TRADE_H
 #define TRADE_H
 
 #include <glaze/glaze.hpp>
@@ -28,6 +28,7 @@ struct AggregateTradeEvent {
   std::int64_t aggregate_trade_id;  // "a"
   ScaledPrice price;                // "p"
   ScaledQty quantity;               // "q"
+  ScaledQty notional_quantity;      // "nq" (added 2025-12-31)
   std::int64_t first_trade_id;      // "f"
   std::int64_t last_trade_id;       // "l"
   std::int64_t trade_time;          // "T"
@@ -45,6 +46,7 @@ struct AggregateTradeEvent {
         "a", &T::aggregate_trade_id,
         "p", &T::price,
         "q", &T::quantity,
+        "nq", &T::quantity,
         "f", &T::first_trade_id,
         "l", &T::last_trade_id,
         "T", &T::trade_time,

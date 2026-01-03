@@ -44,6 +44,19 @@ struct EntryConfig {
   double position_size{0.01};
   double safety_margin{0.00005};
   double min_spread_filter{0.0004};
+
+  // Multi-Factor Scoring parameters
+  double min_signal_quality{0.65};   // Minimum composite score for entry
+  double zscore_weight{0.35};        // Z-score component weight
+  double wall_weight{0.30};          // Wall strength weight
+  double volume_weight{0.20};        // Volume reversal weight
+  double obi_weight{0.15};           // OBI alignment weight
+  double zscore_norm_min{2.0};       // Z-score normalization min
+  double zscore_norm_max{3.0};       // Z-score normalization max
+  double wall_norm_multiplier{2.0};  // Wall normalization multiplier
+  double obi_norm_min{0.05};         // OBI normalization min
+  double obi_norm_max{0.25};         // OBI normalization max
+  int volume_score_lookback{5};      // Volume analysis window
 };
 
 struct ExitConfig {
@@ -101,6 +114,56 @@ struct MeanReversionConfig {
   // False reversal detection
   double false_reversal_ratio{
       0.5};  // Ratio of min_reversal_bounce for false reversal
+};
+
+// ==========================================
+// Multi-Factor Signal Scoring
+// ==========================================
+/**
+ * @brief Entry signal quality score (0-1 range for each component)
+ *
+ * Replaces boolean entry signals with scored signals to capture
+ * signal strength and filter low-quality setups.
+ *
+ * Example:
+ * - Z-score -2.1 → z_score_strength = 0.1
+ * - Z-score -3.0 → z_score_strength = 1.0
+ * - composite() = weighted average of all components
+ */
+struct SignalScore {
+  double z_score_strength{0.0};  // 0-1: Z-score magnitude normalized
+  double wall_strength{0.0};     // 0-1: Wall size vs threshold
+  double volume_strength{0.0};   // 0-1: Directional volume momentum
+  double obi_strength{0.0};      // 0-1: Orderbook imbalance alignment
+
+  /**
+   * @brief Calculate composite score (weighted average)
+   * @param weights Entry config with component weights
+   * @return Composite score (0-1)
+   */
+  double composite(const EntryConfig& cfg) const {
+    return cfg.zscore_weight * z_score_strength +
+           cfg.wall_weight * wall_strength +
+           cfg.volume_weight * volume_strength + cfg.obi_weight * obi_strength;
+  }
+
+  /**
+   * @brief Get signal quality classification
+   * @param cfg Entry config with min_signal_quality threshold
+   * @return Quality level (EXCELLENT/GOOD/MARGINAL/POOR)
+   */
+  enum class Quality { EXCELLENT, GOOD, MARGINAL, POOR };
+
+  Quality get_quality(const EntryConfig& cfg) const {
+    double score = composite(cfg);
+    if (score > 0.8)
+      return Quality::EXCELLENT;
+    if (score >= cfg.min_signal_quality)
+      return Quality::GOOD;
+    if (score > 0.5)
+      return Quality::MARGINAL;
+    return Quality::POOR;
+  }
 };
 
 class MeanReversionMakerStrategy
@@ -169,7 +232,19 @@ class MeanReversionMakerStrategy
             INI_CONFIG.get_int("entry", "obi_levels", 5),
             INI_CONFIG.get_double("entry", "position_size", 0.01),
             INI_CONFIG.get_double("entry", "safety_margin", 0.00005),
-            INI_CONFIG.get_double("entry", "min_spread_filter", 0.0004)},
+            INI_CONFIG.get_double("entry", "min_spread_filter", 0.0004),
+            // Multi-Factor Scoring
+            INI_CONFIG.get_double("entry", "min_signal_quality", 0.65),
+            INI_CONFIG.get_double("entry", "zscore_weight", 0.35),
+            INI_CONFIG.get_double("entry", "wall_weight", 0.30),
+            INI_CONFIG.get_double("entry", "volume_weight", 0.20),
+            INI_CONFIG.get_double("entry", "obi_weight", 0.15),
+            INI_CONFIG.get_double("entry", "zscore_norm_min", 2.0),
+            INI_CONFIG.get_double("entry", "zscore_norm_max", 3.0),
+            INI_CONFIG.get_double("entry", "wall_norm_multiplier", 2.0),
+            INI_CONFIG.get_double("entry", "obi_norm_min", 0.05),
+            INI_CONFIG.get_double("entry", "obi_norm_max", 0.25),
+            INI_CONFIG.get_int("entry", "volume_score_lookback", 5)},
 
         exit_cfg_{INI_CONFIG.get("exit", "enabled", "true") == "true",
             INI_CONFIG.get_double("exit", "wall_amount_decay_ratio", 0.5),
@@ -844,6 +919,29 @@ class MeanReversionMakerStrategy
           z_robust);
     }
 
+    // 1. Calculate Multi-Factor Signal Score
+    double obi = calculate_orderbook_imbalance(order_book);
+    SignalScore signal =
+        calculate_long_signal_score(z_robust, bid_wall_info_, obi);
+    double composite = signal.composite(entry_cfg_);
+
+    // Check signal quality threshold
+    if (composite < entry_cfg_.min_signal_quality) {
+      if (debug_cfg_.log_entry_exit) {
+        this->logger_.info(
+            "[Entry Block] LONG | Signal quality too low | "
+            "score:{:.2f} < {:.2f} | z:{:.2f} wall:{:.2f} vol:{:.2f} "
+            "obi:{:.2f}",
+            composite,
+            entry_cfg_.min_signal_quality,
+            signal.z_score_strength,
+            signal.wall_strength,
+            signal.volume_strength,
+            signal.obi_strength);
+      }
+      return;
+    }
+
     // 2. Check Z-score threshold (oversold)
     if (z_robust >= -zscore_entry_threshold_)
       return;
@@ -885,7 +983,7 @@ class MeanReversionMakerStrategy
     // 5. OBI check (sell dominance for mean reversion)
     // Mean reversion: enter LONG when sell pressure is WEAKENING (expect bounce)
     // Directional filter: Block if OBI < -threshold (sell momentum still too strong)
-    double obi = calculate_orderbook_imbalance(order_book);
+    // NOTE: OBI already calculated above for signal scoring
     if (obi >= 0.0) {
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
@@ -959,14 +1057,23 @@ class MeanReversionMakerStrategy
 
     if (debug_cfg_.log_entry_exit) {
       this->logger_.info(
-          "[Entry Signal] LONG | z_robust:{:.2f} | price:{} | "
-          "wall:${:.0f}@{:.4f}% | obi:{:.2f} | ofi:{:.2f}",
+          "[Entry Signal] LONG | quality:{:.2f} ({}) | z_robust:{:.2f} | "
+          "price:{} | wall:${:.0f}@{:.4f}% | obi:{:.2f} | ofi:{:.2f} | "
+          "components: z={:.2f} wall={:.2f} vol={:.2f} obi={:.2f}",
+          composite,
+          signal.get_quality(entry_cfg_) == SignalScore::Quality::EXCELLENT
+              ? "EXCELLENT"
+              : "GOOD",
           z_robust,
           bbo->bid_price.value,
           bid_wall_info_.accumulated_amount,
           bid_wall_info_.distance_pct * 100,
           obi,
-          ofi);
+          ofi,
+          signal.z_score_strength,
+          signal.wall_strength,
+          signal.volume_strength,
+          signal.obi_strength);
     }
   }
 
@@ -977,7 +1084,30 @@ class MeanReversionMakerStrategy
       const BBO* bbo, double z_robust) {
     // Z-score is passed as parameter to avoid redundant calculation
 
-    // 1. Check if still in overbought territory (but declining)
+    // 1. Calculate Multi-Factor Signal Score
+    double obi = calculate_orderbook_imbalance(order_book);
+    SignalScore signal =
+        calculate_short_signal_score(z_robust, ask_wall_info_, obi);
+    double composite = signal.composite(entry_cfg_);
+
+    // Check signal quality threshold
+    if (composite < entry_cfg_.min_signal_quality) {
+      if (debug_cfg_.log_entry_exit) {
+        this->logger_.info(
+            "[Entry Block] SHORT | Signal quality too low | "
+            "score:{:.2f} < {:.2f} | z:{:.2f} wall:{:.2f} vol:{:.2f} "
+            "obi:{:.2f}",
+            composite,
+            entry_cfg_.min_signal_quality,
+            signal.z_score_strength,
+            signal.wall_strength,
+            signal.volume_strength,
+            signal.obi_strength);
+      }
+      return;
+    }
+
+    // 2. Check if still in overbought territory (but declining)
     // Allow entry if z > threshold * 0.8 (haven't dropped too much)
     if (z_robust < zscore_entry_threshold_ * 0.8) {
       if (debug_cfg_.log_entry_exit) {
@@ -1028,7 +1158,7 @@ class MeanReversionMakerStrategy
     // 5. OBI check (buy dominance for mean reversion)
     // Mean reversion: enter SHORT when buy pressure is WEAKENING (expect drop)
     // Directional filter: Block if OBI > threshold (buy momentum still too strong)
-    double obi = calculate_orderbook_imbalance(order_book);
+    // NOTE: OBI already calculated above for signal scoring
     if (obi <= 0.0) {
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
@@ -1102,14 +1232,23 @@ class MeanReversionMakerStrategy
 
     if (debug_cfg_.log_entry_exit) {
       this->logger_.info(
-          "[Entry Signal] SHORT | z_robust:{:.2f} | price:{} | "
-          "wall:${:.0f}@{:.4f}% | obi:{:.2f} | ofi:{:.2f}",
+          "[Entry Signal] SHORT | quality:{:.2f} ({}) | z_robust:{:.2f} | "
+          "price:{} | wall:${:.0f}@{:.4f}% | obi:{:.2f} | ofi:{:.2f} | "
+          "components: z={:.2f} wall={:.2f} vol={:.2f} obi={:.2f}",
+          composite,
+          signal.get_quality(entry_cfg_) == SignalScore::Quality::EXCELLENT
+              ? "EXCELLENT"
+              : "GOOD",
           z_robust,
           bbo->ask_price.value,
           ask_wall_info_.accumulated_amount,
           ask_wall_info_.distance_pct * 100,
           obi,
-          ofi);
+          ofi,
+          signal.z_score_strength,
+          signal.wall_strength,
+          signal.volume_strength,
+          signal.obi_strength);
     }
   }
 
@@ -1784,6 +1923,124 @@ class MeanReversionMakerStrategy
         }
         break;
     }
+  }
+
+  // ========================================
+  // Multi-Factor Signal Scoring
+  // ========================================
+
+  /**
+   * @brief Calculate volume reversal score (0-1)
+   * @param expected_direction Expected trade direction for reversal
+   * @return Normalized score combining tick ratio and volume ratio
+   */
+  double calculate_volume_reversal_score(
+      common::Side expected_direction) const {
+    const auto* trades = this->feature_engine_->get_recent_trades();
+    const size_t trade_count = this->feature_engine_->get_trade_history_size();
+
+    const int lookback = entry_cfg_.volume_score_lookback;
+    if (trade_count < static_cast<size_t>(lookback))
+      return 0.0;
+
+    int directional_count = 0;
+    double directional_volume = 0.0;
+    double total_volume = 0.0;
+
+    // Analyze recent trades
+    for (size_t i = trade_count - lookback; i < trade_count; ++i) {
+      if (trades[i].side == expected_direction) {
+        directional_count++;
+        directional_volume += trades[i].qty;
+      }
+      total_volume += trades[i].qty;
+    }
+
+    if (total_volume < 1e-8)
+      return 0.0;
+
+    // Combine tick ratio and volume ratio
+    double tick_ratio =
+        static_cast<double>(directional_count) / static_cast<double>(lookback);
+    double volume_ratio = directional_volume / total_volume;
+
+    return (tick_ratio + volume_ratio) / 2.0;  // Average of both metrics
+  }
+
+  /**
+   * @brief Calculate long entry signal score
+   * @param z Z-score value
+   * @param wall Wall information
+   * @param obi Orderbook imbalance
+   * @return SignalScore with all components normalized to 0-1
+   */
+  SignalScore calculate_long_signal_score(double z,
+      const FeatureEngineT::WallInfo& wall, double obi) const {
+    SignalScore score;
+
+    // === 1. Z-score component: normalize to 0-1 ===
+    // Example: z=-2.0 → 0.0, z=-2.5 → 0.5, z=-3.0 → 1.0
+    double z_abs = std::abs(z);
+    double z_range = entry_cfg_.zscore_norm_max - entry_cfg_.zscore_norm_min;
+    score.z_score_strength =
+        std::clamp((z_abs - entry_cfg_.zscore_norm_min) / z_range, 0.0, 1.0);
+
+    // === 2. Wall strength: compare to dynamic threshold ===
+    // Example: threshold=30k, wall=15k → 0.25, wall=60k → 1.0
+    double wall_target = dynamic_threshold_->get_min_quantity() *
+                         entry_cfg_.wall_norm_multiplier;
+    score.wall_strength =
+        std::clamp(wall.accumulated_amount / wall_target, 0.0, 1.0);
+
+    // === 3. Volume reversal: calculate directional strength ===
+    score.volume_strength = calculate_volume_reversal_score(common::Side::kBuy);
+
+    // === 4. OBI strength: normalize to 0-1 ===
+    // Long: OBI should be negative (sell pressure) but not too extreme
+    // Example: OBI=-0.05 → 0.0, OBI=-0.15 → 0.5, OBI=-0.25 → 1.0
+    double obi_abs = std::abs(obi);
+    double obi_range = entry_cfg_.obi_norm_max - entry_cfg_.obi_norm_min;
+    score.obi_strength =
+        std::clamp((obi_abs - entry_cfg_.obi_norm_min) / obi_range, 0.0, 1.0);
+
+    return score;
+  }
+
+  /**
+   * @brief Calculate short entry signal score
+   * @param z Z-score value
+   * @param wall Wall information
+   * @param obi Orderbook imbalance
+   * @return SignalScore with all components normalized to 0-1
+   */
+  SignalScore calculate_short_signal_score(double z,
+      const FeatureEngineT::WallInfo& wall, double obi) const {
+    SignalScore score;
+
+    // === 1. Z-score component ===
+    double z_abs = std::abs(z);
+    double z_range = entry_cfg_.zscore_norm_max - entry_cfg_.zscore_norm_min;
+    score.z_score_strength =
+        std::clamp((z_abs - entry_cfg_.zscore_norm_min) / z_range, 0.0, 1.0);
+
+    // === 2. Wall strength ===
+    double wall_target = dynamic_threshold_->get_min_quantity() *
+                         entry_cfg_.wall_norm_multiplier;
+    score.wall_strength =
+        std::clamp(wall.accumulated_amount / wall_target, 0.0, 1.0);
+
+    // === 3. Volume reversal ===
+    score.volume_strength =
+        calculate_volume_reversal_score(common::Side::kSell);
+
+    // === 4. OBI strength ===
+    // Short: OBI should be positive (buy pressure) but not too extreme
+    double obi_abs = std::abs(obi);
+    double obi_range = entry_cfg_.obi_norm_max - entry_cfg_.obi_norm_min;
+    score.obi_strength =
+        std::clamp((obi_abs - entry_cfg_.obi_norm_min) / obi_range, 0.0, 1.0);
+
+    return score;
   }
 
   // ========================================

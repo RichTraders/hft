@@ -192,6 +192,14 @@ class MeanReversionMakerStrategy
     REVERSAL_STRONG     // Bounced strongly, ready for entry
   };
 
+  // === Market regime enumeration (lightweight trend detection) ===
+  enum class MarketRegime : uint8_t {
+    RANGING = 0,    // Ranging market - mean reversion works
+    TRENDING_UP,    // Uptrend - avoid shorts
+    TRENDING_DOWN,  // Downtrend - avoid longs
+    VOLATILE        // High volatility - reduce size
+  };
+
   // === Position state structure ===
   struct PositionState {
     double qty{0.0};
@@ -200,6 +208,8 @@ class MeanReversionMakerStrategy
     PositionStatus status{PositionStatus::NONE};
     uint64_t state_time{0};  // PENDING: order sent time, ACTIVE: fill time
     std::optional<common::OrderId> pending_order_id;  // Track expected order
+    bool is_regime_override{
+        false};  // Flag: entered against trend (risky, quick exit)
   };
 
   // Note: TradeRecord is now managed by FeatureEngine::TradeInfo
@@ -425,6 +435,29 @@ class MeanReversionMakerStrategy
         min_price_int,
         wall_level_qty_,
         wall_level_idx_);
+
+    // === 3.5. Update wall quality trackers (spoofing detection) ===
+    if (bid_wall_info_.is_valid) {
+      bid_wall_tracker_.update(current_time,
+          bid_wall_info_.accumulated_amount,
+          bid_wall_info_.distance_pct);
+    } else {
+      bid_wall_tracker_.reset();
+    }
+
+    if (ask_wall_info_.is_valid) {
+      ask_wall_tracker_.update(current_time,
+          ask_wall_info_.accumulated_amount,
+          ask_wall_info_.distance_pct);
+    } else {
+      ask_wall_tracker_.reset();
+    }
+
+    // === 3.6. Update market regime (lightweight, throttled to 100ms) ===
+    const auto* bbo = order_book->get_bbo();
+    double mid_price = (bbo->bid_price.value + bbo->ask_price.value) * 0.5;
+    double z_slow = robust_zscore_slow_->calculate_zscore(mid_price);
+    update_market_regime(z_slow);
 
     // NOTE: Wall detection does NOT gate entry anymore
     // Entry is now gated by mean reversion state (REVERSAL_DETECTED)
@@ -741,7 +774,8 @@ class MeanReversionMakerStrategy
     if (long_position_.status == PositionStatus::ACTIVE &&
         pos_info->long_position_ == 0.0) {
       long_position_.status = PositionStatus::NONE;
-      long_position_.pending_order_id.reset();  // Clear exit order ID
+      long_position_.pending_order_id.reset();    // Clear exit order ID
+      long_position_.is_regime_override = false;  // Reset override flag
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info("[Exit Complete] Long closed | PnL: {:.2f}",
             pos_info->long_real_pnl_);
@@ -751,7 +785,8 @@ class MeanReversionMakerStrategy
     if (short_position_.status == PositionStatus::ACTIVE &&
         pos_info->short_position_ == 0.0) {
       short_position_.status = PositionStatus::NONE;
-      short_position_.pending_order_id.reset();  // Clear exit order ID
+      short_position_.pending_order_id.reset();    // Clear exit order ID
+      short_position_.is_regime_override = false;  // Reset override flag
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info("[Exit Complete] Short closed | PnL: {:.2f}",
             pos_info->short_real_pnl_);
@@ -919,7 +954,47 @@ class MeanReversionMakerStrategy
           z_robust);
     }
 
-    // 1. Calculate Multi-Factor Signal Score
+    // 1. Market regime filter (avoid counter-trend trades)
+    // EXCEPTION: Allow LONG in downtrend if DEEP oversold (z_mid < -2.5)
+    if (current_regime_ == MarketRegime::TRENDING_DOWN) {
+      if (z_robust > -2.5) {  // Not deep enough to override
+        if (debug_cfg_.log_entry_exit) {
+          this->logger_.info(
+              "[Entry Block] LONG | Market in DOWNTREND | regime:TRENDING_DOWN "
+              "| "
+              "z_mid:{:.2f} (need < -2.5 for override)",
+              z_robust);
+        }
+        return;
+      } else {
+        // Deep oversold override - allow entry despite downtrend
+        if (debug_cfg_.log_entry_exit) {
+          this->logger_.info(
+              "[Regime Override] LONG allowed in DOWNTREND | z_mid:{:.2f} < "
+              "-2.5 (DEEP oversold)",
+              z_robust);
+        }
+      }
+    }
+
+    // 2. Wall quality check (spoofing detection)
+    double wall_quality = bid_wall_tracker_.composite_quality();
+
+    if (wall_quality < 0.6) {  // 60% minimum quality threshold
+      if (debug_cfg_.log_entry_exit) {
+        this->logger_.info(
+            "[Entry Block] LONG | Wall quality too low (spoofing?) | "
+            "quality:{:.2f} | stability:{:.2f} | persistence:{:.2f} | "
+            "distance:{:.2f}",
+            wall_quality,
+            bid_wall_tracker_.stability_score(),
+            bid_wall_tracker_.persistence_score(),
+            bid_wall_tracker_.distance_consistency_score());
+      }
+      return;
+    }
+
+    // 2. Calculate Multi-Factor Signal Score
     double obi = calculate_orderbook_imbalance(order_book);
     SignalScore signal =
         calculate_long_signal_score(z_robust, bid_wall_info_, obi);
@@ -1051,19 +1126,23 @@ class MeanReversionMakerStrategy
     long_position_.entry_price = bbo->bid_price.value;
     long_position_.entry_wall_info = bid_wall_info_;
     long_position_.state_time = get_current_time_ns();
+    long_position_.is_regime_override =
+        (current_regime_ == MarketRegime::TRENDING_DOWN);
 
     // 8. Execute entry (OrderId stored internally)
     place_entry_order(common::Side::kBuy, bbo->bid_price.value);
 
     if (debug_cfg_.log_entry_exit) {
       this->logger_.info(
-          "[Entry Signal] LONG | quality:{:.2f} ({}) | z_robust:{:.2f} | "
+          "[Entry Signal] LONG | quality:{:.2f} ({}) | wall_quality:{:.2f} | "
+          "z_robust:{:.2f} | "
           "price:{} | wall:${:.0f}@{:.4f}% | obi:{:.2f} | ofi:{:.2f} | "
           "components: z={:.2f} wall={:.2f} vol={:.2f} obi={:.2f}",
           composite,
           signal.get_quality(entry_cfg_) == SignalScore::Quality::EXCELLENT
               ? "EXCELLENT"
               : "GOOD",
+          wall_quality,
           z_robust,
           bbo->bid_price.value,
           bid_wall_info_.accumulated_amount,
@@ -1084,7 +1163,46 @@ class MeanReversionMakerStrategy
       const BBO* bbo, double z_robust) {
     // Z-score is passed as parameter to avoid redundant calculation
 
-    // 1. Calculate Multi-Factor Signal Score
+    // 1. Market regime filter (avoid counter-trend trades)
+    // EXCEPTION: Allow SHORT in uptrend if DEEP overbought (z_mid > +2.5)
+    if (current_regime_ == MarketRegime::TRENDING_UP) {
+      if (z_robust < 2.5) {  // Not deep enough to override
+        if (debug_cfg_.log_entry_exit) {
+          this->logger_.info(
+              "[Entry Block] SHORT | Market in UPTREND | regime:TRENDING_UP | "
+              "z_mid:{:.2f} (need > +2.5 for override)",
+              z_robust);
+        }
+        return;
+      } else {
+        // Deep overbought override - allow entry despite uptrend
+        if (debug_cfg_.log_entry_exit) {
+          this->logger_.info(
+              "[Regime Override] SHORT allowed in UPTREND | z_mid:{:.2f} > "
+              "+2.5 (DEEP overbought)",
+              z_robust);
+        }
+      }
+    }
+
+    // 2. Wall quality check (spoofing detection)
+    double wall_quality = ask_wall_tracker_.composite_quality();
+
+    if (wall_quality < 0.6) {  // 60% minimum quality threshold
+      if (debug_cfg_.log_entry_exit) {
+        this->logger_.info(
+            "[Entry Block] SHORT | Wall quality too low (spoofing?) | "
+            "quality:{:.2f} | stability:{:.2f} | persistence:{:.2f} | "
+            "distance:{:.2f}",
+            wall_quality,
+            ask_wall_tracker_.stability_score(),
+            ask_wall_tracker_.persistence_score(),
+            ask_wall_tracker_.distance_consistency_score());
+      }
+      return;
+    }
+
+    // 2. Calculate Multi-Factor Signal Score
     double obi = calculate_orderbook_imbalance(order_book);
     SignalScore signal =
         calculate_short_signal_score(z_robust, ask_wall_info_, obi);
@@ -1226,19 +1344,23 @@ class MeanReversionMakerStrategy
     short_position_.entry_price = bbo->ask_price.value;
     short_position_.entry_wall_info = ask_wall_info_;
     short_position_.state_time = get_current_time_ns();
+    short_position_.is_regime_override =
+        (current_regime_ == MarketRegime::TRENDING_UP);
 
     // 8. Execute entry (OrderId stored internally)
     place_entry_order(common::Side::kSell, bbo->ask_price.value);
 
     if (debug_cfg_.log_entry_exit) {
       this->logger_.info(
-          "[Entry Signal] SHORT | quality:{:.2f} ({}) | z_robust:{:.2f} | "
+          "[Entry Signal] SHORT | quality:{:.2f} ({}) | wall_quality:{:.2f} | "
+          "z_robust:{:.2f} | "
           "price:{} | wall:${:.0f}@{:.4f}% | obi:{:.2f} | ofi:{:.2f} | "
           "components: z={:.2f} wall={:.2f} vol={:.2f} obi={:.2f}",
           composite,
           signal.get_quality(entry_cfg_) == SignalScore::Quality::EXCELLENT
               ? "EXCELLENT"
               : "GOOD",
+          wall_quality,
           z_robust,
           bbo->ask_price.value,
           ask_wall_info_.accumulated_amount,
@@ -1348,9 +1470,17 @@ class MeanReversionMakerStrategy
     }
 
     // Priority 4: Z-score mean reversion (profit target)
-    else if (current_z >= -exit_cfg_.zscore_exit_threshold) {
+    // Override entries (risky) → tighter exit threshold (-0.5 → -1.0)
+    double exit_threshold =
+        long_position_.is_regime_override
+            ? exit_cfg_.zscore_exit_threshold * 2.0  // -0.5 → -1.0
+            : exit_cfg_.zscore_exit_threshold;       // -0.5
+
+    if (current_z >= -exit_threshold) {
       should_exit = true;
-      reason = "Z-score mean reversion";
+      reason = long_position_.is_regime_override
+                   ? "Z-score mean reversion (OVERRIDE mode - quick exit)"
+                   : "Z-score mean reversion";
     }
 
     // Priority 5: Wall decay
@@ -1432,9 +1562,17 @@ class MeanReversionMakerStrategy
     }
 
     // Priority 4: Z-score mean reversion (profit target)
-    else if (current_z <= exit_cfg_.zscore_exit_threshold) {
+    // Override entries (risky) → tighter exit threshold (+0.5 → +1.0)
+    double exit_threshold =
+        short_position_.is_regime_override
+            ? exit_cfg_.zscore_exit_threshold * 2.0  // +0.5 → +1.0
+            : exit_cfg_.zscore_exit_threshold;       // +0.5
+
+    if (current_z <= exit_threshold) {
       should_exit = true;
-      reason = "Z-score mean reversion";
+      reason = short_position_.is_regime_override
+                   ? "Z-score mean reversion (OVERRIDE mode - quick exit)"
+                   : "Z-score mean reversion";
     }
 
     // Priority 5: Wall decay
@@ -1926,6 +2064,59 @@ class MeanReversionMakerStrategy
   }
 
   // ========================================
+  // Lightweight Market Regime Detection
+  // ========================================
+
+  /**
+   * @brief Detect market regime using existing Z-score data (zero overhead)
+   *
+   * Strategy:
+   * 1. Trend detection: 3 consecutive slow Z-scores in same direction
+   * 2. Volatility: MAD ratio from robust_zscore_mid
+   * 3. Updated every 100ms (throttled, not hot path)
+   */
+  void update_market_regime(double z_slow) {
+    // Track last 3 slow Z-scores
+    z_slow_history_.push_back(z_slow);
+    if (z_slow_history_.size() > 3) {
+      z_slow_history_.pop_front();
+    }
+
+    if (z_slow_history_.size() < 3) {
+      current_regime_ = MarketRegime::RANGING;
+      return;
+    }
+
+    // Volatility ratio (already computed in robust_zscore_mid)
+    double baseline_mad = robust_zscore_mid_->get_mad();
+    double current_mad = robust_zscore_mid_->get_mad();
+    vol_ratio_ = (baseline_mad > 1e-8) ? (current_mad / baseline_mad) : 1.0;
+
+    // High volatility override
+    if (vol_ratio_ > 2.0) {
+      current_regime_ = MarketRegime::VOLATILE;
+      return;
+    }
+
+    // Trend detection: 3 consecutive Z-scores below -1.5 or above +1.5
+    bool all_oversold = (z_slow_history_[0] < -1.5) &&
+                        (z_slow_history_[1] < -1.5) &&
+                        (z_slow_history_[2] < -1.5);
+
+    bool all_overbought = (z_slow_history_[0] > 1.5) &&
+                          (z_slow_history_[1] > 1.5) &&
+                          (z_slow_history_[2] > 1.5);
+
+    if (all_oversold) {
+      current_regime_ = MarketRegime::TRENDING_DOWN;
+    } else if (all_overbought) {
+      current_regime_ = MarketRegime::TRENDING_UP;
+    } else {
+      current_regime_ = MarketRegime::RANGING;
+    }
+  }
+
+  // ========================================
   // Multi-Factor Signal Scoring
   // ========================================
 
@@ -2075,6 +2266,10 @@ class MeanReversionMakerStrategy
   common::TickerId ticker_;
   FeatureEngineT::WallInfo bid_wall_info_;
   FeatureEngineT::WallInfo ask_wall_info_;
+  FeatureEngineT::WallTracker
+      bid_wall_tracker_;  // Wall quality tracking (spoofing detection)
+  FeatureEngineT::WallTracker
+      ask_wall_tracker_;  // Wall quality tracking (spoofing detection)
   PositionState long_position_;
   PositionState short_position_;
   BBO prev_bbo_;
@@ -2106,6 +2301,12 @@ class MeanReversionMakerStrategy
   ReversionPhase short_phase_{ReversionPhase::NEUTRAL};
   double oversold_min_z_{0.0};    // Minimum Z-Score reached in oversold
   double overbought_max_z_{0.0};  // Maximum Z-Score reached in overbought
+
+  // Market regime tracking (lightweight, no extra computation)
+  MarketRegime current_regime_{MarketRegime::RANGING};
+  std::deque<double>
+      z_slow_history_;     // Last 3 slow Z-scores for trend detection
+  double vol_ratio_{1.0};  // Volatility ratio (from robust_zscore_mid)
 
   // Throttling timestamp for orderbook updates
   uint64_t last_orderbook_check_time_{0};

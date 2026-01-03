@@ -38,6 +38,98 @@ class FeatureEngine {
     bool is_valid{false};
   };
 
+  // Wall quality tracking structure (spoofing detection)
+  struct WallTracker {
+    uint64_t first_seen{0};           // When wall was first detected
+    uint64_t last_update{0};          // Last update timestamp
+    int snapshot_count{0};            // Number of snapshots taken
+    std::deque<double> size_snapshots;      // Last 20 size snapshots (100ms × 20 = 2sec)
+    std::deque<double> distance_snapshots;  // Last 20 distance snapshots
+
+    void update(uint64_t now, double size, double distance_pct) {
+      if (first_seen == 0) {
+        first_seen = now;
+      }
+      last_update = now;
+      snapshot_count++;
+
+      size_snapshots.push_back(size);
+      distance_snapshots.push_back(distance_pct);
+
+      if (size_snapshots.size() > 20) {
+        size_snapshots.pop_front();
+        distance_snapshots.pop_front();
+      }
+    }
+
+    void reset() {
+      first_seen = 0;
+      last_update = 0;
+      snapshot_count = 0;
+      size_snapshots.clear();
+      distance_snapshots.clear();
+    }
+
+    // Persistence score: How long has wall been present?
+    // 2+ seconds = 1.0, 1 second = 0.5, 0.5 seconds = 0.0
+    double persistence_score() const {
+      if (snapshot_count < 5) return 0.0;  // Too new
+      double duration_sec = (last_update - first_seen) / 1e9;
+      return std::clamp(duration_sec / 2.0, 0.0, 1.0);
+    }
+
+    // Stability score: Coefficient of Variation (CV)
+    // CV < 0.15 = 1.0 (very stable)
+    // CV = 0.30 = 0.5
+    // CV > 0.50 = 0.0 (spoofing)
+    double stability_score() const {
+      if (size_snapshots.size() < 10) return 0.0;
+
+      // Calculate average
+      double avg = std::accumulate(size_snapshots.begin(), size_snapshots.end(), 0.0)
+                   / size_snapshots.size();
+
+      if (avg < 1e-8) return 0.0;
+
+      // Calculate variance
+      double variance = 0.0;
+      for (double size : size_snapshots) {
+        variance += (size - avg) * (size - avg);
+      }
+      variance /= size_snapshots.size();
+
+      // Coefficient of Variation
+      double cv = std::sqrt(variance) / avg;
+
+      // CV < 0.15 = 1.0 (very stable)
+      // CV = 0.30 = 0.5
+      // CV > 0.50 = 0.0 (spoofing)
+      return std::clamp(1.0 - (cv / 0.5), 0.0, 1.0);
+    }
+
+    // Distance consistency score
+    // Close to BBO = good (< 0.05% = 1.0)
+    // Far from BBO = bad (> 0.15% = 0.0)
+    double distance_consistency_score() const {
+      if (distance_snapshots.size() < 10) return 0.0;
+
+      double avg_dist = std::accumulate(distance_snapshots.begin(),
+                                        distance_snapshots.end(), 0.0)
+                        / distance_snapshots.size();
+
+      // Close to BBO = good (< 0.05% = 1.0)
+      // Far from BBO = bad (> 0.15% = 0.0)
+      return std::clamp(1.0 - (avg_dist - 0.0005) / 0.001, 0.0, 1.0);
+    }
+
+    // Composite quality score (weighted average)
+    double composite_quality() const {
+      return 0.50 * stability_score() +
+             0.35 * persistence_score() +
+             0.15 * distance_consistency_score();
+    }
+  };
+
   explicit FeatureEngine(const common::Logger::Producer& logger)
       : logger_(logger),
         tick_multiplier_(INI_CONFIG.get_int("orderbook", "tick_multiplier_int")),

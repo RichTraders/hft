@@ -34,16 +34,17 @@ namespace trading {
 
 // === Strategy Configuration Structures (int64_t version) ===
 struct WallDetectionConfig {
-  int64_t max_distance_bps{15};  // 0.15% = 15 bps (scaled by kBpsScale=10000 for calcs)
+  int64_t max_distance_bps{
+      15};  // 0.15% = 15 bps (scaled by kBpsScale=10000 for calcs)
   int max_levels{100};
 };
 
 struct EntryConfig {
-  int64_t obi_threshold{2500};      // 0.25 * kObiScale (10000)
+  int64_t obi_threshold{2500};  // 0.25 * kObiScale (10000)
   int obi_levels{5};
-  int64_t position_size_raw{10};    // 0.01 * kQtyScale (1000)
-  int64_t safety_margin_bps{5};     // 0.00005 = 0.5 bps
-  int64_t min_spread_bps{40};       // 0.0004 = 4 bps
+  int64_t position_size_raw{10};  // 0.01 * kQtyScale (1000)
+  int64_t safety_margin_bps{5};   // 0.00005 = 0.5 bps
+  int64_t min_spread_bps{40};     // 0.0004 = 4 bps
 
   // Multi-Factor Scoring parameters (all scaled by kSignalScale=10000)
   int64_t min_signal_quality{6500};  // 0.65 * kSignalScale
@@ -53,48 +54,42 @@ struct EntryConfig {
   int64_t obi_weight{1500};          // 0.15 * kSignalScale
 
   // Z-score normalization (scaled by kZScoreScale=10000)
-  int64_t zscore_norm_min{20000};    // 2.0 * kZScoreScale
-  int64_t zscore_norm_max{30000};    // 3.0 * kZScoreScale
+  int64_t zscore_norm_min{20000};  // 2.0 * kZScoreScale
+  int64_t zscore_norm_max{30000};  // 3.0 * kZScoreScale
 
   // Wall normalization (scaled by kSignalScale)
-  int64_t wall_norm_multiplier{20000}; // 2.0 * kSignalScale
+  int64_t wall_norm_multiplier{20000};  // 2.0 * kSignalScale
 
   // OBI normalization (scaled by kObiScale=10000)
-  int64_t obi_norm_min{500};         // 0.05 * kObiScale
-  int64_t obi_norm_max{2500};        // 0.25 * kObiScale
+  int64_t obi_norm_min{500};   // 0.05 * kObiScale
+  int64_t obi_norm_max{2500};  // 0.25 * kObiScale
 
-  int volume_score_lookback{5};      // Volume analysis window
+  int volume_score_lookback{5};  // Volume analysis window
 };
 
 struct ExitConfig {
   bool enabled{true};  // Enable/disable position exit monitoring
-  int64_t wall_amount_decay_ratio{5000};    // 0.5 * kSignalScale
-  int64_t wall_distance_expand_ratio{12000}; // 1.2 * kSignalScale
-  int64_t max_loss_bps{20};                 // 0.2% = 20 bps
-  uint64_t max_hold_time_ns{5'000'000'000}; // 5 seconds default (HFT)
-  int64_t max_price_deviation_bps{20};      // 0.2% = 20 bps
+  int64_t wall_amount_decay_ratio{5000};      // 0.5 * kSignalScale
+  int64_t wall_distance_expand_ratio{12000};  // 1.2 * kSignalScale
+  int64_t max_loss_bps{20};                   // 0.2% = 20 bps
+  uint64_t max_hold_time_ns{5'000'000'000};   // 5 seconds default (HFT)
+  int64_t max_price_deviation_bps{20};        // 0.2% = 20 bps
   bool cancel_on_wall_decay{true};
 
   // Active exit conditions (profit-taking)
-  int64_t zscore_exit_threshold{5000};      // 0.5 * kZScoreScale
-  int64_t obi_exit_threshold{3000};         // 0.3 * kObiScale
-  bool reversal_momentum_exit{true};        // Enable volume reversal exit
-  int exit_lookback_ticks{10};              // Exit momentum lookback
-  int exit_min_directional_ticks{7};        // 70% directional ticks required
-  int64_t exit_min_volume_ratio{15000};     // 1.5 * kSignalScale
-};
-
-struct TrendFilterConfig {
-  int lookback_ticks{5};
-  int consecutive_threshold{4};
-  int64_t volume_multiplier{15000};  // 1.5 * kSignalScale
+  int64_t zscore_exit_threshold{5000};   // 0.5 * kZScoreScale
+  int64_t obi_exit_threshold{3000};      // 0.3 * kObiScale
+  bool reversal_momentum_exit{true};     // Enable volume reversal exit
+  int exit_lookback_ticks{10};           // Exit momentum lookback
+  int exit_min_directional_ticks{7};     // 70% directional ticks required
+  int64_t exit_min_volume_ratio{15000};  // 1.5 * kSignalScale
 };
 
 struct ReversalMomentumConfig {
   bool enabled{true};
   int lookback_ticks{5};
   int min_directional_ticks{3};
-  int64_t min_volume_ratio{12000};   // 1.2 * kSignalScale
+  int64_t min_volume_ratio{12000};  // 1.2 * kSignalScale
 };
 
 struct DebugLoggingConfig {
@@ -105,12 +100,12 @@ struct DebugLoggingConfig {
 
 struct AdverseSelectionConfig {
   int max_fill_history{20};
-  uint64_t measurement_window_ns{1000000000};      // 1 second
-  uint64_t measurement_tolerance_ns{100000000};    // ±100ms
-  int64_t adverse_threshold_bps{2};                // 0.02% = 2 bps
+  uint64_t measurement_window_ns{1000000000};    // 1 second
+  uint64_t measurement_tolerance_ns{100000000};  // ±100ms
+  int64_t adverse_threshold_bps{2};              // 0.02% = 2 bps
   int min_samples{10};
-  int64_t ratio_threshold{5000};                   // 0.5 * kSignalScale
-  int64_t margin_multiplier{15000};                // 1.5 * kSignalScale
+  int64_t ratio_threshold{5000};     // 0.5 * kSignalScale
+  int64_t margin_multiplier{15000};  // 1.5 * kSignalScale
 };
 
 struct MeanReversionConfig {
@@ -121,13 +116,13 @@ struct MeanReversionConfig {
   int64_t neutral_zone_threshold{10000};      // 1.0 * kZScoreScale
 
   // 5-State threshold multipliers (scaled by kSignalScale)
-  int64_t building_multiplier{10000};         // 1.0 * kSignalScale
-  int64_t deep_multiplier{12000};             // 1.2 * kSignalScale
-  int64_t reversal_weak_multiplier{8000};     // 0.8 * kSignalScale
-  int64_t reversal_strong_multiplier{6000};   // 0.6 * kSignalScale
+  int64_t building_multiplier{10000};        // 1.0 * kSignalScale
+  int64_t deep_multiplier{12000};            // 1.2 * kSignalScale
+  int64_t reversal_weak_multiplier{8000};    // 0.8 * kSignalScale
+  int64_t reversal_strong_multiplier{6000};  // 0.6 * kSignalScale
 
   // False reversal detection (scaled by kSignalScale)
-  int64_t false_reversal_ratio{5000};         // 0.5 * kSignalScale
+  int64_t false_reversal_ratio{5000};  // 0.5 * kSignalScale
 };
 
 // ==========================================
@@ -145,10 +140,11 @@ struct MeanReversionConfig {
  * - composite() = weighted average of all components
  */
 struct SignalScore {
-  int64_t z_score_strength{0};   // [0, kSignalScale]: Z-score magnitude normalized
-  int64_t wall_strength{0};      // [0, kSignalScale]: Wall size vs threshold
-  int64_t volume_strength{0};    // [0, kSignalScale]: Directional volume momentum
-  int64_t obi_strength{0};       // [0, kSignalScale]: Orderbook imbalance alignment
+  int64_t z_score_strength{
+      0};                    // [0, kSignalScale]: Z-score magnitude normalized
+  int64_t wall_strength{0};  // [0, kSignalScale]: Wall size vs threshold
+  int64_t volume_strength{0};  // [0, kSignalScale]: Directional volume momentum
+  int64_t obi_strength{0};  // [0, kSignalScale]: Orderbook imbalance alignment
 
   /**
    * @brief Calculate composite score (weighted average)
@@ -161,9 +157,10 @@ struct SignalScore {
    */
   [[nodiscard]] int64_t composite(const EntryConfig& cfg) const {
     return (cfg.zscore_weight * z_score_strength +
-            cfg.wall_weight * wall_strength +
-            cfg.volume_weight * volume_strength +
-            cfg.obi_weight * obi_strength) / common::kSignalScale;
+               cfg.wall_weight * wall_strength +
+               cfg.volume_weight * volume_strength +
+               cfg.obi_weight * obi_strength) /
+           common::kSignalScale;
   }
 
   /**
@@ -196,11 +193,11 @@ struct SignalScore {
  */
 struct AdverseSelectionTracker {
   struct FillRecord {
-    uint64_t fill_time{0};         // Fill timestamp (ns)
-    int64_t fill_price_raw{0};     // Fill price in raw scale
-    common::Side side;             // Buy or Sell
-    int64_t price_1s_later_raw{0}; // Price 1 second after fill
-    bool measured{false};          // Measurement complete flag
+    uint64_t fill_time{0};          // Fill timestamp (ns)
+    int64_t fill_price_raw{0};      // Fill price in raw scale
+    common::Side side;              // Buy or Sell
+    int64_t price_1s_later_raw{0};  // Price 1 second after fill
+    bool measured{false};           // Measurement complete flag
   };
 
   std::deque<FillRecord> recent_fills;
@@ -261,13 +258,15 @@ struct AdverseSelectionTracker {
   [[nodiscard]] int64_t get_ratio(int min_samples) const {
     if (total_measured < min_samples)
       return 0;
-    return (static_cast<int64_t>(adverse_count) * common::kSignalScale) / total_measured;
+    return (static_cast<int64_t>(adverse_count) * common::kSignalScale) /
+           total_measured;
   }
 
   /**
    * @brief Check if strategy is being picked off
    */
-  [[nodiscard]] bool is_being_picked_off(const AdverseSelectionConfig& cfg) const {
+  [[nodiscard]] bool is_being_picked_off(
+      const AdverseSelectionConfig& cfg) const {
     return get_ratio(cfg.min_samples) > cfg.ratio_threshold;
   }
 
@@ -317,8 +316,8 @@ class MeanReversionMakerStrategy
 
   // === Position state structure (int64_t version) ===
   struct PositionState {
-    int64_t qty{0};           // Quantity in raw scale (qty * kQtyScale)
-    int64_t entry_price{0};   // Entry price in raw scale
+    int64_t qty{0};          // Quantity in raw scale (qty * kQtyScale)
+    int64_t entry_price{0};  // Entry price in raw scale
     FeatureEngineT::WallInfo entry_wall_info;
     PositionStatus status{PositionStatus::NONE};
     uint64_t state_time{0};  // PENDING: order sent time, ACTIVE: fill time
@@ -351,77 +350,94 @@ class MeanReversionMakerStrategy
             common::kZScoreScale)),
 
         // === Config structures (all values converted to int64_t) ===
-        wall_cfg_{
-            static_cast<int64_t>(INI_CONFIG.get_double("wall_detection",
-                "max_distance_pct", 0.0015) * common::kBpsScale),  // bps
+        wall_cfg_{static_cast<int64_t>(INI_CONFIG.get_double("wall_detection",
+                                           "max_distance_pct", 0.0015) *
+                                       common::kBpsScale),  // bps
             INI_CONFIG.get_int("wall_detection", "max_levels", 100)},
 
-        entry_cfg_{
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "obi_threshold", 0.25) * common::kObiScale),
+        entry_cfg_{static_cast<int64_t>(
+                       INI_CONFIG.get_double("entry", "obi_threshold", 0.25) *
+                       common::kObiScale),
             INI_CONFIG.get_int("entry", "obi_levels", 5),
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "position_size", 0.01) * common::FixedPointConfig::kQtyScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "safety_margin", 0.00005) * common::kBpsScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "min_spread_filter", 0.0004) * common::kBpsScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "position_size", 0.01) *
+                common::FixedPointConfig::kQtyScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "safety_margin", 0.00005) *
+                common::kBpsScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "min_spread_filter", 0.0004) *
+                common::kBpsScale),
             // Multi-Factor Scoring (all * kSignalScale)
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "min_signal_quality", 0.65) * common::kSignalScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "zscore_weight", 0.35) * common::kSignalScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "wall_weight", 0.30) * common::kSignalScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "volume_weight", 0.20) * common::kSignalScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "obi_weight", 0.15) * common::kSignalScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "zscore_norm_min", 2.0) * common::kZScoreScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "zscore_norm_max", 3.0) * common::kZScoreScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "wall_norm_multiplier", 2.0) * common::kSignalScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "obi_norm_min", 0.05) * common::kObiScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("entry",
-                "obi_norm_max", 0.25) * common::kObiScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "min_signal_quality", 0.65) *
+                common::kSignalScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "zscore_weight", 0.35) *
+                common::kSignalScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "wall_weight", 0.30) *
+                common::kSignalScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "volume_weight", 0.20) *
+                common::kSignalScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "obi_weight", 0.15) *
+                common::kSignalScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "zscore_norm_min", 2.0) *
+                common::kZScoreScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "zscore_norm_max", 3.0) *
+                common::kZScoreScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "wall_norm_multiplier", 2.0) *
+                common::kSignalScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "obi_norm_min", 0.05) *
+                common::kObiScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("entry", "obi_norm_max", 0.25) *
+                common::kObiScale),
             INI_CONFIG.get_int("entry", "volume_score_lookback", 5)},
 
         exit_cfg_{INI_CONFIG.get("exit", "enabled", "true") == "true",
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("exit", "wall_amount_decay_ratio", 0.5) *
+                common::kSignalScale),
             static_cast<int64_t>(INI_CONFIG.get_double("exit",
-                "wall_amount_decay_ratio", 0.5) * common::kSignalScale),
+                                     "wall_distance_expand_ratio", 1.2) *
+                                 common::kSignalScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("exit", "max_loss_pct", 0.002) *
+                common::kBpsScale),
+            static_cast<uint64_t>(
+                INI_CONFIG.get_double("exit", "max_hold_time_sec", 5.0) *
+                1'000'000'000),
             static_cast<int64_t>(INI_CONFIG.get_double("exit",
-                "wall_distance_expand_ratio", 1.2) * common::kSignalScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("exit",
-                "max_loss_pct", 0.002) * common::kBpsScale),
-            static_cast<uint64_t>(INI_CONFIG.get_double("exit",
-                "max_hold_time_sec", 5.0) * 1'000'000'000),
-            static_cast<int64_t>(INI_CONFIG.get_double("exit",
-                "max_price_deviation_pct", 0.002) * common::kBpsScale),
+                                     "max_price_deviation_pct", 0.002) *
+                                 common::kBpsScale),
             INI_CONFIG.get("exit", "cancel_on_wall_decay", "true") == "true",
-            static_cast<int64_t>(INI_CONFIG.get_double("exit",
-                "zscore_exit_threshold", 0.5) * common::kZScoreScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("exit",
-                "obi_exit_threshold", 0.3) * common::kObiScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("exit", "zscore_exit_threshold", 0.5) *
+                common::kZScoreScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("exit", "obi_exit_threshold", 0.3) *
+                common::kObiScale),
             INI_CONFIG.get("exit", "reversal_momentum_exit", "true") == "true",
             INI_CONFIG.get_int("exit", "exit_lookback_ticks", 10),
             INI_CONFIG.get_int("exit", "exit_min_directional_ticks", 7),
-            static_cast<int64_t>(INI_CONFIG.get_double("exit",
-                "exit_min_volume_ratio", 1.5) * common::kSignalScale)},
-
-        trend_cfg_{INI_CONFIG.get_int("trend_filter", "lookback_ticks", 5),
-            INI_CONFIG.get_int("trend_filter", "consecutive_threshold", 4),
-            static_cast<int64_t>(INI_CONFIG.get_double("trend_filter",
-                "volume_multiplier", 1.5) * common::kSignalScale)},
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("exit", "exit_min_volume_ratio", 1.5) *
+                common::kSignalScale)},
 
         reversal_cfg_{
             INI_CONFIG.get("reversal_momentum", "enabled", "true") == "true",
             INI_CONFIG.get_int("reversal_momentum", "lookback_ticks", 5),
             INI_CONFIG.get_int("reversal_momentum", "min_directional_ticks", 3),
             static_cast<int64_t>(INI_CONFIG.get_double("reversal_momentum",
-                "min_volume_ratio", 1.2) * common::kSignalScale)},
+                                     "min_volume_ratio", 1.2) *
+                                 common::kSignalScale)},
 
         debug_cfg_{
             INI_CONFIG.get("debug", "log_wall_detection", "false") == "true",
@@ -430,23 +446,32 @@ class MeanReversionMakerStrategy
 
         mean_reversion_cfg_{
             static_cast<int64_t>(INI_CONFIG.get_double("mean_reversion",
-                "oversold_start_threshold", 1.5) * common::kZScoreScale),
+                                     "oversold_start_threshold", 1.5) *
+                                 common::kZScoreScale),
             static_cast<int64_t>(INI_CONFIG.get_double("mean_reversion",
-                "overbought_start_threshold", 1.5) * common::kZScoreScale),
+                                     "overbought_start_threshold", 1.5) *
+                                 common::kZScoreScale),
             static_cast<int64_t>(INI_CONFIG.get_double("mean_reversion",
-                "min_reversal_bounce", 0.2) * common::kZScoreScale),
+                                     "min_reversal_bounce", 0.2) *
+                                 common::kZScoreScale),
             static_cast<int64_t>(INI_CONFIG.get_double("mean_reversion",
-                "neutral_zone_threshold", 1.0) * common::kZScoreScale),
+                                     "neutral_zone_threshold", 1.0) *
+                                 common::kZScoreScale),
             static_cast<int64_t>(INI_CONFIG.get_double("mean_reversion",
-                "building_multiplier", 1.0) * common::kSignalScale),
+                                     "building_multiplier", 1.0) *
+                                 common::kSignalScale),
             static_cast<int64_t>(INI_CONFIG.get_double("mean_reversion",
-                "deep_multiplier", 1.2) * common::kSignalScale),
+                                     "deep_multiplier", 1.2) *
+                                 common::kSignalScale),
             static_cast<int64_t>(INI_CONFIG.get_double("mean_reversion",
-                "reversal_weak_multiplier", 0.8) * common::kSignalScale),
+                                     "reversal_weak_multiplier", 0.8) *
+                                 common::kSignalScale),
             static_cast<int64_t>(INI_CONFIG.get_double("mean_reversion",
-                "reversal_strong_multiplier", 0.6) * common::kSignalScale),
+                                     "reversal_strong_multiplier", 0.6) *
+                                 common::kSignalScale),
             static_cast<int64_t>(INI_CONFIG.get_double("mean_reversion",
-                "false_reversal_ratio", 0.5) * common::kSignalScale)},
+                                     "false_reversal_ratio", 0.5) *
+                                 common::kSignalScale)},
 
         adverse_selection_cfg_{
             INI_CONFIG.get_int("adverse_selection", "max_fill_history", 20),
@@ -455,12 +480,15 @@ class MeanReversionMakerStrategy
             static_cast<uint64_t>(INI_CONFIG.get_double("adverse_selection",
                 "measurement_tolerance_ns", 100'000'000)),
             static_cast<int64_t>(INI_CONFIG.get_double("adverse_selection",
-                "adverse_threshold_pct", 0.0002) * common::kBpsScale),
+                                     "adverse_threshold_pct", 0.0002) *
+                                 common::kBpsScale),
             INI_CONFIG.get_int("adverse_selection", "min_samples", 10),
             static_cast<int64_t>(INI_CONFIG.get_double("adverse_selection",
-                "ratio_threshold", 0.5) * common::kSignalScale),
+                                     "ratio_threshold", 0.5) *
+                                 common::kSignalScale),
             static_cast<int64_t>(INI_CONFIG.get_double("adverse_selection",
-                "margin_multiplier", 1.5) * common::kSignalScale)},
+                                     "margin_multiplier", 1.5) *
+                                 common::kSignalScale)},
 
         // === Z-score config ===
         zscore_window_size_(
@@ -480,9 +508,10 @@ class MeanReversionMakerStrategy
             INI_CONFIG.get_int("robust_zscore_slow", "window_size", 100)),
         zscore_slow_min_samples_(
             INI_CONFIG.get_int("robust_zscore_slow", "min_samples", 60)),
-        zscore_slow_threshold_(static_cast<int64_t>(
-            INI_CONFIG.get_double("robust_zscore_slow", "entry_threshold", 1.5) *
-            common::kZScoreScale)),
+        zscore_slow_threshold_(
+            static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore_slow",
+                                     "entry_threshold", 1.5) *
+                                 common::kZScoreScale)),
 
         // === OBI calculation buffers ===
         bid_qty_(entry_cfg_.obi_levels),
@@ -498,23 +527,30 @@ class MeanReversionMakerStrategy
         dynamic_threshold_(std::make_unique<DynamicWallThreshold>(
             VolumeThresholdConfig{
                 static_cast<int64_t>(INI_CONFIG.get_double("wall_defense",
-                    "volume_ema_alpha", 0.03) * common::kEmaScale),
+                                         "volume_ema_alpha", 0.03) *
+                                     common::kEmaScale),
                 static_cast<int64_t>(INI_CONFIG.get_double("wall_defense",
-                    "volume_multiplier", 4.0) * common::kSignalScale),
+                                         "volume_multiplier", 4.0) *
+                                     common::kSignalScale),
                 INI_CONFIG.get_int("wall_defense", "volume_min_samples", 20)},
             OrderbookThresholdConfig{
                 INI_CONFIG.get_int("wall_defense", "orderbook_top_levels", 20),
                 static_cast<int64_t>(INI_CONFIG.get_double("wall_defense",
-                    "orderbook_multiplier", 3.0) * common::kSignalScale),
+                                         "orderbook_multiplier", 3.0) *
+                                     common::kSignalScale),
                 static_cast<int64_t>(INI_CONFIG.get_double("wall_defense",
-                    "orderbook_percentile", 80) * 100)},  // 80% = 8000
+                                         "orderbook_percentile", 80) *
+                                     100)},  // 80% = 8000
             HybridThresholdConfig{
                 static_cast<int64_t>(INI_CONFIG.get_double("wall_defense",
-                    "volume_weight", 0.7) * common::kSignalScale),
+                                         "volume_weight", 0.7) *
+                                     common::kSignalScale),
                 static_cast<int64_t>(INI_CONFIG.get_double("wall_defense",
-                    "orderbook_weight", 0.3) * common::kSignalScale),
+                                         "orderbook_weight", 0.3) *
+                                     common::kSignalScale),
                 static_cast<int64_t>(INI_CONFIG.get_double("wall_defense",
-                    "min_quantity", 50.0) * common::FixedPointConfig::kQtyScale)})),
+                                         "min_quantity", 50.0) *
+                                     common::FixedPointConfig::kQtyScale)})),
 
         // === Robust Z-score modules (multi-timeframe) - int64_t config ===
         robust_zscore_fast_(std::make_unique<RobustZScore>(RobustZScoreConfig{
@@ -523,28 +559,37 @@ class MeanReversionMakerStrategy
             zscore_min_mad_threshold_raw_,
             INI_CONFIG.get_int("robust_zscore_fast", "baseline_window", 100),
             static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore_fast",
-                "min_vol_scalar", 0.7) * common::kSignalScale),
+                                     "min_vol_scalar", 0.7) *
+                                 common::kSignalScale),
             static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore_fast",
-                "max_vol_scalar", 1.3) * common::kSignalScale),
+                                     "max_vol_scalar", 1.3) *
+                                 common::kSignalScale),
             static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore_fast",
-                "vol_ratio_low", 0.5) * common::kSignalScale),
+                                     "vol_ratio_low", 0.5) *
+                                 common::kSignalScale),
             static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore_fast",
-                "vol_ratio_high", 2.0) * common::kSignalScale),
-            INI_CONFIG.get_int("robust_zscore_fast", "baseline_min_history", 30)})),
+                                     "vol_ratio_high", 2.0) *
+                                 common::kSignalScale),
+            INI_CONFIG.get_int("robust_zscore_fast", "baseline_min_history",
+                30)})),
 
         robust_zscore_mid_(std::make_unique<RobustZScore>(RobustZScoreConfig{
             zscore_window_size_,
             zscore_min_samples_,
             zscore_min_mad_threshold_raw_,
             INI_CONFIG.get_int("robust_zscore", "baseline_window", 100),
-            static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore",
-                "min_vol_scalar", 0.7) * common::kSignalScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore",
-                "max_vol_scalar", 1.3) * common::kSignalScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore",
-                "vol_ratio_low", 0.5) * common::kSignalScale),
-            static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore",
-                "vol_ratio_high", 2.0) * common::kSignalScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("robust_zscore", "min_vol_scalar", 0.7) *
+                common::kSignalScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("robust_zscore", "max_vol_scalar", 1.3) *
+                common::kSignalScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("robust_zscore", "vol_ratio_low", 0.5) *
+                common::kSignalScale),
+            static_cast<int64_t>(
+                INI_CONFIG.get_double("robust_zscore", "vol_ratio_high", 2.0) *
+                common::kSignalScale),
             INI_CONFIG.get_int("robust_zscore", "baseline_min_history", 30)})),
 
         robust_zscore_slow_(std::make_unique<RobustZScore>(RobustZScoreConfig{
@@ -553,14 +598,19 @@ class MeanReversionMakerStrategy
             zscore_min_mad_threshold_raw_,
             INI_CONFIG.get_int("robust_zscore_slow", "baseline_window", 100),
             static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore_slow",
-                "min_vol_scalar", 0.7) * common::kSignalScale),
+                                     "min_vol_scalar", 0.7) *
+                                 common::kSignalScale),
             static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore_slow",
-                "max_vol_scalar", 1.3) * common::kSignalScale),
+                                     "max_vol_scalar", 1.3) *
+                                 common::kSignalScale),
             static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore_slow",
-                "vol_ratio_low", 0.5) * common::kSignalScale),
+                                     "vol_ratio_low", 0.5) *
+                                 common::kSignalScale),
             static_cast<int64_t>(INI_CONFIG.get_double("robust_zscore_slow",
-                "vol_ratio_high", 2.0) * common::kSignalScale),
-            INI_CONFIG.get_int("robust_zscore_slow", "baseline_min_history", 30)})),
+                                     "vol_ratio_high", 2.0) *
+                                 common::kSignalScale),
+            INI_CONFIG.get_int("robust_zscore_slow", "baseline_min_history",
+                30)})),
 
         // === Adverse selection tracking ===
         original_safety_margin_bps_(entry_cfg_.safety_margin_bps) {
@@ -574,7 +624,7 @@ class MeanReversionMakerStrategy
   // ========================================
   // 100ms interval: Orderbook update
   // ========================================
-  void on_orderbook_updated(const common::TickerId& ticker, common::Price,
+  void on_orderbook_updated(const common::TickerId& ticker, common::PriceType,
       common::Side, const MarketOrderBookT* order_book) noexcept {
     ticker_ = ticker;
     uint64_t current_time = get_current_time_ns();
@@ -687,7 +737,8 @@ class MeanReversionMakerStrategy
             adverse_selection_cfg_)) {
       // margin = original * multiplier / kSignalScale
       const_cast<EntryConfig&>(entry_cfg_).safety_margin_bps =
-          (original_safety_margin_bps_ * adverse_selection_cfg_.margin_multiplier) /
+          (original_safety_margin_bps_ *
+              adverse_selection_cfg_.margin_multiplier) /
           common::kSignalScale;
 
       if (debug_cfg_.log_entry_exit) {
@@ -1067,12 +1118,17 @@ class MeanReversionMakerStrategy
   // OBI calculation (int64_t version)
   // ========================================
   // Returns OBI scaled by kObiScale. Range: [-kObiScale, +kObiScale]
-  int64_t calculate_orderbook_imbalance_int64(const MarketOrderBookT* order_book) {
+  int64_t calculate_orderbook_imbalance_int64(
+      const MarketOrderBookT* order_book) {
     // 1. Extract quantities from orderbook
-    (void)order_book->peek_qty(true, entry_cfg_.obi_levels,
-        std::span<int64_t>(bid_qty_), {});
-    (void)order_book->peek_qty(false, entry_cfg_.obi_levels,
-        std::span<int64_t>(ask_qty_), {});
+    (void)order_book->peek_qty(true,
+        entry_cfg_.obi_levels,
+        std::span<int64_t>(bid_qty_),
+        {});
+    (void)order_book->peek_qty(false,
+        entry_cfg_.obi_levels,
+        std::span<int64_t>(ask_qty_),
+        {});
 
     // 2. Use FeatureEngine's optimized OBI calculation (int64_t version)
     return this->feature_engine_->orderbook_imbalance_int64(bid_qty_, ask_qty_);
@@ -1169,8 +1225,7 @@ class MeanReversionMakerStrategy
     // z_robust is scaled by kZScoreScale (10000). -2.5 = -25000
 
     if (debug_cfg_.log_entry_exit) {
-      this->logger_.info(
-          "[RobustZ] price:{} | median:{} | MAD:{} | z:{}",
+      this->logger_.info("[RobustZ] price:{} | median:{} | MAD:{} | z:{}",
           trade->price.value,
           robust_zscore_mid_->get_median(),
           robust_zscore_mid_->get_mad(),
@@ -1251,33 +1306,7 @@ class MeanReversionMakerStrategy
       return;
     }
 
-    // 4. Trend acceleration filter (SAFETY)
-    if (this->feature_engine_->is_trend_accelerating(common::Side::kSell,
-            trend_cfg_.lookback_ticks,
-            trend_cfg_.consecutive_threshold,
-            trend_cfg_.volume_multiplier)) {
-      if (debug_cfg_.log_entry_exit) {
-        const auto* trades = this->feature_engine_->get_recent_trades();
-        const size_t trade_count =
-            this->feature_engine_->get_trade_history_size();
-        int sell_count = 0;
-        size_t count = std::min(trade_count,
-            static_cast<size_t>(trend_cfg_.lookback_ticks));
-        for (size_t i = 0; i < count; ++i) {
-          size_t idx = trade_count - count + i;
-          if (trades[idx].side == common::Side::kSell)
-            sell_count++;
-        }
-        this->logger_.info(
-            "[Entry Block] Long | Trend accelerating | z:{:.2f} | sells:{}/{}",
-            z_robust,
-            sell_count,
-            count);
-      }
-      return;
-    }
-
-    // 5. OBI check (sell dominance for mean reversion)
+    // 4. OBI check (sell dominance for mean reversion)
     // Mean reversion: enter LONG when sell pressure is WEAKENING (expect bounce)
     // Directional filter: Block if OBI < -threshold (sell momentum still too strong)
     // NOTE: OBI already calculated above for signal scoring
@@ -1313,8 +1342,9 @@ class MeanReversionMakerStrategy
     }
 
     // 6. Spread filter (in bps: 10000 = 100%)
-    int64_t spread_bps = ((bbo->ask_price.value - bbo->bid_price.value) *
-                          common::kBpsScale) / bbo->bid_price.value;
+    int64_t spread_bps =
+        ((bbo->ask_price.value - bbo->bid_price.value) * common::kBpsScale) /
+        bbo->bid_price.value;
     if (spread_bps < entry_cfg_.min_spread_bps) {
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
@@ -1454,33 +1484,7 @@ class MeanReversionMakerStrategy
       return;
     }
 
-    // 4. Trend acceleration filter (SAFETY)
-    if (this->feature_engine_->is_trend_accelerating(common::Side::kBuy,
-            trend_cfg_.lookback_ticks,
-            trend_cfg_.consecutive_threshold,
-            trend_cfg_.volume_multiplier)) {
-      if (debug_cfg_.log_entry_exit) {
-        const auto* trades = this->feature_engine_->get_recent_trades();
-        const size_t trade_count =
-            this->feature_engine_->get_trade_history_size();
-        int buy_count = 0;
-        size_t count = std::min(trade_count,
-            static_cast<size_t>(trend_cfg_.lookback_ticks));
-        for (size_t i = 0; i < count; ++i) {
-          size_t idx = trade_count - count + i;
-          if (trades[idx].side == common::Side::kBuy)
-            buy_count++;
-        }
-        this->logger_.info(
-            "[Entry Block] Short | Trend accelerating | z:{:.2f} | buys:{}/{}",
-            z_robust,
-            buy_count,
-            count);
-      }
-      return;
-    }
-
-    // 5. OBI check (buy dominance for mean reversion)
+    // 4. OBI check (buy dominance for mean reversion)
     // Mean reversion: enter SHORT when buy pressure is WEAKENING (expect drop)
     // Directional filter: Block if OBI > threshold (buy momentum still too strong)
     // NOTE: OBI already calculated above for signal scoring
@@ -1516,8 +1520,9 @@ class MeanReversionMakerStrategy
     }
 
     // 6. Spread filter (in bps: 10000 = 100%)
-    int64_t spread_bps = ((bbo->ask_price.value - bbo->bid_price.value) *
-                          common::kBpsScale) / bbo->bid_price.value;
+    int64_t spread_bps =
+        ((bbo->ask_price.value - bbo->bid_price.value) * common::kBpsScale) /
+        bbo->bid_price.value;
     if (spread_bps < entry_cfg_.min_spread_bps) {
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
@@ -1575,8 +1580,8 @@ class MeanReversionMakerStrategy
 
     // safety_margin_bps is in basis points, convert to price raw:
     // margin_raw = base_price * margin_bps / kBpsScale
-    int64_t margin_raw = (base_price_raw * entry_cfg_.safety_margin_bps) /
-                         common::kBpsScale;
+    int64_t margin_raw =
+        (base_price_raw * entry_cfg_.safety_margin_bps) / common::kBpsScale;
 
     if (side == common::Side::kBuy) {
       intent.price = common::PriceType::from_raw(base_price_raw - margin_raw);
@@ -1978,8 +1983,7 @@ class MeanReversionMakerStrategy
           oversold_min_z_ = 0;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
-                "[MeanReversion] Long reset to NEUTRAL | z:{}",
+            this->logger_.info("[MeanReversion] Long reset to NEUTRAL | z:{}",
                 current_z);
           }
         }
@@ -1993,7 +1997,8 @@ class MeanReversionMakerStrategy
             oversold_min_z_ + mean_reversion_cfg_.min_reversal_bounce) {
           // Weak reversal: still below weak threshold
           if (z_abs * common::kSignalScale >
-              adaptive_threshold * mean_reversion_cfg_.reversal_weak_multiplier) {
+              adaptive_threshold *
+                  mean_reversion_cfg_.reversal_weak_multiplier) {
             long_phase_ = ReversionPhase::REVERSAL_WEAK;
 
             if (debug_cfg_.log_entry_exit) {
@@ -2026,8 +2031,7 @@ class MeanReversionMakerStrategy
           long_phase_ = ReversionPhase::BUILDING_OVERSOLD;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
-                "[MeanReversion] Long back to BUILDING | z:{}",
+            this->logger_.info("[MeanReversion] Long back to BUILDING | z:{}",
                 current_z);
           }
         }
@@ -2121,7 +2125,8 @@ class MeanReversionMakerStrategy
 
           if (debug_cfg_.log_entry_exit) {
             this->logger_.info(
-                "[MeanReversion] Short BUILDING_OVERBOUGHT | z:{} | threshold:{}",
+                "[MeanReversion] Short BUILDING_OVERBOUGHT | z:{} | "
+                "threshold:{}",
                 current_z,
                 adaptive_threshold);
           }
@@ -2139,7 +2144,8 @@ class MeanReversionMakerStrategy
 
           if (debug_cfg_.log_entry_exit) {
             this->logger_.info(
-                "[MeanReversion] Short DEEP_OVERBOUGHT | z:{} | deep_threshold:{}",
+                "[MeanReversion] Short DEEP_OVERBOUGHT | z:{} | "
+                "deep_threshold:{}",
                 current_z,
                 (adaptive_threshold * mean_reversion_cfg_.deep_multiplier) /
                     common::kSignalScale);
@@ -2151,8 +2157,7 @@ class MeanReversionMakerStrategy
           overbought_max_z_ = 0;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
-                "[MeanReversion] Short reset to NEUTRAL | z:{}",
+            this->logger_.info("[MeanReversion] Short reset to NEUTRAL | z:{}",
                 current_z);
           }
         }
@@ -2166,7 +2171,8 @@ class MeanReversionMakerStrategy
             overbought_max_z_ - mean_reversion_cfg_.min_reversal_bounce) {
           // Weak reversal: still above weak threshold
           if (z_abs * common::kSignalScale >
-              adaptive_threshold * mean_reversion_cfg_.reversal_weak_multiplier) {
+              adaptive_threshold *
+                  mean_reversion_cfg_.reversal_weak_multiplier) {
             short_phase_ = ReversionPhase::REVERSAL_WEAK;
 
             if (debug_cfg_.log_entry_exit) {
@@ -2199,8 +2205,7 @@ class MeanReversionMakerStrategy
           short_phase_ = ReversionPhase::BUILDING_OVERSOLD;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
-                "[MeanReversion] Short back to BUILDING | z:{}",
+            this->logger_.info("[MeanReversion] Short back to BUILDING | z:{}",
                 current_z);
           }
         }
@@ -2267,7 +2272,8 @@ class MeanReversionMakerStrategy
 
           if (debug_cfg_.log_entry_exit) {
             this->logger_.info(
-                "[MeanReversion] Short STRONG -> WEAK (reversal weakening) | z:{}",
+                "[MeanReversion] Short STRONG -> WEAK (reversal weakening) | "
+                "z:{}",
                 current_z);
           }
         }
@@ -2356,7 +2362,9 @@ class MeanReversionMakerStrategy
     int64_t total_volume = 0;
 
     // Analyze recent trades (qty is already int64_t raw)
-    for (size_t i = trade_count - static_cast<size_t>(lookback); i < trade_count; ++i) {
+    for (size_t i = trade_count - static_cast<size_t>(lookback);
+        i < trade_count;
+        ++i) {
       if (trades[i].side == expected_direction) {
         directional_count++;
         directional_volume += trades[i].qty_raw;
@@ -2369,11 +2377,12 @@ class MeanReversionMakerStrategy
 
     // Combine tick ratio and volume ratio (both scaled by kSignalScale)
     // tick_ratio = directional_count * kSignalScale / lookback
-    int64_t tick_ratio = (static_cast<int64_t>(directional_count) *
-                          common::kSignalScale) / lookback;
+    int64_t tick_ratio =
+        (static_cast<int64_t>(directional_count) * common::kSignalScale) /
+        lookback;
     // volume_ratio = directional_volume * kSignalScale / total_volume
-    int64_t volume_ratio = (directional_volume * common::kSignalScale) /
-                           total_volume;
+    int64_t volume_ratio =
+        (directional_volume * common::kSignalScale) / total_volume;
 
     // Average of both: (tick + volume) / 2
     return (tick_ratio + volume_ratio) / 2;
@@ -2396,22 +2405,23 @@ class MeanReversionMakerStrategy
     int64_t z_abs = std::abs(z);
     int64_t z_range = entry_cfg_.zscore_norm_max - entry_cfg_.zscore_norm_min;
     if (z_range > 0) {
-      int64_t z_normalized = (z_abs - entry_cfg_.zscore_norm_min) *
-                             common::kSignalScale / z_range;
-      score.z_score_strength = std::clamp(z_normalized,
-                                          int64_t{0}, common::kSignalScale);
+      int64_t z_normalized =
+          (z_abs - entry_cfg_.zscore_norm_min) * common::kSignalScale / z_range;
+      score.z_score_strength =
+          std::clamp(z_normalized, int64_t{0}, common::kSignalScale);
     }
 
     // === 2. Wall strength: compare to dynamic threshold ===
     // wall_target = min_qty * multiplier / kSignalScale
     // strength = wall_notional * kSignalScale / wall_target
     int64_t wall_target = (dynamic_threshold_->get_min_quantity() *
-                           entry_cfg_.wall_norm_multiplier) / common::kSignalScale;
+                              entry_cfg_.wall_norm_multiplier) /
+                          common::kSignalScale;
     if (wall_target > 0) {
-      int64_t wall_normalized = (wall.accumulated_notional * common::kSignalScale) /
-                                wall_target;
-      score.wall_strength = std::clamp(wall_normalized,
-                                       int64_t{0}, common::kSignalScale);
+      int64_t wall_normalized =
+          (wall.accumulated_notional * common::kSignalScale) / wall_target;
+      score.wall_strength =
+          std::clamp(wall_normalized, int64_t{0}, common::kSignalScale);
     }
 
     // === 3. Volume reversal: calculate directional strength ===
@@ -2424,8 +2434,8 @@ class MeanReversionMakerStrategy
     if (obi_range > 0) {
       int64_t obi_normalized = (obi_abs - entry_cfg_.obi_norm_min) *
                                common::kSignalScale / obi_range;
-      score.obi_strength = std::clamp(obi_normalized,
-                                      int64_t{0}, common::kSignalScale);
+      score.obi_strength =
+          std::clamp(obi_normalized, int64_t{0}, common::kSignalScale);
     }
 
     return score;
@@ -2446,20 +2456,21 @@ class MeanReversionMakerStrategy
     int64_t z_abs = std::abs(z);
     int64_t z_range = entry_cfg_.zscore_norm_max - entry_cfg_.zscore_norm_min;
     if (z_range > 0) {
-      int64_t z_normalized = (z_abs - entry_cfg_.zscore_norm_min) *
-                             common::kSignalScale / z_range;
-      score.z_score_strength = std::clamp(z_normalized,
-                                          int64_t{0}, common::kSignalScale);
+      int64_t z_normalized =
+          (z_abs - entry_cfg_.zscore_norm_min) * common::kSignalScale / z_range;
+      score.z_score_strength =
+          std::clamp(z_normalized, int64_t{0}, common::kSignalScale);
     }
 
     // === 2. Wall strength: compare to dynamic threshold ===
     int64_t wall_target = (dynamic_threshold_->get_min_quantity() *
-                           entry_cfg_.wall_norm_multiplier) / common::kSignalScale;
+                              entry_cfg_.wall_norm_multiplier) /
+                          common::kSignalScale;
     if (wall_target > 0) {
-      int64_t wall_normalized = (wall.accumulated_notional * common::kSignalScale) /
-                                wall_target;
-      score.wall_strength = std::clamp(wall_normalized,
-                                       int64_t{0}, common::kSignalScale);
+      int64_t wall_normalized =
+          (wall.accumulated_notional * common::kSignalScale) / wall_target;
+      score.wall_strength =
+          std::clamp(wall_normalized, int64_t{0}, common::kSignalScale);
     }
 
     // === 3. Volume reversal ===
@@ -2473,8 +2484,8 @@ class MeanReversionMakerStrategy
     if (obi_range > 0) {
       int64_t obi_normalized = (obi_abs - entry_cfg_.obi_norm_min) *
                                common::kSignalScale / obi_range;
-      score.obi_strength = std::clamp(obi_normalized,
-                                      int64_t{0}, common::kSignalScale);
+      score.obi_strength =
+          std::clamp(obi_normalized, int64_t{0}, common::kSignalScale);
     }
 
     return score;
@@ -2491,7 +2502,6 @@ class MeanReversionMakerStrategy
   const WallDetectionConfig wall_cfg_;
   const EntryConfig entry_cfg_;
   const ExitConfig exit_cfg_;
-  const TrendFilterConfig trend_cfg_;
   const ReversalMomentumConfig reversal_cfg_;
   const DebugLoggingConfig debug_cfg_;
   const MeanReversionConfig mean_reversion_cfg_;
@@ -2555,9 +2565,8 @@ class MeanReversionMakerStrategy
 
   // Market regime tracking (lightweight, no extra computation)
   MarketRegime current_regime_{MarketRegime::RANGING};
-  std::deque<int64_t>
-      z_slow_history_;        // Last 3 slow Z-scores (scaled)
-  int64_t vol_ratio_{10000};  // Volatility ratio (kSignalScale)
+  std::deque<int64_t> z_slow_history_;  // Last 3 slow Z-scores (scaled)
+  int64_t vol_ratio_{10000};            // Volatility ratio (kSignalScale)
 
   // Throttling timestamp for orderbook updates
   uint64_t last_orderbook_check_time_{0};

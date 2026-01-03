@@ -27,7 +27,11 @@ void block_all_signals(sigset_t& set) {
   pthread_sigmask(SIG_BLOCK, &set, nullptr);
 }
 int main() {
+#ifdef __APPLE__
+  pthread_setname_np("hft_main");
+#else
   pthread_setname_np(pthread_self(), "hft_main");
+#endif
   sigset_t set;
   block_all_signals(set);
 

@@ -319,54 +319,6 @@ class FeatureEngine {
   }
 
   // ========================================
-  // Trend acceleration detection (int64_t version)
-  // ========================================
-  [[nodiscard]] bool is_trend_accelerating(common::Side direction,
-      int lookback_ticks, int consecutive_threshold,
-      int64_t volume_multiplier_scaled) const noexcept {
-    // volume_multiplier_scaled: 1.5 = 15000 (kSignalScale)
-    if (trade_history_count_ < static_cast<size_t>(lookback_ticks)) {
-      return false;
-    }
-
-    // === 1. Direction consistency check ===
-    int consecutive_count = 0;
-    size_t lookback = std::min(trade_history_count_,
-        static_cast<size_t>(lookback_ticks));
-
-    for (size_t i = 0; i < lookback; ++i) {
-      size_t idx = (trade_history_count_ - lookback + i);
-      if (recent_trades_[idx].side == direction) {
-        consecutive_count++;
-      }
-    }
-
-    if (consecutive_count < consecutive_threshold) {
-      return false;
-    }
-
-    // === 2. Volume acceleration check (int64_t, no division) ===
-    if (trade_history_count_ >= static_cast<size_t>(lookback_ticks)) {
-      // Recent 2 ticks sum
-      int64_t vol_recent_sum = get_trade(0).qty_raw + get_trade(1).qty_raw;
-
-      // Previous 3 ticks sum
-      int64_t vol_old_sum = get_trade(2).qty_raw +
-                            get_trade(3).qty_raw +
-                            get_trade(4).qty_raw;
-
-      // Compare: vol_recent/2 > vol_old/3 * multiplier
-      // Equivalent: vol_recent * 3 * kSignalScale > vol_old * 2 * multiplier_scaled
-      if (vol_recent_sum * 3 * common::kSignalScale >
-          vol_old_sum * 2 * volume_multiplier_scaled) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  // ========================================
   // Wall detection (int64_t version)
   // ========================================
   template <typename OrderBook>

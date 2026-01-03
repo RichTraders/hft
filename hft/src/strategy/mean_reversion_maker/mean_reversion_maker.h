@@ -84,6 +84,25 @@ struct DebugLoggingConfig {
   bool log_entry_exit{false};
 };
 
+struct MeanReversionConfig {
+  // Legacy parameters (backwards compatibility)
+  double oversold_start_threshold{1.5};    // Deprecated
+  double overbought_start_threshold{1.5};  // Deprecated
+  double min_reversal_bounce{0.2};         // Minimum bounce from extreme
+  double neutral_zone_threshold{1.0};      // Reset threshold
+
+  // 5-State threshold multipliers (relative to adaptive_threshold)
+  double building_multiplier{1.0};       // NEUTRAL → BUILDING
+  double deep_multiplier{1.2};           // BUILDING → DEEP
+  double reversal_weak_multiplier{0.8};  // DEEP → REVERSAL_WEAK
+  double reversal_strong_multiplier{
+      0.6};  // WEAK → STRONG (not used in current logic)
+
+  // False reversal detection
+  double false_reversal_ratio{
+      0.5};  // Ratio of min_reversal_bounce for false reversal
+};
+
 class MeanReversionMakerStrategy
     : public BaseStrategy<MeanReversionMakerStrategy> {
  public:
@@ -99,6 +118,15 @@ class MeanReversionMakerStrategy
     NONE = 0,     // No position, no pending order
     PENDING = 1,  // Order sent, waiting for fill
     ACTIVE = 2    // Position filled and active
+  };
+
+  // === Mean reversion phase enumeration (5-State for volatility adaptation) ===
+  enum class ReversionPhase : uint8_t {
+    NEUTRAL = 0,        // |z| < neutral_threshold (1.0)
+    BUILDING_OVERSOLD,  // -adaptive_threshold < z < -neutral_threshold
+    DEEP_OVERSOLD,      // z < -adaptive_threshold × deep_multiplier
+    REVERSAL_WEAK,      // Bounced, but z still in weak reversal zone
+    REVERSAL_STRONG     // Bounced strongly, ready for entry
   };
 
   // === Position state structure ===
@@ -175,6 +203,22 @@ class MeanReversionMakerStrategy
             INI_CONFIG.get("debug", "log_defense_check", "false") == "true",
             INI_CONFIG.get("debug", "log_entry_exit", "false") == "true"},
 
+        mean_reversion_cfg_{INI_CONFIG.get_double("mean_reversion",
+                                "oversold_start_threshold", 1.5),
+            INI_CONFIG.get_double("mean_reversion",
+                "overbought_start_threshold", 1.5),
+            INI_CONFIG.get_double("mean_reversion", "min_reversal_bounce", 0.2),
+            INI_CONFIG.get_double("mean_reversion", "neutral_zone_threshold",
+                1.0),
+            INI_CONFIG.get_double("mean_reversion", "building_multiplier", 1.0),
+            INI_CONFIG.get_double("mean_reversion", "deep_multiplier", 1.2),
+            INI_CONFIG.get_double("mean_reversion", "reversal_weak_multiplier",
+                0.8),
+            INI_CONFIG.get_double("mean_reversion",
+                "reversal_strong_multiplier", 0.6),
+            INI_CONFIG.get_double("mean_reversion", "false_reversal_ratio",
+                0.5)},
+
         // === Z-score config ===
         zscore_window_size_(
             INI_CONFIG.get_int("robust_zscore", "window_size", 30)),
@@ -211,10 +255,16 @@ class MeanReversionMakerStrategy
                 INI_CONFIG.get_double("wall_defense", "min_quantity", 50.0)})),
 
         // === Robust Z-score module ===
-        robust_zscore_(std::make_unique<RobustZScore>(
-            RobustZScoreConfig{zscore_window_size_,
-                zscore_min_samples_,
-                zscore_min_mad_threshold_})) {
+        robust_zscore_(std::make_unique<RobustZScore>(RobustZScoreConfig{
+            zscore_window_size_,
+            zscore_min_samples_,
+            zscore_min_mad_threshold_,
+            INI_CONFIG.get_int("robust_zscore", "baseline_window", 100),
+            INI_CONFIG.get_double("robust_zscore", "min_vol_scalar", 0.7),
+            INI_CONFIG.get_double("robust_zscore", "max_vol_scalar", 1.3),
+            INI_CONFIG.get_double("robust_zscore", "vol_ratio_low", 0.5),
+            INI_CONFIG.get_double("robust_zscore", "vol_ratio_high", 2.0),
+            INI_CONFIG.get_int("robust_zscore", "baseline_min_history", 30)})) {
     this->logger_.info(
         "[MeanReversionMaker] Initialized | min_quantity:{:.2f} BTC | "
         "simultaneous:{}",
@@ -246,6 +296,7 @@ class MeanReversionMakerStrategy
 
     // === 3. Detect walls (bidirectional) ===
     const int min_price_int = order_book->config().min_price_int;
+    // Detect walls (for reference, not for gating entry)
     bid_wall_info_ = this->feature_engine_->detect_wall(order_book,
         common::Side::kBuy,
         wall_cfg_.max_levels,
@@ -254,7 +305,6 @@ class MeanReversionMakerStrategy
         min_price_int,
         wall_level_qty_,
         wall_level_idx_);
-    allow_long_entry_ = bid_wall_info_.is_valid;
 
     ask_wall_info_ = this->feature_engine_->detect_wall(order_book,
         common::Side::kSell,
@@ -264,7 +314,10 @@ class MeanReversionMakerStrategy
         min_price_int,
         wall_level_qty_,
         wall_level_idx_);
-    allow_short_entry_ = ask_wall_info_.is_valid;
+
+    // NOTE: Wall detection does NOT gate entry anymore
+    // Entry is now gated by mean reversion state (REVERSAL_DETECTED)
+    // Wall is checked AFTER reversal is detected
 
     // === 4. Position exit monitoring (stop loss) ===
     check_position_exit(order_book);
@@ -287,65 +340,51 @@ class MeanReversionMakerStrategy
       return;
     }
 
-    // === 1. Update price statistics ===
-    uint64_t current_time = get_current_time_ns();
-
+    // === 1. Hot path: Z-score and mean reversion tracking ===
     // Update Robust Z-score
     robust_zscore_->on_price(market_data->price.value);
 
-    // Note: Trade history is now managed by FeatureEngine
-
-    // Accumulate trade volume for wall threshold (EMA update)
-    dynamic_threshold_->on_trade(current_time,
-        market_data->price.value,
-        market_data->qty.value);
-
-    // === Calculate Z-score once (performance optimization) ===
+    // Calculate Z-score once (performance optimization)
     double current_z =
         robust_zscore_->calculate_zscore(market_data->price.value);
 
-    // === 2. Long entry check (Reversal Confirmation Strategy) ===
-    // Enter LONG when: oversold -> reversing up -> buy trade occurs
-    bool was_oversold = (prev_z_score_ < -zscore_entry_threshold_);
-    bool is_reversing_up = (current_z > prev_z_score_);
+    // Update mean reversion phase (ALWAYS, regardless of wall)
+    update_long_phase(current_z);
+    update_short_phase(current_z);
 
-    if (market_data->side ==
-            common::Side::kBuy &&  // Buy trade (reversal signal)
-        was_oversold &&            // Was oversold before
-        is_reversing_up &&         // Reversing up now
-        allow_long_entry_ &&
-        (long_position_.status == PositionStatus::NONE &&
-            (allow_simultaneous_positions_ ||
-                short_position_.status == PositionStatus::NONE))) {
-
-      if (validate_defense_realtime(market_data,
-              prev_bbo_,
-              current_bbo,
-              common::Side::kBuy)) {
+    // === 2. Long entry check (Phase-Based Mean Reversion) ===
+    // NEW ORDER: Check reversal signal FIRST, then check wall
+    if (is_long_reversal_signal(market_data)) {
+      // Check wall AFTER reversal detected
+      if (bid_wall_info_.is_valid && validate_defense_realtime(market_data,
+                                         prev_bbo_,
+                                         current_bbo,
+                                         common::Side::kBuy)) {
         check_long_entry(market_data, order_book, current_bbo, current_z);
+      } else {
+        if (debug_cfg_.log_entry_exit) {
+          this->logger_.info(
+              "[Entry Skip] Reversal detected but no wall | z:{:.2f}",
+              current_z);
+        }
       }
     }
 
-    // === 3. Short entry check (Reversal Confirmation Strategy) ===
-    // Enter SHORT when: overbought -> reversing down -> sell trade occurs
-    bool was_overbought = (prev_z_score_ > zscore_entry_threshold_);
-    bool is_reversing_down = (current_z < prev_z_score_);
-
-    if (market_data->side ==
-            common::Side::
-                kSell &&      // [CRITICAL CHANGE] Sell trade (reversal signal)
-        was_overbought &&     // [NEW] Was overbought before
-        is_reversing_down &&  // [NEW] Reversing down now
-        allow_short_entry_ &&
-        (short_position_.status == PositionStatus::NONE &&
-            (allow_simultaneous_positions_ ||
-                long_position_.status == PositionStatus::NONE))) {
-
-      if (validate_defense_realtime(market_data,
-              prev_bbo_,
-              current_bbo,
-              common::Side::kSell)) {
+    // === 3. Short entry check (Phase-Based Mean Reversion) ===
+    // NEW ORDER: Check reversal signal FIRST, then check wall
+    if (is_short_reversal_signal(market_data)) {
+      // Check wall AFTER reversal detected
+      if (ask_wall_info_.is_valid && validate_defense_realtime(market_data,
+                                         prev_bbo_,
+                                         current_bbo,
+                                         common::Side::kSell)) {
         check_short_entry(market_data, order_book, current_bbo, current_z);
+      } else {
+        if (debug_cfg_.log_entry_exit) {
+          this->logger_.info(
+              "[Entry Skip] Reversal detected but no wall | z:{:.2f}",
+              current_z);
+        }
       }
     }
 
@@ -353,7 +392,15 @@ class MeanReversionMakerStrategy
     prev_bbo_ = *current_bbo;
     prev_z_score_ = current_z;
 
-    // === 5. Trigger TTL sweep (every trade) ===
+    // === 5. Cold path: Background updates ===
+    // Accumulate trade volume for wall threshold (EMA update)
+    // This updates slowly (alpha=0.03) and only used in on_orderbook_updated (100ms)
+    uint64_t current_time = get_current_time_ns();
+    dynamic_threshold_->on_trade(current_time,
+        market_data->price.value,
+        market_data->qty.value);
+
+    // === 6. Trigger TTL sweep (every trade) ===
     this->order_manager_->apply({});
   }
 
@@ -386,6 +433,8 @@ class MeanReversionMakerStrategy
             // Normal fill - expected order
             long_position_.status = PositionStatus::ACTIVE;
             long_position_.entry_price = report->avg_price.value;
+            long_position_.entry_wall_info =
+                bid_wall_info_;  // Update wall at fill time
             long_position_.state_time = get_current_time_ns();
             long_position_.pending_order_id.reset();
 
@@ -450,6 +499,8 @@ class MeanReversionMakerStrategy
             // Normal fill - expected order
             short_position_.status = PositionStatus::ACTIVE;
             short_position_.entry_price = report->avg_price.value;
+            short_position_.entry_wall_info =
+                ask_wall_info_;  // Update wall at fill time
             short_position_.state_time = get_current_time_ns();
             short_position_.pending_order_id.reset();
 
@@ -1263,6 +1314,398 @@ class MeanReversionMakerStrategy
   }
 
   // ========================================
+  // Mean Reversion Signal Detection
+  // ========================================
+  bool is_long_reversal_signal(const MarketData* trade) const {
+    // Phase check: Must be in REVERSAL_STRONG (not REVERSAL_WEAK)
+    if (long_phase_ != ReversionPhase::REVERSAL_STRONG) {
+      return false;
+    }
+
+    // Trade direction check: Buy trade confirms reversal
+    if (trade->side != common::Side::kBuy) {
+      return false;
+    }
+
+    // Position check: No existing position
+    if (long_position_.status != PositionStatus::NONE) {
+      return false;
+    }
+
+    // Simultaneous position check
+    if (!allow_simultaneous_positions_ &&
+        short_position_.status != PositionStatus::NONE) {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool is_short_reversal_signal(const MarketData* trade) const {
+    // Phase check: Must be in REVERSAL_STRONG (not REVERSAL_WEAK)
+    if (short_phase_ != ReversionPhase::REVERSAL_STRONG) {
+      return false;
+    }
+
+    // Trade direction check: Sell trade confirms reversal
+    if (trade->side != common::Side::kSell) {
+      return false;
+    }
+
+    // Position check: No existing position
+    if (short_position_.status != PositionStatus::NONE) {
+      return false;
+    }
+
+    // Simultaneous position check
+    if (!allow_simultaneous_positions_ &&
+        long_position_.status != PositionStatus::NONE) {
+      return false;
+    }
+
+    return true;
+  }
+
+  // ========================================
+  // Mean Reversion Phase Tracking (5-State + Volatility-Adaptive)
+  // ========================================
+  void update_long_phase(double current_z) {
+    // Calculate adaptive threshold
+    double adaptive_threshold =
+        robust_zscore_->get_adaptive_threshold(zscore_entry_threshold_);
+
+    double z_abs = std::abs(current_z);
+
+    switch (long_phase_) {
+      case ReversionPhase::NEUTRAL:
+        // Enter BUILDING_OVERSOLD when crossing neutral zone
+        if (current_z < -mean_reversion_cfg_.neutral_zone_threshold) {
+          long_phase_ = ReversionPhase::BUILDING_OVERSOLD;
+          oversold_min_z_ = current_z;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Long BUILDING_OVERSOLD | z:{:.2f} | "
+                "threshold:{:.2f}",
+                current_z,
+                adaptive_threshold);
+          }
+        }
+        break;
+
+      case ReversionPhase::BUILDING_OVERSOLD:
+        oversold_min_z_ = std::min(oversold_min_z_, current_z);
+
+        // Enter DEEP_OVERSOLD when crossing deep threshold
+        if (z_abs > adaptive_threshold * mean_reversion_cfg_.deep_multiplier) {
+          long_phase_ = ReversionPhase::DEEP_OVERSOLD;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Long DEEP_OVERSOLD | z:{:.2f} | "
+                "deep_threshold:{:.2f}",
+                current_z,
+                adaptive_threshold * mean_reversion_cfg_.deep_multiplier);
+          }
+        }
+        // Return to NEUTRAL if going back above neutral zone
+        else if (current_z > -mean_reversion_cfg_.neutral_zone_threshold) {
+          long_phase_ = ReversionPhase::NEUTRAL;
+          oversold_min_z_ = 0.0;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Long reset to NEUTRAL | z:{:.2f}",
+                current_z);
+          }
+        }
+        break;
+
+      case ReversionPhase::DEEP_OVERSOLD:
+        oversold_min_z_ = std::min(oversold_min_z_, current_z);
+
+        // Check for reversal bounce
+        if (current_z >
+            oversold_min_z_ + mean_reversion_cfg_.min_reversal_bounce) {
+          // Weak reversal: still below weak threshold
+          if (z_abs > adaptive_threshold *
+                          mean_reversion_cfg_.reversal_weak_multiplier) {
+            long_phase_ = ReversionPhase::REVERSAL_WEAK;
+
+            if (debug_cfg_.log_entry_exit) {
+              this->logger_.info(
+                  "[MeanReversion] 🔸 Long REVERSAL_WEAK | "
+                  "min_z:{:.2f} → current_z:{:.2f} | bounce:{:.2f}",
+                  oversold_min_z_,
+                  current_z,
+                  current_z - oversold_min_z_);
+            }
+          }
+          // Strong reversal: crossed above weak threshold
+          else {
+            long_phase_ = ReversionPhase::REVERSAL_STRONG;
+
+            if (debug_cfg_.log_entry_exit) {
+              this->logger_.info(
+                  "[MeanReversion] 🚨 Long REVERSAL_STRONG | "
+                  "min_z:{:.2f} → current_z:{:.2f} | bounce:{:.2f} | wall:{}",
+                  oversold_min_z_,
+                  current_z,
+                  current_z - oversold_min_z_,
+                  bid_wall_info_.is_valid ? "YES" : "NO");
+            }
+          }
+        }
+        // Dropped back to BUILDING level
+        else if (z_abs <
+                 adaptive_threshold * mean_reversion_cfg_.deep_multiplier) {
+          long_phase_ = ReversionPhase::BUILDING_OVERSOLD;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Long back to BUILDING | z:{:.2f}",
+                current_z);
+          }
+        }
+        break;
+
+      case ReversionPhase::REVERSAL_WEAK:
+        // Re-check threshold (adaptive_threshold may have changed!)
+        if (z_abs <
+            adaptive_threshold * mean_reversion_cfg_.reversal_weak_multiplier) {
+          long_phase_ = ReversionPhase::REVERSAL_STRONG;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] 🚨 Long WEAK → STRONG | z:{:.2f} | "
+                "threshold:{:.2f}",
+                current_z,
+                adaptive_threshold *
+                    mean_reversion_cfg_.reversal_weak_multiplier);
+          }
+        }
+        // Falling back to DEEP_OVERSOLD
+        else if (current_z < oversold_min_z_ -
+                                 mean_reversion_cfg_.min_reversal_bounce *
+                                     mean_reversion_cfg_.false_reversal_ratio) {
+          long_phase_ = ReversionPhase::DEEP_OVERSOLD;
+          oversold_min_z_ = current_z;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Long WEAK → DEEP (false reversal) | z:{:.2f}",
+                current_z);
+          }
+        }
+        // Return to neutral
+        else if (current_z > -mean_reversion_cfg_.neutral_zone_threshold) {
+          long_phase_ = ReversionPhase::NEUTRAL;
+          oversold_min_z_ = 0.0;
+        }
+        break;
+
+      case ReversionPhase::REVERSAL_STRONG:
+        // Only allow entry from this state
+        // Reset after entry or return to neutral
+        if (long_position_.status != PositionStatus::NONE ||
+            current_z > -mean_reversion_cfg_.neutral_zone_threshold) {
+          long_phase_ = ReversionPhase::NEUTRAL;
+          oversold_min_z_ = 0.0;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Long reset | z:{:.2f} | position:{}",
+                current_z,
+                long_position_.status == PositionStatus::NONE ? "NONE"
+                                                              : "ACTIVE");
+          }
+        }
+        // Falling back to WEAK (reversal weakening)
+        else if (z_abs > adaptive_threshold *
+                             mean_reversion_cfg_.reversal_weak_multiplier) {
+          long_phase_ = ReversionPhase::REVERSAL_WEAK;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Long STRONG → WEAK (reversal weakening) | "
+                "z:{:.2f}",
+                current_z);
+          }
+        }
+        break;
+    }
+  }
+
+  void update_short_phase(double current_z) {
+    // Calculate adaptive threshold
+    double adaptive_threshold =
+        robust_zscore_->get_adaptive_threshold(zscore_entry_threshold_);
+
+    double z_abs = std::abs(current_z);
+
+    switch (short_phase_) {
+      case ReversionPhase::NEUTRAL:
+        // Enter BUILDING (overbought) when crossing neutral zone
+        if (current_z > mean_reversion_cfg_.neutral_zone_threshold) {
+          short_phase_ =
+              ReversionPhase::BUILDING_OVERSOLD;  // Reusing for overbought
+          overbought_max_z_ = current_z;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Short BUILDING_OVERBOUGHT | z:{:.2f} | "
+                "threshold:{:.2f}",
+                current_z,
+                adaptive_threshold);
+          }
+        }
+        break;
+
+      case ReversionPhase::BUILDING_OVERSOLD:  // Actually overbought for Short
+        overbought_max_z_ = std::max(overbought_max_z_, current_z);
+
+        // Enter DEEP_OVERBOUGHT when crossing deep threshold
+        if (z_abs > adaptive_threshold * mean_reversion_cfg_.deep_multiplier) {
+          short_phase_ =
+              ReversionPhase::DEEP_OVERSOLD;  // Reusing for deep overbought
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Short DEEP_OVERBOUGHT | z:{:.2f} | "
+                "deep_threshold:{:.2f}",
+                current_z,
+                adaptive_threshold * mean_reversion_cfg_.deep_multiplier);
+          }
+        }
+        // Return to NEUTRAL
+        else if (current_z < mean_reversion_cfg_.neutral_zone_threshold) {
+          short_phase_ = ReversionPhase::NEUTRAL;
+          overbought_max_z_ = 0.0;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Short reset to NEUTRAL | z:{:.2f}",
+                current_z);
+          }
+        }
+        break;
+
+      case ReversionPhase::DEEP_OVERSOLD:  // Actually deep overbought for Short
+        overbought_max_z_ = std::max(overbought_max_z_, current_z);
+
+        // Check for reversal drop
+        if (current_z <
+            overbought_max_z_ - mean_reversion_cfg_.min_reversal_bounce) {
+          // Weak reversal: still above weak threshold
+          if (z_abs > adaptive_threshold *
+                          mean_reversion_cfg_.reversal_weak_multiplier) {
+            short_phase_ = ReversionPhase::REVERSAL_WEAK;
+
+            if (debug_cfg_.log_entry_exit) {
+              this->logger_.info(
+                  "[MeanReversion] 🔸 Short REVERSAL_WEAK | "
+                  "max_z:{:.2f} → current_z:{:.2f} | drop:{:.2f}",
+                  overbought_max_z_,
+                  current_z,
+                  overbought_max_z_ - current_z);
+            }
+          }
+          // Strong reversal: crossed below weak threshold
+          else {
+            short_phase_ = ReversionPhase::REVERSAL_STRONG;
+
+            if (debug_cfg_.log_entry_exit) {
+              this->logger_.info(
+                  "[MeanReversion] 🚨 Short REVERSAL_STRONG | "
+                  "max_z:{:.2f} → current_z:{:.2f} | drop:{:.2f} | wall:{}",
+                  overbought_max_z_,
+                  current_z,
+                  overbought_max_z_ - current_z,
+                  ask_wall_info_.is_valid ? "YES" : "NO");
+            }
+          }
+        }
+        // Rose back to BUILDING level
+        else if (z_abs <
+                 adaptive_threshold * mean_reversion_cfg_.deep_multiplier) {
+          short_phase_ = ReversionPhase::BUILDING_OVERSOLD;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Short back to BUILDING | z:{:.2f}",
+                current_z);
+          }
+        }
+        break;
+
+      case ReversionPhase::REVERSAL_WEAK:
+        // Re-check threshold (adaptive_threshold may have changed!)
+        if (z_abs <
+            adaptive_threshold * mean_reversion_cfg_.reversal_weak_multiplier) {
+          short_phase_ = ReversionPhase::REVERSAL_STRONG;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] 🚨 Short WEAK → STRONG | z:{:.2f} | "
+                "threshold:{:.2f}",
+                current_z,
+                adaptive_threshold *
+                    mean_reversion_cfg_.reversal_weak_multiplier);
+          }
+        }
+        // Rising back to DEEP_OVERBOUGHT
+        else if (current_z > overbought_max_z_ +
+                                 mean_reversion_cfg_.min_reversal_bounce *
+                                     mean_reversion_cfg_.false_reversal_ratio) {
+          short_phase_ = ReversionPhase::DEEP_OVERSOLD;
+          overbought_max_z_ = current_z;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Short WEAK → DEEP (false reversal) | z:{:.2f}",
+                current_z);
+          }
+        }
+        // Return to neutral
+        else if (current_z < mean_reversion_cfg_.neutral_zone_threshold) {
+          short_phase_ = ReversionPhase::NEUTRAL;
+          overbought_max_z_ = 0.0;
+        }
+        break;
+
+      case ReversionPhase::REVERSAL_STRONG:
+        // Only allow entry from this state
+        // Reset after entry or return to neutral
+        if (short_position_.status != PositionStatus::NONE ||
+            current_z < mean_reversion_cfg_.neutral_zone_threshold) {
+          short_phase_ = ReversionPhase::NEUTRAL;
+          overbought_max_z_ = 0.0;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Short reset | z:{:.2f} | position:{}",
+                current_z,
+                short_position_.status == PositionStatus::NONE ? "NONE"
+                                                               : "ACTIVE");
+          }
+        }
+        // Rising back to WEAK (reversal weakening)
+        else if (z_abs > adaptive_threshold *
+                             mean_reversion_cfg_.reversal_weak_multiplier) {
+          short_phase_ = ReversionPhase::REVERSAL_WEAK;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[MeanReversion] Short STRONG → WEAK (reversal weakening) | "
+                "z:{:.2f}",
+                current_z);
+          }
+        }
+        break;
+    }
+  }
+
+  // ========================================
   // Member variables
   // ========================================
   // Config parameters (grouped)
@@ -1276,6 +1719,7 @@ class MeanReversionMakerStrategy
   const TrendFilterConfig trend_cfg_;
   const ReversalMomentumConfig reversal_cfg_;
   const DebugLoggingConfig debug_cfg_;
+  const MeanReversionConfig mean_reversion_cfg_;
 
   // Z-score config (kept separate for module initialization)
   const int zscore_window_size_;
@@ -1286,8 +1730,6 @@ class MeanReversionMakerStrategy
   common::TickerId ticker_;
   FeatureEngineT::WallInfo bid_wall_info_;
   FeatureEngineT::WallInfo ask_wall_info_;
-  bool allow_long_entry_{false};
-  bool allow_short_entry_{false};
   PositionState long_position_;
   PositionState short_position_;
   BBO prev_bbo_;
@@ -1311,6 +1753,12 @@ class MeanReversionMakerStrategy
 
   // Reversal confirmation tracking
   double prev_z_score_{0.0};
+
+  // Mean reversion phase tracking (Simplified)
+  ReversionPhase long_phase_{ReversionPhase::NEUTRAL};
+  ReversionPhase short_phase_{ReversionPhase::NEUTRAL};
+  double oversold_min_z_{0.0};    // Minimum Z-Score reached in oversold
+  double overbought_max_z_{0.0};  // Maximum Z-Score reached in overbought
 
   // Throttling timestamp for orderbook updates
   uint64_t last_orderbook_check_time_{0};

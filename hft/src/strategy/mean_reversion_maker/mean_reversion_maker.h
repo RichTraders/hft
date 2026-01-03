@@ -44,7 +44,6 @@ struct EntryConfig {
   int obi_levels{5};
   int64_t position_size_raw{10};  // 0.01 * kQtyScale (1000)
   int64_t safety_margin_bps{5};   // 0.00005 = 0.5 bps
-  int64_t min_spread_bps{40};     // 0.0004 = 4 bps
 
   // Multi-Factor Scoring parameters (all scaled by kSignalScale=10000)
   int64_t min_signal_quality{6500};  // 0.65 * kSignalScale
@@ -352,9 +351,6 @@ class MeanReversionMakerStrategy
                 common::FixedPointConfig::kQtyScale),
             static_cast<int64_t>(
                 INI_CONFIG.get_double("entry", "safety_margin", 0.00005) *
-                common::kBpsScale),
-            static_cast<int64_t>(
-                INI_CONFIG.get_double("entry", "min_spread_filter", 0.0004) *
                 common::kBpsScale),
             // Multi-Factor Scoring (all * kSignalScale)
             static_cast<int64_t>(
@@ -1223,23 +1219,7 @@ class MeanReversionMakerStrategy
       return;
     }
 
-    // 6. Spread filter (in bps: 10000 = 100%)
-    int64_t spread_bps =
-        ((bbo->ask_price.value - bbo->bid_price.value) * common::kBpsScale) /
-        bbo->bid_price.value;
-    if (spread_bps < entry_cfg_.min_spread_bps) {
-      if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
-            "[Entry Block] Long | Spread too small | z:{} | spread:{} bps "
-            "< {} bps",
-            z_robust,
-            spread_bps,
-            entry_cfg_.min_spread_bps);
-      }
-      return;
-    }
-
-    // 7. Set position to PENDING state BEFORE sending order
+    // 6. Set position to PENDING state BEFORE sending order
     long_position_.status = PositionStatus::PENDING;
     long_position_.qty = entry_cfg_.position_size_raw;
     long_position_.entry_price = bbo->bid_price.value;
@@ -1391,23 +1371,7 @@ class MeanReversionMakerStrategy
       return;
     }
 
-    // 6. Spread filter (in bps: 10000 = 100%)
-    int64_t spread_bps =
-        ((bbo->ask_price.value - bbo->bid_price.value) * common::kBpsScale) /
-        bbo->bid_price.value;
-    if (spread_bps < entry_cfg_.min_spread_bps) {
-      if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
-            "[Entry Block] Short | Spread too small | z:{} | "
-            "spread:{} bps < {} bps",
-            z_robust,
-            spread_bps,
-            entry_cfg_.min_spread_bps);
-      }
-      return;
-    }
-
-    // 7. Set position to PENDING state BEFORE sending order
+    // 6. Set position to PENDING state BEFORE sending order
     short_position_.status = PositionStatus::PENDING;
     short_position_.qty = entry_cfg_.position_size_raw;
     short_position_.entry_price = bbo->ask_price.value;

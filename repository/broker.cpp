@@ -245,7 +245,7 @@ void Broker::on_subscribe(const std::string& str_msg, const WireMessage& msg,
       market_update_data_pool_->allocate(app_->create_market_data_message(msg));
 
   if (state_ == StreamState::kBuffering) {
-    if (data->type == kTrade) {
+    if (data->type != kMarket) {
       for (auto* market_data : data->data)
         market_data_pool_->deallocate(market_data);
       market_update_data_pool_->deallocate(data);
@@ -274,7 +274,7 @@ void Broker::on_subscribe(const std::string& str_msg, const WireMessage& msg,
   }
 
   // Skip gap check for trade events
-  if (data->type != kTrade) {
+  if (data->type == kMarket) {
     constexpr auto kMarketType =
         trading::get_market_type<SelectedMarketApp::ExchangeTraits>();
     trading::DepthValidationResult validation_result;
@@ -333,13 +333,19 @@ void Broker::on_heartbeat(const WireMessage& msg) const {
 }
 
 void Broker::recover_from_gap() {
+#ifdef ENABLE_WEBSOCKET
+  if (state_ == StreamState::kBuffering) {
+    log_producer_.info("[Broker] Gap detected, but already buffering mode.");
+    return;
+  }
+#endif
+
   log_producer_.error("[Broker] Recovering from gap...");
 
 #ifdef ENABLE_WEBSOCKET
   state_ = StreamState::kBuffering;
   buffered_events_.clear();
   first_buffered_update_id_ = 0;
-  update_index_ = 0;
 
   const std::string message =
       app_->create_snapshot_request_message(INI_CONFIG.get("meta", "ticker"),

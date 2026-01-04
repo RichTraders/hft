@@ -108,7 +108,7 @@ class WsMarketDataAppT {
 
     initialize_stream();
 
-    logger_.info("WsMarketDataApp started");
+    LOG_INFO(logger_, "WsMarketDataApp started");
     return true;
   }
 
@@ -130,7 +130,9 @@ class WsMarketDataAppT {
     if (msg.empty() || !api_transport_) {
       return false;
     }
-    logger_.info("[WsMarketDataApp] Sending message to api server :{}", msg);
+    LOG_INFO(logger_,
+        "[WsMarketDataApp] Sending message to api server :{}",
+        msg);
     return api_transport_->write(msg) >= 0;
   }
 
@@ -138,7 +140,9 @@ class WsMarketDataAppT {
     if (msg.empty() || !stream_transport_) {
       return false;
     }
-    logger_.info("[WsMarketDataApp] Sending message to stream server :{}", msg);
+    LOG_INFO(logger_,
+        "[WsMarketDataApp] Sending message to stream server :{}",
+        msg);
     return stream_transport_->write(msg) >= 0;
   }
 
@@ -150,8 +154,8 @@ class WsMarketDataAppT {
 #ifdef REPOSITORY
   void register_callback(std::function<void(const std::string&,
           const WireMessage&, const std::string&)>
-          cb) {
-    raw_data_callback_ = std::move(cb);
+          callback) {
+    raw_data_callback_ = std::move(callback);
   }
 #endif
 
@@ -235,7 +239,7 @@ class WsMarketDataAppT {
     const auto callback = callbacks_.find(std::string(type));
     if (callback == callbacks_.end() || !callback->second) {
 #ifndef REPOSITORY
-      logger_.warn("No callback registered for message type {}", type);
+      LOG_WARN(logger_, "No callback registered for message type {}", type);
 #endif
       return;
     }
@@ -288,7 +292,8 @@ class WsMarketDataAppT {
     }
 
     static constexpr int kMinimumLogPrintSize = 200;
-    logger_.trace("[WsMarketDataApp]Received stream payload (size: {}): {}...",
+    LOG_TRACE(logger_,
+        "[WsMarketDataApp]Received stream payload (size: {}): {}...",
         payload.size(),
         payload.substr(0,
             std::min<size_t>(kMinimumLogPrintSize, payload.size())));
@@ -330,7 +335,8 @@ class WsMarketDataAppT {
     }
 
     static constexpr int kMinimumLogPrintSize = 200;
-    logger_.info("[WsMarketDataApp]Received API payload (size: {}): {}...",
+    LOG_INFO(logger_,
+        "[WsMarketDataApp]Received API payload (size: {}): {}...",
         payload.size(),
         payload.substr(0,
             std::min<size_t>(kMinimumLogPrintSize, payload.size())));

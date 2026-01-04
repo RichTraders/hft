@@ -34,7 +34,7 @@ class SpotWsOeDecoder : public WsOeDecoderBase<SpotWsOeDecoder> {
     if (payload.empty()) {
       return WireMessage{};
     }
-    logger_.debug("[WsOeCore]payload :{}", payload);
+    LOG_DEBUG(logger_, "[WsOeCore]payload :{}", payload);
 
     if (payload.contains("executionReport")) {
       return this->decode_or_log<BinanceSpotOeTraits::ExecutionReportResponse,
@@ -56,10 +56,10 @@ class SpotWsOeDecoder : public WsOeDecoderBase<SpotWsOeDecoder> {
             header,
             payload);
     if (error_code != glz::error_code::none) {
-      logger_.error("Failed to decode payload");
+      LOG_ERROR(logger_, "Failed to decode payload");
       return WireMessage{};
     }
-    logger_.debug("[WsOeCore]header id :{}", header.id);
+    LOG_DEBUG(logger_, "[WsOeCore]header id :{}", header.id);
 
     if (header.id.starts_with("login_")) {
       return this->decode_or_log<BinanceSpotOeTraits::SessionLogonResponse,

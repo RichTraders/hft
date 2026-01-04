@@ -105,9 +105,8 @@ target_compile_definitions(BrokerCommon PUBLIC LOGGER_PREFIX_DISABLED)
 target_link_libraries(BrokerCommon
         PUBLIC
         absl::flat_hash_map
+        concurrentqueue
 )
-target_include_directories(BrokerCommon PRIVATE
-        ${CMAKE_SOURCE_DIR}/extern/concurrentqueue)
 ######################################
 
 # WebSocket Core for Repository (with REPOSITORY macro)
@@ -160,7 +159,7 @@ endif()
 ######################################
 
 set(CMAKE_CXX_STANDARD 20)
-add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+add_compile_options(-Wall -Wextra -Werror -Wno-pedantic)
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(-march=native)
 endif ()

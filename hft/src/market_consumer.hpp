@@ -84,12 +84,12 @@ class MarketConsumer
     register_handler("3", [this](auto&& msg) { on_reject(msg); });
     register_handler("5", [this](auto&& msg) { on_logout(msg); });
 
-    logger_.info("[Constructor] MarketConsumer Created");
+    LOG_INFO(logger_, "[Constructor] MarketConsumer Created");
   }
 
   void start() {
     if (!app_->start()) {
-      logger_.info("[MarketConsumer] Market Data Start");
+      LOG_INFO(logger_, "[MarketConsumer] Market Data Start");
     }
   }
 
@@ -131,16 +131,16 @@ class MarketConsumer
   }
 
   void on_snapshot(const WireMessage& msg) {
-    logger_.info("[MarketConsumer]Snapshot making start");
+    LOG_INFO(logger_, "[MarketConsumer]Snapshot making start");
 
     auto* snapshot_data = market_update_data_pool_->allocate(
         app_->create_snapshot_data_message(msg));
 
     if (UNLIKELY(snapshot_data == nullptr)) {
-      logger_.error(
+      LOG_ERROR(logger_,
           "[MarketConsumer] Market update data pool exhausted on snapshot");
 #ifdef ENABLE_WEBSOCKET
-      logger_.warn(
+      LOG_WARN(logger_,
           "[MarketConsumer] Clearing {} buffered events to free memory",
           buffered_events_.size());
       for (auto* buffered : buffered_events_) {
@@ -153,7 +153,7 @@ class MarketConsumer
 
       static constexpr int kMaxRetries = 3;
       if (++retry_count_ >= kMaxRetries) {
-        logger_.error(
+        LOG_ERROR(logger_,
             "[MarketConsumer] Failed to allocate snapshot after {} retries",
             kMaxRetries);
         app_->stop();
@@ -176,14 +176,14 @@ class MarketConsumer
     static constexpr int kMaxRetries = 3;
     if (state_ == StreamState::kBuffering) {
       if (snapshot_update_id < first_buffered_update_id_) {
-        logger_.warn(
+        LOG_WARN(logger_,
             "[MarketConsumer][Message]Snapshot too old, refetching "
             "snapshot:{}, buffered:{}",
             snapshot_update_id,
             first_buffered_update_id_);
 
         if (++retry_count_ >= kMaxRetries) {
-          logger_.error(
+          LOG_ERROR(logger_,
               "[MarketConsumer][Message]Failed to get valid snapshot "
               "after {} retries, terminating",
               kMaxRetries);
@@ -212,7 +212,7 @@ class MarketConsumer
     state_ = StreamState::kApplyingSnapshot;
     update_index_ = snapshot_update_id;
     if (UNLIKELY(!on_market_data_fn_(snapshot_data))) {
-      logger_.error("[MarketConsumer][Message] failed to send snapshot");
+      LOG_ERROR(logger_, "[MarketConsumer][Message] failed to send snapshot");
     }
 
 #ifdef ENABLE_WEBSOCKET
@@ -240,7 +240,7 @@ class MarketConsumer
         update_index_ = validation_result.new_update_index;
         on_market_data_fn_(buffered);
       } else {
-        logger_.error(
+        LOG_ERROR(logger_,
             "[MarketConsumer]Buffered event gap detected! Expected pu:{}, got "
             "pu:{}, start:{}, end:{}",
             update_index_,
@@ -250,7 +250,7 @@ class MarketConsumer
         buffered_events_.clear();
 
         if (++retry_count_ >= kMaxRetries) {
-          logger_.error(
+          LOG_ERROR(logger_,
               "[MarketConsumer][Message]Failed to recover from gap "
               "after {} retries, terminating",
               kMaxRetries);
@@ -267,7 +267,7 @@ class MarketConsumer
     first_depth_after_snapshot_ = true;
 #else
     if (UNLIKELY(snapshot_data == nullptr)) {
-      logger_.error("[Message] failed to create snapshot");
+      LOG_ERROR(logger_, "[Message] failed to create snapshot");
       resubscribe();
 
       for (auto& market_data : snapshot_data->data) {
@@ -279,7 +279,7 @@ class MarketConsumer
 #endif
 
     state_ = StreamState::kRunning;
-    logger_.info("[MarketConsumer]Snapshot Done");
+    LOG_INFO(logger_, "[MarketConsumer]Snapshot Done");
   }
 
   void on_subscribe(WireMessage msg) {
@@ -317,20 +317,23 @@ class MarketConsumer
 
   void on_reject(const WireMessage& msg) const {
     const auto rejected_message = app_->create_reject_message(msg);
-    logger_.error("[MarketConsumer][Message] {}", rejected_message.toString());
+    LOG_ERROR(logger_,
+        "[MarketConsumer][Message] {}",
+        rejected_message.toString());
     if (rejected_message.session_reject_reason == "A") {
       app_->stop();
     }
   }
 
   void on_logout(const WireMessage& /*msg*/) const {
-    logger_.info("[MarketConsumer][Message] logout");
+    LOG_INFO(logger_, "[MarketConsumer][Message] logout");
   }
 
   void on_instrument_list(const WireMessage& msg) const {
     const InstrumentInfo instrument_message =
         app_->create_instrument_list_message(msg);
-    logger_.info("[MarketConsumer][Message] on_instrument_list :{}",
+    LOG_INFO(logger_,
+        "[MarketConsumer][Message] on_instrument_list :{}",
         instrument_message.toString());
     on_instrument_info_fn_(instrument_message);
   }
@@ -338,7 +341,7 @@ class MarketConsumer
   void on_heartbeat(const WireMessage& msg) const {
     auto message = app_->create_heartbeat_message(msg);
     if (UNLIKELY(!app_->send(message))) {
-      logger_.error("[MarketConsumer][Message] failed to send heartbeat");
+      LOG_ERROR(logger_, "[MarketConsumer][Message] failed to send heartbeat");
     }
   }
 

@@ -22,7 +22,8 @@ RiskCheckResult RiskInfo::checkPreTradeRisk(const common::Side side,
     const common::QtyType qty, common::QtyType reserved_position,
     const common::Logger::Producer& logger) noexcept {
   if (qty.value > risk_cfg_.max_order_size_.value) {
-    logger.debug("[Risk]Order is too large [Desired:{}][Allow:{}]",
+    LOG_DEBUG(logger,
+        "[Risk]Order is too large [Desired:{}][Allow:{}]",
         qty.value,
         risk_cfg_.max_order_size_.value);
     return RiskCheckResult::kOrderTooLarge;
@@ -33,7 +34,7 @@ RiskCheckResult RiskInfo::checkPreTradeRisk(const common::Side side,
   if (current_position + reserved_position.value +
           sideToValue(side) * qty.value >
       risk_cfg_.max_position_.value) {
-    logger.debug(
+    LOG_DEBUG(logger,
         "[Risk]Maximum position allowed has been reached."
         "[Desired:{}][Current:{}][Working:{}][Allow:{}]",
         sideToValue(side) * qty.value,
@@ -45,7 +46,7 @@ RiskCheckResult RiskInfo::checkPreTradeRisk(const common::Side side,
   if (current_position + reserved_position.value +
           sideToValue(side) * qty.value <
       risk_cfg_.min_position_.value) {
-    logger.debug(
+    LOG_DEBUG(logger,
         "[Risk]Minimum position allowed has been reached."
         "[Desired:{}][Current:{}][Working:{}][Allow:{}]",
         sideToValue(side) * qty.value,
@@ -55,7 +56,7 @@ RiskCheckResult RiskInfo::checkPreTradeRisk(const common::Side side,
     return RiskCheckResult::kPositionTooSmall;
   }
   if (current_total_pnl < risk_cfg_.max_loss_) {
-    logger.debug(
+    LOG_DEBUG(logger,
         "[Risk]Maximum PnL allowed has been reached."
         "[Current:{}][Allow:{}]",
         current_total_pnl,
@@ -74,10 +75,10 @@ RiskManager::RiskManager(const common::Logger::Producer& logger,
   ticker_risk_[INI_CONFIG.get("meta", "ticker")] =
       RiskInfo(position_keeper->get_position_info(ticker),
           ticker_cfg.at(ticker).risk_cfg_);
-  logger_.info("[Constructor] RiskManager Created");
+  LOG_INFO(logger_, "[Constructor] RiskManager Created");
 }
 
 RiskManager::~RiskManager() {
-  logger_.info("[Destructor] RiskManager Destroy");
+  LOG_INFO(logger_, "[Destructor] RiskManager Destroy");
 }
 }  // namespace trading

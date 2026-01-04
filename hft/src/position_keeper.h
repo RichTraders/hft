@@ -17,10 +17,10 @@
 #include <string>
 
 #include "absl/container/flat_hash_map.h"
+#include "common/fixed_point_config.hpp"
 #include "common/ini_config.hpp"
 #include "common/logger.h"
 #include "common/types.h"
-#include "common/fixed_point_config.hpp"
 
 namespace trading {
 struct BBO;
@@ -46,19 +46,16 @@ struct PositionInfo {
   std::array<int64_t, common::sideToIndex(common::Side::kTrade)> open_vwap_{};
   int64_t volume_ = 0;
 
-  [[nodiscard]] int64_t get_position() const noexcept {
-    return position_;
-  }
-  [[nodiscard]] int64_t get_total_pnl() const noexcept {
-    return total_pnl_;
-  }
+  [[nodiscard]] int64_t get_position() const noexcept { return position_; }
+  [[nodiscard]] int64_t get_total_pnl() const noexcept { return total_pnl_; }
 
   [[nodiscard]] double get_position_double() const noexcept {
     return static_cast<double>(position_) / common::FixedPointConfig::kQtyScale;
   }
   [[nodiscard]] double get_total_pnl_double() const noexcept {
     return static_cast<double>(total_pnl_) /
-           (common::FixedPointConfig::kPriceScale * common::FixedPointConfig::kQtyScale);
+           (common::FixedPointConfig::kPriceScale *
+               common::FixedPointConfig::kQtyScale);
   }
 
   const BBO* bbo_ = nullptr;
@@ -77,10 +74,12 @@ class PositionKeeper {
   explicit PositionKeeper(const common::Logger::Producer& logger)
       : logger_(logger),
         ticker_position_{{INI_CONFIG.get("meta", "ticker"), PositionInfo{}}} {
-    logger_.info("[Constructor] PositionKeeper Created");
+    LOG_INFO(logger_, "[Constructor] PositionKeeper Created");
   }
   // NOLINTNEXTLINE(modernize-use-equals-default) - logs destruction
-  ~PositionKeeper() { logger_.info("[Destructor] PositionKeeper Destroy"); }
+  ~PositionKeeper() {
+    LOG_INFO(logger_, "[Destructor] PositionKeeper Destroy");
+  }
 
   void add_fill(const ExecutionReport* report) noexcept;
 

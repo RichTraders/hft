@@ -41,7 +41,7 @@ class FuturesWsOeDecoder : public WsOeDecoderBase<FuturesWsOeDecoder> {
     if (payload.size() < oe_decode::kMinPayloadLen) [[unlikely]] {
       return WireMessage{};
     }
-    logger_.debug("[WsOeCore]payload :{}", payload);
+    LOG_DEBUG(logger_, "[WsOeCore]payload :{}", payload);
 
     const char event_char = payload[oe_decode::kEventTypeOffset];
 

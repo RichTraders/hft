@@ -59,7 +59,7 @@ class BinanceFuturesOeEncoder {
         signature,
         ts_value);
 
-    logger_.info("[WsOeCore] session.logon 요청 생성");
+    LOG_INFO(logger_, "[WsOeCore] session.logon 요청 생성");
     return request;
   }
   [[nodiscard]] std::string create_log_out_message() const {
@@ -69,7 +69,7 @@ class BinanceFuturesOeEncoder {
         std::format(R"({{"id":"o{}","method":"session.logout","params":{{}}}})",
             timestamp);
 
-    logger_.info("[WsOeCore] session.logout 요청 생성");
+    LOG_INFO(logger_, "[WsOeCore] session.logout 요청 생성");
     return request;
   }
   [[nodiscard]] std::string create_heartbeat_message() const { return ""; }
@@ -86,9 +86,9 @@ class BinanceFuturesOeEncoder {
 
     const auto request_str = glz::write_json(request).value_or("error");
     if (UNLIKELY(request_str == "error")) {
-      logger_.error("[WsOeCore] userDataStream.start 요청 실패");
+      LOG_ERROR(logger_, "[WsOeCore] userDataStream.start 요청 실패");
     } else {
-      logger_.info("[WsOeCore] userDataStream.start 요청 생성");
+      LOG_INFO(logger_, "[WsOeCore] userDataStream.start 요청 생성");
     }
 
     return request_str;
@@ -101,9 +101,9 @@ class BinanceFuturesOeEncoder {
 
     const auto request_str = glz::write_json(request).value_or("error");
     if (UNLIKELY(request_str == "error")) {
-      logger_.error("[WsOeCore] userDataStream.stop 요청 실패");
+      LOG_ERROR(logger_, "[WsOeCore] userDataStream.stop 요청 실패");
     } else {
-      logger_.info("[WsOeCore] userDataStream.stop 요청 생성");
+      LOG_INFO(logger_, "[WsOeCore] userDataStream.stop 요청 생성");
     }
 
     return request_str;
@@ -116,9 +116,9 @@ class BinanceFuturesOeEncoder {
 
     const auto request_str = glz::write_json(request).value_or("error");
     if (UNLIKELY(request_str == "error")) {
-      logger_.error("[WsOeCore] userDataStream.ping 요청 실패");
+      LOG_ERROR(logger_, "[WsOeCore] userDataStream.ping 요청 실패");
     } else {
-      logger_.trace("[WsOeCore] userDataStream.ping 요청 생성");
+      LOG_TRACE(logger_, "[WsOeCore] userDataStream.ping 요청 생성");
     }
 
     return request_str;

@@ -93,22 +93,22 @@ void benchmark_baseline_double(const std::vector<std::string>& lines,
   size_t snapshot_count = 0;
 
   for (const auto& line : lines) {
-    const auto e2e_start = common::rdtsc();
+    const auto e2e_start = common::rdtsc_start();
 
     // DECODE
-    const auto decode_start = common::rdtsc();
+    const auto decode_start = common::rdtsc_start();
     const WireMessage wire_msg = md_core.decode(line);
-    decode_stats.record(common::rdtsc() - decode_start);
+    decode_stats.record(common::rdtsc_end() - decode_start);
 
     // DISPATCH
     std::string_view msg_type;
-    const auto dispatch_start = common::rdtsc();
+    const auto dispatch_start = common::rdtsc_start();
     BinanceDispatchRouter::process_message<BinanceFuturesTraits>(wire_msg,
         [&msg_type](std::string_view type) { msg_type = type; });
-    dispatch_stats.record(common::rdtsc() - dispatch_start);
+    dispatch_stats.record(common::rdtsc_end() - dispatch_start);
 
     // CONVERT
-    const auto convert_start = common::rdtsc();
+    const auto convert_start = common::rdtsc_start();
     if (msg_type == "X") {
       auto result = md_core.create_market_data_message(wire_msg);
       (void)result;
@@ -122,9 +122,9 @@ void benchmark_baseline_double(const std::vector<std::string>& lines,
       (void)result;
       snapshot_count++;
     }
-    convert_stats.record(common::rdtsc() - convert_start);
+    convert_stats.record(common::rdtsc_end() - convert_start);
 
-    e2e_stats.record(common::rdtsc() - e2e_start);
+    e2e_stats.record(common::rdtsc_end() - e2e_start);
   }
 
   printf("\n=== Baseline (double) ===\n");
@@ -157,22 +157,22 @@ void benchmark_fixedpoint_via_double(const std::vector<std::string>& lines,
   size_t snapshot_count = 0;
 
   for (const auto& line : lines) {
-    const auto e2e_start = common::rdtsc();
+    const auto e2e_start = common::rdtsc_start();
 
     // DECODE (same as baseline - glaze → double)
-    const auto decode_start = common::rdtsc();
+    const auto decode_start = common::rdtsc_start();
     const WireMessage wire_msg = md_core.decode(line);
-    decode_stats.record(common::rdtsc() - decode_start);
+    decode_stats.record(common::rdtsc_end() - decode_start);
 
     // DISPATCH
     std::string_view msg_type;
-    const auto dispatch_start = common::rdtsc();
+    const auto dispatch_start = common::rdtsc_start();
     BinanceDispatchRouter::process_message<BinanceFuturesTraits>(wire_msg,
         [&msg_type](std::string_view type) { msg_type = type; });
-    dispatch_stats.record(common::rdtsc() - dispatch_start);
+    dispatch_stats.record(common::rdtsc_end() - dispatch_start);
 
     // CONVERT (with additional double → FixedPoint conversion)
-    const auto convert_start = common::rdtsc();
+    const auto convert_start = common::rdtsc_start();
     if (msg_type == "X") {
       // Visit depth or trade and convert to FixedPoint
       std::visit(
@@ -223,9 +223,9 @@ void benchmark_fixedpoint_via_double(const std::vector<std::string>& lines,
           },
           wire_msg);
     }
-    convert_stats.record(common::rdtsc() - convert_start);
+    convert_stats.record(common::rdtsc_end() - convert_start);
 
-    e2e_stats.record(common::rdtsc() - e2e_start);
+    e2e_stats.record(common::rdtsc_end() - e2e_start);
   }
 
   printf("\n=== FixedPoint (via double) ===\n");
@@ -311,14 +311,14 @@ void benchmark_fixedpoint_direct(const std::vector<std::string>& lines,
       price_qty_pairs.size(), depth_count, trade_count, snapshot_count);
 
   // Now benchmark direct string → FixedPoint conversion
-  const auto parse_start = common::rdtsc();
+  const auto parse_start = common::rdtsc_start();
   for (const auto& [price_str, qty_str] : price_qty_pairs) {
     FixedPrice price = FixedPrice::from_string(price_str.c_str(), price_str.size());
     FixedQty qty = FixedQty::from_string(qty_str.c_str(), qty_str.size());
     (void)price;
     (void)qty;
   }
-  const auto parse_end = common::rdtsc();
+  const auto parse_end = common::rdtsc_end();
 
   uint64_t total_cycles = parse_end - parse_start;
   uint64_t avg_cycles = price_qty_pairs.empty() ? 0 : total_cycles / price_qty_pairs.size();
@@ -328,14 +328,14 @@ void benchmark_fixedpoint_direct(const std::vector<std::string>& lines,
       static_cast<unsigned long long>(avg_cycles));
 
   // Compare with double parsing
-  const auto double_start = common::rdtsc();
+  const auto double_start = common::rdtsc_start();
   for (const auto& [price_str, qty_str] : price_qty_pairs) {
     double price = std::strtod(price_str.c_str(), nullptr);
     double qty = std::strtod(qty_str.c_str(), nullptr);
     (void)price;
     (void)qty;
   }
-  const auto double_end = common::rdtsc();
+  const auto double_end = common::rdtsc_end();
 
   uint64_t double_total = double_end - double_start;
   uint64_t double_avg = price_qty_pairs.empty() ? 0 : double_total / price_qty_pairs.size();
@@ -390,20 +390,20 @@ void benchmark_arithmetic(const std::vector<std::string>& lines) {
 
   // Double arithmetic
   volatile double double_sum = 0;
-  const auto double_start = common::rdtsc();
+  const auto double_start = common::rdtsc_start();
   for (const auto& [price, qty] : double_pairs) {
     double_sum += price * qty;
   }
-  const auto double_end = common::rdtsc();
+  const auto double_end = common::rdtsc_end();
 
   // FixedPoint arithmetic
   volatile int64_t fixed_sum = 0;
-  const auto fixed_start = common::rdtsc();
+  const auto fixed_start = common::rdtsc_start();
   for (const auto& [price, qty] : fixed_pairs) {
     auto result = price * qty;
     fixed_sum += result.raw_value;
   }
-  const auto fixed_end = common::rdtsc();
+  const auto fixed_end = common::rdtsc_end();
 
   uint64_t double_cycles = double_end - double_start;
   uint64_t fixed_cycles = fixed_end - fixed_start;

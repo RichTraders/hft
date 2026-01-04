@@ -35,11 +35,11 @@ FixOeCore::FixOeCore(SendId sender_comp_id, TargetId target_comp_id,
       response_manager_(response_manager),
       qty_precision_(INI_CONFIG.get_int("meta", "qty_precision")),
       price_precision_(INI_CONFIG.get_int("meta", "price_precision")) {
-  logger_.info("[Constructor] FixOeCore Created");
+  LOG_INFO(logger_, "[Constructor] FixOeCore Created");
 }
 
 FixOeCore::~FixOeCore() {
-  logger_.info("[Destructor] FixOeCore Destroy");
+  LOG_INFO(logger_, "[Destructor] FixOeCore Destroy");
 }
 
 std::string FixOeCore::create_log_on_message(const std::string& sig_b64,

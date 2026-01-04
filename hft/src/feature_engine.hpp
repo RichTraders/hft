@@ -16,9 +16,9 @@
 #include <cmath>
 #include <vector>
 
+#include "common/fixed_point_config.hpp"
 #include "common/logger.h"
 #include "common/types.h"
-#include "common/fixed_point_config.hpp"
 #include "core/market_data.h"
 #include "order_book.hpp"
 
@@ -30,9 +30,8 @@ class FeatureEngine {
       : logger_(logger),
         vwap_size_(INI_CONFIG.get_int("strategy", "vwap_size", kVwapSize)),
         vwap_qty_raw_(vwap_size_),
-        vwap_price_raw_(vwap_size_)
-  {
-    logger_.info("[Constructor] FeatureEngine Created");
+        vwap_price_raw_(vwap_size_) {
+    LOG_INFO(logger_, "[Constructor] FeatureEngine Created");
   }
 
   ~FeatureEngine() { std::cout << "[Destructor] FeatureEngine Destroy\n"; }
@@ -64,7 +63,8 @@ class FeatureEngine {
     }
     vwap_index_++;
 
-    logger_.trace("[Updated] {} mkt-price:{} agg-trade-ratio:{}",
+    LOG_TRACE(logger_,
+        "[Updated] {} mkt-price:{} agg-trade-ratio:{}",
         market_update->toString(),
         get_market_price_double(),
         agg_trade_qty_ratio_);
@@ -96,7 +96,8 @@ class FeatureEngine {
       spread_raw_ = bbo->ask_price.value - bbo->bid_price.value;
     }
 
-    logger_.trace("[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
+    LOG_TRACE(logger_,
+        "[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
         common::toString(price),
         common::toString(side),
         get_market_price_double(),
@@ -111,10 +112,12 @@ class FeatureEngine {
       num += level[index].price_raw * level[index].qty_raw;
       den += level[index].qty_raw;
     }
-    if (den <= 0) return common::kPriceInvalid;
+    if (den <= 0)
+      return common::kPriceInvalid;
     // Result is in price_scale (price*qty/qty = price)
     // NOLINTNEXTLINE(bugprone-integer-division) - intentional integer division for VWAP
-    return static_cast<double>(num / den) / common::FixedPointConfig::kPriceScale;
+    return static_cast<double>(num / den) /
+           common::FixedPointConfig::kPriceScale;
   }
 
   // OBI range: [-kObiScale, +kObiScale] representing [-1.0, +1.0]
@@ -162,7 +165,9 @@ class FeatureEngine {
     return (diff * kObiScale) / total;
   }
 
-  [[nodiscard]] int64_t get_market_price() const noexcept { return mkt_price_raw_; }
+  [[nodiscard]] int64_t get_market_price() const noexcept {
+    return mkt_price_raw_;
+  }
   [[nodiscard]] int64_t get_mid_price() const noexcept {
     return (book_ticker_raw_.bid_price + book_ticker_raw_.ask_price) / 2;
   }
@@ -173,7 +178,8 @@ class FeatureEngine {
   [[nodiscard]] int64_t get_vwap() const noexcept { return vwap_raw_; }
 
   [[nodiscard]] double get_market_price_double() const noexcept {
-    return static_cast<double>(mkt_price_raw_) / common::FixedPointConfig::kPriceScale;
+    return static_cast<double>(mkt_price_raw_) /
+           common::FixedPointConfig::kPriceScale;
   }
 
   [[nodiscard]] auto get_agg_trade_qty_ratio() const noexcept {

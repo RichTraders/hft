@@ -223,7 +223,6 @@ class TradeEngine {
       while (queue_->dequeue(message) && md_processed < kMarketDataBatchLimit) {
         if (UNLIKELY(message == nullptr))
           continue;
-        wait.reset();
         START_MEASURE(MAKE_ORDERBOOK_ALL);
         for (const auto* market_data : message->data) {
           START_MEASURE(MAKE_ORDERBOOK_UNIT);
@@ -244,7 +243,6 @@ class TradeEngine {
       ResponseCommon response;
       while (response_queue_->dequeue(response) &&
              resp_processed < kResponseBatchLimit) {
-        wait.reset();
         START_MEASURE(RESPONSE_COMMON);
         switch (response.res_type) {
           case ResponseType::kExecutionReport:
@@ -270,7 +268,9 @@ class TradeEngine {
         ++resp_processed;
       }
 
-      if (md_processed == 0 && resp_processed == 0) {
+      if (md_processed > 0 || resp_processed > 0) {
+        wait.reset();
+      } else {
         wait.idle_hot();
       }
     }

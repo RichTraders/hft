@@ -154,8 +154,8 @@ class WsMarketDataAppT {
 #ifdef REPOSITORY
   void register_callback(std::function<void(const std::string&,
           const WireMessage&, const std::string&)>
-          cb) {
-    raw_data_callback_ = std::move(cb);
+          callback) {
+    raw_data_callback_ = std::move(callback);
   }
 #endif
 

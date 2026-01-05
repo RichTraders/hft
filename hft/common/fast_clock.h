@@ -30,9 +30,8 @@ struct FastClock {
   uint64_t last_cycle;
   uint64_t last_epoch;
 
-  FastClock(double cpu_hz, unsigned interval_h)
-      : recal_cycles(
-            static_cast<uint64_t>(cpu_hz * kHourToSeconds * interval_h)),
+  FastClock(double cpu_hz, unsigned interval_sec)
+      : recal_cycles(static_cast<uint64_t>(cpu_hz * interval_sec)),
         inv_f(kGhz / cpu_hz),
         last_cycle(rdtsc()),
         last_epoch(std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -51,8 +50,8 @@ struct FastClock {
       cycle_diff = 0;
     }
 
-    const auto dt_ns = std::llround(
-        inv_f * cycle_diff);  //NOLINT(bugprone-narrowing-conversions)
+    // NOLINTNEXTLINE(bugprone-narrowing-conversions)
+    const auto dt_ns = static_cast<uint64_t>(inv_f * cycle_diff);
     return last_epoch + dt_ns;
   }
 };

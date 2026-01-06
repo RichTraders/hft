@@ -454,27 +454,12 @@ class MarketOrderBook final {
   auto on_market_data_updated(const MarketData* market_update) noexcept
       -> void {
 
-    const int64_t max_price_raw = config_.max_price_int;
-    const int64_t min_price_raw = config_.min_price_int;
-
-    if (market_update->price.value > max_price_raw ||
-        market_update->price.value < min_price_raw) {
-      logger_.error("common::Price[{}] is invalid (range: {} ~ {})",
-          market_update->price.to_double(),
-          static_cast<double>(min_price_raw) /
-              common::FixedPointConfig::kPriceScale,
-          static_cast<double>(max_price_raw) /
-              common::FixedPointConfig::kPriceScale);
-      return;
-    }
-
-    const int idx = config_.price_to_index(market_update->price);
-    const auto qty = market_update->qty;
-
+    // Handle update types that don't require price validation first
     switch (market_update->type) {
       case common::MarketUpdateType::kInvalid:
         logger_.error("error in market update data");
-        break;
+        return;
+
       case common::MarketUpdateType::kClear: {
         for (int i = 0; i < config_.bucket_count; ++i) {
           if (bid_buckets_[i]) {
@@ -495,6 +480,62 @@ class MarketOrderBook final {
         logger_.info("Cleared all market data.");
         return;
       }
+
+      case common::MarketUpdateType::kBookTicker: {
+        if (LIKELY(trade_engine_)) {
+          trade_engine_->on_book_ticker_updated(market_update);
+        }
+        return;
+      }
+
+      case common::MarketUpdateType::kTrade: {
+        if (LIKELY(trade_engine_)) {
+          trade_engine_->on_trade_updated(market_update, this);
+        }
+
+        // Trade updates still need price validation for trade_order
+        const int64_t max_price_raw = config_.max_price_int;
+        const int64_t min_price_raw = config_.min_price_int;
+
+        if (market_update->price.value > max_price_raw ||
+            market_update->price.value < min_price_raw) {
+          logger_.error("common::Price[{}] is invalid for trade (range: {} ~ {})",
+              market_update->price.to_double(),
+              static_cast<double>(min_price_raw) /
+                  common::FixedPointConfig::kPriceScale,
+              static_cast<double>(max_price_raw) /
+                  common::FixedPointConfig::kPriceScale);
+          return;
+        }
+
+        const int idx = config_.price_to_index(market_update->price);
+        trade_order(market_update, idx);
+        return;
+      }
+
+      default:
+        break;
+    }
+
+    // Validate price for order book updates (kAdd, kModify, kCancel)
+    const int64_t max_price_raw = config_.max_price_int;
+    const int64_t min_price_raw = config_.min_price_int;
+
+    if (market_update->price.value > max_price_raw ||
+        market_update->price.value < min_price_raw) {
+      logger_.error("common::Price[{}] is invalid (range: {} ~ {})",
+          market_update->price.to_double(),
+          static_cast<double>(min_price_raw) /
+              common::FixedPointConfig::kPriceScale,
+          static_cast<double>(max_price_raw) /
+              common::FixedPointConfig::kPriceScale);
+      return;
+    }
+
+    const int idx = config_.price_to_index(market_update->price);
+    const auto qty = market_update->qty;
+
+    switch (market_update->type) {
       case common::MarketUpdateType::kAdd:
       case common::MarketUpdateType::kModify: {
         add_order(market_update, idx, qty);
@@ -504,20 +545,9 @@ class MarketOrderBook final {
         delete_order(market_update, idx);
         break;
       }
-      case common::MarketUpdateType::kTrade: {
-        if (LIKELY(trade_engine_)) {
-          trade_engine_->on_trade_updated(market_update, this);
-        }
-
-        trade_order(market_update, idx);
+      default:
+        // Already handled above
         return;
-      }
-      case common::MarketUpdateType::kBookTicker: {
-        if (LIKELY(trade_engine_)) {
-          trade_engine_->on_book_ticker_updated(market_update);
-        }
-        return;
-      }
     }
 
     logger_.trace("[Updated] {} {}",

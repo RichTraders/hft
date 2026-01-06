@@ -32,6 +32,29 @@ struct MarketData;
 
 namespace trading {
 
+// === Phase Tracking ===
+enum class MarketPhase {
+  NEUTRAL,   // 횡보
+  BUILDING,  // 압력 형성 중
+  DEEP,      // 극단적 압력
+  WEAK,      // 압력 약화 시작
+  VERY_WEAK  // 진입 가능 (거의 반전)
+};
+
+struct PhaseState {
+  MarketPhase long_phase{MarketPhase::NEUTRAL};
+  MarketPhase short_phase{MarketPhase::NEUTRAL};
+  int64_t peak_z{0};
+  uint64_t phase_entry_time{0};
+};
+
+// === Multi-timeframe Z-scores ===
+struct ZScores {
+  int64_t z_fast;
+  int64_t z_mid;
+  int64_t z_slow;
+};
+
 // === Strategy Configuration Structures (int64_t version) ===
 struct WallDetectionConfig {
   int64_t max_distance_bps{
@@ -48,20 +71,16 @@ struct EntryConfig {
 
   // Multi-Factor Scoring parameters (all scaled by kSignalScale=10000)
   int64_t min_signal_quality{6500};  // 0.65 * kSignalScale
-  int64_t zscore_weight{3500};       // 0.35 * kSignalScale
-  int64_t wall_weight{3000};         // 0.30 * kSignalScale
-  int64_t obi_weight{1500};          // 0.15 * kSignalScale
-
-  // Z-score normalization (scaled by kZScoreScale=10000)
-  int64_t zscore_norm_min{20000};  // 2.0 * kZScoreScale
-  int64_t zscore_norm_max{30000};  // 3.0 * kZScoreScale
+  int64_t wall_weight{6000};         // 0.60 * kSignalScale
+  int64_t obi_weight{4000};          // 0.40 * kSignalScale
 
   // Wall normalization (scaled by kSignalScale)
-  int64_t wall_norm_multiplier{20000};  // 2.0 * kSignalScale
+  int64_t wall_norm_multiplier{30000};  // 3.0 * kSignalScale
 
   // OBI normalization (scaled by kObiScale=10000)
-  int64_t obi_norm_min{500};   // 0.05 * kObiScale
-  int64_t obi_norm_max{2500};  // 0.25 * kObiScale
+  // INVERTED: closer to 0 (neutral) = higher score
+  int64_t obi_norm_min{0};     // 0.0 * kObiScale (neutral start)
+  int64_t obi_norm_max{1500};  // 0.15 * kObiScale (entry threshold)
 
   // Z-score retention ratio for SHORT entry (0.8 = 80%)
   int64_t short_zscore_min_ratio{8000};  // 0.8 * kSignalScale
@@ -81,8 +100,7 @@ struct ExitConfig {
   bool cancel_on_wall_decay{true};
 
   // Active exit conditions (profit-taking)
-  int64_t zscore_exit_threshold{5000};  // 0.5 * kZScoreScale
-  int64_t obi_exit_threshold{5000};     // 0.5 * kObiScale (0.3 → 0.5)
+  int64_t obi_exit_threshold{5000};  // 0.5 * kObiScale (0.3 → 0.5)
 
   // Multi-timeframe exit alignment: neutral zone threshold
   // Exit when all timeframes enter neutral zone (|z| < threshold)
@@ -93,10 +111,10 @@ struct ExitConfig {
   int64_t min_exit_quality{6500};  // 0.65 * kSignalScale
 
   // Component weights (must sum to kSignalScale=10000)
-  int64_t z_reversion_weight{4000};   // 40% (가장 중요)
-  int64_t obi_reversal_weight{3000};  // 30%
-  int64_t wall_decay_weight{2000};    // 20%
-  int64_t time_weight{1000};          // 10%
+  // Phase tracking handles Z-score reversion, so exit score uses OBI/Wall/Time only
+  int64_t obi_reversal_weight{5000};  // 50%
+  int64_t wall_decay_weight{3000};    // 30%
+  int64_t time_weight{2000};          // 20%
 
   // Soft time limit ratio (50% of max_hold_time)
   int64_t soft_time_ratio{5000};  // 0.5 * kSignalScale
@@ -159,8 +177,6 @@ struct NormalizationConfig {
  * - composite() = weighted average of all components
  */
 struct SignalScore {
-  int64_t z_score_strength{
-      0};                    // [0, kSignalScale]: Z-score magnitude normalized
   int64_t wall_strength{0};  // [0, kSignalScale]: Wall size vs threshold
   int64_t obi_strength{0};   // [0, kSignalScale]: Orderbook imbalance alignment
 
@@ -174,9 +190,7 @@ struct SignalScore {
    * result is [0, kSignalScale]
    */
   [[nodiscard]] int64_t composite(const EntryConfig& cfg) const {
-    return (cfg.zscore_weight * z_score_strength +
-               cfg.wall_weight * wall_strength +
-               cfg.obi_weight * obi_strength) /
+    return (cfg.wall_weight * wall_strength + cfg.obi_weight * obi_strength) /
            common::kSignalScale;
   }
 
@@ -211,7 +225,7 @@ struct SignalScore {
  */
 struct ExitScore {
   // === Scored signals [0, kSignalScale] ===
-  int64_t z_reversion_strength{0};   // Z-score 회귀 강도
+  // Z-score reversion is handled by Phase tracking (DEEP check)
   int64_t obi_reversal_strength{0};  // OBI 반전 강도
   int64_t wall_decay_strength{0};    // 벽 약화 강도
   int64_t time_pressure{0};          // 시간 압박 강도
@@ -222,8 +236,9 @@ struct ExitScore {
    * @return Composite exit score [0, kSignalScale]
    */
   [[nodiscard]] int64_t composite(const ExitConfig& cfg) const {
-    return (cfg.z_reversion_weight * z_reversion_strength +
-               cfg.obi_reversal_weight * obi_reversal_strength +
+    // Phase tracking handles Z-score reversion
+    // Composite uses OBI/Wall/Time only
+    return (cfg.obi_reversal_weight * obi_reversal_strength +
                cfg.wall_decay_weight * wall_decay_strength +
                cfg.time_weight * time_pressure) /
            common::kSignalScale;
@@ -423,28 +438,19 @@ class MeanReversionMakerStrategy
                 INI_CONFIG.get_double("entry", "min_signal_quality", 0.65) *
                 common::kSignalScale),
             static_cast<int64_t>(
-                INI_CONFIG.get_double("entry", "zscore_weight", 0.35) *
+                INI_CONFIG.get_double("entry", "wall_weight", 0.60) *
                 common::kSignalScale),
             static_cast<int64_t>(
-                INI_CONFIG.get_double("entry", "wall_weight", 0.30) *
+                INI_CONFIG.get_double("entry", "obi_weight", 0.40) *
                 common::kSignalScale),
             static_cast<int64_t>(
-                INI_CONFIG.get_double("entry", "obi_weight", 0.15) *
+                INI_CONFIG.get_double("entry", "wall_norm_multiplier", 3.0) *
                 common::kSignalScale),
             static_cast<int64_t>(
-                INI_CONFIG.get_double("entry", "zscore_norm_min", 2.0) *
-                common::kZScoreScale),
-            static_cast<int64_t>(
-                INI_CONFIG.get_double("entry", "zscore_norm_max", 3.0) *
-                common::kZScoreScale),
-            static_cast<int64_t>(
-                INI_CONFIG.get_double("entry", "wall_norm_multiplier", 2.0) *
-                common::kSignalScale),
-            static_cast<int64_t>(
-                INI_CONFIG.get_double("entry", "obi_norm_min", 0.05) *
+                INI_CONFIG.get_double("entry", "obi_norm_min", 0.0) *
                 common::kObiScale),
             static_cast<int64_t>(
-                INI_CONFIG.get_double("entry", "obi_norm_max", 0.25) *
+                INI_CONFIG.get_double("entry", "obi_norm_max", 0.15) *
                 common::kObiScale),
             static_cast<int64_t>(
                 INI_CONFIG.get_double("entry", "short_zscore_min_ratio", 0.8) *
@@ -470,9 +476,6 @@ class MeanReversionMakerStrategy
                                  common::kBpsScale),
             INI_CONFIG.get("exit", "cancel_on_wall_decay", "true") == "true",
             static_cast<int64_t>(
-                INI_CONFIG.get_double("exit", "zscore_exit_threshold", 0.5) *
-                common::kZScoreScale),
-            static_cast<int64_t>(
                 INI_CONFIG.get_double("exit", "obi_exit_threshold", 0.5) *
                 common::kObiScale),
             static_cast<int64_t>(
@@ -483,16 +486,13 @@ class MeanReversionMakerStrategy
                 INI_CONFIG.get_double("exit", "min_exit_quality", 0.65) *
                 common::kSignalScale),
             static_cast<int64_t>(
-                INI_CONFIG.get_double("exit", "z_reversion_weight", 0.40) *
+                INI_CONFIG.get_double("exit", "obi_reversal_weight", 0.50) *
                 common::kSignalScale),
             static_cast<int64_t>(
-                INI_CONFIG.get_double("exit", "obi_reversal_weight", 0.30) *
+                INI_CONFIG.get_double("exit", "wall_decay_weight", 0.30) *
                 common::kSignalScale),
             static_cast<int64_t>(
-                INI_CONFIG.get_double("exit", "wall_decay_weight", 0.20) *
-                common::kSignalScale),
-            static_cast<int64_t>(
-                INI_CONFIG.get_double("exit", "time_weight", 0.10) *
+                INI_CONFIG.get_double("exit", "time_weight", 0.20) *
                 common::kSignalScale),
             static_cast<int64_t>(
                 INI_CONFIG.get_double("exit", "soft_time_ratio", 0.5) *
@@ -792,8 +792,7 @@ class MeanReversionMakerStrategy
     // Entry is now gated by mean reversion state (REVERSAL_DETECTED)
     // Wall is checked AFTER reversal is detected
 
-    // === 4. Position exit monitoring (stop loss) ===
-    check_position_exit(order_book);
+    // Position exit monitoring is now handled in on_trade_updated for faster response
   }
 
   // ========================================
@@ -802,12 +801,6 @@ class MeanReversionMakerStrategy
   void on_trade_updated(const MarketData* market_data,
       MarketOrderBookT* order_book) noexcept {
     const auto* current_bbo = order_book->get_bbo();
-
-    if (debug_cfg_.log_entry_exit) {
-      this->logger_.info("[on_trade_updated] price:{} qty:{}",
-          market_data->price.value,
-          market_data->qty.value);
-    }
 
     // BBO validation
     if (!is_bbo_valid(current_bbo)) {
@@ -839,19 +832,18 @@ class MeanReversionMakerStrategy
     // Handle adverse selection detection
     handle_adverse_selection(get_current_time_ns(), market_data->price.value);
 
-    // Check timeframe alignments
-    bool long_momentum_weak = check_long_momentum_weakening(zscores.z_slow,
-        zscores.z_mid,
-        zscores.z_fast);
-    bool short_momentum_weak = check_short_momentum_weakening(zscores.z_slow,
-        zscores.z_mid,
-        zscores.z_fast);
+    // Update phase tracking (use volatility-adaptive threshold)
+    int64_t adaptive =
+        robust_zscore_mid_->get_adaptive_threshold(zscore_mid_threshold_);
+    update_short_phase(zscores, adaptive);
+    update_long_phase(zscores, adaptive);
 
-    // Try LONG entry if SHORT momentum weakening
-    if (short_momentum_weak) {
+    // Try LONG entry if SHORT phase is VERY_WEAK
+    if (phase_state_.short_phase == MarketPhase::VERY_WEAK) {
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
-            "[short_momentum_weak] z_fast:{} z_mid:{} z_slow:{} | bid_wall:{} "
+            "[SHORT Phase VERY_WEAK] z_fast:{} z_mid:{} z_slow:{} | "
+            "bid_wall:{} "
             "| long_pos:{}",
             zscores.z_fast,
             zscores.z_mid,
@@ -861,13 +853,17 @@ class MeanReversionMakerStrategy
       }
 
       try_long_entry(market_data, order_book, current_bbo, zscores);
+
+      // Reset phase after entry attempt
+      phase_state_.short_phase = MarketPhase::NEUTRAL;
     }
 
-    // Try SHORT entry if LONG momentum weakening
-    if (long_momentum_weak) {
+    // Try SHORT entry if LONG phase is VERY_WEAK
+    if (phase_state_.long_phase == MarketPhase::VERY_WEAK) {
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
-            "[long_momentum_weak] z_fast:{} z_mid:{} z_slow:{} | ask_wall:{} | "
+            "[LONG Phase VERY_WEAK] z_fast:{} z_mid:{} z_slow:{} | ask_wall:{} "
+            "| "
             "short_pos:{}",
             zscores.z_fast,
             zscores.z_mid,
@@ -877,11 +873,13 @@ class MeanReversionMakerStrategy
       }
 
       try_short_entry(market_data, order_book, current_bbo, zscores);
+
+      // Reset phase after entry attempt
+      phase_state_.long_phase = MarketPhase::NEUTRAL;
     }
 
-    if (debug_cfg_.log_entry_exit) {
-      this->logger_.info("[on_trade_updated] Completed");
-    }
+    // Check position exit after phase updates
+    check_position_exit(market_data, order_book, current_bbo, zscores);
 
     // Save state for next tick
     prev_bbo_ = *current_bbo;
@@ -962,13 +960,38 @@ class MeanReversionMakerStrategy
                 actual_position);
 
             if (actual_position > 0) {
-              emergency_exit(common::Side::kSell,
+              // CRITICAL FIX: Update position qty BEFORE calling emergency_exit
+              long_position_.qty = actual_position;
+              long_position_.entry_price = report->avg_price.value;
+
+              auto order_ids = emergency_exit(common::Side::kSell,
                   report->avg_price.value,
                   "Late fill");
-            }
 
-            long_position_.status = PositionStatus::NONE;
-            long_position_.pending_order_id.reset();
+              // Track the liquidation order
+              if (!order_ids.empty()) {
+                long_position_.pending_order_id = order_ids[0];
+                long_position_.status = PositionStatus::PENDING;
+
+                this->logger_.info(
+                    "[LATE FILL] Emergency liquidation order sent | "
+                    "order_id:{} | qty:{} | price:{}",
+                    common::toString(order_ids[0]),
+                    actual_position,
+                    report->avg_price.value);
+              } else {
+                // Failed to send liquidation order - force reset
+                this->logger_.error(
+                    "[LATE FILL] Emergency liquidation FAILED | "
+                    "resetting position state");
+                long_position_.status = PositionStatus::NONE;
+                long_position_.pending_order_id.reset();
+              }
+            } else {
+              // No actual position, just reset state
+              long_position_.status = PositionStatus::NONE;
+              long_position_.pending_order_id.reset();
+            }
           }
         }
         // Late fill case: NONE → ACTIVE (cancelled order filled after timeout)
@@ -982,10 +1005,27 @@ class MeanReversionMakerStrategy
               common::toString(report->cl_order_id),
               actual_position);
 
-          emergency_exit(common::Side::kSell,
+          // CRITICAL FIX: Update position qty BEFORE calling emergency_exit
+          long_position_.qty = actual_position;
+          long_position_.entry_price = report->avg_price.value;
+
+          auto order_ids = emergency_exit(common::Side::kSell,
               report->avg_price.value,
               "Late fill - no pending");
-          long_position_.status = PositionStatus::NONE;
+
+          if (!order_ids.empty()) {
+            long_position_.pending_order_id = order_ids[0];
+            long_position_.status = PositionStatus::PENDING;
+
+            this->logger_.info(
+                "[LATE FILL - No Pending] Emergency liquidation order sent | "
+                "order_id:{} | qty:{}",
+                common::toString(order_ids[0]),
+                actual_position);
+          } else {
+            long_position_.status = PositionStatus::NONE;
+            long_position_.pending_order_id.reset();
+          }
         }
       }
 
@@ -1034,13 +1074,38 @@ class MeanReversionMakerStrategy
                 actual_position);
 
             if (actual_position > 0) {
-              emergency_exit(common::Side::kBuy,
+              // CRITICAL FIX: Update position qty BEFORE calling emergency_exit
+              short_position_.qty = actual_position;
+              short_position_.entry_price = report->avg_price.value;
+
+              auto order_ids = emergency_exit(common::Side::kBuy,
                   report->avg_price.value,
                   "Late fill");
-            }
 
-            short_position_.status = PositionStatus::NONE;
-            short_position_.pending_order_id.reset();
+              // Track the liquidation order
+              if (!order_ids.empty()) {
+                short_position_.pending_order_id = order_ids[0];
+                short_position_.status = PositionStatus::PENDING;
+
+                this->logger_.info(
+                    "[LATE FILL] Emergency liquidation order sent | "
+                    "order_id:{} | qty:{} | price:{}",
+                    common::toString(order_ids[0]),
+                    actual_position,
+                    report->avg_price.value);
+              } else {
+                // Failed to send liquidation order - force reset
+                this->logger_.error(
+                    "[LATE FILL] Emergency liquidation FAILED | "
+                    "resetting position state");
+                short_position_.status = PositionStatus::NONE;
+                short_position_.pending_order_id.reset();
+              }
+            } else {
+              // No actual position, just reset state
+              short_position_.status = PositionStatus::NONE;
+              short_position_.pending_order_id.reset();
+            }
           }
         }
         // Late fill case: NONE → ACTIVE (cancelled order filled after timeout)
@@ -1054,10 +1119,27 @@ class MeanReversionMakerStrategy
               common::toString(report->cl_order_id),
               actual_position);
 
-          emergency_exit(common::Side::kBuy,
+          // CRITICAL FIX: Update position qty BEFORE calling emergency_exit
+          short_position_.qty = actual_position;
+          short_position_.entry_price = report->avg_price.value;
+
+          auto order_ids = emergency_exit(common::Side::kBuy,
               report->avg_price.value,
               "Late fill - no pending");
-          short_position_.status = PositionStatus::NONE;
+
+          if (!order_ids.empty()) {
+            short_position_.pending_order_id = order_ids[0];
+            short_position_.status = PositionStatus::PENDING;
+
+            this->logger_.info(
+                "[LATE FILL - No Pending] Emergency liquidation order sent | "
+                "order_id:{} | qty:{}",
+                common::toString(order_ids[0]),
+                actual_position);
+          } else {
+            short_position_.status = PositionStatus::NONE;
+            short_position_.pending_order_id.reset();
+          }
         }
       }
     }
@@ -1315,6 +1397,16 @@ class MeanReversionMakerStrategy
     // Z-score is passed as parameter to avoid redundant calculation
     // z_robust is scaled by kZScoreScale (10000). -2.5 = -25000
 
+    // 0. CRITICAL: Check if already in position or pending
+    if (long_position_.status != PositionStatus::NONE) {
+      if (debug_cfg_.log_entry_exit) {
+        this->logger_.info(
+            "[Entry Block] LONG | Already in position | status:{}",
+            static_cast<int>(long_position_.status));
+      }
+      return;
+    }
+
     if (debug_cfg_.log_entry_exit) {
       this->logger_.info("[RobustZ] price:{} | median:{} | MAD:{} | z:{}",
           trade->price.value,
@@ -1338,28 +1430,19 @@ class MeanReversionMakerStrategy
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
             "[Entry Block] LONG | Signal quality too low | "
-            "score:{} < {} | z:{} wall:{} obi:{}",
+            "score:{} < {} | wall:{} obi:{} | weights: w={} o={}",
             composite,
             entry_cfg_.min_signal_quality,
-            signal.z_score_strength,
             signal.wall_strength,
-            signal.obi_strength);
+            signal.obi_strength,
+            entry_cfg_.wall_weight,
+            entry_cfg_.obi_weight);
       }
       return;
     }
 
-    // 4. Check Z-score threshold (oversold)
-    if (z_robust >= -zscore_mid_threshold_) {
-      if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
-            "[Entry Block] LONG | Z-score too high | z:{} >= -{}",
-            z_robust,
-            zscore_mid_threshold_);
-      }
-      return;
-    }
-
-    // 5. Wall existence check (CRITICAL)
+    // 4. Wall existence check (CRITICAL)
+    // Note: Z-score timing is handled by Phase tracking, not here
     if (!bid_wall_info_.is_valid) {
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info("[Entry Block] Long | No wall | z:{}", z_robust);
@@ -1394,7 +1477,7 @@ class MeanReversionMakerStrategy
           "[Entry Signal] LONG | quality:{} ({}) | wall_quality:{} | "
           "z_robust:{} | "
           "price:{} | wall:{}@{} bps | obi:{} | "
-          "components: z={} wall={} obi={}",
+          "components: wall={} obi={}",
           composite,
           signal.get_quality(entry_cfg_) == SignalScore::Quality::EXCELLENT
               ? "EXCELLENT"
@@ -1405,7 +1488,6 @@ class MeanReversionMakerStrategy
           bid_wall_info_.accumulated_notional,
           bid_wall_info_.distance_bps,
           obi,
-          signal.z_score_strength,
           signal.wall_strength,
           signal.obi_strength);
     }
@@ -1418,6 +1500,16 @@ class MeanReversionMakerStrategy
       const BBO* bbo, int64_t z_robust) {
     // Z-score is passed as parameter to avoid redundant calculation
     // z_robust is scaled by kZScoreScale (10000). +2.5 = +25000
+
+    // 0. CRITICAL: Check if already in position or pending
+    if (short_position_.status != PositionStatus::NONE) {
+      if (debug_cfg_.log_entry_exit) {
+        this->logger_.info(
+            "[Entry Block] SHORT | Already in position | status:{}",
+            static_cast<int>(short_position_.status));
+      }
+      return;
+    }
 
     // 1. Wall quality check (spoofing detection)
     if (!check_wall_quality(ask_wall_tracker_, "SHORT"))
@@ -1434,31 +1526,17 @@ class MeanReversionMakerStrategy
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
             "[Entry Block] SHORT | Signal quality too low | "
-            "score:{} < {} | z:{} wall:{} obi:{}",
+            "score:{} < {} | wall:{} obi:{}",
             composite,
             entry_cfg_.min_signal_quality,
-            signal.z_score_strength,
             signal.wall_strength,
             signal.obi_strength);
       }
       return;
     }
 
-    // 4. Check if still in overbought territory (but declining)
-    // Allow entry if z > threshold * min_ratio (haven't dropped too much)
-    if (z_robust * common::kSignalScale <
-        zscore_mid_threshold_ * entry_cfg_.short_zscore_min_ratio) {
-      if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
-            "[Entry Block] Short | Already dropped too much | z:{} < {}",
-            z_robust,
-            (zscore_mid_threshold_ * entry_cfg_.short_zscore_min_ratio) /
-                common::kSignalScale);
-      }
-      return;
-    }
-
-    // 5. Wall existence check (CRITICAL)
+    // 4. Wall existence check (CRITICAL)
+    // Note: Z-score timing is handled by Phase tracking, not here
     if (!ask_wall_info_.is_valid) {
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info("[Entry Block] Short | No wall | z:{:.2f}",
@@ -1494,7 +1572,7 @@ class MeanReversionMakerStrategy
           "[Entry Signal] SHORT | quality:{} ({}) | wall_quality:{} | "
           "z_robust:{} | "
           "price:{} | wall:{}@{} bps | obi:{} | "
-          "components: z={} wall={} obi={}",
+          "components: wall={} obi={}",
           composite,
           signal.get_quality(entry_cfg_) == SignalScore::Quality::EXCELLENT
               ? "EXCELLENT"
@@ -1505,7 +1583,6 @@ class MeanReversionMakerStrategy
           ask_wall_info_.accumulated_notional,
           ask_wall_info_.distance_bps,
           obi,
-          signal.z_score_strength,
           signal.wall_strength,
           signal.obi_strength);
     }
@@ -1562,20 +1639,30 @@ class MeanReversionMakerStrategy
   }
 
   // ========================================
-  // Position exit monitoring (100ms)
+  // Position exit monitoring (realtime, called from on_trade_updated)
   // ========================================
-  void check_position_exit(const MarketOrderBookT* order_book) {
-    const auto* bbo = order_book->get_bbo();
-
-    // Calculate multi-timeframe z-scores for exit alignment
+  void check_position_exit(const MarketData* /*market_data*/,
+      MarketOrderBookT* order_book, const BBO* bbo, const ZScores& zscores) {
     int64_t mid_price = (bbo->bid_price.value + bbo->ask_price.value) / 2;
-    int64_t z_fast = robust_zscore_fast_->calculate_zscore(mid_price);
-    int64_t z_mid = robust_zscore_mid_->calculate_zscore(mid_price);
-    int64_t z_slow = robust_zscore_slow_->calculate_zscore(mid_price);
     int64_t current_obi = calculate_orderbook_imbalance_int64(order_book);
 
-    check_long_exit(bbo, mid_price, z_fast, z_mid, z_slow, current_obi);
-    check_short_exit(bbo, mid_price, z_fast, z_mid, z_slow, current_obi);
+    // Only check exits for active positions
+    if (long_position_.status == PositionStatus::ACTIVE) {
+      check_long_exit(bbo,
+          mid_price,
+          zscores.z_fast,
+          zscores.z_mid,
+          zscores.z_slow,
+          current_obi);
+    }
+    if (short_position_.status == PositionStatus::ACTIVE) {
+      check_short_exit(bbo,
+          mid_price,
+          zscores.z_fast,
+          zscores.z_mid,
+          zscores.z_slow,
+          current_obi);
+    }
   }
 
   // ========================================
@@ -1592,16 +1679,17 @@ class MeanReversionMakerStrategy
       return;
     }
 
-    // Multi-timeframe exit alignment: Reversal detection
-    // LONG exit: Fast + Mid both turn negative (downtrend starting)
-    // Catches both sideways (z→0) and reversal (z<0) scenarios
-    bool exit_timeframe_aligned = (z_fast < 0) && (z_mid < 0);
+    // Phase-based exit alignment: Reversal detection
+    // LONG exit: LONG phase가 DEEP 이상이면 청산 신호 (과매수 극단 및 반전 진행 중)
+    // DEEP/WEAK/VERY_WEAK 모두 포함
+    bool exit_phase_signal = (phase_state_.long_phase >= MarketPhase::DEEP);
 
-    if (!exit_timeframe_aligned) {
+    if (!exit_phase_signal) {
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
-            "[Exit Block] LONG | Timeframes NOT aligned | "
-            "z_fast:{} z_mid:{} z_slow:{} (need z_fast<0 && z_mid<0)",
+            "[Exit Block] LONG | Phase not ready for exit | "
+            "phase:{} z_fast:{} z_mid:{} z_slow:{}",
+            static_cast<int>(phase_state_.long_phase),
             z_fast,
             z_mid,
             z_slow);
@@ -1655,8 +1743,7 @@ class MeanReversionMakerStrategy
 
     // 2-1. 모든 청산 신호를 독립적으로 평가 (Mid-only scoring)
     uint64_t hold_time = get_current_time_ns() - long_position_.state_time;
-    ExitScore exit_score =
-        calculate_long_exit_score(z_mid, current_obi, mid_price, hold_time);
+    ExitScore exit_score = calculate_long_exit_score(current_obi, hold_time);
 
     // 2-2. 복합 점수 계산
     int64_t composite_score = exit_score.composite(exit_cfg_);
@@ -1669,14 +1756,13 @@ class MeanReversionMakerStrategy
         this->logger_.info(
             "[Exit Signal] LONG | reason:{} | "
             "z:{} obi:{} wall:{}/{} time:{}s | "
-            "components: z_rev={} obi_rev={} wall_decay={} time_p={}",
+            "components: obi_rev={} wall_decay={} time_p={}",
             reason,
             z_mid,
             current_obi,
             bid_wall_info_.accumulated_notional,
             long_position_.entry_wall_info.accumulated_notional,
             hold_time / 1'000'000'000,
-            exit_score.z_reversion_strength,
             exit_score.obi_reversal_strength,
             exit_score.wall_decay_strength,
             exit_score.time_pressure);
@@ -1704,15 +1790,17 @@ class MeanReversionMakerStrategy
       return;
     }
 
-    // Multi-timeframe exit alignment: Reversal detection
-    // SHORT exit: Fast + Mid both turn positive (uptrend starting)
-    bool exit_timeframe_aligned = (z_fast > 0) && (z_mid > 0);
+    // Phase-based exit alignment: Reversal detection
+    // SHORT exit: SHORT phase가 DEEP 이상이면 청산 신호 (과매도 극단 및 반전 진행 중)
+    // DEEP/WEAK/VERY_WEAK 모두 포함
+    bool exit_phase_signal = (phase_state_.short_phase >= MarketPhase::DEEP);
 
-    if (!exit_timeframe_aligned) {
+    if (!exit_phase_signal) {
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
-            "[Exit Block] SHORT | Timeframes NOT aligned | "
-            "z_fast:{} z_mid:{} z_slow:{} (need z_fast>0 && z_mid>0)",
+            "[Exit Block] SHORT | Phase not ready for exit | "
+            "phase:{} z_fast:{} z_mid:{} z_slow:{}",
+            static_cast<int>(phase_state_.short_phase),
             z_fast,
             z_mid,
             z_slow);
@@ -1766,8 +1854,7 @@ class MeanReversionMakerStrategy
 
     // 2-1. 모든 청산 신호를 독립적으로 평가 (Mid-only scoring)
     uint64_t hold_time = get_current_time_ns() - short_position_.state_time;
-    ExitScore exit_score =
-        calculate_short_exit_score(z_mid, current_obi, mid_price, hold_time);
+    ExitScore exit_score = calculate_short_exit_score(current_obi, hold_time);
 
     // 2-2. 복합 점수 계산
     int64_t composite_score = exit_score.composite(exit_cfg_);
@@ -1780,14 +1867,13 @@ class MeanReversionMakerStrategy
         this->logger_.info(
             "[Exit Signal] SHORT | reason:{} | "
             "z:{} obi:{} wall:{}/{} time:{}s | "
-            "components: z_rev={} obi_rev={} wall_decay={} time_p={}",
+            "components: obi_rev={} wall_decay={} time_p={}",
             reason,
             z_mid,
             current_obi,
             ask_wall_info_.accumulated_notional,
             short_position_.entry_wall_info.accumulated_notional,
             hold_time / 1'000'000'000,
-            exit_score.z_reversion_strength,
             exit_score.obi_reversal_strength,
             exit_score.wall_decay_strength,
             exit_score.time_pressure);
@@ -1879,17 +1965,12 @@ class MeanReversionMakerStrategy
   // Multi-timeframe Z-score Calculation
   // ========================================
 
-  struct ZScores {
-    int64_t z_fast;
-    int64_t z_mid;
-    int64_t z_slow;
-  };
-
   ZScores calculate_multi_timeframe_zscores(int64_t price) {
     // Calculate z-scores FIRST using historical window
-    ZScores result{.z_fast = robust_zscore_fast_->calculate_zscore(price),
-        .z_mid = robust_zscore_mid_->calculate_zscore(price),
-        .z_slow = robust_zscore_slow_->calculate_zscore(price)};
+    ZScores result;
+    result.z_fast = robust_zscore_fast_->calculate_zscore(price);
+    result.z_mid = robust_zscore_mid_->calculate_zscore(price);
+    result.z_slow = robust_zscore_slow_->calculate_zscore(price);
 
     // THEN add new price to window for next calculation
     robust_zscore_fast_->on_price(price);
@@ -2048,24 +2129,12 @@ class MeanReversionMakerStrategy
    * @param mid_price Mid price in raw scale (for wall target calculation)
    * @return SignalScore with all components normalized to [0, kSignalScale]
    */
-  SignalScore calculate_long_signal_score(int64_t z,
+  SignalScore calculate_long_signal_score(int64_t /*z*/,
       const FeatureEngineT::WallInfo& wall, int64_t obi,
       int64_t mid_price) const {
     SignalScore score;
 
-    // === 1. Z-score component: normalize to [0, kSignalScale] ===
-    // z is scaled by kZScoreScale. Example: z=-25000 (-2.5)
-    // Range: [zscore_norm_min, zscore_norm_max] → [0, kSignalScale]
-    int64_t z_abs = std::abs(z);
-    int64_t z_range = entry_cfg_.zscore_norm_max - entry_cfg_.zscore_norm_min;
-    if (z_range > 0) {
-      int64_t z_normalized =
-          (z_abs - entry_cfg_.zscore_norm_min) * common::kSignalScale / z_range;
-      score.z_score_strength =
-          std::clamp(z_normalized, int64_t{0}, common::kSignalScale);
-    }
-
-    // === 2. Wall strength: compare to dynamic threshold ===
+    // === 1. Wall strength: compare to dynamic threshold ===
     // Convert min_quantity to notional first: min_qty * mid_price / kQtyScale
     // Then apply multiplier: notional * multiplier / kSignalScale
     int64_t min_notional =
@@ -2080,12 +2149,15 @@ class MeanReversionMakerStrategy
           std::clamp(wall_normalized, int64_t{0}, common::kSignalScale);
     }
 
-    // === 3. OBI strength: normalize to [0, kSignalScale] ===
+    // === 2. OBI strength: normalize to [0, kSignalScale] ===
     // obi is scaled by kObiScale. Range: [obi_norm_min, obi_norm_max]
+    // INVERTED: obi closer to 0 (neutral) = higher score
+    // Long: obi in (-threshold, 0) where closer to 0 means sell pressure weakening
     int64_t obi_abs = std::abs(obi);
     int64_t obi_range = entry_cfg_.obi_norm_max - entry_cfg_.obi_norm_min;
     if (obi_range > 0) {
-      int64_t obi_normalized = (obi_abs - entry_cfg_.obi_norm_min) *
+      // Invert: max - abs gives higher score when closer to neutral
+      int64_t obi_normalized = (entry_cfg_.obi_norm_max - obi_abs) *
                                common::kSignalScale / obi_range;
       score.obi_strength =
           std::clamp(obi_normalized, int64_t{0}, common::kSignalScale);
@@ -2103,22 +2175,12 @@ class MeanReversionMakerStrategy
    * @param mid_price Mid price in raw scale (for wall target calculation)
    * @return SignalScore with all components normalized to [0, kSignalScale]
    */
-  SignalScore calculate_short_signal_score(int64_t z,
+  SignalScore calculate_short_signal_score(int64_t /*z*/,
       const FeatureEngineT::WallInfo& wall, int64_t obi,
       int64_t mid_price) const {
     SignalScore score;
 
-    // === 1. Z-score component: normalize to [0, kSignalScale] ===
-    int64_t z_abs = std::abs(z);
-    int64_t z_range = entry_cfg_.zscore_norm_max - entry_cfg_.zscore_norm_min;
-    if (z_range > 0) {
-      int64_t z_normalized =
-          (z_abs - entry_cfg_.zscore_norm_min) * common::kSignalScale / z_range;
-      score.z_score_strength =
-          std::clamp(z_normalized, int64_t{0}, common::kSignalScale);
-    }
-
-    // === 2. Wall strength: compare to dynamic threshold ===
+    // === 1. Wall strength: compare to dynamic threshold ===
     // Convert min_quantity to notional first: min_qty * mid_price / kQtyScale
     // Then apply multiplier: notional * multiplier / kSignalScale
     int64_t min_notional =
@@ -2133,12 +2195,14 @@ class MeanReversionMakerStrategy
           std::clamp(wall_normalized, int64_t{0}, common::kSignalScale);
     }
 
-    // === 3. OBI strength: normalize to [0, kSignalScale] ===
-    // Short: OBI should be positive (buy pressure) but not too extreme
+    // === 2. OBI strength: normalize to [0, kSignalScale] ===
+    // INVERTED: obi closer to 0 (neutral) = higher score
+    // Short: obi in (0, threshold) where closer to 0 means buy pressure weakening
     int64_t obi_abs = std::abs(obi);
     int64_t obi_range = entry_cfg_.obi_norm_max - entry_cfg_.obi_norm_min;
     if (obi_range > 0) {
-      int64_t obi_normalized = (obi_abs - entry_cfg_.obi_norm_min) *
+      // Invert: max - abs gives higher score when closer to neutral
+      int64_t obi_normalized = (entry_cfg_.obi_norm_max - obi_abs) *
                                common::kSignalScale / obi_range;
       score.obi_strength =
           std::clamp(obi_normalized, int64_t{0}, common::kSignalScale);
@@ -2306,15 +2370,13 @@ class MeanReversionMakerStrategy
    * @param hold_time_ns Position holding time (nanoseconds)
    * @return ExitScore with all components
    */
-  ExitScore calculate_long_exit_score(int64_t current_z, int64_t current_obi,
-      int64_t /* mid_price */, uint64_t hold_time_ns) const {
+  ExitScore calculate_long_exit_score(int64_t current_obi,
+      uint64_t hold_time_ns) const {
 
     ExitScore score;
 
-    score.z_reversion_strength = calculate_z_reversion_strength(current_z,
-        exit_cfg_.zscore_exit_threshold,
-        true);
-
+    // Z-score reversion is handled by Phase tracking (DEEP check)
+    // Exit score only evaluates OBI/Wall/Time
     score.obi_reversal_strength = calculate_obi_reversal_strength(current_obi,
         exit_cfg_.obi_exit_threshold,
         true);
@@ -2331,15 +2393,13 @@ class MeanReversionMakerStrategy
    * @brief Calculate short exit signal score
    * (로직은 LONG과 대칭, Z-score와 OBI 부호만 반대)
    */
-  ExitScore calculate_short_exit_score(int64_t current_z, int64_t current_obi,
-      int64_t /* mid_price */, uint64_t hold_time_ns) const {
+  ExitScore calculate_short_exit_score(int64_t current_obi,
+      uint64_t hold_time_ns) const {
 
     ExitScore score;
 
-    score.z_reversion_strength = calculate_z_reversion_strength(current_z,
-        exit_cfg_.zscore_exit_threshold,
-        false);
-
+    // Z-score reversion is handled by Phase tracking (DEEP check)
+    // Exit score only evaluates OBI/Wall/Time
     score.obi_reversal_strength = calculate_obi_reversal_strength(current_obi,
         exit_cfg_.obi_exit_threshold,
         false);
@@ -2415,10 +2475,463 @@ class MeanReversionMakerStrategy
   int64_t original_safety_margin_bps_;  // Backup for restoration
   AdverseSelectionTracker adverse_selection_tracker_;
 
+  // Phase tracking
+  PhaseState phase_state_;
+
   // Note: Trade history is now managed by FeatureEngine::recent_trades_
 
   // Throttling timestamp for orderbook updates
   uint64_t last_orderbook_check_time_{0};
+
+  // ========================================
+  // Phase Tracking Implementation
+  // ========================================
+
+  const char* phase_to_string(MarketPhase phase) const {
+    switch (phase) {
+      case MarketPhase::NEUTRAL:
+        return "NEUTRAL";
+      case MarketPhase::BUILDING:
+        return "BUILDING";
+      case MarketPhase::DEEP:
+        return "DEEP";
+      case MarketPhase::WEAK:
+        return "WEAK";
+      case MarketPhase::VERY_WEAK:
+        return "VERY_WEAK";
+      default:
+        return "UNKNOWN";
+    }
+  }
+
+  void update_short_phase(const ZScores& zscores, int64_t adaptive_threshold) {
+
+    MarketPhase prev_phase = phase_state_.short_phase;
+
+    switch (phase_state_.short_phase) {
+      case MarketPhase::NEUTRAL: {
+        int64_t building_threshold =
+            -((adaptive_threshold * mean_reversion_cfg_.building_multiplier) /
+                common::kSignalScale);
+
+        // SHORT: z_mid가 building_threshold보다 작으면 (더 음수)
+        if (zscores.z_mid < building_threshold) {
+          phase_state_.short_phase = MarketPhase::BUILDING;
+          phase_state_.phase_entry_time = get_current_time_ns();
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase SHORT] NEUTRAL → BUILDING | z_fast:{} z_mid:{} "
+                "z_slow:{} | adaptive:{} building_threshold:{}",
+                zscores.z_fast,
+                zscores.z_mid,
+                zscores.z_slow,
+                adaptive_threshold,
+                building_threshold);
+          }
+        }
+        break;
+      }
+
+      case MarketPhase::BUILDING: {
+        int64_t deep_threshold =
+            -((adaptive_threshold * mean_reversion_cfg_.deep_multiplier) /
+                common::kSignalScale);
+        int64_t building_threshold =
+            -((adaptive_threshold * mean_reversion_cfg_.building_multiplier) /
+                common::kSignalScale);
+
+        // SHORT: z_mid가 deep_threshold보다 작으면 (더 음수)
+        if (zscores.z_mid < deep_threshold) {
+          phase_state_.short_phase = MarketPhase::DEEP;
+          phase_state_.peak_z = zscores.z_mid;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase SHORT] BUILDING → DEEP | z_fast:{} z_mid:{} z_slow:{} "
+                "| adaptive:{} deep_threshold:{} peak:{}",
+                zscores.z_fast,
+                zscores.z_mid,
+                zscores.z_slow,
+                adaptive_threshold,
+                deep_threshold,
+                phase_state_.peak_z);
+          }
+        }
+        // SHORT: z_mid가 building_threshold보다 크면 (0에 가까움)
+        else if (zscores.z_mid > building_threshold) {
+          phase_state_.short_phase = MarketPhase::NEUTRAL;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase SHORT] BUILDING → NEUTRAL | z_mid:{} > "
+                "building_threshold:{} | adaptive:{}",
+                zscores.z_mid,
+                building_threshold,
+                adaptive_threshold);
+          }
+        }
+        break;
+      }
+
+      case MarketPhase::DEEP: {
+        bool peak_updated = false;
+        // SHORT phase: 더 음수면 peak 업데이트 (더 극단적인 oversold)
+        if (zscores.z_mid < phase_state_.peak_z) {
+          int64_t old_peak = phase_state_.peak_z;
+          phase_state_.peak_z = zscores.z_mid;
+          peak_updated = true;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase SHORT] DEEP peak updated | old:{} → new:{} | z_mid:{}",
+                old_peak,
+                phase_state_.peak_z,
+                zscores.z_mid);
+          }
+        }
+
+        int64_t weak_threshold =
+            -((adaptive_threshold *
+                  mean_reversion_cfg_.reversal_weak_multiplier) /
+                common::kSignalScale);
+
+        if (zscores.z_mid > weak_threshold) {
+          phase_state_.short_phase = MarketPhase::WEAK;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase SHORT] DEEP → WEAK | z_fast:{} z_mid:{} z_slow:{} | "
+                "peak:{} adaptive:{} weak_threshold:{}",
+                zscores.z_fast,
+                zscores.z_mid,
+                zscores.z_slow,
+                phase_state_.peak_z,
+                adaptive_threshold,
+                weak_threshold);
+          }
+        } else if (!peak_updated && debug_cfg_.log_entry_exit) {
+          this->logger_.info(
+              "[Phase SHORT] DEEP continuing | z_mid:{} peak:{} "
+              "weak_threshold:{}",
+              zscores.z_mid,
+              phase_state_.peak_z,
+              weak_threshold);
+        }
+        break;
+      }
+
+      case MarketPhase::WEAK: {
+        // SHORT phase: peak는 음수, z_mid도 음수. bounce = 얼마나 0에 가까워졌는가
+        // 예: peak=-30000, z_mid=-10000 → bounce = -10000 - (-30000) = 20000
+        int64_t bounce = zscores.z_mid - phase_state_.peak_z;
+        int64_t min_bounce = (mean_reversion_cfg_.min_reversal_bounce *
+                                 mean_reversion_cfg_.false_reversal_ratio) /
+                             common::kSignalScale;
+
+        if (bounce < min_bounce) {
+          phase_state_.short_phase = MarketPhase::DEEP;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase SHORT] WEAK → DEEP (False Reversal) | bounce:{} < "
+                "min_bounce:{} | peak:{} z_mid:{}",
+                bounce,
+                min_bounce,
+                phase_state_.peak_z,
+                zscores.z_mid);
+          }
+        } else {
+          // SHORT: 음수 값을 양수 threshold와 비교 (z > -threshold)
+          bool fast_weak = zscores.z_fast > -zscore_fast_threshold_;
+          bool mid_weak = zscores.z_mid > -zscore_mid_threshold_;
+          bool slow_weak = zscores.z_slow > -zscore_slow_threshold_;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase SHORT] WEAK checking VERY_WEAK | fast:{}>-{}? {} | "
+                "mid:{}>-{}? {} | slow:{}>-{}? {} | bounce:{}",
+                zscores.z_fast,
+                zscore_fast_threshold_,
+                fast_weak,
+                zscores.z_mid,
+                zscore_mid_threshold_,
+                mid_weak,
+                zscores.z_slow,
+                zscore_slow_threshold_,
+                slow_weak,
+                bounce);
+          }
+
+          if (fast_weak && mid_weak && slow_weak) {
+            phase_state_.short_phase = MarketPhase::VERY_WEAK;
+
+            if (debug_cfg_.log_entry_exit) {
+              this->logger_.info(
+                  "[Phase SHORT] WEAK → VERY_WEAK ✓ | z_fast:{} (>-{}) "
+                  "z_mid:{} (>-{}) z_slow:{} (>-{}) | bounce:{}",
+                  zscores.z_fast,
+                  zscore_fast_threshold_,
+                  zscores.z_mid,
+                  zscore_mid_threshold_,
+                  zscores.z_slow,
+                  zscore_slow_threshold_,
+                  bounce);
+            }
+          }
+        }
+        break;
+      }
+
+      case MarketPhase::VERY_WEAK: {
+        int64_t building_threshold =
+            -((adaptive_threshold * mean_reversion_cfg_.building_multiplier) /
+                common::kSignalScale);
+
+        // SHORT: z_mid가 building_threshold보다 크면 (0에 너무 가까움)
+        if (zscores.z_mid > building_threshold) {
+          phase_state_.short_phase = MarketPhase::NEUTRAL;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase SHORT] VERY_WEAK → NEUTRAL | z_mid:{} > "
+                "building_threshold:{} | adaptive:{}",
+                zscores.z_mid,
+                building_threshold,
+                adaptive_threshold);
+          }
+        } else if (debug_cfg_.log_entry_exit) {
+          this->logger_.info(
+              "[Phase SHORT] VERY_WEAK waiting | z_fast:{} z_mid:{} z_slow:{}",
+              zscores.z_fast,
+              zscores.z_mid,
+              zscores.z_slow);
+        }
+        break;
+      }
+    }
+
+    if (prev_phase != phase_state_.short_phase && debug_cfg_.log_entry_exit) {
+      this->logger_.info("[Phase SHORT] Transition: {} → {}",
+          phase_to_string(prev_phase),
+          phase_to_string(phase_state_.short_phase));
+    }
+  }
+
+  void update_long_phase(const ZScores& zscores, int64_t adaptive_threshold) {
+
+    MarketPhase prev_phase = phase_state_.long_phase;
+
+    switch (phase_state_.long_phase) {
+      case MarketPhase::NEUTRAL: {
+        int64_t building_threshold =
+            (adaptive_threshold * mean_reversion_cfg_.building_multiplier) /
+            common::kSignalScale;
+
+        // LONG: z_mid가 building_threshold보다 크면 (더 양수)
+        if (zscores.z_mid > building_threshold) {
+          phase_state_.long_phase = MarketPhase::BUILDING;
+          phase_state_.phase_entry_time = get_current_time_ns();
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase LONG] NEUTRAL → BUILDING | z_fast:{} z_mid:{} "
+                "z_slow:{} | adaptive:{} building_threshold:{}",
+                zscores.z_fast,
+                zscores.z_mid,
+                zscores.z_slow,
+                adaptive_threshold,
+                building_threshold);
+          }
+        }
+        break;
+      }
+
+      case MarketPhase::BUILDING: {
+        int64_t deep_threshold =
+            (adaptive_threshold * mean_reversion_cfg_.deep_multiplier) /
+            common::kSignalScale;
+        int64_t building_threshold =
+            (adaptive_threshold * mean_reversion_cfg_.building_multiplier) /
+            common::kSignalScale;
+
+        // LONG: z_mid가 deep_threshold보다 크면 (더 양수)
+        if (zscores.z_mid > deep_threshold) {
+          phase_state_.long_phase = MarketPhase::DEEP;
+          phase_state_.peak_z = zscores.z_mid;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase LONG] BUILDING → DEEP | z_fast:{} z_mid:{} z_slow:{} | "
+                "adaptive:{} deep_threshold:{} peak:{}",
+                zscores.z_fast,
+                zscores.z_mid,
+                zscores.z_slow,
+                adaptive_threshold,
+                deep_threshold,
+                phase_state_.peak_z);
+          }
+        }
+        // LONG: z_mid가 building_threshold보다 작으면 (0에 가까움)
+        else if (zscores.z_mid < building_threshold) {
+          phase_state_.long_phase = MarketPhase::NEUTRAL;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase LONG] BUILDING → NEUTRAL | z_mid:{} < "
+                "building_threshold:{} | adaptive:{}",
+                zscores.z_mid,
+                building_threshold,
+                adaptive_threshold);
+          }
+        }
+        break;
+      }
+
+      case MarketPhase::DEEP: {
+        bool peak_updated = false;
+        // LONG phase: 더 양수면 peak 업데이트 (더 극단적인 overbought)
+        if (zscores.z_mid > phase_state_.peak_z) {
+          int64_t old_peak = phase_state_.peak_z;
+          phase_state_.peak_z = zscores.z_mid;
+          peak_updated = true;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase LONG] DEEP peak updated | old:{} → new:{} | z_mid:{}",
+                old_peak,
+                phase_state_.peak_z,
+                zscores.z_mid);
+          }
+        }
+
+        int64_t weak_threshold =
+            (adaptive_threshold *
+                mean_reversion_cfg_.reversal_weak_multiplier) /
+            common::kSignalScale;
+
+        // LONG: z_mid가 weak_threshold보다 작으면 (0에 가까워짐)
+        if (zscores.z_mid < weak_threshold) {
+          phase_state_.long_phase = MarketPhase::WEAK;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase LONG] DEEP → WEAK | z_fast:{} z_mid:{} z_slow:{} | "
+                "peak:{} adaptive:{} weak_threshold:{}",
+                zscores.z_fast,
+                zscores.z_mid,
+                zscores.z_slow,
+                phase_state_.peak_z,
+                adaptive_threshold,
+                weak_threshold);
+          }
+        } else if (!peak_updated && debug_cfg_.log_entry_exit) {
+          this->logger_.info(
+              "[Phase LONG] DEEP continuing | z_mid:{} peak:{} "
+              "weak_threshold:{}",
+              zscores.z_mid,
+              phase_state_.peak_z,
+              weak_threshold);
+        }
+        break;
+      }
+
+      case MarketPhase::WEAK: {
+        // LONG phase: peak는 양수, z_mid도 양수. bounce = 얼마나 0에 가까워졌는가
+        // 예: peak=+30000, z_mid=+10000 → bounce = +30000 - (+10000) = 20000
+        int64_t bounce = phase_state_.peak_z - zscores.z_mid;
+        int64_t min_bounce = (mean_reversion_cfg_.min_reversal_bounce *
+                                 mean_reversion_cfg_.false_reversal_ratio) /
+                             common::kSignalScale;
+
+        if (bounce < min_bounce) {
+          phase_state_.long_phase = MarketPhase::DEEP;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase LONG] WEAK → DEEP (False Reversal) | bounce:{} < "
+                "min_bounce:{} | peak:{} z_mid:{}",
+                bounce,
+                min_bounce,
+                phase_state_.peak_z,
+                zscores.z_mid);
+          }
+        } else {
+          // LONG: 양수 값을 양수 threshold와 비교 (z < threshold)
+          bool fast_weak = zscores.z_fast < zscore_fast_threshold_;
+          bool mid_weak = zscores.z_mid < zscore_mid_threshold_;
+          bool slow_weak = zscores.z_slow < zscore_slow_threshold_;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase LONG] WEAK checking VERY_WEAK | fast:{}<{}? {} | "
+                "mid:{}<{}? {} | slow:{}<{}? {} | bounce:{}",
+                zscores.z_fast,
+                zscore_fast_threshold_,
+                fast_weak,
+                zscores.z_mid,
+                zscore_mid_threshold_,
+                mid_weak,
+                zscores.z_slow,
+                zscore_slow_threshold_,
+                slow_weak,
+                bounce);
+          }
+
+          if (fast_weak && mid_weak && slow_weak) {
+            phase_state_.long_phase = MarketPhase::VERY_WEAK;
+
+            if (debug_cfg_.log_entry_exit) {
+              this->logger_.info(
+                  "[Phase LONG] WEAK → VERY_WEAK ✓ | z_fast:{} (<{}) z_mid:{} "
+                  "(<{}) z_slow:{} (<{}) | bounce:{}",
+                  zscores.z_fast,
+                  zscore_fast_threshold_,
+                  zscores.z_mid,
+                  zscore_mid_threshold_,
+                  zscores.z_slow,
+                  zscore_slow_threshold_,
+                  bounce);
+            }
+          }
+        }
+        break;
+      }
+
+      case MarketPhase::VERY_WEAK: {
+        int64_t building_threshold =
+            (adaptive_threshold * mean_reversion_cfg_.building_multiplier) /
+            common::kSignalScale;
+
+        // LONG: z_mid가 building_threshold보다 작으면 (0에 너무 가까움)
+        if (zscores.z_mid < building_threshold) {
+          phase_state_.long_phase = MarketPhase::NEUTRAL;
+
+          if (debug_cfg_.log_entry_exit) {
+            this->logger_.info(
+                "[Phase LONG] VERY_WEAK → NEUTRAL | z_mid:{} < "
+                "building_threshold:{} | adaptive:{}",
+                zscores.z_mid,
+                building_threshold,
+                adaptive_threshold);
+          }
+        } else if (debug_cfg_.log_entry_exit) {
+          this->logger_.info(
+              "[Phase LONG] VERY_WEAK waiting | z_fast:{} z_mid:{} z_slow:{}",
+              zscores.z_fast,
+              zscores.z_mid,
+              zscores.z_slow);
+        }
+        break;
+      }
+    }
+
+    if (prev_phase != phase_state_.long_phase && debug_cfg_.log_entry_exit) {
+      this->logger_.info("[Phase LONG] Transition: {} → {}",
+          phase_to_string(prev_phase),
+          phase_to_string(phase_state_.long_phase));
+    }
+  }
 };
 
 }  // namespace trading

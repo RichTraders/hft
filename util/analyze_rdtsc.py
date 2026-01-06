@@ -20,8 +20,30 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterator, Tuple
 
-# CPU frequency in Hz
+# CPU frequency in Hz (default, will be auto-detected)
 CPU_FREQ_HZ = 3593.234e6
+
+
+def detect_tsc_freq() -> float | None:
+    """Detect TSC frequency from dmesg (most accurate for RDTSC)."""
+    import subprocess
+
+    try:
+        result = subprocess.run(['sudo', 'dmesg'], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            for line in result.stdout.split('\n'):
+                if 'Refined TSC clocksource calibration' in line:
+                    match = re.search(r'(\d+\.?\d*)\s*MHz', line)
+                    if match:
+                        return float(match.group(1)) * 1e6
+                if 'tsc: Detected' in line:
+                    match = re.search(r'(\d+\.?\d*)\s*MHz', line)
+                    if match:
+                        return float(match.group(1)) * 1e6
+    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
+        pass
+
+    return None
 
 
 @dataclass
@@ -80,15 +102,10 @@ def find_related_files(base_path: str) -> list[str]:
     if '*' in base_path or '?' in base_path:
         return sorted(glob.glob(base_path if base_path.endswith('.log') else f"{base_path}.log"))
 
-    # Find all related files: base.log, base_1.log, base_2.log, ...
+    # Find all related files: base_1.log, base_2.log, ..., base.log (no suffix last)
     files = []
 
-    # Main file (no suffix)
-    main_file = f"{base_path}.log"
-    if os.path.exists(main_file):
-        files.append(main_file)
-
-    # Numbered suffixes
+    # Numbered suffixes first (in order: _1, _2, _3, ...)
     i = 1
     while True:
         suffix_file = f"{base_path}_{i}.log"
@@ -97,6 +114,11 @@ def find_related_files(base_path: str) -> list[str]:
             i += 1
         else:
             break
+
+    # Main file (no suffix) comes last
+    main_file = f"{base_path}.log"
+    if os.path.exists(main_file):
+        files.append(main_file)
 
     return files
 
@@ -117,27 +139,26 @@ def merge_files_by_time(filepaths: list[str]) -> Iterator[str]:
     """
     import heapq
 
-    # Create iterators for each file
     iterators = []
+    counter = 0
     for fp in filepaths:
         it = iter_file_lines_with_timestamp(fp)
         try:
             ts, line = next(it)
-            # heapq uses first element for comparison
-            iterators.append((ts, line, it, fp))
+            iterators.append((ts, counter, line, it, fp))
+            counter += 1
         except StopIteration:
             pass
 
-    # Use heap to merge
     heapq.heapify(iterators)
 
     while iterators:
-        ts, line, it, fp = heapq.heappop(iterators)
+        ts, idx, line, it, fp = heapq.heappop(iterators)
         yield line
 
         try:
             next_ts, next_line = next(it)
-            heapq.heappush(iterators, (next_ts, next_line, it, fp))
+            heapq.heappush(iterators, (next_ts, idx, next_line, it, fp))
         except StopIteration:
             pass
 
@@ -298,8 +319,8 @@ Examples:
                         help='Keyword to filter log files (default: benchmark_rdtsc)')
     parser.add_argument('--skip', '-s', type=int, default=0,
                         help='Number of initial samples to skip per tag (warmup)')
-    parser.add_argument('--freq', '-f', type=float, default=CPU_FREQ_HZ,
-                        help=f'CPU frequency in Hz (default: {CPU_FREQ_HZ:.3e})')
+    parser.add_argument('--freq', '-f', type=float, default=None,
+                        help=f'CPU frequency in Hz (default: auto-detect from dmesg)')
     parser.add_argument('--no-merge', action='store_true',
                         help='Do not merge related files, parse single file only')
     parser.add_argument('--markdown', '-m', action='store_true',
@@ -308,7 +329,15 @@ Examples:
                         help='Output file for markdown table')
     args = parser.parse_args()
 
-    CPU_FREQ_HZ = args.freq
+    if args.freq:
+        CPU_FREQ_HZ = args.freq
+    else:
+        detected = detect_tsc_freq()
+        if detected:
+            CPU_FREQ_HZ = detected
+            print(f"Auto-detected TSC frequency: {CPU_FREQ_HZ/1e6:.3f} MHz")
+        else:
+            print(f"Warning: Could not detect TSC frequency, using default: {CPU_FREQ_HZ/1e6:.3f} MHz")
 
     if args.logfile:
         base_path = args.logfile
@@ -356,13 +385,6 @@ Examples:
         print("No RDTSC measurements found!")
         return 1
 
-    # Merge MAKE_ORDERBOOK_UNIT_BID and MAKE_ORDERBOOK_UNIT_ASK into MAKE_ORDERBOOK_UNIT
-    unit_bid = measurements.pop('MAKE_ORDERBOOK_UNIT_BID', [])
-    unit_ask = measurements.pop('MAKE_ORDERBOOK_UNIT_ASK', [])
-    if unit_bid or unit_ask:
-        measurements['MAKE_ORDERBOOK_UNIT'].extend(unit_bid)
-        measurements['MAKE_ORDERBOOK_UNIT'].extend(unit_ask)
-
     print(f"\nCPU Frequency: {CPU_FREQ_HZ:.3e} Hz ({CPU_FREQ_HZ/1e9:.3f} GHz)")
     print(f"\nFound {len(measurements)} measurement types:")
     for name, values in sorted(measurements.items()):
@@ -371,10 +393,11 @@ Examples:
     priority_order = [
         'Convert_Message_Stream',
         'Convert_Message_API',
+        'DOMAIN_MAPPER',
+        'ORDERBOOK_APPLY',
         'ORDERBOOK_UPDATED',
         'TRADE_UPDATED',
         'BOOK_TICKER_UPDATED',
-        'MAKE_ORDERBOOK_UNIT',
         'MAKE_ORDERBOOK_ALL',
     ]
 

@@ -7,18 +7,52 @@ ISO_SCRIPT="$SCRIPT_DIR/manage_cpu_isolation.sh"
 ANALYZE_SCRIPT="$SCRIPT_DIR/analyze_rdtsc.py"
 
 PERF_EVENTS="cycles,instructions,branches,branch-misses,context-switches,page-faults,l1_data_cache_fills_all,l1_data_cache_fills_from_within_same_ccx,l1_data_cache_fills_from_memory,l2_cache_hits_from_dc_misses,l2_cache_misses_from_dc_misses,l1_dtlb_misses,l2_dtlb_misses"
+
+BRANCH_PROFILE="${BRANCH_PROFILE:-1}"
+
+find_perf() {
+    local kernel_ver
+    kernel_ver="$(uname -r)"
+
+    if [ -x "/usr/lib/linux-tools/$kernel_ver/perf" ]; then
+        echo "/usr/lib/linux-tools/$kernel_ver/perf"
+        return
+    fi
+    for p in /usr/lib/linux-tools/*/perf /usr/lib/linux-tools-*/perf; do
+        if [ -x "$p" ]; then
+            echo "$p"
+            return
+        fi
+    done
+
+    if command -v perf &>/dev/null && perf --version &>/dev/null; then
+        command -v perf
+        return
+    fi
+}
+
+PERF_CMD="$(find_perf)"
+if [ -n "$PERF_CMD" ]; then
+    echo "Found perf: $PERF_CMD"
+else
+    echo "Warning: perf not found. Running without perf stat."
+    echo "  Install with: sudo apt install linux-tools-generic linux-tools-\$(uname -r)"
+fi
+
 DEFAULT_BUILD_DIR_A="cmake-build-relwithdebinfo-clang/test"
 DEFAULT_BUILD_DIR_B="cmake-build-relwithdebinfo-clang-double/test"
 DEFAULT_PROGRAM="full_pipeline_benchmark_tests"
 
 print_usage() {
     echo "Usage: sudo $0 [BUILD_DIR_A] [BUILD_DIR_B] [PROGRAM] [args...]"
+    echo "       sudo BRANCH_PROFILE=0 $0 ...  # branch-misses 프로파일링 비활성화"
     echo "Example: sudo $0"
     echo "         sudo $0 cmake-build-a cmake-build-b"
     echo "Defaults:"
     echo "  BUILD_DIR_A: $DEFAULT_BUILD_DIR_A"
     echo "  BUILD_DIR_B: $DEFAULT_BUILD_DIR_B"
     echo "  PROGRAM: $DEFAULT_PROGRAM"
+    echo "  BRANCH_PROFILE: 1 (enabled)"
 }
 
 if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
@@ -66,11 +100,28 @@ run_test() {
     echo ">>> Starting CPU isolation..."
     sudo "$ISO_SCRIPT" start
 
-    echo ">>> Running with perf stat..."
-    echo "asdfasd : $build_dir"
-    sudo systemd-run --scope --slice=iso.slice -p AllowedCPUs=1-5 \
-        --working-directory="$build_dir" \
-        /usr/lib/linux-tools-6.8.0-90/perf stat -e "$PERF_EVENTS" "$program_path" "$@"
+    if [ -n "$PERF_CMD" ]; then
+        #echo ">>> Running with perf stat ($PERF_CMD)..."
+        #sudo systemd-run --scope --slice=iso.slice -p AllowedCPUs=1-5 \
+        #    --working-directory="$build_dir" \
+        #    "$PERF_CMD" stat -e "$PERF_EVENTS" "$program_path" "$@"
+
+        if [ "$BRANCH_PROFILE" = "1" ]; then
+            local perf_data="$build_dir/perf_${label}.data"
+            echo ">>> Recording cache-misses profile (CPU 1-4 only, excluding logger)..."
+            sudo systemd-run --scope --slice=iso.slice -p AllowedCPUs=1-5 \
+                --working-directory="$build_dir" \
+                "$PERF_CMD" record -e cache-misses -g -C 1-4 -o "$perf_data" "$program_path" "$@"
+            chmod 644 "$perf_data"
+            echo ">>> Cache-misses hotspots:"
+            "$PERF_CMD" report -i "$perf_data" --stdio --no-children -n --percent-limit=0.1 --dso=full_pipeline_benchmark_tests
+        fi
+    else
+        echo ">>> Running without perf..."
+        sudo systemd-run --scope --slice=iso.slice -p AllowedCPUs=1-5 \
+            --working-directory="$build_dir" \
+            "$program_path" "$@"
+    fi
 
     echo ">>> Stopping CPU isolation..."
     sudo "$ISO_SCRIPT" stop
@@ -82,7 +133,7 @@ run_test() {
     echo "[$label] Done."
 }
 
-run_test "$BUILD_DIR_A" "A" "$@"
+#run_test "$BUILD_DIR_A" "A" "$@"
 run_test "$BUILD_DIR_B" "B" "$@"
 
 echo ""

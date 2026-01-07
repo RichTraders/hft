@@ -146,7 +146,8 @@ struct glz::detail::from<glz::JSON, ::schema::PriceQtyArray> {
         ++it;
       if (it == end)
         break;
-      entry[0] = std::strtod(price_start, nullptr);
+      const char* price_end = &(*it);
+      std::from_chars(price_start, price_end, entry[0]);
       ++it;
 
       while (it != end && *it != ',')
@@ -164,7 +165,8 @@ struct glz::detail::from<glz::JSON, ::schema::PriceQtyArray> {
         ++it;
       if (it == end)
         break;
-      entry[1] = std::strtod(qty_start, nullptr);
+      const char* qty_end = &(*it);
+      std::from_chars(qty_start, qty_end, entry[1]);
       ++it;
 
       while (it != end && *it != ']')

@@ -13,6 +13,7 @@
 #ifndef BINANCE_FUTURE_MESSAGE_VISITOR_H
 #define BINANCE_FUTURE_MESSAGE_VISITOR_H
 #include <common/logger.h>
+#include <common/performance.h>
 #include <common/memory_pool.hpp>
 
 #include "market_data.h"
@@ -76,6 +77,11 @@ struct BinanceFuturesMdMessageConverter {
     }
     [[nodiscard]] MarketUpdateData operator()(
         const schema::futures::DepthResponse& msg) const {
+#ifdef ENABLE_CONVERTER_TIMING
+      logger_.info("[CONVERTER_TIMING] DepthResponse E:{} T:{}",
+          msg.data.timestamp,
+          msg.data.transaction_time);
+#endif
       std::vector<MarketData*> entries;
       entries.reserve(msg.data.bids.size() + msg.data.asks.size());
 
@@ -107,6 +113,12 @@ struct BinanceFuturesMdMessageConverter {
     }
     [[nodiscard]] MarketUpdateData operator()(
         const schema::futures::TradeEvent& msg) const {
+#ifdef ENABLE_CONVERTER_TIMING
+      logger_.info("[CONVERTER_TIMING] TradeEvent E:{} T:{} data:{}",
+          msg.data.event_time,
+          msg.data.trade_time,
+          static_cast<int64_t>(msg.data.price));
+#endif
       std::vector<MarketData*> entries;
       entries.reserve(1);
 
@@ -130,6 +142,16 @@ struct BinanceFuturesMdMessageConverter {
 
     [[nodiscard]] MarketUpdateData operator()(
         const schema::futures::BookTickerEvent& msg) const {
+#ifdef ENABLE_CONVERTER_TIMING
+      logger_.info(
+          "[CONVERTER_TIMING] BookTickerEvent E:{} T:{} bid:{}@{} ask:{}@{}",
+          msg.data.event_time,
+          msg.data.transaction_time,
+          static_cast<int64_t>(msg.data.best_bid_price),
+          static_cast<int64_t>(msg.data.best_bid_qty),
+          static_cast<int64_t>(msg.data.best_ask_price),
+          static_cast<int64_t>(msg.data.best_ask_qty));
+#endif
       std::vector<MarketData*> entries;
       entries.reserve(2);
 

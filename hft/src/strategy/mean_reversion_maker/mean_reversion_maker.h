@@ -1288,8 +1288,8 @@ class MeanReversionMakerStrategy
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
             "[Entry Block] {} | Wall quality too low (spoofing?) | "
-            "quality:{:.2f} | stability:{:.2f} | persistence:{:.2f} | "
-            "distance:{:.2f}",
+            "quality:{} | stability:{} | persistence:{} | "
+            "distance:{}",
             side_name,
             wall_quality,
             wall_tracker.stability_score(),
@@ -1313,7 +1313,7 @@ class MeanReversionMakerStrategy
     if (obi >= 0) {
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
-            "[Entry Block] Long | OBI not negative | z:{:.2f} | obi:{:.2f}",
+            "[Entry Block] Long | OBI not negative | z:{} | obi:{}",
             z_robust,
             obi);
       }
@@ -1324,7 +1324,7 @@ class MeanReversionMakerStrategy
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
             "[Entry Block] Long | OBI too negative (momentum still down) | "
-            "z:{:.2f} | obi:{:.2f} < -{:.2f}",
+            "z:{} | obi:{} < -{}",
             z_robust,
             obi,
             entry_cfg_.obi_threshold);
@@ -1347,7 +1347,7 @@ class MeanReversionMakerStrategy
     if (obi <= 0) {
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
-            "[Entry Block] Short | OBI not positive | z:{:.2f} | obi:{:.2f}",
+            "[Entry Block] Short | OBI not positive | z:{} | obi:{}",
             z_robust,
             obi);
       }
@@ -1358,7 +1358,7 @@ class MeanReversionMakerStrategy
       if (debug_cfg_.log_entry_exit) {
         this->logger_.info(
             "[Entry Block] Short | OBI too positive (momentum still up) | "
-            "z:{:.2f} | obi:{:.2f} > {:.2f}",
+            "z:{} | obi:{} > {}",
             z_robust,
             obi,
             entry_cfg_.obi_threshold);
@@ -1539,7 +1539,7 @@ class MeanReversionMakerStrategy
     // Note: Z-score timing is handled by Phase tracking, not here
     if (!ask_wall_info_.is_valid) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info("[Entry Block] Short | No wall | z:{:.2f}",
+        this->logger_.info("[Entry Block] Short | No wall | z:{}",
             z_robust);
       }
       return;

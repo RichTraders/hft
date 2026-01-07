@@ -60,6 +60,7 @@ macro(add_unit_test _TEST_NAME)
             -Wno-missing-field-initializers
             -Wno-error=unused-parameter
             -Wno-error=unused-function
+            -Wno-error=unused-variable
     )
 
     if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -91,16 +92,56 @@ add_definitions(-DGOOGLEMOCK_INCLUDE_GMOCK_INTERNAL_GMOCK_GENERATED_FUNCTION_MOC
 # Include mock utilities directory
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/mock)
 
-# Auto-discover unit tests (exclude integration tests and pipeline tests)
+# Auto-discover unit tests (exclude integration tests and pipeline benchmark tests)
 file(GLOB TEST_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/*_tests.cpp")
 list(FILTER TEST_SOURCES EXCLUDE REGEX ".*cpu_cgroup_integration_tests\\.cpp$")
+list(FILTER TEST_SOURCES EXCLUDE REGEX ".*full_pipeline_benchmark_tests\\.cpp$")
 
 foreach (test_src IN LISTS TEST_SOURCES)
     get_filename_component(fname "${test_src}" NAME_WE)
     string(REGEX REPLACE "_tests$" "" test_name "${fname}")
     add_unit_test(${test_name})
 endforeach ()
+
+# Strategy-specific full_pipeline_benchmark tests
+macro(add_strategy_benchmark strategy_type strategy_name)
+    set(TARGET_NAME "full_pipeline_benchmark_${strategy_name}_tests")
+    set(gen_dir "${CMAKE_BINARY_DIR}/generated/test_${strategy_name}")
+    file(MAKE_DIRECTORY "${gen_dir}")
+
+    set(STRATEGY_TYPE "${strategy_type}")
+    set(STRATEGY_NAME "${strategy_name}")
+    configure_file("${CMAKE_SOURCE_DIR}/cmake/strategy_config.hpp.in"
+            "${gen_dir}/strategy_config.hpp" @ONLY)
+
+    add_executable(${TARGET_NAME} full_pipeline_benchmark_tests.cpp)
+    target_include_directories(${TARGET_NAME} PRIVATE "${gen_dir}")
+    target_compile_definitions(${TARGET_NAME} PRIVATE ENABLE_WEBSOCKET UNIT_TEST)
+    target_link_libraries(${TARGET_NAME} PRIVATE
+            HftLib_ws HftLib_fix
+            cap
+            GTest::gtest_main
+            GTest::gmock
+    )
+    target_precompile_headers(${TARGET_NAME} PRIVATE
+            ${CMAKE_SOURCE_DIR}/include/pch.h)
+    target_compile_options(${TARGET_NAME} PRIVATE
+            -Wno-missing-field-initializers
+            -Wno-error=unused-parameter
+            -Wno-error=unused-function
+            -Wno-error=unused-variable
+    )
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(${TARGET_NAME} PRIVATE -Wno-error=return-type-c-linkage)
+    endif()
+
+    list(APPEND BENCHMARK_TARGETS ${TARGET_NAME})
+endmacro()
+
+add_strategy_benchmark("trading::ObiVwapDirectionalStrategy" "directional")
+add_strategy_benchmark("trading::MeanReversionMakerStrategy" "mean_reversion")
+add_strategy_benchmark("trading::LiquidTaker" "liquid_taker")
 
 # Add integration tests with special handling
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cpu_cgroup_integration_tests.cpp")

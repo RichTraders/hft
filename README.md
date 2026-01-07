@@ -582,11 +582,29 @@ START_MEASURE(TAG);
 END_MEASURE(TAG, logger);  // outputs "[RDTSC]: TAG: <cycles>"
 ```
 
+### Strategy-Specific Benchmark Targets
+
+| Target | Strategy |
+|--------|----------|
+| `full_pipeline_benchmark_directional_tests` | ObiVwapDirectionalStrategy |
+| `full_pipeline_benchmark_mean_reversion_tests` | MeanReversionMakerStrategy |
+| `full_pipeline_benchmark_liquid_taker_tests` | LiquidTaker |
+
+Build example:
+```bash
+cmake --build build --target full_pipeline_benchmark_mean_reversion_tests
+```
+
+**A/B Testing Note**: Ensure the config file matches the strategy being tested. The benchmark loads config from `test/resources/`. Update `full_pipeline_benchmark_tests.cpp` if needed:
+```cpp
+INI_CONFIG.load("resources/config-xrpusdc.ini");  // Verify this matches your strategy
+```
+
 ### Running Benchmarks
 
 Run benchmarks in CPU-isolated environment for accurate results:
 ```bash
-sudo systemd-run --scope --slice=iso.slice -p AllowedCPUs=1-5 ./benchmark_tests
+sudo systemd-run --scope --slice=iso.slice -p AllowedCPUs=1-5 ./full_pipeline_benchmark_mean_reversion_tests
 ```
 
 ### Analyzing Results

@@ -52,7 +52,26 @@ build_program() {
     local cmake_build_dir="${build_dir%/test}"
 
     echo ">>> Building $PROGRAM in $cmake_build_dir..."
-    cmake --build "$cmake_build_dir" --target "$PROGRAM" -j
+    # Run build as original user to avoid permission issues
+    if [ -n "$SUDO_USER" ]; then
+        sudo -u "$SUDO_USER" cmake --build "$cmake_build_dir" --target "$PROGRAM" -j
+    else
+        cmake --build "$cmake_build_dir" --target "$PROGRAM" -j
+    fi
+}
+
+check_iso_slice_available() {
+    # Check if systemd-run and iso.slice are available
+    if ! command -v systemd-run &> /dev/null; then
+        return 1
+    fi
+    if ! systemctl list-units --type=slice 2>/dev/null | grep -q "iso.slice"; then
+        # Try to check if iso.slice can be created
+        if [ ! -f /sys/fs/cgroup/iso.slice/cgroup.controllers ] 2>/dev/null; then
+            return 1
+        fi
+    fi
+    return 0
 }
 
 run_test() {
@@ -71,17 +90,27 @@ run_test() {
     echo " [$label] Running: $program_path"
     echo "============================================================"
 
-    echo ">>> Starting CPU isolation..."
-    sudo "$ISO_SCRIPT" start
+    if check_iso_slice_available && [ -x "$ISO_SCRIPT" ]; then
+        echo ">>> Starting CPU isolation..."
+        sudo "$ISO_SCRIPT" start
 
-    echo ">>> Running with perf stat..."
-    echo "asdfasd : $build_dir"
-    sudo systemd-run --scope --slice=iso.slice -p AllowedCPUs=1-5 \
-        --working-directory="$build_dir" \
-        /usr/lib/linux-tools-6.8.0-90/perf stat -e "$PERF_EVENTS" "$program_path" "$@"
+        echo ">>> Running with perf stat (iso.slice)..."
+        sudo systemd-run --scope --slice=iso.slice -p AllowedCPUs=1-5 \
+            --working-directory="$build_dir" \
+            /usr/lib/linux-tools-6.8.0-90/perf stat -e "$PERF_EVENTS" "$program_path" "$@"
 
-    echo ">>> Stopping CPU isolation..."
-    sudo "$ISO_SCRIPT" stop
+        echo ">>> Stopping CPU isolation..."
+        sudo "$ISO_SCRIPT" stop
+    else
+        echo ">>> iso.slice not available, running without CPU isolation..."
+        pushd "$build_dir" > /dev/null
+        if command -v perf &> /dev/null; then
+            perf stat -e "$PERF_EVENTS" "$program_path" "$@" 2>&1 || "$program_path" "$@"
+        else
+            "$program_path" "$@"
+        fi
+        popd > /dev/null
+    fi
 
     echo ">>> Analyzing RDTSC..."
     python3 "$ANALYZE_SCRIPT" -d "$build_dir" -k benchmark_rdtsc -m
@@ -91,7 +120,7 @@ run_test() {
 }
 
 build_program "$BUILD_DIR_A"
-build_program "$BUILD_DIR_B"
+#build_program "$BUILD_DIR_B"
 
 run_test "$BUILD_DIR_A" "A" "$@"
 #run_test "$BUILD_DIR_B" "B" "$@"

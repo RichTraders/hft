@@ -47,6 +47,14 @@ else
     PROGRAM="$DEFAULT_PROGRAM"
 fi
 
+build_program() {
+    local build_dir="$1"
+    local cmake_build_dir="${build_dir%/test}"
+
+    echo ">>> Building $PROGRAM in $cmake_build_dir..."
+    cmake --build "$cmake_build_dir" --target "$PROGRAM" -j
+}
+
 run_test() {
     local build_dir="$(cd "$1" && pwd)"
     local label="$2"
@@ -81,6 +89,9 @@ run_test() {
     echo ""
     echo "[$label] Done."
 }
+
+build_program "$BUILD_DIR_A"
+build_program "$BUILD_DIR_B"
 
 run_test "$BUILD_DIR_A" "A" "$@"
 #run_test "$BUILD_DIR_B" "B" "$@"

@@ -96,7 +96,7 @@ graph TB
 |----------|------------|
 | Language | C++23 |
 | Build | CMake 3.28+, Ninja |
-| Compiler | Clang 18+ (recommended), GCC 13+ |
+| Compiler | Clang 18+ (recommended), GCC 13+, **macOS: Homebrew LLVM required** |
 | WebSocket | libwebsockets 4.4.0 |
 | JSON | Glaze (compile-time reflection) |
 | FIX Protocol | fix8 |
@@ -124,6 +124,8 @@ hft/
 # Prerequisite
 
 ## System Dependencies
+
+### Linux
 Install required system packages:
 ```bash
 sudo apt install -y libtbb-dev libcurl4-openssl-dev cmake ninja-build clang-18
@@ -136,6 +138,15 @@ sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 100
 sudo update-alternatives --config cc
 sudo update-alternatives --config c++
 ```
+
+### macOS
+**Homebrew LLVM is required** - Apple Clang does not support `std::from_chars` for floating-point types.
+
+```bash
+brew install llvm ninja cmake
+```
+
+CMake will automatically detect and use Homebrew LLVM at `/opt/homebrew/opt/llvm`.
 
 ## Build
 

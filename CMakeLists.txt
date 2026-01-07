@@ -1,4 +1,26 @@
 cmake_minimum_required(VERSION 3.28)
+
+# Use Homebrew LLVM on macOS for full C++17 from_chars support
+if (APPLE AND EXISTS "/opt/homebrew/opt/llvm/bin/clang++")
+    set(CMAKE_C_COMPILER "/opt/homebrew/opt/llvm/bin/clang")
+    set(CMAKE_CXX_COMPILER "/opt/homebrew/opt/llvm/bin/clang++")
+    # Set sysroot to avoid SDK header conflicts
+    execute_process(
+        COMMAND xcrun --show-sdk-path
+        OUTPUT_VARIABLE MACOS_SDK_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(CMAKE_OSX_SYSROOT "${MACOS_SDK_PATH}")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3")
+    # Disable C++20 module scanning (conflicts with Ninja + LLVM)
+    set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+    # Use LLVM's libc++ to avoid ABI mismatch
+    set(LLVM_ROOT "/opt/homebrew/opt/llvm")
+    add_compile_options(-stdlib=libc++ -nostdinc++)
+    add_compile_options(-isystem ${LLVM_ROOT}/include/c++/v1)
+    add_link_options(-stdlib=libc++ -L${LLVM_ROOT}/lib/c++ -Wl,-rpath,${LLVM_ROOT}/lib/c++)
+endif ()
+
 project(hft)
 
 set(CMAKE_CXX_STANDARD 20)

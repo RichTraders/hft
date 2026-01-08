@@ -24,9 +24,6 @@ macro(add_unit_test _TEST_NAME)
     add_executable(${TARGET_NAME} ${_TEST_NAME}_tests.cpp)
 
     set(BASE_LIBS "")
-    if (NOT APPLE)
-        set(BASE_LIBS cap)
-    endif()
 
     if (${_TEST_NAME} MATCHES "^benchmark_")
         target_link_libraries(${TARGET_NAME} PRIVATE
@@ -144,9 +141,6 @@ macro(add_strategy_benchmark strategy_type strategy_name)
     target_compile_definitions(${TARGET_NAME} PRIVATE ENABLE_WEBSOCKET UNIT_TEST)
 
     set(STRATEGY_LIBS HftLib_ws GTest::gtest_main GTest::gmock)
-    if (NOT APPLE)
-        list(APPEND STRATEGY_LIBS cap)
-    endif()
 
     target_link_libraries(${TARGET_NAME} PRIVATE ${STRATEGY_LIBS})
     target_precompile_headers(${TARGET_NAME} PRIVATE
@@ -180,8 +174,6 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cpu_cgroup_integration_tests.cpp")
             DESTINATION ${CMAKE_BINARY_DIR}/test
             FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 endif ()
-
-file(COPY set_cpu.sh DESTINATION ${CMAKE_BINARY_DIR}/test)
 
 add_custom_target(RUN_ALL_TESTS
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -C $<CONFIG>

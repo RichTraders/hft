@@ -678,6 +678,34 @@ python3 util/plot_regime.py cmake-build-measure/test/benchmark_rdtsc_20260108005
 - PNG: 3-panel subplot (Regime with mid price, Phase LONG/SHORT with trade price)
 - Parquet: Per-tick data with regime and phase labels for backtesting analysis
 
+### Phase Accuracy Analysis
+
+Use `util/analyze_phase_accuracy.py` to evaluate strategy phase predictions against regime ground truth.
+
+```bash
+# Basic usage
+python3 util/analyze_phase_accuracy.py regime_phase_data.parquet
+
+# With confusion matrix plot and detailed breakdown
+python3 util/analyze_phase_accuracy.py regime_phase_data.parquet -v -o confusion_matrix.png
+```
+
+**Entry Confusion Matrix (Mean Reversion Perspective):**
+| Action \ Regime | Up (Rebound) | Sideways (Range) | Down (Trend) |
+|-----------------|--------------|------------------|--------------|
+| Long Entry | TP (Rebound) | Marginal | FATAL (Knife) |
+| Short Entry | FATAL (Rocket) | Marginal | TP (Top) |
+
+**Phase to Action Mapping:**
+- `SHORT VERY_WEAK` → Long Entry (oversold bounce expected)
+- `LONG VERY_WEAK` → Short Entry (overbought drop expected)
+- Other phases → Hold
+
+**Key Metrics:**
+- **Win Rate**: TP entries / Total entries (correct direction)
+- **Safe Rate**: (TP + Marginal) / Total entries (non-losing)
+- **Fatal Rate**: FATAL entries / Total entries (adverse selection)
+
 See `docs/benchmark-guide.md` for detailed workflow and visualization tools.
 
 ### A/B Comparison Tests

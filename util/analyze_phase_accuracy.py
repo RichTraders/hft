@@ -2,14 +2,22 @@
 """
 Analyze Phase prediction accuracy against Regime ground truth.
 
-Trading-oriented confusion matrix:
-- Rows: Predicted action (Long Entry, Hold, Short Entry)
-- Cols: Actual regime (Up, Sideways, Down)
+Mean Reversion Entry Confusion Matrix:
+- Rows: Entry action (Long Entry, Short Entry)
+- Cols: Actual regime at entry (Up=Rebound, Sideways=Range, Down=Trend)
 
-Phase to Action mapping:
-- LONG VERY_WEAK -> Long Entry (reversal signal)
-- SHORT VERY_WEAK -> Short Entry (reversal signal)
-- Otherwise -> Hold (wait for entry signal)
+Mean Reversion perspective:
+- Long Entry + Up (Rebound): TP - caught the bounce
+- Long Entry + Sideways: Marginal - breakeven to small profit (MR works in range)
+- Long Entry + Down (Trend): FATAL - caught falling knife (adverse selection)
+- Short Entry + Up: FATAL - shorted a rocket
+- Short Entry + Sideways: Marginal - breakeven to small profit
+- Short Entry + Down: TP - sold the top
+
+Phase to Action mapping (from mean_reversion_maker.h):
+- SHORT VERY_WEAK -> Long Entry (oversold bounce expected)
+- LONG VERY_WEAK -> Short Entry (overbought drop expected)
+- Otherwise -> Hold
 """
 
 import argparse
@@ -18,6 +26,7 @@ from collections import defaultdict
 
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def load_parquet(filepath: str) -> pd.DataFrame:
@@ -37,17 +46,19 @@ def map_phase_to_action(row) -> str:
     """
     Map Phase LONG/SHORT to trading action.
 
-    Logic:
-    - LONG VERY_WEAK -> 'long_entry' (buy signal - expect reversal up)
-    - SHORT VERY_WEAK -> 'short_entry' (sell signal - expect reversal down)
-    - Both VERY_WEAK -> use the one that transitioned more recently (ambiguous, default hold)
+    Logic (from mean_reversion_maker.h):
+    - SHORT VERY_WEAK -> 'long_entry' (uptrend momentum weakening -> expect continuation up)
+    - LONG VERY_WEAK -> 'short_entry' (downtrend momentum weakening -> expect continuation down)
+    - Both VERY_WEAK -> ambiguous, default to hold
     - Otherwise -> 'hold' (no entry signal yet)
     """
     phase_long = row['phase_long']
     phase_short = row['phase_short']
 
-    long_entry = phase_long == 'VERY_WEAK'
-    short_entry = phase_short == 'VERY_WEAK'
+    # Note: Logic is OPPOSITE of what you might expect
+    # SHORT VERY_WEAK triggers long entry, LONG VERY_WEAK triggers short entry
+    long_entry = phase_short == 'VERY_WEAK'   # SHORT weak -> go long
+    short_entry = phase_long == 'VERY_WEAK'   # LONG weak -> go short
 
     if long_entry and not short_entry:
         return 'long_entry'
@@ -60,137 +71,196 @@ def map_phase_to_action(row) -> str:
         return 'hold'
 
 
-def compute_trading_matrix(df: pd.DataFrame) -> dict:
+def compute_entry_matrix(df: pd.DataFrame) -> tuple[dict, pd.DataFrame]:
     """
-    Compute time-weighted trading confusion matrix.
+    Compute entry count confusion matrix.
 
-    Returns dict with:
-    - matrix[action][regime] = duration_ms
+    Returns:
+    - count_matrix[action][regime] = entry_count
+    - df with action column added
     """
     # Add action column
     df['action'] = df.apply(map_phase_to_action, axis=1)
 
-    actions = ['long_entry', 'hold', 'short_entry']
     regimes = ['up', 'sideways', 'down']
-    matrix = defaultdict(lambda: defaultdict(float))
+    count_matrix = defaultdict(lambda: defaultdict(int))
 
-    # Accumulate durations
+    # Track action transitions for counting entries
+    prev_action = None
+
+    # Count entries (transitions INTO entry signals)
     for _, row in df.iterrows():
         action = row['action']
         regime = row['regime']
-        duration = row['duration_ms']
-        matrix[action][regime] += duration
 
-    return dict(matrix), df
+        # Count entry when action changes to entry signal
+        if action != prev_action and action in ['long_entry', 'short_entry']:
+            count_matrix[action][regime] += 1
+        prev_action = action
+
+    return dict(count_matrix), df
 
 
-def print_trading_matrix(matrix: dict, total_duration_ms: float):
-    """Print trading-oriented confusion matrix."""
-    actions = ['long_entry', 'hold', 'short_entry']
+def print_entry_matrix(count_matrix: dict):
+    """Print entry count confusion matrix."""
+    actions = ['long_entry', 'short_entry']
     regimes = ['up', 'sideways', 'down']
 
-    # Labels for cells
     labels = {
-        ('long_entry', 'up'): 'TP (Profit)',
-        ('long_entry', 'sideways'): 'FP (Cost)',
-        ('long_entry', 'down'): 'FATAL (Loss)',
-        ('hold', 'up'): 'Missed',
-        ('hold', 'sideways'): 'TN (Good)',
-        ('hold', 'down'): 'Missed',
-        ('short_entry', 'up'): 'FATAL (Loss)',
-        ('short_entry', 'sideways'): 'FP (Cost)',
-        ('short_entry', 'down'): 'TP (Profit)',
+        ('long_entry', 'up'): 'TP (Rebound)',
+        ('long_entry', 'sideways'): 'Marginal',
+        ('long_entry', 'down'): 'FATAL (Knife)',
+        ('short_entry', 'up'): 'FATAL (Rocket)',
+        ('short_entry', 'sideways'): 'Marginal',
+        ('short_entry', 'down'): 'TP (Top)',
     }
 
     print("\n" + "=" * 80)
-    print("TRADING CONFUSION MATRIX (Time-Weighted)")
+    print("ENTRY CONFUSION MATRIX (Number of Entries)")
     print("=" * 80)
-    print(f"Total Duration: {total_duration_ms/1000:.1f}s ({total_duration_ms/1000/60:.1f}min)")
     print()
-    print("Action mapping: VERY_WEAK -> Entry signal, Others -> Hold")
+    print("Counts transitions INTO entry signals (action changed to long/short_entry)")
+    print("Action: SHORT VERY_WEAK -> Long, LONG VERY_WEAK -> Short")
     print()
 
     # Header
     print(f"{'Action \\ Regime':>15}", end="")
     for regime in regimes:
-        header = {'up': 'Up (Long+)', 'sideways': 'Sideways', 'down': 'Down (Short+)'}
+        header = {'up': 'Up (Rebound)', 'sideways': 'Sideways (Range)', 'down': 'Down (Trend)'}
         print(f"{header[regime]:>20}", end="")
     print(f"{'Total':>12}")
     print("-" * 80)
 
     # Matrix rows
+    total_entries = 0
     for action in actions:
-        action_label = {'long_entry': 'Long Entry', 'hold': 'Hold', 'short_entry': 'Short Entry'}
+        action_label = {'long_entry': 'Long Entry', 'short_entry': 'Short Entry'}
         print(f"{action_label[action]:>15}", end="")
 
-        row_total = sum(matrix.get(action, {}).get(r, 0) for r in regimes)
+        row_total = sum(count_matrix.get(action, {}).get(r, 0) for r in regimes)
+        total_entries += row_total
 
         for regime in regimes:
-            val = matrix.get(action, {}).get(regime, 0)
+            val = count_matrix.get(action, {}).get(regime, 0)
             pct = val / row_total * 100 if row_total > 0 else 0
             label = labels.get((action, regime), '')
-            print(f"{pct:>6.1f}% {label:<12}", end="")
+            print(f"{pct:>5.1f}% ({val:>4}) {label:<12}", end="")
 
-        print(f"{row_total/1000:>10.1f}s")
+        print(f"{row_total:>10}")
 
     print("-" * 80)
 
-    # Summary metrics
-    long_entry_total = sum(matrix.get('long_entry', {}).get(r, 0) for r in regimes)
-    short_entry_total = sum(matrix.get('short_entry', {}).get(r, 0) for r in regimes)
-    hold_total = sum(matrix.get('hold', {}).get(r, 0) for r in regimes)
-
-    # True Positives (correct entries)
-    tp_long = matrix.get('long_entry', {}).get('up', 0)
-    tp_short = matrix.get('short_entry', {}).get('down', 0)
+    # Summary
+    tp_long = count_matrix.get('long_entry', {}).get('up', 0)
+    tp_short = count_matrix.get('short_entry', {}).get('down', 0)
     tp_total = tp_long + tp_short
 
-    # Fatal errors (wrong direction)
-    fatal_long = matrix.get('long_entry', {}).get('down', 0)
-    fatal_short = matrix.get('short_entry', {}).get('up', 0)
+    fatal_long = count_matrix.get('long_entry', {}).get('down', 0)
+    fatal_short = count_matrix.get('short_entry', {}).get('up', 0)
     fatal_total = fatal_long + fatal_short
 
-    # False positives (entry during sideways)
-    fp_long = matrix.get('long_entry', {}).get('sideways', 0)
-    fp_short = matrix.get('short_entry', {}).get('sideways', 0)
-    fp_total = fp_long + fp_short
-
-    # True negatives (hold during sideways)
-    tn = matrix.get('hold', {}).get('sideways', 0)
-
-    # Missed opportunities
-    missed_up = matrix.get('hold', {}).get('up', 0)
-    missed_down = matrix.get('hold', {}).get('down', 0)
-    missed_total = missed_up + missed_down
-
-    entry_total = long_entry_total + short_entry_total
+    marginal_long = count_matrix.get('long_entry', {}).get('sideways', 0)
+    marginal_short = count_matrix.get('short_entry', {}).get('sideways', 0)
+    marginal_total = marginal_long + marginal_short
 
     print()
-    print("=== TRADING METRICS ===")
-    print()
-    print(f"Entry Signals: {entry_total/1000:.1f}s ({entry_total/total_duration_ms*100:.1f}% of time)")
-    print(f"  - Long Entry:  {long_entry_total/1000:.1f}s")
-    print(f"  - Short Entry: {short_entry_total/1000:.1f}s")
-    print()
+    print(f"Total Entries: {total_entries}")
+    if total_entries > 0:
+        win_rate = tp_total / total_entries * 100
+        marginal_rate = marginal_total / total_entries * 100
+        fatal_rate = fatal_total / total_entries * 100
 
-    if entry_total > 0:
-        print(f"Entry Quality:")
-        print(f"  - True Positive (Profit):  {tp_total/1000:>8.1f}s ({tp_total/entry_total*100:>5.1f}%)")
-        print(f"  - False Positive (Cost):   {fp_total/1000:>8.1f}s ({fp_total/entry_total*100:>5.1f}%)")
-        print(f"  - FATAL (Wrong Direction): {fatal_total/1000:>8.1f}s ({fatal_total/entry_total*100:>5.1f}%)")
+        print(f"  - TP (Rebound/Top):  {tp_total:>4} ({win_rate:>5.1f}%)")
+        print(f"  - Marginal (Range):  {marginal_total:>4} ({marginal_rate:>5.1f}%)")
+        print(f"  - FATAL (Trend):     {fatal_total:>4} ({fatal_rate:>5.1f}%)")
         print()
-
-        # Win rate
-        win_rate = tp_total / entry_total * 100
-        fatal_rate = fatal_total / entry_total * 100
-        print(f"  Win Rate: {win_rate:.1f}%")
+        print(f"  Win Rate (TP only): {win_rate:.1f}%")
+        print(f"  Safe Rate (TP+Marginal): {win_rate + marginal_rate:.1f}%")
         print(f"  Fatal Rate: {fatal_rate:.1f}%")
-        print()
-
-    print(f"Hold Period: {hold_total/1000:.1f}s ({hold_total/total_duration_ms*100:.1f}% of time)")
-    print(f"  - True Negative (Sideways): {tn/1000:>8.1f}s")
-    print(f"  - Missed Opportunity:       {missed_total/1000:>8.1f}s")
     print()
+
+
+def plot_entry_matrix(count_matrix: dict, output_path: str):
+    """Plot entry count confusion matrix as heatmap."""
+    actions = ['long_entry', 'short_entry']
+    regimes = ['up', 'sideways', 'down']
+
+    # Build matrix data (percentages within each row)
+    data = np.zeros((2, 3))
+    counts = np.zeros((2, 3))
+    for i, action in enumerate(actions):
+        row_total = sum(count_matrix.get(action, {}).get(r, 0) for r in regimes)
+        for j, regime in enumerate(regimes):
+            val = count_matrix.get(action, {}).get(regime, 0)
+            data[i, j] = val / row_total * 100 if row_total > 0 else 0
+            counts[i, j] = val
+
+    # Color scheme
+    cell_colors = np.array([
+        ['#90EE90', '#FFD700', '#FF6B6B'],  # Long Entry: TP(Rebound), Marginal, FATAL(Knife)
+        ['#FF6B6B', '#FFD700', '#90EE90'],  # Short Entry: FATAL(Rocket), Marginal, TP(Top)
+    ])
+
+    cell_labels = np.array([
+        ['TP\n(Rebound)', 'Marginal\n(Range)', 'FATAL\n(Knife)'],
+        ['FATAL\n(Rocket)', 'Marginal\n(Range)', 'TP\n(Top)'],
+    ])
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Draw cells with custom colors
+    for i in range(2):
+        for j in range(3):
+            color = cell_colors[i, j]
+            rect = plt.Rectangle((j, 1-i), 1, 1, facecolor=color, edgecolor='white', linewidth=2)
+            ax.add_patch(rect)
+
+            # Add percentage, count, and label
+            pct = data[i, j]
+            cnt = int(counts[i, j])
+            label = cell_labels[i, j]
+            ax.text(j + 0.5, 1-i + 0.70, f'{pct:.1f}%', ha='center', va='center',
+                   fontsize=16, fontweight='bold')
+            ax.text(j + 0.5, 1-i + 0.50, f'({cnt})', ha='center', va='center',
+                   fontsize=12, color='#555555')
+            ax.text(j + 0.5, 1-i + 0.28, label, ha='center', va='center',
+                   fontsize=10, color='#333333')
+
+    # Labels
+    action_labels = ['Long Entry', 'Short Entry']
+    regime_labels = ['Up\n(Rebound)', 'Sideways\n(Range)', 'Down\n(Trend)']
+
+    total_entries = int(counts.sum())
+
+    ax.set_xlim(0, 3)
+    ax.set_ylim(0, 2)
+    ax.set_xticks([0.5, 1.5, 2.5])
+    ax.set_xticklabels(regime_labels, fontsize=11)
+    ax.set_yticks([0.5, 1.5])
+    ax.set_yticklabels(reversed(action_labels), fontsize=11)
+
+    ax.set_xlabel('Regime at Entry (Ground Truth)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Entry Action (Phase Signal)', fontsize=12, fontweight='bold')
+    ax.set_title(f'Mean Reversion Entry Confusion Matrix\n(Total: {total_entries} entries)',
+                fontsize=14, fontweight='bold')
+
+    # Remove spines
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    ax.set_aspect('equal')
+
+    # Add legend
+    legend_elements = [
+        plt.Rectangle((0, 0), 1, 1, facecolor='#90EE90', label='Good (TP)'),
+        plt.Rectangle((0, 0), 1, 1, facecolor='#FFD700', label='Marginal (Range)'),
+        plt.Rectangle((0, 0), 1, 1, facecolor='#FF6B6B', label='Fatal (Adverse)'),
+    ]
+    ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(1.02, 1))
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    print(f"Saved confusion matrix plot to {output_path}")
 
 
 def print_phase_distribution(df: pd.DataFrame):
@@ -232,7 +302,7 @@ def print_regime_distribution(df: pd.DataFrame):
             print(f"  {regime:>10}: {val/1000:>8.1f}s ({val/total*100:>5.1f}%)")
 
 
-def analyze_by_phase_intensity(df: pd.DataFrame, matrix: dict):
+def analyze_by_phase_intensity(df: pd.DataFrame, count_matrix: dict):
     """Analyze accuracy breakdown by phase intensity."""
     print("\n" + "=" * 70)
     print("ACCURACY BY PHASE INTENSITY")
@@ -265,6 +335,8 @@ def main():
     parser.add_argument('parquet', help='Path to parquet file from plot_regime.py')
     parser.add_argument('--verbose', '-v', action='store_true',
                         help='Show detailed breakdown')
+    parser.add_argument('--output', '-o', type=str, default=None,
+                        help='Output image file path for confusion matrix plot')
 
     args = parser.parse_args()
 
@@ -272,19 +344,21 @@ def main():
     df = load_parquet(args.parquet)
     print(f"Loaded {len(df)} records")
 
-    total_duration_ms = df['duration_ms'].sum()
-
     # Print distributions
     print_regime_distribution(df)
     print_phase_distribution(df)
 
-    # Compute and print trading confusion matrix
-    matrix, df = compute_trading_matrix(df)
-    print_trading_matrix(matrix, total_duration_ms)
+    # Compute and print entry confusion matrix
+    count_matrix, df = compute_entry_matrix(df)
+    print_entry_matrix(count_matrix)
+
+    # Plot confusion matrix
+    if args.output:
+        plot_entry_matrix(count_matrix, args.output)
 
     # Detailed analysis
     if args.verbose:
-        analyze_by_phase_intensity(df, matrix)
+        analyze_by_phase_intensity(df, count_matrix)
 
     return 0
 

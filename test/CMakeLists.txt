@@ -23,15 +23,25 @@ macro(add_unit_test _TEST_NAME)
 
     add_executable(${TARGET_NAME} ${_TEST_NAME}_tests.cpp)
 
-    set(BASE_LIBS cap)
+    set(BASE_LIBS "")
+    if (NOT APPLE)
+        set(BASE_LIBS cap)
+    endif()
 
     if (${_TEST_NAME} MATCHES "^benchmark_")
         target_link_libraries(${TARGET_NAME} PRIVATE
-                HftLib_ws HftLib_fix
+                HftLib_ws
                 ${BASE_LIBS}
                 benchmark::benchmark
                 benchmark::benchmark_main
         )
+        # Add WebSocket include directories for benchmark tests
+        if(ENABLE_WEBSOCKET)
+            target_include_directories(${TARGET_NAME} PRIVATE
+                    ${CMAKE_SOURCE_DIR}/hft/core/websocket
+                    ${CMAKE_SOURCE_DIR}/hft/core/websocket/market_data
+            )
+        endif()
     elseif (${_TEST_NAME} MATCHES "^fix_")
         target_link_libraries(${TARGET_NAME} PRIVATE
                 HftLib_fix
@@ -98,6 +108,20 @@ file(GLOB TEST_SOURCES CONFIGURE_DEPENDS
 list(FILTER TEST_SOURCES EXCLUDE REGEX ".*cpu_cgroup_integration_tests\\.cpp$")
 list(FILTER TEST_SOURCES EXCLUDE REGEX ".*full_pipeline_benchmark_tests\\.cpp$")
 
+# Exclude fix_ tests and FIX benchmark tests when ENABLE_WEBSOCKET is ON
+if(ENABLE_WEBSOCKET)
+    list(FILTER TEST_SOURCES EXCLUDE REGEX ".*fix_.*_tests\\.cpp$")
+    list(FILTER TEST_SOURCES EXCLUDE REGEX ".*benchmark_decoder_performance_fix_tests\\.cpp$")
+    # Exclude broken benchmark tests that reference non-existent json_md_decoder.hpp
+    list(FILTER TEST_SOURCES EXCLUDE REGEX ".*benchmark_decoder_performance_json_tests\\.cpp$")
+    list(FILTER TEST_SOURCES EXCLUDE REGEX ".*benchmark_fixed_point_tests\\.cpp$")
+endif()
+
+# Exclude Linux-specific tests on macOS
+if(APPLE)
+    list(FILTER TEST_SOURCES EXCLUDE REGEX ".*cpu_priority_tests\\.cpp$")
+endif()
+
 foreach (test_src IN LISTS TEST_SOURCES)
     get_filename_component(fname "${test_src}" NAME_WE)
     string(REGEX REPLACE "_tests$" "" test_name "${fname}")
@@ -118,12 +142,13 @@ macro(add_strategy_benchmark strategy_type strategy_name)
     add_executable(${TARGET_NAME} full_pipeline_benchmark_tests.cpp)
     target_include_directories(${TARGET_NAME} PRIVATE "${gen_dir}")
     target_compile_definitions(${TARGET_NAME} PRIVATE ENABLE_WEBSOCKET UNIT_TEST)
-    target_link_libraries(${TARGET_NAME} PRIVATE
-            HftLib_ws HftLib_fix
-            cap
-            GTest::gtest_main
-            GTest::gmock
-    )
+
+    set(STRATEGY_LIBS HftLib_ws GTest::gtest_main GTest::gmock)
+    if (NOT APPLE)
+        list(APPEND STRATEGY_LIBS cap)
+    endif()
+
+    target_link_libraries(${TARGET_NAME} PRIVATE ${STRATEGY_LIBS})
     target_precompile_headers(${TARGET_NAME} PRIVATE
             ${CMAKE_SOURCE_DIR}/include/pch.h)
     target_compile_options(${TARGET_NAME} PRIVATE

@@ -100,8 +100,8 @@ TEST_F(MarketOrderBookTest, ClearResetsOrderBookAndUpdatesBBO) {
   EXPECT_FALSE(bbo->ask_qty.is_valid());
 }
 
-// Trade
-TEST_F(MarketOrderBookTest, TradeInvokesTradeEngineAndSkipsOrderBookUpdate) {
+// Delete
+TEST_F(MarketOrderBookTest, DeleteUpdatesOrderBook) {
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
   const auto price = PriceType::from_raw(100000);
   const auto qty = QtyType::from_raw(5000);
@@ -110,17 +110,15 @@ TEST_F(MarketOrderBookTest, TradeInvokesTradeEngineAndSkipsOrderBookUpdate) {
 
   book_->on_market_data_updated(&md);
 
-  const auto trade_price = PriceType::from_raw(100000);
-  const auto trade_qty = QtyType::from_raw(4000);
-  const MarketData trade_md =
-      MarketData(MarketUpdateType::kTrade, OrderId{kOrderIdInvalid}, symbol,
-                 Side::kBuy, trade_price, trade_qty);
-  book_->on_market_data_updated(&trade_md);
+  const MarketData delete_md =
+      MarketData(MarketUpdateType::kCancel, OrderId{kOrderIdInvalid}, symbol,
+                 Side::kBuy, price, QtyType{});
+  book_->on_market_data_updated(&delete_md);
 
   const BBO* bbo = book_->get_bbo();
-  EXPECT_EQ(bbo->bid_price, price);
+  EXPECT_FALSE(bbo->bid_price.is_valid());
   EXPECT_FALSE(bbo->ask_price.is_valid());
-  EXPECT_EQ(bbo->bid_qty.value, qty.value - trade_qty.value);
+  EXPECT_FALSE(bbo->bid_qty.is_valid());
   EXPECT_FALSE(bbo->ask_qty.is_valid());
 }
 
@@ -182,20 +180,6 @@ TEST_F(MarketOrderBookTest, AddOrders) {
     EXPECT_EQ(bbo->bid_price, price);
     EXPECT_FALSE(bbo->ask_price.is_valid());
     EXPECT_EQ(bbo->bid_qty, qty);
-    EXPECT_FALSE(bbo->ask_qty.is_valid());
-  }
-  {
-    const auto price = PriceType::from_raw(100001);
-    const auto qty = QtyType::from_raw(2000);
-    const MarketData md(MarketUpdateType::kTrade, OrderId{kOrderIdInvalid},
-                        symbol, Side::kBuy, price, qty);
-
-    book_->on_market_data_updated(&md);
-
-    const BBO* bbo = book_->get_bbo();
-    EXPECT_EQ(bbo->bid_price, price);
-    EXPECT_FALSE(bbo->ask_price.is_valid());
-    EXPECT_EQ(bbo->bid_qty.value, 1000);  // 3000 - 2000
     EXPECT_FALSE(bbo->ask_qty.is_valid());
   }
 }
@@ -441,7 +425,7 @@ TEST_F(MarketOrderBookTest, PeekLevels) {
   EXPECT_EQ(bbo->bid_price, cfg.index_to_price(45));
 
   auto bids = book_->peek_levels(true, 3);
-  std::vector want_bids = {35, 25, 15};
+  std::vector want_bids = {45, 35, 25};
   EXPECT_EQ(bids, want_bids);
 
   for (int idx : {200, 210, 220}) {
@@ -455,7 +439,7 @@ TEST_F(MarketOrderBookTest, PeekLevels) {
   EXPECT_EQ(bbo->ask_price, cfg.index_to_price(200));
 
   auto asks = book_->peek_levels(false, 2);
-  std::vector want_asks = {210, 220};
+  std::vector want_asks = {200, 210};
   EXPECT_EQ(asks, want_asks);
 }
 
@@ -578,23 +562,8 @@ TEST_F(MarketOrderBookTest, MultipleOrdersAcrossBuckets) {
 // Edge Case Tests
 // ============================================================================
 
-TEST_F(MarketOrderBookTest, ZeroQuantityAdd_UpdatesBBOWithZero) {
-  const auto& cfg = book_->config();
-  TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
-  const auto price = cfg.index_to_price(100);
-  const auto zero_qty = QtyType::from_raw(0);
-
-  const MarketData md(MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, price, zero_qty);
-  book_->on_market_data_updated(&md);
-
-  const BBO* bbo = book_->get_bbo();
-  // Zero qty order is still added to book, but with zero qty
-  EXPECT_EQ(bbo->bid_price, price);
-  EXPECT_EQ(bbo->bid_qty.value, 0);
-}
-
-TEST_F(MarketOrderBookTest, TradeExhaustsEntireLevel_BBOUpdatesToNextLevel) {
+TEST_F(MarketOrderBookTest, DeleteExhaustsEntireLevel_BBOUpdatesToNextLevel) {
   const auto& cfg = book_->config();
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
@@ -616,11 +585,10 @@ TEST_F(MarketOrderBookTest, TradeExhaustsEntireLevel_BBOUpdatesToNextLevel) {
   EXPECT_EQ(bbo->bid_price, cfg.index_to_price(200));
   EXPECT_EQ(bbo->bid_qty.value, 5000);
 
-  // Trade exhausts the best level
+  // Delete exhausts the best level
   {
     const auto price = cfg.index_to_price(200);
-    const auto qty = QtyType::from_raw(5000);
-    const MarketData md(MarketUpdateType::kTrade, OrderId{0}, symbol, Side::kBuy, price, qty);
+    const MarketData md(MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, price, QtyType{});
     book_->on_market_data_updated(&md);
   }
 
@@ -629,7 +597,7 @@ TEST_F(MarketOrderBookTest, TradeExhaustsEntireLevel_BBOUpdatesToNextLevel) {
   EXPECT_EQ(bbo->bid_qty.value, 3000);
 }
 
-TEST_F(MarketOrderBookTest, TradeMoreThanAvailable_LevelBecomesZero) {
+TEST_F(MarketOrderBookTest, DeleteLevel_LevelBecomesInvalid) {
   const auto& cfg = book_->config();
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
@@ -641,10 +609,9 @@ TEST_F(MarketOrderBookTest, TradeMoreThanAvailable_LevelBecomesZero) {
   const BBO* bbo = book_->get_bbo();
   EXPECT_EQ(bbo->ask_price, price);
 
-  // Trade more than available
-  const auto trade_qty = QtyType::from_raw(3000);
-  const MarketData trade_md(MarketUpdateType::kTrade, OrderId{0}, symbol, Side::kSell, price, trade_qty);
-  book_->on_market_data_updated(&trade_md);
+  // Delete the level
+  const MarketData delete_md(MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kSell, price, QtyType{});
+  book_->on_market_data_updated(&delete_md);
 
   // Level should be cleared
   EXPECT_FALSE(bbo->ask_price.is_valid());
@@ -758,7 +725,6 @@ TEST_F(MarketOrderBookTest, PeekLevelsWithQty_ReturnsCorrectData) {
   const auto& cfg = book_->config();
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
-  // Add levels: peek_levels_with_qty returns levels AFTER the best (next levels)
   std::vector<std::pair<int, int64_t>> levels = {{100, 1000}, {200, 2000}, {300, 3000}};
 
   for (const auto& [idx, qty_val] : levels) {
@@ -769,18 +735,17 @@ TEST_F(MarketOrderBookTest, PeekLevelsWithQty_ReturnsCorrectData) {
   }
 
   std::vector<trading::LevelView> out;
-  // peek_levels_with_qty returns levels after best bid (300), so we get 200, 100
   int count = book_->peek_levels_with_qty(true, 3, out);
 
-  // Best bid is 300, so peek returns 200 and 100 (2 levels after best)
-  EXPECT_EQ(count, 2);
-  ASSERT_EQ(out.size(), 2u);
+  EXPECT_EQ(count, 3);
+  ASSERT_EQ(out.size(), 3u);
 
-  // After best bid (300): 200, then 100
-  EXPECT_EQ(out[0].idx, 200);
-  EXPECT_EQ(out[0].qty_raw, 2000);
-  EXPECT_EQ(out[1].idx, 100);
-  EXPECT_EQ(out[1].qty_raw, 1000);
+  EXPECT_EQ(out[0].idx, 300);
+  EXPECT_EQ(out[0].qty_raw, 3000);
+  EXPECT_EQ(out[1].idx, 200);
+  EXPECT_EQ(out[1].qty_raw, 2000);
+  EXPECT_EQ(out[2].idx, 100);
+  EXPECT_EQ(out[2].qty_raw, 1000);
 }
 
 TEST_F(MarketOrderBookTest, PeekLevelsWithQty_EmptyBook_ReturnsZero) {
@@ -795,7 +760,6 @@ TEST_F(MarketOrderBookTest, PeekLevelsWithQty_RequestMoreThanAvailable) {
   const auto& cfg = book_->config();
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
-  // Add 3 levels for asks
   for (int idx : {100, 200, 300}) {
     auto p = cfg.index_to_price(idx);
     auto q = QtyType::from_raw(1000);
@@ -804,19 +768,17 @@ TEST_F(MarketOrderBookTest, PeekLevelsWithQty_RequestMoreThanAvailable) {
   }
 
   std::vector<trading::LevelView> out;
-  // Best ask is 100, peek returns levels after: 200, 300
   int count = book_->peek_levels_with_qty(false, 10, out);
 
-  EXPECT_EQ(count, 2);
-  EXPECT_EQ(out.size(), 2u);
+  EXPECT_EQ(count, 3);
+  EXPECT_EQ(out.size(), 3u);
 }
 
 TEST_F(MarketOrderBookTest, PeekQty_ReturnsCorrectQuantities) {
   const auto& cfg = book_->config();
   TickerId symbol = INI_CONFIG.get("meta", "ticker");
 
-  // peek_qty returns levels after best, so we need 4 levels to get 3 results
-  std::vector<std::pair<int, int64_t>> levels = {{50, 500}, {100, 1000}, {150, 1500}, {200, 2000}};
+  std::vector<std::pair<int, int64_t>> levels = {{100, 1000}, {200, 2000}, {300, 3000}};
 
   for (const auto& [idx, qty_val] : levels) {
     auto p = cfg.index_to_price(idx);
@@ -827,19 +789,17 @@ TEST_F(MarketOrderBookTest, PeekQty_ReturnsCorrectQuantities) {
 
   std::array<int64_t, 3> qty_out{};
   std::array<int, 3> idx_out{};
-  // Best bid is 200, peek returns levels after: 150, 100, 50
   int filled = book_->peek_qty<int64_t>(true, 3,
       std::span<int64_t>{qty_out.data(), qty_out.size()},
       std::span<int>{idx_out.data(), idx_out.size()});
 
   EXPECT_EQ(filled, 3);
-  // After best bid (200): 150, 100, 50
-  EXPECT_EQ(idx_out[0], 150);
-  EXPECT_EQ(qty_out[0], 1500);
-  EXPECT_EQ(idx_out[1], 100);
-  EXPECT_EQ(qty_out[1], 1000);
-  EXPECT_EQ(idx_out[2], 50);
-  EXPECT_EQ(qty_out[2], 500);
+  EXPECT_EQ(idx_out[0], 300);
+  EXPECT_EQ(qty_out[0], 3000);
+  EXPECT_EQ(idx_out[1], 200);
+  EXPECT_EQ(qty_out[1], 2000);
+  EXPECT_EQ(idx_out[2], 100);
+  EXPECT_EQ(qty_out[2], 1000);
 }
 
 TEST_F(MarketOrderBookTest, OrdersAtBucketBoundary) {
@@ -977,6 +937,778 @@ TEST_F(MarketOrderBookTest, ModifyToZeroQty_SetsQtyToZero) {
   const BBO* bbo = book_->get_bbo();
   if (bbo->ask_price.is_valid()) {
     EXPECT_EQ(bbo->ask_qty.value, 0);
+  }
+}
+
+// ============================================================================
+// Enhanced peek_qty Tests
+// ============================================================================
+
+TEST_F(MarketOrderBookTest, PeekQty_IncludesBestLevel) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  std::vector<std::pair<int, int64_t>> levels = {
+      {100, 1000}, {200, 2000}, {300, 3000}};
+
+  for (const auto& [idx, qty_val] : levels) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(qty_val);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::array<int64_t, 10> qty_out{};
+  std::array<int, 10> idx_out{};
+
+  int filled = book_->peek_qty<int64_t>(
+      true, 10, std::span<int64_t>{qty_out}, std::span<int>{idx_out});
+
+  EXPECT_EQ(filled, 3);
+  EXPECT_EQ(idx_out[0], 300);
+  EXPECT_EQ(qty_out[0], 3000);
+  EXPECT_EQ(idx_out[1], 200);
+  EXPECT_EQ(qty_out[1], 2000);
+  EXPECT_EQ(idx_out[2], 100);
+  EXPECT_EQ(qty_out[2], 1000);
+}
+
+TEST_F(MarketOrderBookTest, PeekQty_AskSide_IncludesBestLevel) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  std::vector<std::pair<int, int64_t>> levels = {
+      {100, 1000}, {200, 2000}, {300, 3000}};
+
+  for (const auto& [idx, qty_val] : levels) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(qty_val);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kSell, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::array<int64_t, 10> qty_out{};
+  std::array<int, 10> idx_out{};
+
+  int filled = book_->peek_qty<int64_t>(
+      false, 10, std::span<int64_t>{qty_out}, std::span<int>{idx_out});
+
+  EXPECT_EQ(filled, 3);
+  EXPECT_EQ(idx_out[0], 100);
+  EXPECT_EQ(qty_out[0], 1000);
+  EXPECT_EQ(idx_out[1], 200);
+  EXPECT_EQ(qty_out[1], 2000);
+  EXPECT_EQ(idx_out[2], 300);
+  EXPECT_EQ(qty_out[2], 3000);
+}
+
+TEST_F(MarketOrderBookTest, PeekQty_AfterDelete_StillWorks) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  std::vector<std::pair<int, int64_t>> levels = {
+      {100, 1000}, {200, 2000}, {300, 3000}, {400, 4000}};
+
+  for (const auto& [idx, qty_val] : levels) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(qty_val);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  {
+    auto p = cfg.index_to_price(300);
+    MarketData md{
+        MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, p, QtyType{}};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::array<int64_t, 10> qty_out{};
+  std::array<int, 10> idx_out{};
+
+  int filled = book_->peek_qty<int64_t>(
+      true, 10, std::span<int64_t>{qty_out}, std::span<int>{idx_out});
+
+  EXPECT_EQ(filled, 3);
+  EXPECT_EQ(idx_out[0], 400);
+  EXPECT_EQ(qty_out[0], 4000);
+  EXPECT_EQ(idx_out[1], 200);
+  EXPECT_EQ(qty_out[1], 2000);
+  EXPECT_EQ(idx_out[2], 100);
+  EXPECT_EQ(qty_out[2], 1000);
+}
+
+TEST_F(MarketOrderBookTest, PeekQty_AfterBestDeleted_FindsNewBest) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  std::vector<std::pair<int, int64_t>> levels = {
+      {100, 1000}, {200, 2000}, {300, 3000}};
+
+  for (const auto& [idx, qty_val] : levels) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(qty_val);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  {
+    auto p = cfg.index_to_price(300);
+    MarketData md{
+        MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, p, QtyType{}};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::array<int64_t, 10> qty_out{};
+  std::array<int, 10> idx_out{};
+
+  int filled = book_->peek_qty<int64_t>(
+      true, 10, std::span<int64_t>{qty_out}, std::span<int>{idx_out});
+
+  EXPECT_EQ(filled, 2);
+  EXPECT_EQ(idx_out[0], 200);
+  EXPECT_EQ(qty_out[0], 2000);
+  EXPECT_EQ(idx_out[1], 100);
+  EXPECT_EQ(qty_out[1], 1000);
+}
+
+TEST_F(MarketOrderBookTest, PeekQty_LimitedBuffer_ReturnsPartial) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  std::vector<std::pair<int, int64_t>> levels = {
+      {100, 1000}, {200, 2000}, {300, 3000}, {400, 4000}, {500, 5000}};
+
+  for (const auto& [idx, qty_val] : levels) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(qty_val);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::array<int64_t, 3> qty_out{};
+  std::array<int, 3> idx_out{};
+
+  int filled = book_->peek_qty<int64_t>(
+      true, 3, std::span<int64_t>{qty_out}, std::span<int>{idx_out});
+
+  EXPECT_EQ(filled, 3);
+  EXPECT_EQ(idx_out[0], 500);
+  EXPECT_EQ(qty_out[0], 5000);
+  EXPECT_EQ(idx_out[1], 400);
+  EXPECT_EQ(qty_out[1], 4000);
+  EXPECT_EQ(idx_out[2], 300);
+  EXPECT_EQ(qty_out[2], 3000);
+}
+
+TEST_F(MarketOrderBookTest, PeekQty_EmptyBook_ReturnsNegativeOne) {
+  std::array<int64_t, 10> qty_out{};
+  std::array<int, 10> idx_out{};
+
+  int filled = book_->peek_qty<int64_t>(
+      true, 10, std::span<int64_t>{qty_out}, std::span<int>{idx_out});
+
+  EXPECT_EQ(filled, -1);
+}
+
+TEST_F(MarketOrderBookTest, PeekQty_SingleLevel_ReturnsOne) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  auto p = cfg.index_to_price(100);
+  auto q = QtyType::from_raw(1000);
+  MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+  book_->on_market_data_updated(&md);
+
+  std::array<int64_t, 10> qty_out{};
+  std::array<int, 10> idx_out{};
+
+  int filled = book_->peek_qty<int64_t>(
+      true, 10, std::span<int64_t>{qty_out}, std::span<int>{idx_out});
+
+  EXPECT_EQ(filled, 1);
+  EXPECT_EQ(idx_out[0], 100);
+  EXPECT_EQ(qty_out[0], 1000);
+}
+
+TEST_F(MarketOrderBookTest, PeekQty_ConsecutiveUpdates_Consistent) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  for (int i = 100; i <= 500; i += 100) {
+    auto p = cfg.index_to_price(i);
+    auto q = QtyType::from_raw(i * 10);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  for (int run = 0; run < 3; ++run) {
+    std::array<int64_t, 10> qty_out{};
+    std::array<int, 10> idx_out{};
+
+    int filled = book_->peek_qty<int64_t>(
+        true, 10, std::span<int64_t>{qty_out}, std::span<int>{idx_out});
+
+    EXPECT_EQ(filled, 5) << "Run " << run;
+    EXPECT_EQ(idx_out[0], 500) << "Run " << run;
+    EXPECT_EQ(qty_out[0], 5000) << "Run " << run;
+    EXPECT_EQ(idx_out[4], 100) << "Run " << run;
+    EXPECT_EQ(qty_out[4], 1000) << "Run " << run;
+  }
+}
+
+TEST_F(MarketOrderBookTest, PeekQty_MixedAddDelete_Correct) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  for (int i = 100; i <= 500; i += 100) {
+    auto p = cfg.index_to_price(i);
+    auto q = QtyType::from_raw(i * 10);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  {
+    auto p = cfg.index_to_price(400);
+    MarketData md{
+        MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, p, QtyType{}};
+    book_->on_market_data_updated(&md);
+  }
+
+  {
+    auto p = cfg.index_to_price(600);
+    auto q = QtyType::from_raw(6000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  {
+    auto p = cfg.index_to_price(200);
+    MarketData md{
+        MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, p, QtyType{}};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::array<int64_t, 10> qty_out{};
+  std::array<int, 10> idx_out{};
+
+  int filled = book_->peek_qty<int64_t>(
+      true, 10, std::span<int64_t>{qty_out}, std::span<int>{idx_out});
+
+  EXPECT_EQ(filled, 4);
+  EXPECT_EQ(idx_out[0], 600);
+  EXPECT_EQ(qty_out[0], 6000);
+  EXPECT_EQ(idx_out[1], 500);
+  EXPECT_EQ(qty_out[1], 5000);
+  EXPECT_EQ(idx_out[2], 300);
+  EXPECT_EQ(qty_out[2], 3000);
+  EXPECT_EQ(idx_out[3], 100);
+  EXPECT_EQ(qty_out[3], 1000);
+}
+
+TEST_F(MarketOrderBookTest, BestIdxCache_AfterMultipleDeletes) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  for (int idx : {100, 200, 300, 400, 500}) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(500));
+
+  for (int del_idx : {500, 400, 300}) {
+    auto p = cfg.index_to_price(del_idx);
+    MarketData md{MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, p, QtyType{}};
+    book_->on_market_data_updated(&md);
+  }
+
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(200));
+
+  std::array<int64_t, 2> qty_out{};
+  std::array<int, 2> idx_out{};
+  int filled = book_->peek_qty<int64_t>(true, 2,
+      std::span<int64_t>{qty_out.data(), qty_out.size()},
+      std::span<int>{idx_out.data(), idx_out.size()});
+
+  EXPECT_EQ(filled, 2);
+  EXPECT_EQ(idx_out[0], 200);
+  EXPECT_EQ(idx_out[1], 100);
+}
+
+TEST_F(MarketOrderBookTest, BestIdxCache_AfterModify) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  for (int idx : {100, 200, 300}) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(2000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(300));
+  EXPECT_EQ(bbo->bid_qty, QtyType::from_raw(2000));
+
+  {
+    auto p = cfg.index_to_price(300);
+    auto q = QtyType::from_raw(1500);
+    MarketData md{MarketUpdateType::kModify, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(300));
+  EXPECT_EQ(bbo->bid_qty, QtyType::from_raw(1500));
+
+  std::array<int64_t, 3> qty_out{};
+  std::array<int, 3> idx_out{};
+  int filled = book_->peek_qty<int64_t>(true, 3,
+      std::span<int64_t>{qty_out.data(), qty_out.size()},
+      std::span<int>{idx_out.data(), idx_out.size()});
+
+  EXPECT_EQ(filled, 3);
+  EXPECT_EQ(idx_out[0], 300);
+  EXPECT_EQ(qty_out[0], 1500);
+  EXPECT_EQ(idx_out[1], 200);
+  EXPECT_EQ(qty_out[1], 2000);
+  EXPECT_EQ(idx_out[2], 100);
+  EXPECT_EQ(qty_out[2], 2000);
+}
+
+TEST_F(MarketOrderBookTest, NextActiveIdx_CrossesBucketBoundary) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  constexpr int kBucketSize = 4096;
+  std::vector<int> indices = {
+    kBucketSize - 2,
+    kBucketSize - 1,
+    kBucketSize,
+    kBucketSize + 1,
+    kBucketSize * 2 - 1,
+    kBucketSize * 2,
+  };
+
+  for (int idx : indices) {
+    if (idx >= cfg.num_levels) continue;
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  int max_idx = -1;
+  for (int idx : indices) {
+    if (idx < cfg.num_levels && idx > max_idx) max_idx = idx;
+  }
+
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(max_idx));
+
+  std::vector<int> collected;
+  int idx = max_idx;
+  collected.push_back(idx);
+  while (idx >= 0) {
+    idx = book_->next_active_idx(true, idx);
+    if (idx >= 0) collected.push_back(idx);
+  }
+
+  std::vector<int> expected;
+  for (int i = static_cast<int>(indices.size()) - 1; i >= 0; --i) {
+    if (indices[i] < cfg.num_levels) expected.push_back(indices[i]);
+  }
+  std::sort(expected.begin(), expected.end(), std::greater<int>());
+
+  EXPECT_EQ(collected, expected);
+}
+
+TEST_F(MarketOrderBookTest, PeekQty_AfterRapidAddDeleteTrade) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  for (int idx : {100, 200, 300, 400, 500}) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  {
+    auto p = cfg.index_to_price(300);
+    MarketData md{MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, p, QtyType{}};
+    book_->on_market_data_updated(&md);
+  }
+
+  {
+    auto p = cfg.index_to_price(500);
+    auto q = QtyType::from_raw(500);
+    MarketData md{MarketUpdateType::kModify, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  {
+    auto p = cfg.index_to_price(350);
+    auto q = QtyType::from_raw(2000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::array<int64_t, 5> qty_out{};
+  std::array<int, 5> idx_out{};
+  int filled = book_->peek_qty<int64_t>(true, 5,
+      std::span<int64_t>{qty_out.data(), qty_out.size()},
+      std::span<int>{idx_out.data(), idx_out.size()});
+
+  EXPECT_EQ(filled, 5);
+  EXPECT_EQ(idx_out[0], 500);
+  EXPECT_EQ(qty_out[0], 500);
+  EXPECT_EQ(idx_out[1], 400);
+  EXPECT_EQ(qty_out[1], 1000);
+  EXPECT_EQ(idx_out[2], 350);
+  EXPECT_EQ(qty_out[2], 2000);
+  EXPECT_EQ(idx_out[3], 200);
+  EXPECT_EQ(qty_out[3], 1000);
+  EXPECT_EQ(idx_out[4], 100);
+  EXPECT_EQ(qty_out[4], 1000);
+}
+
+TEST_F(MarketOrderBookTest, BestIdxCache_AskSide_AfterDeletes) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  for (int idx : {100, 200, 300, 400, 500}) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kSell, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_EQ(bbo->ask_price, cfg.index_to_price(100));
+
+  for (int del_idx : {100, 200}) {
+    auto p = cfg.index_to_price(del_idx);
+    MarketData md{MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kSell, p, QtyType{}};
+    book_->on_market_data_updated(&md);
+  }
+
+  EXPECT_EQ(bbo->ask_price, cfg.index_to_price(300));
+
+  std::array<int64_t, 3> qty_out{};
+  std::array<int, 3> idx_out{};
+  int filled = book_->peek_qty<int64_t>(false, 3,
+      std::span<int64_t>{qty_out.data(), qty_out.size()},
+      std::span<int>{idx_out.data(), idx_out.size()});
+
+  EXPECT_EQ(filled, 3);
+  EXPECT_EQ(idx_out[0], 300);
+  EXPECT_EQ(idx_out[1], 400);
+  EXPECT_EQ(idx_out[2], 500);
+}
+
+TEST_F(MarketOrderBookTest, ModifyBestLevel_CacheStaysValid) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  for (int idx : {100, 200, 300}) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(300));
+
+  {
+    auto p = cfg.index_to_price(300);
+    auto q = QtyType::from_raw(5000);
+    MarketData md{MarketUpdateType::kModify, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(300));
+  EXPECT_EQ(bbo->bid_qty, QtyType::from_raw(5000));
+
+  std::array<int64_t, 3> qty_out{};
+  std::array<int, 3> idx_out{};
+  int filled = book_->peek_qty<int64_t>(true, 3,
+      std::span<int64_t>{qty_out.data(), qty_out.size()},
+      std::span<int>{idx_out.data(), idx_out.size()});
+
+  EXPECT_EQ(filled, 3);
+  EXPECT_EQ(idx_out[0], 300);
+  EXPECT_EQ(qty_out[0], 5000);
+}
+
+TEST_F(MarketOrderBookTest, ModifyNonBest_BestUnchanged) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  for (int idx : {100, 200, 300}) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(300));
+
+  {
+    auto p = cfg.index_to_price(200);
+    auto q = QtyType::from_raw(500);
+    MarketData md{MarketUpdateType::kModify, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(300));
+  EXPECT_EQ(bbo->bid_qty, QtyType::from_raw(1000));
+
+  std::array<int64_t, 3> qty_out{};
+  std::array<int, 3> idx_out{};
+  int filled = book_->peek_qty<int64_t>(true, 3,
+      std::span<int64_t>{qty_out.data(), qty_out.size()},
+      std::span<int>{idx_out.data(), idx_out.size()});
+
+  EXPECT_EQ(filled, 3);
+  EXPECT_EQ(idx_out[0], 300);
+  EXPECT_EQ(qty_out[0], 1000);
+  EXPECT_EQ(idx_out[1], 200);
+  EXPECT_EQ(qty_out[1], 500);
+  EXPECT_EQ(idx_out[2], 100);
+  EXPECT_EQ(qty_out[2], 1000);
+}
+
+TEST_F(MarketOrderBookTest, PeekLevelsWithQty_VsPeekQty_Consistency) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  for (int idx : {100, 200, 300, 400, 500}) {
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(idx * 10);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::vector<trading::LevelView> level_view_out;
+  int count1 = book_->peek_levels_with_qty(true, 5, level_view_out);
+
+  std::array<int64_t, 5> qty_out{};
+  std::array<int, 5> idx_out{};
+  int count2 = book_->peek_qty<int64_t>(true, 5,
+      std::span<int64_t>{qty_out.data(), qty_out.size()},
+      std::span<int>{idx_out.data(), idx_out.size()});
+
+  EXPECT_EQ(count1, count2);
+  for (int i = 0; i < count1; ++i) {
+    EXPECT_EQ(level_view_out[i].idx, idx_out[i]) << "Index mismatch at position " << i;
+    EXPECT_EQ(level_view_out[i].qty_raw, qty_out[i]) << "Qty mismatch at position " << i;
+  }
+}
+
+// ============================================================================
+// Bucket Boundary Tests
+// ============================================================================
+
+TEST_F(MarketOrderBookTest, BucketBoundary_AddAtExactBoundary) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  constexpr int kBucketSize = 4096;
+  std::vector<int> boundary_indices = {
+      0,
+      kBucketSize - 1,
+      kBucketSize,
+      kBucketSize * 2 - 1,
+      kBucketSize * 2,
+  };
+
+  for (int idx : boundary_indices) {
+    if (idx >= cfg.num_levels) continue;
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw((idx + 1) * 100);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::array<int64_t, 10> qty_out{};
+  std::array<int, 10> idx_out{};
+  int filled = book_->peek_qty<int64_t>(true, 10,
+      std::span<int64_t>{qty_out.data(), qty_out.size()},
+      std::span<int>{idx_out.data(), idx_out.size()});
+
+  int expected_count = 0;
+  for (int idx : boundary_indices) {
+    if (idx < cfg.num_levels) ++expected_count;
+  }
+  EXPECT_EQ(filled, expected_count);
+
+  for (int i = 0; i < filled - 1; ++i) {
+    EXPECT_GT(idx_out[i], idx_out[i + 1]) << "Bid side should be descending";
+  }
+}
+
+TEST_F(MarketOrderBookTest, BucketBoundary_DeleteAtBoundary) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  constexpr int kBucketSize = 4096;
+  std::vector<int> indices = {
+      kBucketSize - 1,
+      kBucketSize,
+      kBucketSize + 1,
+  };
+
+  for (int idx : indices) {
+    if (idx >= cfg.num_levels) continue;
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  const BBO* bbo = book_->get_bbo();
+  int best_before = kBucketSize + 1 < cfg.num_levels ? kBucketSize + 1 : kBucketSize;
+  EXPECT_EQ(bbo->bid_price, cfg.index_to_price(best_before));
+
+  {
+    auto p = cfg.index_to_price(kBucketSize);
+    MarketData md{MarketUpdateType::kCancel, OrderId{0}, symbol, Side::kBuy, p, QtyType{}};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::array<int64_t, 3> qty_out{};
+  std::array<int, 3> idx_out{};
+  int filled = book_->peek_qty<int64_t>(true, 3,
+      std::span<int64_t>{qty_out.data(), qty_out.size()},
+      std::span<int>{idx_out.data(), idx_out.size()});
+
+  EXPECT_EQ(filled, 2);
+  if (kBucketSize + 1 < cfg.num_levels) {
+    EXPECT_EQ(idx_out[0], kBucketSize + 1);
+    EXPECT_EQ(idx_out[1], kBucketSize - 1);
+  }
+}
+
+TEST_F(MarketOrderBookTest, BucketBoundary_AskSideCrossBoundary) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  constexpr int kBucketSize = 4096;
+  std::vector<int> indices = {
+      0,
+      kBucketSize - 1,
+      kBucketSize,
+      kBucketSize * 2 - 1,
+      kBucketSize * 2,
+  };
+
+  for (int idx : indices) {
+    if (idx >= cfg.num_levels) continue;
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kSell, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  const BBO* bbo = book_->get_bbo();
+  EXPECT_EQ(bbo->ask_price, cfg.index_to_price(0));
+
+  std::array<int64_t, 10> qty_out{};
+  std::array<int, 10> idx_out{};
+  int filled = book_->peek_qty<int64_t>(false, 10,
+      std::span<int64_t>{qty_out.data(), qty_out.size()},
+      std::span<int>{idx_out.data(), idx_out.size()});
+
+  int expected = 0;
+  for (int idx : indices) {
+    if (idx < cfg.num_levels) ++expected;
+  }
+  EXPECT_EQ(filled, expected);
+
+  for (int i = 0; i < filled - 1; ++i) {
+    EXPECT_LT(idx_out[i], idx_out[i + 1]) << "Ask side should be ascending";
+  }
+}
+
+TEST_F(MarketOrderBookTest, BucketBoundary_PeekLevelsWithQty_CrossBoundary) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  constexpr int kBucketSize = 4096;
+  std::vector<int> indices = {
+      0,
+      kBucketSize - 1,
+      kBucketSize,
+      kBucketSize * 2 - 1,
+      kBucketSize * 2,
+  };
+
+  for (int idx : indices) {
+    if (idx >= cfg.num_levels) continue;
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(idx + 1);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::vector<trading::LevelView> levels;
+  int count = book_->peek_levels_with_qty(true, 10, levels);
+
+  int expected = 0;
+  for (int idx : indices) {
+    if (idx < cfg.num_levels) ++expected;
+  }
+  EXPECT_EQ(count, expected);
+
+  for (int i = 0; i < count; ++i) {
+    EXPECT_EQ(levels[i].qty_raw, levels[i].idx + 1);
+  }
+}
+
+TEST_F(MarketOrderBookTest, BucketBoundary_MultipleBucketsWithGaps) {
+  const auto& cfg = book_->config();
+  TickerId symbol = INI_CONFIG.get("meta", "ticker");
+
+  constexpr int kBucketSize = 4096;
+  std::vector<int> indices = {
+      100,
+      kBucketSize + 100,
+      kBucketSize * 3 + 100,
+  };
+
+  for (int idx : indices) {
+    if (idx >= cfg.num_levels) continue;
+    auto p = cfg.index_to_price(idx);
+    auto q = QtyType::from_raw(1000);
+    MarketData md{MarketUpdateType::kAdd, OrderId{0}, symbol, Side::kBuy, p, q};
+    book_->on_market_data_updated(&md);
+  }
+
+  std::array<int64_t, 5> qty_out{};
+  std::array<int, 5> idx_out{};
+  int filled = book_->peek_qty<int64_t>(true, 5,
+      std::span<int64_t>{qty_out.data(), qty_out.size()},
+      std::span<int>{idx_out.data(), idx_out.size()});
+
+  int expected = 0;
+  std::vector<int> expected_indices;
+  for (int idx : indices) {
+    if (idx < cfg.num_levels) {
+      ++expected;
+      expected_indices.push_back(idx);
+    }
+  }
+  std::sort(expected_indices.begin(), expected_indices.end(), std::greater<int>());
+
+  EXPECT_EQ(filled, expected);
+  for (int i = 0; i < filled; ++i) {
+    EXPECT_EQ(idx_out[i], expected_indices[i]);
   }
 }
 

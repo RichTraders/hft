@@ -31,6 +31,7 @@
 
 #include "performance.h"
 #include "thread.hpp"
+#include "types.h"
 
 namespace common {
 #ifdef LOGGER_PERF_TRACE
@@ -375,12 +376,13 @@ class Logger {
       log(LogLevel::kFatal, str, loc);
     }
 
+    [[nodiscard]] bool is_enabled(LogLevel lvl) const noexcept;
+
    private:
     struct Impl;  // per-producer (ProducerToken 보유)
     Impl* impl_{nullptr};
     explicit Producer(Impl* producer) : impl_(producer) {}
     friend class Logger;
-    [[nodiscard]] bool is_enabled(LogLevel lvl) const noexcept;
   };
 
  private:
@@ -398,4 +400,41 @@ class Logger {
 };
 
 }  // namespace common
+
+#define LOG_TRACE(producer, fmt, ...)                                \
+  do {                                                               \
+    if (UNLIKELY((producer).is_enabled(common::LogLevel::kTrace)))   \
+      (producer).logf(common::LogLevel::kTrace, fmt, ##__VA_ARGS__); \
+  } while (0)
+
+#define LOG_DEBUG(producer, fmt, ...)                                \
+  do {                                                               \
+    if (UNLIKELY((producer).is_enabled(common::LogLevel::kDebug)))   \
+      (producer).logf(common::LogLevel::kDebug, fmt, ##__VA_ARGS__); \
+  } while (0)
+
+#define LOG_INFO(producer, fmt, ...)                                \
+  do {                                                              \
+    if (UNLIKELY((producer).is_enabled(common::LogLevel::kInfo)))   \
+      (producer).logf(common::LogLevel::kInfo, fmt, ##__VA_ARGS__); \
+  } while (0)
+
+#define LOG_WARN(producer, fmt, ...)                                \
+  do {                                                              \
+    if (UNLIKELY((producer).is_enabled(common::LogLevel::kWarn)))   \
+      (producer).logf(common::LogLevel::kWarn, fmt, ##__VA_ARGS__); \
+  } while (0)
+
+#define LOG_ERROR(producer, fmt, ...)                                \
+  do {                                                               \
+    if (UNLIKELY((producer).is_enabled(common::LogLevel::kError)))   \
+      (producer).logf(common::LogLevel::kError, fmt, ##__VA_ARGS__); \
+  } while (0)
+
+#define LOG_FATAL(producer, fmt, ...)                                \
+  do {                                                               \
+    if (UNLIKELY((producer).is_enabled(common::LogLevel::kFatal)))   \
+      (producer).logf(common::LogLevel::kFatal, fmt, ##__VA_ARGS__); \
+  } while (0)
+
 #endif

@@ -26,7 +26,7 @@ InventoryManager::InventoryManager(const common::Logger::Producer& logger,
       target_position_(static_cast<int64_t>(
           INI_CONFIG.get_double("inventory", "target_position", 0.0) *
           common::FixedPointConfig::kQtyScale)) {
-  logger_.info(
+  LOG_INFO(logger_,
       "InventoryManager initialized with skew_coefficient={}, "
       "target_position={}",
       model_.get_skew_coefficient(),
@@ -35,7 +35,7 @@ InventoryManager::InventoryManager(const common::Logger::Producer& logger,
 }
 
 InventoryManager::~InventoryManager() {
-  logger_.info("InventoryManager destroyed");
+  LOG_INFO(logger_, "InventoryManager destroyed");
 }
 
 auto InventoryManager::get_quote_adjustment(common::Side side,
@@ -53,7 +53,8 @@ auto InventoryManager::get_skew_coefficient() const noexcept -> double {
 }
 
 void InventoryManager::set_skew_coefficient(double coefficient) noexcept {
-  logger_.info("Updating skew_coefficient from {} to {}",
+  LOG_INFO(logger_,
+      "Updating skew_coefficient from {} to {}",
       model_.get_skew_coefficient(),
       coefficient);
   model_.set_skew_coefficient(coefficient);

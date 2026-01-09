@@ -99,7 +99,7 @@ class TradeEngine {
     ticker_order_book_.insert({ticker, std::move(orderbook)});
 
     thread_.start(&TradeEngine::run, this);
-    logger_.info("[Constructor] TradeEngine Created");
+    LOG_INFO(logger_, "[Constructor] TradeEngine Created");
   }
 
   ~TradeEngine() {
@@ -116,15 +116,15 @@ class TradeEngine {
     };
   }
 
-
   void stop() { running_.store(false, std::memory_order_release); }
 
   bool on_market_data_updated(MarketUpdateData* data) {
     return queue_->enqueue(data);
   }
 
-  void on_orderbook_updated(const common::TickerId& ticker, common::PriceType price,
-      common::Side side, MarketOrderBook<Strategy>* market_order_book) {
+  void on_orderbook_updated(const common::TickerId& ticker,
+      common::PriceType price, common::Side side,
+      MarketOrderBook<Strategy>* market_order_book) {
     START_MEASURE(ORDERBOOK_UPDATED);
     feature_engine_->on_order_book_updated(price, side, market_order_book);
     strategy_.on_orderbook_updated(ticker, price, side, market_order_book);
@@ -177,7 +177,9 @@ class TradeEngine {
         qty_increment_ = sym->min_qty_increment;
       }
 
-      logger_.info("[TradeEngine] Updated qty_increment to {}", qty_increment_);
+      LOG_INFO(logger_,
+          "[TradeEngine] Updated qty_increment to {}",
+          qty_increment_);
 
       order_manager_->on_instrument_info(instrument_info);
     }
@@ -221,7 +223,6 @@ class TradeEngine {
       while (queue_->dequeue(message) && md_processed < kMarketDataBatchLimit) {
         if (UNLIKELY(message == nullptr))
           continue;
-        wait.reset();
         START_MEASURE(MAKE_ORDERBOOK_ALL);
         for (const auto* market_data : message->data) {
           START_MEASURE(MAKE_ORDERBOOK_UNIT);
@@ -242,7 +243,6 @@ class TradeEngine {
       ResponseCommon response;
       while (response_queue_->dequeue(response) &&
              resp_processed < kResponseBatchLimit) {
-        wait.reset();
         START_MEASURE(RESPONSE_COMMON);
         switch (response.res_type) {
           case ResponseType::kExecutionReport:
@@ -268,19 +268,23 @@ class TradeEngine {
         ++resp_processed;
       }
 
-      if (md_processed == 0 && resp_processed == 0) {
+      if (md_processed > 0 || resp_processed > 0) {
+        wait.reset();
+      } else {
         wait.idle_hot();
       }
     }
   }
 
   void on_order_cancel_reject(const OrderCancelReject* reject) {
-    logger_.info("[OrderResult]Order cancel request is rejected. error :{}",
+    LOG_INFO(logger_,
+        "[OrderResult]Order cancel request is rejected. error :{}",
         reject->toString());
   }
 
   void on_order_mass_cancel_report(const OrderMassCancelReport* cancel_report) {
-    logger_.info("[OrderResult]Order mass cancel is rejected. error:{}",
+    LOG_INFO(logger_,
+        "[OrderResult]Order mass cancel is rejected. error:{}",
         cancel_report->toString());
   }
 };

@@ -118,7 +118,8 @@ struct BinanceSbeOps {
     constexpr size_t kMinSize = sizeof(int64_t) * 2 + sizeof(int8_t) * 2 +
                                 sizeof(schema::sbe::GroupSize32);
     if (UNLIKELY(remaining < kMinSize)) {
-      logger.error("TradeEvent: insufficient buffer (need {}, have {})",
+      LOG_ERROR(logger,
+          "TradeEvent: insufficient buffer (need {}, have {})",
           kMinSize,
           remaining);
       return schema::sbe::SbeTradeEvent{};
@@ -150,7 +151,7 @@ struct BinanceSbeOps {
     if (UNLIKELY(
             group_size.block_length < kTradeEntrySize ||
             remaining < static_cast<size_t>(pos - start) + trades_total_size)) {
-      logger.error("TradeEvent: trades group size exceeds buffer");
+      LOG_ERROR(logger, "TradeEvent: trades group size exceeds buffer");
       return schema::sbe::SbeTradeEvent{};
     }
 
@@ -196,7 +197,7 @@ struct BinanceSbeOps {
       size_t remaining, const common::Logger::Producer& logger) const {
     constexpr size_t kMinSize = sizeof(int64_t) * 6 + sizeof(int8_t) * 2;
     if (UNLIKELY(remaining < kMinSize)) {
-      logger.error(
+      LOG_ERROR(logger,
           std::format("BestBidAsk: insufficient buffer (need {}, have {})",
               kMinSize,
               remaining));
@@ -254,7 +255,7 @@ struct BinanceSbeOps {
     constexpr size_t kMinSize = sizeof(int64_t) * 2 + sizeof(int8_t) * 2 +
                                 sizeof(schema::sbe::GroupSize16) * 2;
     if (UNLIKELY(remaining < kMinSize)) {
-      logger.error(
+      LOG_ERROR(logger,
           std::format("DepthSnapshot: insufficient buffer (need {}, have {})",
               kMinSize,
               remaining));
@@ -286,7 +287,7 @@ struct BinanceSbeOps {
                  remaining < static_cast<size_t>(pos - start) +
                                  bids_total_size +
                                  sizeof(schema::sbe::GroupSize16))) {
-      logger.error("DepthSnapshot: bids group size exceeds buffer");
+      LOG_ERROR(logger, "DepthSnapshot: bids group size exceeds buffer");
       return schema::sbe::SbeDepthSnapshot{};
     }
     event.bids.reserve(bids_group.num_in_group);
@@ -305,7 +306,7 @@ struct BinanceSbeOps {
     if (UNLIKELY(
             asks_group.block_length < kLevelSize ||
             remaining < static_cast<size_t>(pos - start) + asks_total_size)) {
-      logger.error("DepthSnapshot: asks group size exceeds buffer");
+      LOG_ERROR(logger, "DepthSnapshot: asks group size exceeds buffer");
       return schema::sbe::SbeDepthSnapshot{};
     }
     event.asks.reserve(asks_group.num_in_group);
@@ -319,13 +320,13 @@ struct BinanceSbeOps {
 
     const auto consumed = static_cast<size_t>(pos - start);
     if (UNLIKELY(remaining < consumed + sizeof(uint8_t))) {
-      logger.error("DepthSnapshot: missing symbol length");
+      LOG_ERROR(logger, "DepthSnapshot: missing symbol length");
       return schema::sbe::SbeDepthSnapshot{};
     }
     uint8_t symbol_length;
     std::memcpy(&symbol_length, pos, sizeof(uint8_t));
     if (UNLIKELY(remaining < consumed + sizeof(uint8_t) + symbol_length)) {
-      logger.error("DepthSnapshot: symbol exceeds buffer");
+      LOG_ERROR(logger, "DepthSnapshot: symbol exceeds buffer");
       return schema::sbe::SbeDepthSnapshot{};
     }
 
@@ -343,7 +344,7 @@ struct BinanceSbeOps {
     constexpr size_t kMinSize = sizeof(int64_t) * 3 + sizeof(int8_t) * 2 +
                                 sizeof(schema::sbe::GroupSize16) * 2;
     if (UNLIKELY(remaining < kMinSize)) {
-      logger.error(
+      LOG_ERROR(logger,
           std::format("DepthDiff: insufficient buffer (need {}, have {})",
               kMinSize,
               remaining));
@@ -377,7 +378,7 @@ struct BinanceSbeOps {
                  remaining < static_cast<size_t>(pos - start) +
                                  bids_total_size +
                                  sizeof(schema::sbe::GroupSize16))) {
-      logger.error("DepthDiff: bids group size exceeds buffer");
+      LOG_ERROR(logger, "DepthDiff: bids group size exceeds buffer");
       return schema::sbe::SbeDepthResponse{};
     }
     event.bids.reserve(bids_group.num_in_group);
@@ -396,7 +397,7 @@ struct BinanceSbeOps {
     if (UNLIKELY(
             asks_group.block_length < kLevelSize ||
             remaining < static_cast<size_t>(pos - start) + asks_total_size)) {
-      logger.error("DepthDiff: asks group size exceeds buffer");
+      LOG_ERROR(logger, "DepthDiff: asks group size exceeds buffer");
       return schema::sbe::SbeDepthResponse{};
     }
     event.asks.reserve(asks_group.num_in_group);
@@ -410,13 +411,13 @@ struct BinanceSbeOps {
 
     const auto consumed = static_cast<size_t>(pos - start);
     if (UNLIKELY(remaining < consumed + sizeof(uint8_t))) {
-      logger.error("DepthDiff: missing symbol length");
+      LOG_ERROR(logger, "DepthDiff: missing symbol length");
       return schema::sbe::SbeDepthResponse{};
     }
     uint8_t symbol_length;
     std::memcpy(&symbol_length, pos, sizeof(uint8_t));
     if (UNLIKELY(remaining < consumed + sizeof(uint8_t) + symbol_length)) {
-      logger.error("DepthDiff: symbol exceeds buffer");
+      LOG_ERROR(logger, "DepthDiff: symbol exceeds buffer");
       return schema::sbe::SbeDepthResponse{};
     }
 

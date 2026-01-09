@@ -49,7 +49,8 @@ void OrderStateManager::handle_execution_report(const ExecutionReport* response,
       handle_rejected_or_expired(response, side_book, position_tracker);
       break;
     default:
-      logger_.error("[OrderStateManager] Unknown OrdStatus {}",
+      LOG_ERROR(logger_,
+          "[OrderStateManager] Unknown OrdStatus {}",
           toString(response->ord_status));
       break;
   }
@@ -60,13 +61,14 @@ void OrderStateManager::handle_pending_new(const ExecutionReport* response,
   const int layer =
       find_layer(side_book, response->cl_order_id, response->price);
   if (layer < 0) {
-    logger_.error("[OrderStateManager] PendingNew: layer not found {}",
+    LOG_ERROR(logger_,
+        "[OrderStateManager] PendingNew: layer not found {}",
         response->toString());
     return;
   }
   auto& slot = side_book.slots[layer];
   slot.state = OMOrderState::kPendingNew;
-  logger_.info("[OrderStateManager] PendingNew {}", response->toString());
+  LOG_INFO(logger_, "[OrderStateManager] PendingNew {}", response->toString());
 }
 
 void OrderStateManager::handle_new(const ExecutionReport* response,
@@ -85,7 +87,8 @@ void OrderStateManager::handle_new(const ExecutionReport* response,
   }
 
   if (layer < 0) {
-    logger_.error("[OrderStateManager] New: layer not found {}",
+    LOG_ERROR(logger_,
+        "[OrderStateManager] New: layer not found {}",
         response->toString());
     return;
   }
@@ -113,7 +116,7 @@ void OrderStateManager::handle_new(const ExecutionReport* response,
     new_slot.state = OMOrderState::kLive;
   }
 
-  logger_.info("[OrderStateManager] New {}", response->toString());
+  LOG_INFO(logger_, "[OrderStateManager] New {}", response->toString());
 }
 
 void OrderStateManager::handle_partially_filled(const ExecutionReport* response,
@@ -122,7 +125,8 @@ void OrderStateManager::handle_partially_filled(const ExecutionReport* response,
   const int layer =
       find_layer(side_book, response->cl_order_id, response->price);
   if (layer < 0) {
-    logger_.error("[OrderStateManager] PartiallyFilled: layer not found {}",
+    LOG_ERROR(logger_,
+        "[OrderStateManager] PartiallyFilled: layer not found {}",
         response->toString());
     return;
   }
@@ -140,7 +144,9 @@ void OrderStateManager::handle_partially_filled(const ExecutionReport* response,
     slot.last_used = now_ns;
   }
 
-  logger_.info("[OrderStateManager] PartiallyFilled {}", response->toString());
+  LOG_INFO(logger_,
+      "[OrderStateManager] PartiallyFilled {}",
+      response->toString());
 }
 
 void OrderStateManager::handle_filled(const ExecutionReport* response,
@@ -149,7 +155,8 @@ void OrderStateManager::handle_filled(const ExecutionReport* response,
   const int layer =
       find_layer(side_book, response->cl_order_id, response->price);
   if (layer < 0) {
-    logger_.error("[OrderStateManager] Filled: layer not found {}",
+    LOG_ERROR(logger_,
+        "[OrderStateManager] Filled: layer not found {}",
         response->toString());
     return;
   }
@@ -160,7 +167,7 @@ void OrderStateManager::handle_filled(const ExecutionReport* response,
   slot.state = OMOrderState::kDead;
   LayerBook::unmap_layer(side_book, layer);
 
-  logger_.info("[OrderStateManager] Filled {}", response->toString());
+  LOG_INFO(logger_, "[OrderStateManager] Filled {}", response->toString());
 }
 
 void OrderStateManager::handle_pending_cancel(const ExecutionReport* response,
@@ -168,14 +175,17 @@ void OrderStateManager::handle_pending_cancel(const ExecutionReport* response,
   const int layer =
       find_layer(side_book, response->cl_order_id, response->price);
   if (layer < 0) {
-    logger_.error("[OrderStateManager] PendingCancel: layer not found {}",
+    LOG_ERROR(logger_,
+        "[OrderStateManager] PendingCancel: layer not found {}",
         response->toString());
     return;
   }
 
   auto& slot = side_book.slots[layer];
   slot.state = OMOrderState::kPendingCancel;
-  logger_.info("[OrderStateManager] PendingCancel {}", response->toString());
+  LOG_INFO(logger_,
+      "[OrderStateManager] PendingCancel {}",
+      response->toString());
 }
 
 void OrderStateManager::handle_canceled(const ExecutionReport* response,
@@ -189,14 +199,16 @@ void OrderStateManager::handle_canceled(const ExecutionReport* response,
     side_book.orig_id_to_layer.erase(iter);
     auto& slot = side_book.slots[layer];
     slot.state = OMOrderState::kReserved;
-    logger_.info("[OrderStateManager] Canceled (for replace) {}",
+    LOG_INFO(logger_,
+        "[OrderStateManager] Canceled (for replace) {}",
         response->toString());
     return;
   }
 
   layer = find_layer(side_book, response->cl_order_id, response->price);
   if (layer < 0) {
-    logger_.error("[OrderStateManager] Canceled: layer not found {}",
+    LOG_ERROR(logger_,
+        "[OrderStateManager] Canceled: layer not found {}",
         response->toString());
     return;
   }
@@ -206,7 +218,7 @@ void OrderStateManager::handle_canceled(const ExecutionReport* response,
   slot.state = OMOrderState::kDead;
   LayerBook::unmap_layer(side_book, layer);
 
-  logger_.info("[OrderStateManager] Canceled {}", response->toString());
+  LOG_INFO(logger_, "[OrderStateManager] Canceled {}", response->toString());
 }
 
 void OrderStateManager::handle_rejected_or_expired(
@@ -248,7 +260,7 @@ void OrderStateManager::handle_rejected_or_expired(
       side_book.orig_id_to_layer.erase(iter);
     }
 
-    logger_.info(
+    LOG_INFO(logger_,
         "[OrderStateManager] Rejected (replace failed, restored original "
         "oid={}, price={:.2f}, qty={:.6f}) {}",
         pend.original_cl_order_id.value,
@@ -263,13 +275,15 @@ void OrderStateManager::handle_rejected_or_expired(
       slot.state = OMOrderState::kDead;
       LayerBook::unmap_layer(side_book, layer);
     } else {
-      logger_.error("[OrderStateManager] {}: layer not found {}",
+      LOG_ERROR(logger_,
+          "[OrderStateManager] {}: layer not found {}",
           trading::toString(response->ord_status),
           response->toString());
     }
   }
 
-  logger_.error("[OrderStateManager] {} {}",
+  LOG_ERROR(logger_,
+      "[OrderStateManager] {} {}",
       trading::toString(response->ord_status),
       response->toString());
 }

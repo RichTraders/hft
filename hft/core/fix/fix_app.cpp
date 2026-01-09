@@ -55,8 +55,8 @@ template <typename Derived, FixedString ReadThreadName,
 FixApp<Derived, ReadThreadName, WriteThreadName>::~FixApp() {
   write_thread_.join();
   read_thread_.join();
-  logger_.info("[Thread] Fix write finish");
-  logger_.info("[Thread] Fix read finish");
+  LOG_INFO(logger_, "[Thread] Fix write finish");
+  LOG_INFO(logger_, "[Thread] Fix read finish");
 }
 
 template <typename Derived, FixedString ReadThreadName,
@@ -140,7 +140,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::write_loop() {
           fix_write_queue_->enqueue(msg);
           break;
         }
-        logger_.error("send failed");
+        LOG_ERROR(logger_, "send failed");
         thread_running_.store(false, std::memory_order_release);
         transport_.interrupt();
         break;
@@ -161,7 +161,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::read_loop() {
     const int read = transport_.read(buf.data(), buf.size());
     // END_MEASURE(TLS_READ, logger_);
     if (read <= 0) {
-      logger_.error("TLS socket has failed to read. Stop read loop");
+      LOG_ERROR(logger_, "TLS socket has failed to read. Stop read loop");
       thread_running_.store(false, std::memory_order_release);
       return;
     }
@@ -181,7 +181,7 @@ void FixApp<Derived, ReadThreadName, WriteThreadName>::register_callback(
   if (!callbacks_.contains(type)) {
     callbacks_[type] = callback;
   } else {
-    logger_.info("already registered type");
+    LOG_INFO(logger_, "already registered type");
   }
 }
 

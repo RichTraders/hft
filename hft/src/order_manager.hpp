@@ -70,13 +70,11 @@ class OrderManager {
         state_manager_(logger_, tick_converter_),
         expiry_manager_(INI_CONFIG.get_double("orders", "ttl_reserved_ns"),
             INI_CONFIG.get_double("orders", "ttl_live_ns")) {
-    logger_.info("[Constructor] OrderManager Created (ttl_reserved_ns:{}, ttl_live_ns:{})",
-        INI_CONFIG.get_double("orders", "ttl_reserved_ns"),
-        INI_CONFIG.get_double("orders", "ttl_live_ns"));
+    LOG_INFO(logger_, "[Constructor] OrderManager Created");
   }
 
   // NOLINTNEXTLINE(modernize-use-equals-default) - logs destruction
-  ~OrderManager() { logger_.info("[Destructor] OrderManager Destroy"); }
+  ~OrderManager() { LOG_INFO(logger_, "[Destructor] OrderManager Destroy"); }
 
   void on_order_updated(const ExecutionReport* response) noexcept {
     auto& side_book = layer_book_.side_book(response->symbol,
@@ -105,14 +103,10 @@ class OrderManager {
             response->cl_order_id,
             OMOrderState::kLive,
             now);
-        logger_.info("[TTL] Registered expiry for order_id:{} layer:{} state:LIVE (now:{})",
-            common::toString(response->cl_order_id), layer, now);
-      } else {
-        logger_.warn("[TTL] Failed to register expiry - layer not found for order_id:{}",
-            common::toString(response->cl_order_id));
       }
     } else if (response->ord_status == OrdStatus::kPartiallyFilled) {
-      const int layer = LayerBook::find_layer_by_id(side_book, response->cl_order_id);
+      const int layer =
+          LayerBook::find_layer_by_id(side_book, response->cl_order_id);
       if (layer >= 0 && side_book.slots[layer].state == OMOrderState::kLive) {
         expiry_manager_.register_expiry(response->symbol,
             response->side,
@@ -124,7 +118,8 @@ class OrderManager {
       }
     }
 
-    logger_.debug("[OrderUpdated]Order Id:{} reserved_position:{}",
+    LOG_DEBUG(logger_,
+        "[OrderUpdated]Order Id:{} reserved_position:{}",
         response->cl_order_id.value,
         position_tracker_.get_reserved());
 
@@ -143,17 +138,18 @@ class OrderManager {
               auto symbol) { return symbol.symbol == target_ticker; });
 
       if (sym != instrument_info.symbols.end()) {
-        venue_policy_.set_qty_increment(
-            static_cast<int64_t>(sym->min_qty_increment * common::FixedPointConfig::kQtyScale));
+        venue_policy_.set_qty_increment(static_cast<int64_t>(
+            sym->min_qty_increment * common::FixedPointConfig::kQtyScale));
       }
 
-      logger_.info("[OrderManager] Updated qty_increment to {}",
+      LOG_INFO(logger_,
+          "[OrderManager] Updated qty_increment to {}",
           instrument_info.symbols[0].min_qty_increment);
     }
   }
 
-  void new_order(const TickerId& ticker_id, common::PriceType price, Side side, common::QtyType qty,
-      OrderId order_id,
+  void new_order(const TickerId& ticker_id, common::PriceType price, Side side,
+      common::QtyType qty, OrderId order_id,
       std::optional<common::PositionSide> position_side =
           std::nullopt) noexcept {
     const RequestCommon new_request{
@@ -168,12 +164,15 @@ class OrderManager {
         .position_side = position_side};
     trade_engine_->send_request(new_request);
 
-    logger_.info("[OrderRequest]Sent new order {}", new_request.toString());
+    LOG_INFO(logger_,
+        "[OrderRequest]Sent new order {}",
+        new_request.toString());
   }
 
   void modify_order(const TickerId& ticker_id,
       const OrderId& cancel_new_order_id, const OrderId& order_id,
-      const OrderId& original_order_id, common::PriceType price, Side side, common::QtyType qty,
+      const OrderId& original_order_id, common::PriceType price, Side side,
+      common::QtyType qty,
       std::optional<common::PositionSide> position_side =
           std::nullopt) noexcept {
 
@@ -191,7 +190,8 @@ class OrderManager {
           .time_in_force = TimeInForce::kGoodTillCancel,
           .position_side = position_side};
       trade_engine_->send_request(new_request);
-      logger_.info("[OrderRequest]Sent cancel-and-reorder {}",
+      LOG_INFO(logger_,
+          "[OrderRequest]Sent cancel-and-reorder {}",
           new_request.toString());
     } else {
       const RequestCommon modify_request{.req_type = ReqeustType::kOrderModify,
@@ -205,7 +205,8 @@ class OrderManager {
           .time_in_force = TimeInForce::kGoodTillCancel,
           .position_side = position_side};
       trade_engine_->send_request(modify_request);
-      logger_.info("[OrderRequest]Sent modify order {}",
+      LOG_INFO(logger_,
+          "[OrderRequest]Sent modify order {}",
           modify_request.toString());
     }
   }
@@ -221,7 +222,9 @@ class OrderManager {
         .position_side = position_side};
     trade_engine_->send_request(cancel_request);
 
-    logger_.info("[OrderRequest]Sent cancel {}", cancel_request.toString());
+    LOG_INFO(logger_,
+        "[OrderRequest]Sent cancel {}",
+        cancel_request.toString());
   }
 
   std::vector<common::OrderId> apply(const std::vector<QuoteIntentType>& intents) noexcept {
@@ -276,7 +279,8 @@ class OrderManager {
       order::Actions& acts) {
     const auto& ticker =
         intents.empty() ? std::string{} : intents.front().ticker;
-    common::QtyType running = common::QtyType::from_raw(position_tracker_.get_reserved());
+    common::QtyType running =
+        common::QtyType::from_raw(position_tracker_.get_reserved());
     auto allow_new = [&](auto& actions) {
       for (auto action = actions.begin(); action != actions.end();) {
         const common::QtyType delta = action->qty;
@@ -343,8 +347,7 @@ class OrderManager {
       position_tracker_.add_reserved(action.side, action.qty.value);
 
       order_ids.push_back(action.cl_order_id);
-
-      logger_.debug(
+      LOG_DEBUG(logger_,
           "[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}, "
           "reserved_position_={}",
           tick,
@@ -440,7 +443,7 @@ class OrderManager {
 
       const auto delta_qty = action.qty.value - action.last_qty.value;
       position_tracker_.add_reserved(action.side, delta_qty);
-      logger_.debug(
+      LOG_DEBUG(logger_,
           "[Apply][REPLACE] tick:{}/ layer={}, side:{}, order_id={}, "
           "reserved_position_={}",
           tick,
@@ -467,7 +470,7 @@ class OrderManager {
       slot.state = OMOrderState::kCancelReserved;
       slot.last_used = now;
       cancel_order(ticker, action.original_cl_order_id, action.position_side);
-      logger_.debug(
+      LOG_DEBUG(logger_,
           "[Apply][CANCEL] layer={}, side:{}, order_id={}, "
           "reserved: {}",
           action.layer,
@@ -479,38 +482,19 @@ class OrderManager {
 
   void sweep_expired_orders(uint64_t now) noexcept {
     auto expired = expiry_manager_.sweep_expired(now);
-
-    if (expired.empty()) {
-      return;  // No expired orders
-    }
-
-    logger_.info("[TTL] sweep_expired_orders found {} expired orders", expired.size());
-
     for (const auto& key : expired) {
       auto& side_book =
           layer_book_.side_book(key.symbol, key.side, key.position_side);
-      if (UNLIKELY(key.layer >= side_book.slots.size())) {
-        logger_.warn("[TTL] Invalid layer {} for order_id:{}",
-            key.layer, common::toString(key.cl_order_id));
+      if (UNLIKELY(key.layer >= side_book.slots.size()))
         continue;
-      }
 
       auto& slot = side_book.slots[key.layer];
-      if (slot.cl_order_id != key.cl_order_id) {
-        logger_.warn("[TTL] Order ID mismatch at layer {} - slot:{} vs expired:{}",
-            key.layer,
-            common::toString(slot.cl_order_id),
-            common::toString(key.cl_order_id));
+      if (slot.cl_order_id != key.cl_order_id)
         continue;
-      }
 
       if (slot.state == OMOrderState::kDead ||
-          slot.state == OMOrderState::kCancelReserved) {
-        logger_.info("[TTL] Skipping order_id:{} - already in state:{}",
-            common::toString(key.cl_order_id),
-            trading::toString(slot.state));
+          slot.state == OMOrderState::kCancelReserved)
         continue;
-      }
 
       if (slot.state == OMOrderState::kLive ||
           slot.state == OMOrderState::kReserved) {
@@ -519,7 +503,7 @@ class OrderManager {
 
         cancel_order(key.symbol, slot.cl_order_id);
 
-        logger_.info(
+        LOG_DEBUG(logger_,
             "[TTL] Cancel sent (state={}, layer={}, oid={}, "
             "remaining_ns={})",
             trading::toString(slot.state),
@@ -537,8 +521,9 @@ class OrderManager {
 
   void dump_all_slots(const std::string& symbol,
       std::string_view context) noexcept {
-    logger_.debug("[SLOT_DUMP] ========== {} ==========", context);
-    logger_.debug("[SLOT_DUMP] Symbol: {}, Reserved: {}",
+    LOG_DEBUG(logger_, "[SLOT_DUMP] ========== {} ==========", context);
+    LOG_DEBUG(logger_,
+        "[SLOT_DUMP] Symbol: {}, Reserved: {}",
         symbol,
         position_tracker_.get_reserved());
 
@@ -547,7 +532,9 @@ class OrderManager {
           side_idx == 0 ? common::Side::kBuy : common::Side::kSell;
       const auto& side_book = layer_book_.side_book(symbol, side);
 
-      logger_.debug("[SLOT_DUMP] ===== {} Side =====", common::toString(side));
+      LOG_DEBUG(logger_,
+          "[SLOT_DUMP] ===== {} Side =====",
+          common::toString(side));
 
       for (int layer = 0; layer < kSlotsPerSide; ++layer) {
         const auto& slot = side_book.slots[layer];
@@ -558,7 +545,7 @@ class OrderManager {
           continue;
         }
 
-        logger_.debug(
+        LOG_DEBUG(logger_,
             "[SLOT_DUMP]   Layer[{}]: state={}, tick={}, "
             "price={:.2f}, qty={:.6f}, oid={}",
             layer,
@@ -570,7 +557,7 @@ class OrderManager {
       }
     }
 
-    logger_.debug("[SLOT_DUMP] ========== END {} ==========", context);
+    LOG_DEBUG(logger_, "[SLOT_DUMP] ========== END {} ==========", context);
   }
 };
 }  // namespace trading

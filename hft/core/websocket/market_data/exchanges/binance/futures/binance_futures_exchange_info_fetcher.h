@@ -30,7 +30,8 @@ namespace core::http {
 
 class BinanceFuturesExchangeInfoFetcher {
  public:
-  explicit BinanceFuturesExchangeInfoFetcher(const common::Logger::Producer& logger)
+  explicit BinanceFuturesExchangeInfoFetcher(
+      const common::Logger::Producer& logger)
       : logger_(logger) {}
 
   std::optional<InstrumentInfo> fetch(const std::string& symbol = "") {
@@ -42,13 +43,13 @@ class BinanceFuturesExchangeInfoFetcher {
       url += "?symbol=" + symbol;
     }
 
-    logger_.info("[FuturesExchangeInfoFetcher] Fetching from: {}", url);
+    LOG_INFO(logger_, "[FuturesExchangeInfoFetcher] Fetching from: {}", url);
 
     const HttpClient client;
     auto response = client.get(url);
 
     if (!response.ok()) {
-      logger_.error(
+      LOG_ERROR(logger_,
           "[FuturesExchangeInfoFetcher] HTTP request failed: status={}, "
           "error={}",
           response.status_code,
@@ -59,7 +60,8 @@ class BinanceFuturesExchangeInfoFetcher {
     schema::futures::ExchangeInfoHttpResponse exchange_info;
     const auto parse_result = glz::read_json(exchange_info, response.body);
     if (parse_result) {
-      logger_.error("[FuturesExchangeInfoFetcher] Failed to parse response: {}",
+      LOG_ERROR(logger_,
+          "[FuturesExchangeInfoFetcher] Failed to parse response: {}",
           glz::format_error(parse_result, response.body));
       return std::nullopt;
     }

@@ -724,7 +724,7 @@ class MeanReversionMakerStrategy
 
         // === Adverse selection tracking ===
         original_safety_margin_bps_(entry_cfg_.safety_margin_entry_bps) {
-    this->logger_.info("[MeanReversionMaker] Initialized | min_quantity:{} raw",
+    LOG_INFO(logger_,"[MeanReversionMaker] Initialized | min_quantity:{} raw",
         dynamic_threshold_->get_min_quantity());
   }
 
@@ -804,7 +804,7 @@ class MeanReversionMakerStrategy
 
     // BBO validation
     if (!is_bbo_valid(current_bbo)) {
-      this->logger_.warn("Invalid BBO | bid:{}/{} ask:{}/{}",
+      LOG_WARN(logger_,"Invalid BBO | bid:{}/{} ask:{}/{}",
           current_bbo->bid_price.value,
           current_bbo->bid_qty.value,
           current_bbo->ask_price.value,
@@ -813,7 +813,7 @@ class MeanReversionMakerStrategy
     }
 
     if (debug_cfg_.log_entry_exit) {
-      this->logger_.info("[BBO valid] bid:{} ask:{}",
+      LOG_INFO(logger_,"[BBO valid] bid:{} ask:{}",
           current_bbo->bid_price.value,
           current_bbo->ask_price.value);
     }
@@ -823,7 +823,7 @@ class MeanReversionMakerStrategy
         calculate_multi_timeframe_zscores(market_data->price.value);
 
     if (debug_cfg_.log_entry_exit) {
-      this->logger_.info("[Z-scores calculated] fast:{} mid:{} slow:{}",
+      LOG_INFO(logger_,"[Z-scores calculated] fast:{} mid:{} slow:{}",
           zscores.z_fast,
           zscores.z_mid,
           zscores.z_slow);
@@ -841,7 +841,7 @@ class MeanReversionMakerStrategy
     // Try LONG entry if SHORT phase is VERY_WEAK
     if (phase_state_.short_phase == MarketPhase::VERY_WEAK) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[SHORT Phase VERY_WEAK] z_fast:{} z_mid:{} z_slow:{} | "
             "bid_wall:{} "
             "| long_pos:{}",
@@ -861,7 +861,7 @@ class MeanReversionMakerStrategy
     // Try SHORT entry if LONG phase is VERY_WEAK
     if (phase_state_.long_phase == MarketPhase::VERY_WEAK) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[LONG Phase VERY_WEAK] z_fast:{} z_mid:{} z_slow:{} | ask_wall:{} "
             "| "
             "short_pos:{}",
@@ -937,7 +937,7 @@ class MeanReversionMakerStrategy
                 adverse_selection_cfg_.max_fill_history);
 
             if (debug_cfg_.log_entry_exit) {
-              this->logger_.info(
+              LOG_INFO(logger_,
                   "[Entry Filled] LONG | qty:{} | price:{} | "
                   "wall:{}@{} bps",
                   report->last_qty.value,
@@ -949,13 +949,13 @@ class MeanReversionMakerStrategy
             // LATE FILL DETECTED!
             const int64_t actual_position = pos_info->long_position_raw_;
 
-            this->logger_.warn(
+            LOG_WARN(logger_,
                 "[LATE FILL DETECTED] LONG | expected_order_id:{} | "
                 "actual_order_id:{} | "
                 "actual_position:{} | emergency_liquidating",
-                long_position_.pending_order_id
-                    ? common::toString(*long_position_.pending_order_id)
-                    : "none",
+                long_position_.pending_order_id.has_value()
+                    ? long_position_.pending_order_id.value().value
+                    : 0,
                 common::toString(report->cl_order_id),
                 actual_position);
 
@@ -973,15 +973,15 @@ class MeanReversionMakerStrategy
                 long_position_.pending_order_id = order_ids[0];
                 long_position_.status = PositionStatus::PENDING;
 
-                this->logger_.info(
+                LOG_INFO(logger_,
                     "[LATE FILL] Emergency liquidation order sent | "
                     "order_id:{} | qty:{} | price:{}",
-                    common::toString(order_ids[0]),
+                    order_ids[0].value,
                     actual_position,
                     report->avg_price.value);
               } else {
                 // Failed to send liquidation order - force reset
-                this->logger_.error(
+                LOG_ERROR(logger_,
                     "[LATE FILL] Emergency liquidation FAILED | "
                     "resetting position state");
                 long_position_.status = PositionStatus::NONE;
@@ -999,7 +999,7 @@ class MeanReversionMakerStrategy
                  pos_info->long_position_raw_ > 0) {
           const int64_t actual_position = pos_info->long_position_raw_;
 
-          this->logger_.warn(
+          LOG_WARN(logger_,
               "[LATE FILL DETECTED - No Pending] LONG | order_id:{} | "
               "actual_position:{} | emergency_liquidating",
               common::toString(report->cl_order_id),
@@ -1017,7 +1017,7 @@ class MeanReversionMakerStrategy
             long_position_.pending_order_id = order_ids[0];
             long_position_.status = PositionStatus::PENDING;
 
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[LATE FILL - No Pending] Emergency liquidation order sent | "
                 "order_id:{} | qty:{}",
                 common::toString(order_ids[0]),
@@ -1051,7 +1051,7 @@ class MeanReversionMakerStrategy
                 adverse_selection_cfg_.max_fill_history);
 
             if (debug_cfg_.log_entry_exit) {
-              this->logger_.info(
+              LOG_INFO(logger_,
                   "[Entry Filled] SHORT | qty:{} | price:{} | "
                   "wall:{}@{} bps",
                   report->last_qty.value,
@@ -1063,7 +1063,7 @@ class MeanReversionMakerStrategy
             // LATE FILL DETECTED!
             const int64_t actual_position = pos_info->short_position_raw_;
 
-            this->logger_.warn(
+            LOG_WARN(logger_,
                 "[LATE FILL DETECTED] SHORT | expected_order_id:{} | "
                 "actual_order_id:{} | "
                 "actual_position:{} | emergency_liquidating",
@@ -1087,7 +1087,7 @@ class MeanReversionMakerStrategy
                 short_position_.pending_order_id = order_ids[0];
                 short_position_.status = PositionStatus::PENDING;
 
-                this->logger_.info(
+                LOG_INFO(logger_,
                     "[LATE FILL] Emergency liquidation order sent | "
                     "order_id:{} | qty:{} | price:{}",
                     common::toString(order_ids[0]),
@@ -1095,7 +1095,7 @@ class MeanReversionMakerStrategy
                     report->avg_price.value);
               } else {
                 // Failed to send liquidation order - force reset
-                this->logger_.error(
+                LOG_ERROR(logger_,
                     "[LATE FILL] Emergency liquidation FAILED | "
                     "resetting position state");
                 short_position_.status = PositionStatus::NONE;
@@ -1113,7 +1113,7 @@ class MeanReversionMakerStrategy
                  pos_info->short_position_raw_ > 0) {
           const int64_t actual_position = pos_info->short_position_raw_;
 
-          this->logger_.warn(
+          LOG_WARN(logger_,
               "[LATE FILL DETECTED - No Pending] SHORT | order_id:{} | "
               "actual_position:{} | emergency_liquidating",
               common::toString(report->cl_order_id),
@@ -1131,7 +1131,7 @@ class MeanReversionMakerStrategy
             short_position_.pending_order_id = order_ids[0];
             short_position_.status = PositionStatus::PENDING;
 
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[LATE FILL - No Pending] Emergency liquidation order sent | "
                 "order_id:{} | qty:{}",
                 common::toString(order_ids[0]),
@@ -1158,7 +1158,7 @@ class MeanReversionMakerStrategy
         long_position_.state_time = 0;
         long_position_.pending_order_id.reset();
         if (debug_cfg_.log_entry_exit) {
-          this->logger_.info("[Entry Canceled] LONG | reason:{}",
+          LOG_INFO(logger_,"[Entry Canceled] LONG | reason:{}",
               trading::toString(report->ord_status));
         }
       }
@@ -1173,7 +1173,7 @@ class MeanReversionMakerStrategy
         short_position_.state_time = 0;
         short_position_.pending_order_id.reset();
         if (debug_cfg_.log_entry_exit) {
-          this->logger_.info("[Entry Canceled] SHORT | reason:{}",
+          LOG_INFO(logger_,"[Entry Canceled] SHORT | reason:{}",
               trading::toString(report->ord_status));
         }
       }
@@ -1185,7 +1185,7 @@ class MeanReversionMakerStrategy
       long_position_.status = PositionStatus::NONE;
       long_position_.pending_order_id.reset();  // Clear exit order ID
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info("[Exit Complete] Long closed | PnL: {}",
+        LOG_INFO(logger_,"[Exit Complete] Long closed | PnL: {}",
             pos_info->long_real_pnl_);
       }
     }
@@ -1195,7 +1195,7 @@ class MeanReversionMakerStrategy
       short_position_.status = PositionStatus::NONE;
       short_position_.pending_order_id.reset();  // Clear exit order ID
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info("[Exit Complete] Short closed | PnL: {}",
+        LOG_INFO(logger_,"[Exit Complete] Short closed | PnL: {}",
             pos_info->short_real_pnl_);
       }
     }
@@ -1222,7 +1222,7 @@ class MeanReversionMakerStrategy
       bool qty_sufficient = (current_bbo->bid_qty.value >= required_qty);
 
       if (debug_cfg_.log_defense_check) {
-        this->logger_.debug(
+        LOG_DEBUG(logger_,
             "[Defense] Long | trade_qty:{}, prev_bid:{}/{}, curr_bid:{}/{}, "
             "price_diff:{} (max:{}), result:{}",
             trade->qty.value,
@@ -1250,7 +1250,7 @@ class MeanReversionMakerStrategy
       bool qty_sufficient = (current_bbo->ask_qty.value >= required_qty);
 
       if (debug_cfg_.log_defense_check) {
-        this->logger_.debug(
+        LOG_DEBUG(logger_,
             "[Defense] Short | trade_qty:{}, prev_ask:{}/{}, curr_ask:{}/{}, "
             "price_diff:{} (max:{}), result:{}",
             trade->qty.value,
@@ -1286,7 +1286,7 @@ class MeanReversionMakerStrategy
 
     if (wall_quality < kMinWallQuality) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Block] {} | Wall quality too low (spoofing?) | "
             "quality:{} | stability:{} | persistence:{} | "
             "distance:{}",
@@ -1312,7 +1312,7 @@ class MeanReversionMakerStrategy
     // OBI must be negative (sell side weakening) but not too negative
     if (obi >= 0) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Block] Long | OBI not negative | z:{} | obi:{}",
             z_robust,
             obi);
@@ -1322,7 +1322,7 @@ class MeanReversionMakerStrategy
 
     if (obi < -entry_cfg_.obi_threshold) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Block] Long | OBI too negative (momentum still down) | "
             "z:{} | obi:{} < -{}",
             z_robust,
@@ -1346,7 +1346,7 @@ class MeanReversionMakerStrategy
     // OBI must be positive (buy side weakening) but not too positive
     if (obi <= 0) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Block] Short | OBI not positive | z:{} | obi:{}",
             z_robust,
             obi);
@@ -1356,7 +1356,7 @@ class MeanReversionMakerStrategy
 
     if (obi > entry_cfg_.obi_threshold) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Block] Short | OBI too positive (momentum still up) | "
             "z:{} | obi:{} > {}",
             z_robust,
@@ -1400,7 +1400,7 @@ class MeanReversionMakerStrategy
     // 0. CRITICAL: Check if already in position or pending
     if (long_position_.status != PositionStatus::NONE) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Block] LONG | Already in position | status:{}",
             static_cast<int>(long_position_.status));
       }
@@ -1408,7 +1408,7 @@ class MeanReversionMakerStrategy
     }
 
     if (debug_cfg_.log_entry_exit) {
-      this->logger_.info("[RobustZ] price:{} | median:{} | MAD:{} | z:{}",
+      LOG_INFO(logger_,"[RobustZ] price:{} | median:{} | MAD:{} | z:{}",
           trade->price.value,
           robust_zscore_mid_->get_median(),
           robust_zscore_mid_->get_mad(),
@@ -1428,7 +1428,7 @@ class MeanReversionMakerStrategy
 
     if (composite < entry_cfg_.min_signal_quality) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Block] LONG | Signal quality too low | "
             "score:{} < {} | wall:{} obi:{} | weights: w={} o={}",
             composite,
@@ -1445,7 +1445,7 @@ class MeanReversionMakerStrategy
     // Note: Z-score timing is handled by Phase tracking, not here
     if (!bid_wall_info_.is_valid) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info("[Entry Block] Long | No wall | z:{}", z_robust);
+        LOG_INFO(logger_,"[Entry Block] Long | No wall | z:{}", z_robust);
       }
       return;
     }
@@ -1453,7 +1453,7 @@ class MeanReversionMakerStrategy
     // 6. OBI direction check
     if (!check_long_obi_direction(obi, z_robust)) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Block] LONG | OBI direction fail | obi:{} z:{}",
             obi,
             z_robust);
@@ -1473,7 +1473,7 @@ class MeanReversionMakerStrategy
 
     if (debug_cfg_.log_entry_exit) {
       double wall_quality = bid_wall_tracker_.composite_quality();
-      this->logger_.info(
+      LOG_INFO(logger_,
           "[Entry Signal] LONG | quality:{} ({}) | wall_quality:{} | "
           "z_robust:{} | "
           "price:{} | wall:{}@{} bps | obi:{} | "
@@ -1504,7 +1504,7 @@ class MeanReversionMakerStrategy
     // 0. CRITICAL: Check if already in position or pending
     if (short_position_.status != PositionStatus::NONE) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Block] SHORT | Already in position | status:{}",
             static_cast<int>(short_position_.status));
       }
@@ -1524,7 +1524,7 @@ class MeanReversionMakerStrategy
 
     if (composite < entry_cfg_.min_signal_quality) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Block] SHORT | Signal quality too low | "
             "score:{} < {} | wall:{} obi:{}",
             composite,
@@ -1539,7 +1539,7 @@ class MeanReversionMakerStrategy
     // Note: Z-score timing is handled by Phase tracking, not here
     if (!ask_wall_info_.is_valid) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info("[Entry Block] Short | No wall | z:{}",
+        LOG_INFO(logger_,"[Entry Block] Short | No wall | z:{}",
             z_robust);
       }
       return;
@@ -1548,7 +1548,7 @@ class MeanReversionMakerStrategy
     // 6. OBI direction check
     if (!check_short_obi_direction(obi, z_robust)) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Block] SHORT | OBI direction fail | obi:{} z:{}",
             obi,
             z_robust);
@@ -1568,7 +1568,7 @@ class MeanReversionMakerStrategy
 
     if (debug_cfg_.log_entry_exit) {
       double wall_quality = ask_wall_tracker_.composite_quality();
-      this->logger_.info(
+      LOG_INFO(logger_,
           "[Entry Signal] SHORT | quality:{} ({}) | wall_quality:{} | "
           "z_robust:{} | "
           "price:{} | wall:{}@{} bps | obi:{} | "
@@ -1616,7 +1616,7 @@ class MeanReversionMakerStrategy
     intent.qty = common::QtyType::from_raw(entry_cfg_.position_size_raw);
 
     if (debug_cfg_.log_entry_exit) {
-      this->logger_.info(
+      LOG_INFO(logger_,
           "[Order Sent] {} | base_price:{} | margin_bps:{} | order_price:{} | "
           "qty:{}",
           side == common::Side::kBuy ? "BUY" : "SELL",
@@ -1686,7 +1686,7 @@ class MeanReversionMakerStrategy
 
     if (!exit_phase_signal) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Exit Block] LONG | Phase not ready for exit | "
             "phase:{} z_fast:{} z_mid:{} z_slow:{}",
             static_cast<int>(phase_state_.long_phase),
@@ -1718,7 +1718,7 @@ class MeanReversionMakerStrategy
         long_position_.entry_price;
     if (pnl_bps < -exit_cfg_.max_loss_bps) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Stop Loss] LONG | entry:{} mid:{} bid:{} ask:{} | "
             "pnl_bps:{} < -{}",
             long_position_.entry_price,
@@ -1753,7 +1753,7 @@ class MeanReversionMakerStrategy
       const char* reason = "Multi-Factor";
 
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Exit Signal] LONG | reason:{} | "
             "z:{} obi:{} wall:{}/{} time:{}s | "
             "components: obi_rev={} wall_decay={} time_p={}",
@@ -1797,7 +1797,7 @@ class MeanReversionMakerStrategy
 
     if (!exit_phase_signal) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Exit Block] SHORT | Phase not ready for exit | "
             "phase:{} z_fast:{} z_mid:{} z_slow:{}",
             static_cast<int>(phase_state_.short_phase),
@@ -1829,7 +1829,7 @@ class MeanReversionMakerStrategy
         short_position_.entry_price;
     if (pnl_bps < -exit_cfg_.max_loss_bps) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Stop Loss] SHORT | entry:{} mid:{} bid:{} ask:{} | "
             "pnl_bps:{} < -{}",
             short_position_.entry_price,
@@ -1864,7 +1864,7 @@ class MeanReversionMakerStrategy
       const char* reason = "Multi-Factor";
 
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Exit Signal] SHORT | reason:{} | "
             "z:{} obi:{} wall:{}/{} time:{}s | "
             "components: obi_rev={} wall_decay={} time_p={}",
@@ -1914,7 +1914,7 @@ class MeanReversionMakerStrategy
     auto order_ids = this->order_manager_->apply({intent});
 
     if (debug_cfg_.log_entry_exit) {
-      this->logger_.warn("[{} Exit] {} | price:{}",
+      LOG_WARN(logger_,"[{} Exit] {} | price:{}",
           (exit_side == common::Side::kSell) ? "Long" : "Short",
           reason,
           market_price_raw);
@@ -1993,7 +1993,7 @@ class MeanReversionMakerStrategy
           common::kSignalScale;
 
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.warn(
+        LOG_WARN(logger_,
             "[Adverse Selection] Being picked off | ratio:{} | "
             "widening margin: {} → {} bps",
             adverse_selection_tracker_.get_ratio(
@@ -2037,7 +2037,7 @@ class MeanReversionMakerStrategy
 
     if (!bid_wall_info_.is_valid) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info("[Entry Skip LONG] No bid wall");
+        LOG_INFO(logger_,"[Entry Skip LONG] No bid wall");
       }
       return;
     }
@@ -2055,7 +2055,7 @@ class MeanReversionMakerStrategy
             common::kSignalScale;
         bool qty_sufficient = (current_bbo->bid_qty.value >= required_qty);
 
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Skip LONG] Defense fail | price_diff:{} ({} -> {}) | "
             "qty_sufficient:{} ({} vs {} required) | trade_qty:{}",
             price_diff,
@@ -2081,7 +2081,7 @@ class MeanReversionMakerStrategy
 
     if (!ask_wall_info_.is_valid) {
       if (debug_cfg_.log_entry_exit) {
-        this->logger_.info("[Entry Skip SHORT] No ask wall");
+        LOG_INFO(logger_,"[Entry Skip SHORT] No ask wall");
       }
       return;
     }
@@ -2099,7 +2099,7 @@ class MeanReversionMakerStrategy
             common::kSignalScale;
         bool qty_sufficient = (current_bbo->ask_qty.value >= required_qty);
 
-        this->logger_.info(
+        LOG_INFO(logger_,
             "[Entry Skip SHORT] Defense fail | price_diff:{} ({} -> {}) | "
             "qty_sufficient:{} ({} vs {} required) | trade_qty:{}",
             price_diff,
@@ -2520,7 +2520,7 @@ class MeanReversionMakerStrategy
           phase_state_.phase_entry_time = get_current_time_ns();
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase SHORT] NEUTRAL → BUILDING | z_fast:{} z_mid:{} "
                 "z_slow:{} | adaptive:{} building_threshold:{}",
                 zscores.z_fast,
@@ -2547,7 +2547,7 @@ class MeanReversionMakerStrategy
           phase_state_.peak_z = zscores.z_mid;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase SHORT] BUILDING → DEEP | z_fast:{} z_mid:{} z_slow:{} "
                 "| adaptive:{} deep_threshold:{} peak:{}",
                 zscores.z_fast,
@@ -2563,7 +2563,7 @@ class MeanReversionMakerStrategy
           phase_state_.short_phase = MarketPhase::NEUTRAL;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase SHORT] BUILDING → NEUTRAL | z_mid:{} > "
                 "building_threshold:{} | adaptive:{}",
                 zscores.z_mid,
@@ -2583,7 +2583,7 @@ class MeanReversionMakerStrategy
           peak_updated = true;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase SHORT] DEEP peak updated | old:{} → new:{} | z_mid:{}",
                 old_peak,
                 phase_state_.peak_z,
@@ -2600,7 +2600,7 @@ class MeanReversionMakerStrategy
           phase_state_.short_phase = MarketPhase::WEAK;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase SHORT] DEEP → WEAK | z_fast:{} z_mid:{} z_slow:{} | "
                 "peak:{} adaptive:{} weak_threshold:{}",
                 zscores.z_fast,
@@ -2611,7 +2611,7 @@ class MeanReversionMakerStrategy
                 weak_threshold);
           }
         } else if (!peak_updated && debug_cfg_.log_entry_exit) {
-          this->logger_.info(
+          LOG_INFO(logger_,
               "[Phase SHORT] DEEP continuing | z_mid:{} peak:{} "
               "weak_threshold:{}",
               zscores.z_mid,
@@ -2633,7 +2633,7 @@ class MeanReversionMakerStrategy
           phase_state_.short_phase = MarketPhase::DEEP;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase SHORT] WEAK → DEEP (False Reversal) | bounce:{} < "
                 "min_bounce:{} | peak:{} z_mid:{}",
                 bounce,
@@ -2648,7 +2648,7 @@ class MeanReversionMakerStrategy
           bool slow_weak = zscores.z_slow > -zscore_slow_threshold_;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase SHORT] WEAK checking VERY_WEAK | fast:{}>-{}? {} | "
                 "mid:{}>-{}? {} | slow:{}>-{}? {} | bounce:{}",
                 zscores.z_fast,
@@ -2667,7 +2667,7 @@ class MeanReversionMakerStrategy
             phase_state_.short_phase = MarketPhase::VERY_WEAK;
 
             if (debug_cfg_.log_entry_exit) {
-              this->logger_.info(
+              LOG_INFO(logger_,
                   "[Phase SHORT] WEAK → VERY_WEAK ✓ | z_fast:{} (>-{}) "
                   "z_mid:{} (>-{}) z_slow:{} (>-{}) | bounce:{}",
                   zscores.z_fast,
@@ -2693,7 +2693,7 @@ class MeanReversionMakerStrategy
           phase_state_.short_phase = MarketPhase::NEUTRAL;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase SHORT] VERY_WEAK → NEUTRAL | z_mid:{} > "
                 "building_threshold:{} | adaptive:{}",
                 zscores.z_mid,
@@ -2701,7 +2701,7 @@ class MeanReversionMakerStrategy
                 adaptive_threshold);
           }
         } else if (debug_cfg_.log_entry_exit) {
-          this->logger_.info(
+          LOG_INFO(logger_,
               "[Phase SHORT] VERY_WEAK waiting | z_fast:{} z_mid:{} z_slow:{}",
               zscores.z_fast,
               zscores.z_mid,
@@ -2712,7 +2712,7 @@ class MeanReversionMakerStrategy
     }
 
     if (prev_phase != phase_state_.short_phase && debug_cfg_.log_entry_exit) {
-      this->logger_.info("[Phase SHORT] Transition: {} → {}",
+      LOG_INFO(logger_,"[Phase SHORT] Transition: {} → {}",
           phase_to_string(prev_phase),
           phase_to_string(phase_state_.short_phase));
     }
@@ -2734,7 +2734,7 @@ class MeanReversionMakerStrategy
           phase_state_.phase_entry_time = get_current_time_ns();
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase LONG] NEUTRAL → BUILDING | z_fast:{} z_mid:{} "
                 "z_slow:{} | adaptive:{} building_threshold:{}",
                 zscores.z_fast,
@@ -2761,7 +2761,7 @@ class MeanReversionMakerStrategy
           phase_state_.peak_z = zscores.z_mid;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase LONG] BUILDING → DEEP | z_fast:{} z_mid:{} z_slow:{} | "
                 "adaptive:{} deep_threshold:{} peak:{}",
                 zscores.z_fast,
@@ -2777,7 +2777,7 @@ class MeanReversionMakerStrategy
           phase_state_.long_phase = MarketPhase::NEUTRAL;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase LONG] BUILDING → NEUTRAL | z_mid:{} < "
                 "building_threshold:{} | adaptive:{}",
                 zscores.z_mid,
@@ -2797,7 +2797,7 @@ class MeanReversionMakerStrategy
           peak_updated = true;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase LONG] DEEP peak updated | old:{} → new:{} | z_mid:{}",
                 old_peak,
                 phase_state_.peak_z,
@@ -2815,7 +2815,7 @@ class MeanReversionMakerStrategy
           phase_state_.long_phase = MarketPhase::WEAK;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase LONG] DEEP → WEAK | z_fast:{} z_mid:{} z_slow:{} | "
                 "peak:{} adaptive:{} weak_threshold:{}",
                 zscores.z_fast,
@@ -2826,7 +2826,7 @@ class MeanReversionMakerStrategy
                 weak_threshold);
           }
         } else if (!peak_updated && debug_cfg_.log_entry_exit) {
-          this->logger_.info(
+          LOG_INFO(logger_,
               "[Phase LONG] DEEP continuing | z_mid:{} peak:{} "
               "weak_threshold:{}",
               zscores.z_mid,
@@ -2848,7 +2848,7 @@ class MeanReversionMakerStrategy
           phase_state_.long_phase = MarketPhase::DEEP;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase LONG] WEAK → DEEP (False Reversal) | bounce:{} < "
                 "min_bounce:{} | peak:{} z_mid:{}",
                 bounce,
@@ -2863,7 +2863,7 @@ class MeanReversionMakerStrategy
           bool slow_weak = zscores.z_slow < zscore_slow_threshold_;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase LONG] WEAK checking VERY_WEAK | fast:{}<{}? {} | "
                 "mid:{}<{}? {} | slow:{}<{}? {} | bounce:{}",
                 zscores.z_fast,
@@ -2882,7 +2882,7 @@ class MeanReversionMakerStrategy
             phase_state_.long_phase = MarketPhase::VERY_WEAK;
 
             if (debug_cfg_.log_entry_exit) {
-              this->logger_.info(
+              LOG_INFO(logger_,
                   "[Phase LONG] WEAK → VERY_WEAK ✓ | z_fast:{} (<{}) z_mid:{} "
                   "(<{}) z_slow:{} (<{}) | bounce:{}",
                   zscores.z_fast,
@@ -2908,7 +2908,7 @@ class MeanReversionMakerStrategy
           phase_state_.long_phase = MarketPhase::NEUTRAL;
 
           if (debug_cfg_.log_entry_exit) {
-            this->logger_.info(
+            LOG_INFO(logger_,
                 "[Phase LONG] VERY_WEAK → NEUTRAL | z_mid:{} < "
                 "building_threshold:{} | adaptive:{}",
                 zscores.z_mid,
@@ -2916,7 +2916,7 @@ class MeanReversionMakerStrategy
                 adaptive_threshold);
           }
         } else if (debug_cfg_.log_entry_exit) {
-          this->logger_.info(
+          LOG_INFO(logger_,
               "[Phase LONG] VERY_WEAK waiting | z_fast:{} z_mid:{} z_slow:{}",
               zscores.z_fast,
               zscores.z_mid,
@@ -2927,7 +2927,7 @@ class MeanReversionMakerStrategy
     }
 
     if (prev_phase != phase_state_.long_phase && debug_cfg_.log_entry_exit) {
-      this->logger_.info("[Phase LONG] Transition: {} → {}",
+      LOG_INFO(logger_,"[Phase LONG] Transition: {} → {}",
           phase_to_string(prev_phase),
           phase_to_string(phase_state_.long_phase));
     }

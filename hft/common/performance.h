@@ -31,16 +31,45 @@ inline auto rdtsc() noexcept {
 #elif defined(__APPLE__)
   return mach_absolute_time();
 #else
-  return 0;
+  return 0ULL;
+#endif
+}
+
+inline auto rdtsc_start() noexcept {
+#if defined(__x86_64__) || defined(_M_X64)
+  unsigned int lower_bit;
+  unsigned int high_bit;
+  __asm__ __volatile__(
+      "lfence\n\t"
+      "rdtsc"
+      : "=a"(lower_bit), "=d"(high_bit)::);
+  return (static_cast<uint64_t>(high_bit) << kShift) | lower_bit;
+#elif defined(__APPLE__)
+  return mach_absolute_time();
+#else
+  return 0ULL;
+#endif
+}
+
+inline auto rdtsc_end() noexcept {
+#if defined(__x86_64__) || defined(_M_X64)
+  unsigned int lower_bit;
+  unsigned int high_bit;
+  __asm__ __volatile__("rdtscp" : "=a"(lower_bit), "=d"(high_bit)::"rcx");
+  return (static_cast<uint64_t>(high_bit) << kShift) | lower_bit;
+#elif defined(__APPLE__)
+  return mach_absolute_time();
+#else
+  return 0ULL;
 #endif
 }
 }  // namespace common
 
 #ifdef MEASUREMENT
-#define START_MEASURE(TAG) const auto TAG = common::rdtsc()
+#define START_MEASURE(TAG) const auto TAG = common::rdtsc_start()
 #define END_MEASURE(TAG, log)                            \
   do {                                                   \
-    const auto end = common::rdtsc();                    \
+    const auto end = common::rdtsc_end();                \
     (log).fatal("[RDTSC]: {}: {}", #TAG, (end - (TAG))); \
   } while (false)
 #else

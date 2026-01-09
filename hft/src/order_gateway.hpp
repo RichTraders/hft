@@ -59,10 +59,10 @@ class OrderGateway {
         [this](auto msg) { on_rejected(msg); });
 
     if (!app_->start()) {
-      logger_.info("Order Entry Start");
+      LOG_INFO(logger_, "Order Entry Start");
     }
 
-    logger_.info("[Constructor] OrderGateway Created");
+    LOG_INFO(logger_, "[Constructor] OrderGateway Created");
   }
 
   // NOLINTNEXTLINE(modernize-use-equals-default) - logs destruction
@@ -82,7 +82,7 @@ class OrderGateway {
   }
 
   void on_login(const WireMessage& /*msg*/) {
-    logger_.info("[OrderGateway][Message] login successful");
+    LOG_INFO(logger_, "[OrderGateway][Message] login successful");
     app_->set_session_ready();
   }
 
@@ -92,7 +92,8 @@ class OrderGateway {
     res.execution_report = app_->create_execution_report_message(msg);
 
     if (UNLIKELY(!enqueue_response_fn_(res))) {
-      logger_.error("[OrderGateway][Message] failed to send execution_report");
+      LOG_ERROR(logger_,
+          "[OrderGateway][Message] failed to send execution_report");
     }
   }
 
@@ -102,7 +103,7 @@ class OrderGateway {
     res.order_cancel_reject = app_->create_order_cancel_reject_message(msg);
 
     if (UNLIKELY(!enqueue_response_fn_(res))) {
-      logger_.error(
+      LOG_ERROR(logger_,
           "[OrderGateway][Message] failed to send order_cancel_reject");
     }
   }
@@ -114,27 +115,28 @@ class OrderGateway {
         app_->create_order_mass_cancel_report_message(msg);
 
     if (UNLIKELY(!enqueue_response_fn_(res))) {
-      logger_.error("[OrderGateway][Message] failed to send order_mass_cancel");
+      LOG_ERROR(logger_,
+          "[OrderGateway][Message] failed to send order_mass_cancel");
     }
   }
 
   void on_rejected(const WireReject& msg) {
     const OrderReject reject = app_->create_reject_message(msg);
-    logger_.error(reject.toString());
+    LOG_ERROR(logger_, reject.toString());
     if (reject.session_reject_reason == "A") {
       app_->stop();
     }
   }
 
   void on_order_mass_status_response(const WireMessage& /*msg*/) {
-    logger_.info("on_order_mass_status_response");
+    LOG_INFO(logger_, "on_order_mass_status_response");
   }
 
   void on_logout(const WireMessage& /*msg*/) {
     auto message = app_->create_log_out_message();
 
     if (UNLIKELY(!app_->send(message))) {
-      logger_.error("[OrderGateway][Message] failed to send logout");
+      LOG_ERROR(logger_, "[OrderGateway][Message] failed to send logout");
     }
   }
 
@@ -142,7 +144,7 @@ class OrderGateway {
     auto message = app_->create_heartbeat_message(std::move(msg));
 
     if (!message.empty() && UNLIKELY(!app_->send(message))) {
-      logger_.error("[OrderGateway][Message] failed to send heartbeat");
+      LOG_ERROR(logger_, "[OrderGateway][Message] failed to send heartbeat");
     }
   }
 
@@ -170,7 +172,7 @@ class OrderGateway {
         break;
       case ReqeustType::kInvalid:
       default:
-        logger_.info("[Message] invalid request type");
+        LOG_INFO(logger_, "[Message] invalid request type");
         break;
     }
   }
@@ -188,11 +190,12 @@ class OrderGateway {
         .position_side = request.position_side};
 
     const std::string msg = app_->create_order_message(order_data);
-    logger_.debug("[Message]Send order message:{}", msg);
+    LOG_DEBUG(logger_, "[Message]Send order message:{}", msg);
 
     // NOLINTNEXTLINE(bugprone-branch-clone) - post_new_order always called
     if (UNLIKELY(!app_->send(msg))) {
-      logger_.error("[Message] failed to send new_single_order_data [msg:{}]",
+      LOG_ERROR(logger_,
+          "[Message] failed to send new_single_order_data [msg:{}]",
           msg);
     }
     app_->post_new_order(order_data);
@@ -205,11 +208,11 @@ class OrderGateway {
         .position_side = request.position_side};
 
     const std::string msg = app_->create_cancel_order_message(cancel_request);
-    logger_.debug("[Message]Send cancel order message:{}", msg);
+    LOG_DEBUG(logger_, "[Message]Send cancel order message:{}", msg);
 
     // NOLINTNEXTLINE(bugprone-branch-clone) - post_cancel_order always called
     if (UNLIKELY(!app_->send(msg))) {
-      logger_.error("[Message] failed to send order_cancel_request");
+      LOG_ERROR(logger_, "[Message] failed to send order_cancel_request");
     }
     app_->post_cancel_order(cancel_request);
   }
@@ -232,11 +235,11 @@ class OrderGateway {
 
     const std::string msg =
         app_->create_cancel_and_reorder_message(cancel_and_reorder);
-    logger_.debug("[Message]Send cancel and reorder message:{}", msg);
+    LOG_DEBUG(logger_, "[Message]Send cancel and reorder message:{}", msg);
 
     // NOLINTNEXTLINE(bugprone-branch-clone) - post always called
     if (UNLIKELY(!app_->send(msg))) {
-      logger_.error("[Message] failed to create_cancel_and_new_order");
+      LOG_ERROR(logger_, "[Message] failed to create_cancel_and_new_order");
     }
     app_->post_cancel_and_reorder(cancel_and_reorder);
   }
@@ -251,11 +254,11 @@ class OrderGateway {
         .position_side = request.position_side};
 
     const std::string msg = app_->create_modify_order_message(modify_request);
-    logger_.debug("[Message]Send modify order message:{}", msg);
+    LOG_DEBUG(logger_, "[Message]Send modify order message:{}", msg);
 
     // NOLINTNEXTLINE(bugprone-branch-clone) - post always called
     if (UNLIKELY(!app_->send(msg))) {
-      logger_.error("[Message] failed to send order_modify");
+      LOG_ERROR(logger_, "[Message] failed to send order_modify");
     }
     app_->post_modify_order(modify_request);
   }
@@ -267,11 +270,11 @@ class OrderGateway {
         .symbol = request.symbol};
 
     const std::string msg = app_->create_order_all_cancel(all_cancel_request);
-    logger_.debug("[Message]Send cancel all orders message:{}", msg);
+    LOG_DEBUG(logger_, "[Message]Send cancel all orders message:{}", msg);
 
     // NOLINTNEXTLINE(bugprone-branch-clone) - post always called
     if (UNLIKELY(!app_->send(msg))) {
-      logger_.error("[Message] failed to send order_mass_cancel_request");
+      LOG_ERROR(logger_, "[Message] failed to send order_mass_cancel_request");
     }
     app_->post_mass_cancel_order(all_cancel_request);
   }

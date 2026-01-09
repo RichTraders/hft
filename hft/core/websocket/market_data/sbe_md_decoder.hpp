@@ -78,7 +78,7 @@ class SbeMdDecoder : public WsMdDecoderBase<SbeMdDecoder<Exchange>> {
 
       default:
         constexpr int kPayloadMinLength = 200;
-        this->logger_.warn(
+        LOG_WARN(this->logger_,
             "Unknown SBE template ID: {} (schema_id={}, version={}) payload:{}",
             header.template_id,
             header.schema_id,

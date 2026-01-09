@@ -32,12 +32,13 @@ class MarketConsumerRecoveryMixin {
     auto& self = static_cast<Derived&>(*this);
 
     if (self.state_ == StreamState::kBuffering) {
-      self.logger_.info(
+      LOG_INFO(self.logger_,
           "[MarketConsumer]Gap detected, but already snapshot buffering mode.");
       return;
     }
 
-    self.logger_.info("[MarketConsumer]Gap detected, entering buffering mode");
+    LOG_INFO(self.logger_,
+        "[MarketConsumer]Gap detected, entering buffering mode");
     self.state_ = StreamState::kBuffering;
     self.buffered_events_.clear();
     self.first_buffered_update_id_ = 0;
@@ -47,7 +48,7 @@ class MarketConsumerRecoveryMixin {
         INI_CONFIG.get("meta", "level"));
     std::ignore = self.app_->send(snapshot_req);
 
-    self.logger_.info("Gap detected, resubscribing");
+    LOG_INFO(self.logger_, "Gap detected, resubscribing");
   }
 
   void erase_buffer_lower_than_snapshot_impl(
@@ -86,7 +87,7 @@ class MarketConsumerRecoveryMixin {
   void resubscribe_impl() {
     auto& self = static_cast<Derived&>(*this);
 
-    self.logger_.info("Try resubscribing");
+    LOG_INFO(self.logger_, "Try resubscribing");
     self.current_generation_.store(
         self.generation_.fetch_add(1, std::memory_order_acq_rel) + 1,
         std::memory_order_release);

@@ -50,6 +50,24 @@ class BaseStrategy {
 
   ~BaseStrategy() = default;
 
+  void on_orderbook_updated(const common::TickerId& ticker,
+      common::PriceType price, common::Side side,
+      const MarketOrderBook<Strategy>* order_book) noexcept {
+    static_cast<Strategy*>(this)->on_orderbook_updated(ticker,
+        price,
+        side,
+        order_book);
+  }
+
+  void on_trade_updated(const MarketData* market_data,
+      MarketOrderBook<Strategy>* order_book) noexcept {
+    static_cast<Strategy*>(this)->on_trade_updated(market_data, order_book);
+  }
+
+  void on_order_updated(const ExecutionReport* report) noexcept {
+    static_cast<Strategy*>(this)->on_order_updated(report);
+  }
+
  protected:
   OrderManager<Strategy>* order_manager_;
   const FeatureEngine<Strategy>* feature_engine_;

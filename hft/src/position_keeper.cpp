@@ -183,7 +183,7 @@ void PositionInfo::add_fill(const ExecutionReport* report,
   }
   total_pnl_ = unreal_pnl_ + real_pnl_;
 
-  logger.info("[PositionInfo][Fill] {}", toString());
+  LOG_INFO(logger, "[PositionInfo][Fill] {}", toString());
 }
 
 void PositionInfo::update_bbo(const BBO* bbo,
@@ -225,7 +225,10 @@ void PositionInfo::update_bbo(const BBO* bbo,
   total_pnl_ = unreal_pnl_ + real_pnl_;
 
   if (total_pnl_ != old_total_pnl)
-    logger.info("[PositionInfo][Updated] {} {}", toString(), bbo_->toString());
+    LOG_INFO(logger,
+        "[PositionInfo][Updated] {} {}",
+        toString(),
+        bbo_->toString());
 }
 
 void PositionKeeper::add_fill(const ExecutionReport* report) noexcept {

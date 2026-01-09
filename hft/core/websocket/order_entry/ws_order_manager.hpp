@@ -41,7 +41,7 @@ class WsOrderManager {
       : logger_(logger) {}
 
   void register_pending_request(const PendingOrderRequest& request) {
-    logger_.debug(
+    LOG_DEBUG(logger_,
         "[WsOrderManager] Registered pending request: id={}, symbol={}, "
         "side={}",
         request.client_order_id,
@@ -56,7 +56,8 @@ class WsOrderManager {
   void remove_pending_request(std::uint64_t request_id) {
     typename PendingRequestMap::accessor accessor;
     if (pending_requests_.find(accessor, request_id)) {
-      logger_.debug("[WsOrderManager] Removed pending request: id={}",
+      LOG_DEBUG(logger_,
+          "[WsOrderManager] Removed pending request: id={}",
           request_id);
       pending_requests_.erase(accessor);
     }
@@ -67,7 +68,7 @@ class WsOrderManager {
       std::string_view error_message) {
     const auto client_order_id_opt = extract_client_order_id(request_id);
     if (UNLIKELY(!client_order_id_opt.has_value())) {
-      logger_.error(
+      LOG_ERROR(logger_,
           "[WsOrderManager] Failed to extract clientOrderId from request_id: "
           "{}",
           request_id);
@@ -80,7 +81,7 @@ class WsOrderManager {
     const bool found = pending_requests_.find(accessor, client_order_id);
 
     if (!found) {
-      logger_.warn(
+      LOG_WARN(logger_,
           "[WsOrderManager] No pending request found for "
           "clientOrderId={}, creating "
           "minimal ExecutionReport",
@@ -137,7 +138,7 @@ class WsOrderManager {
       }
     }
 
-    logger_.debug(
+    LOG_DEBUG(logger_,
         "[WsOrderManager] Created synthetic ExecutionReport: "
         "clientOrderId={}, error_code={}, error={}",
         client_order_id,
@@ -157,7 +158,7 @@ class WsOrderManager {
     typename CancelReorderMap::accessor accessor;
     cancel_reorder_pairs_.insert(accessor, new_order_id);
     accessor->second = original_order_id;
-    logger_.debug(
+    LOG_DEBUG(logger_,
         "[WsOrderManager] Registered cancel_and_reorder pair: "
         "new_order_id={}, original_order_id={}",
         new_order_id,
@@ -176,7 +177,7 @@ class WsOrderManager {
   void remove_cancel_and_reorder_pair(std::uint64_t new_order_id) {
     typename CancelReorderMap::accessor accessor;
     if (cancel_reorder_pairs_.find(accessor, new_order_id)) {
-      logger_.debug(
+      LOG_DEBUG(logger_,
           "[WsOrderManager] Removed cancel_and_reorder pair: new_order_id={}",
           new_order_id);
       cancel_reorder_pairs_.erase(accessor);

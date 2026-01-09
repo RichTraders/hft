@@ -23,11 +23,11 @@ ResponseManager::ResponseManager(const common::Logger::Producer& logger,
       execution_report_pool_(execution_report_pool),
       order_cancel_reject_pool_(order_cancel_reject_pool),
       order_mass_cancel_report_pool_(order_mass_cancel_report_pool) {
-  logger_.info("[Constructor] Response manager Created");
+  LOG_INFO(logger_, "[Constructor] Response manager Created");
 }
 
 ResponseManager::~ResponseManager() {
-  logger_.info("[Destructor] Response manager Destroy");
+  LOG_INFO(logger_, "[Destructor] Response manager Destroy");
 }
 
 ExecutionReport* ResponseManager::execution_report_allocate() {

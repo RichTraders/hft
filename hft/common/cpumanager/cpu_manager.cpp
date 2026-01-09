@@ -31,9 +31,6 @@
 #endif
 
 namespace common {
-namespace {
-[[maybe_unused]] constexpr auto kDecimalBase = 10;
-}
 // NOLINTBEGIN(unused-parameter)
 CpuManager::CpuManager(const Logger::Producer& logger) : logger_(logger) {
   const int cpu_use_count = INI_CONFIG.get_int("cpu_id", "count");
@@ -66,7 +63,7 @@ CpuManager::CpuManager(const Logger::Producer& logger) : logger_(logger) {
 
     const auto& iter = cpu_info_list_.find(info.cpu_id);
     if (iter == cpu_info_list_.end()) {
-      logger_.error("[CpuManager] failed to get cpu_id info");
+      LOG_ERROR(logger_, "[CpuManager] failed to get cpu_id info");
     }
 
     // 정책(SCHED_RR 등)에 따라 값(prio/nice) 로딩
@@ -86,11 +83,11 @@ CpuManager::CpuManager(const Logger::Producer& logger) : logger_(logger) {
     info.tid = 0;
     thread_info_list_.emplace(thread_name, info);
   }
-  logger_.info("[Constructor] Cpu manager Created");
+  LOG_INFO(logger_, "[Constructor] Cpu manager Created");
 }
 
 CpuManager::~CpuManager() {
-  logger_.info("[Destructor] Cpu manager Destroy");
+  LOG_INFO(logger_, "[Destructor] Cpu manager Destroy");
 }
 
 void CpuManager::trim_newline(std::string& str) {
@@ -103,6 +100,7 @@ void CpuManager::trim_newline(std::string& str) {
 // Apple: 외부 스레드 이름 조회 불가. (현재 스레드가 아니면 찾기 매우 어려움)
 ThreadId CpuManager::get_tid_by_thread_name(const std::string& target_name) {
 #ifdef __linux__
+  static constexpr auto kDecimalBase = 10;
   const std::filesystem::path task_dir =
       std::filesystem::path("/proc") / std::to_string(getpid()) / "task";
   std::error_code err_c;
@@ -142,7 +140,8 @@ ThreadId CpuManager::get_tid_by_thread_name(const std::string& target_name) {
   return 0;
 
 #elif __APPLE__
-  logger_.warn("APPLE doesn't support get thread id. target id :{}",
+  LOG_WARN(logger_,
+      "APPLE doesn't support get thread id. target id :{}",
       target_name);
   return 0;
 #else
@@ -163,18 +162,19 @@ bool CpuManager::init_cpu_to_tid() {
     const int tid = get_tid_by_thread_name(thread_name);
     if (tid == 0) {
 #ifdef __APPLE__
-      logger_.error(
+      LOG_ERROR(logger_,
           "[CpuManager] macOS does not support finding threads by "
           "name externally: '{}'",
           thread_name);
 #else
-      logger_.error("[CpuManager] Thread '{}' not found", thread_name);
+      LOG_ERROR(logger_, "[CpuManager] Thread '{}' not found", thread_name);
 #endif
       continue;
     }
 
     info.second.tid = tid;
-    logger_.info("[CpuManager] Found thread '{}' with TID {}",
+    LOG_INFO(logger_,
+        "[CpuManager] Found thread '{}' with TID {}",
         thread_name,
         tid);
 
@@ -260,7 +260,8 @@ int CpuManager::set_cpu_to_tid(uint8_t cpu_id, ThreadId tid) {
   CPU_ZERO(&cpu_set);
   CPU_SET(cpu_id, &cpu_set);
   if (sched_setaffinity(tid, sizeof(cpu_set), &cpu_set) != 0) {
-    logger_.error("[CpuManager] failed to set cpu({}) to tid({}): {}",
+    LOG_ERROR(logger_,
+        "[CpuManager] failed to set cpu({}) to tid({}): {}",
         cpu_id,
         tid,
         strerror(errno));
@@ -271,13 +272,13 @@ int CpuManager::set_cpu_to_tid(uint8_t cpu_id, ThreadId tid) {
   if (sched_getaffinity(tid, sizeof(cpu_set), &cpu_set) == -1) {
     return -1;
   }
-  logger_.info("[CpuManager] tid {} allowed CPU : {}", tid, cpu_id);
+  LOG_INFO(logger_, "[CpuManager] tid {} allowed CPU : {}", tid, cpu_id);
   return 0;
 
 #elif __APPLE__
   (void)cpu_id;
   (void)tid;
-  logger_.info(
+  LOG_INFO(logger_,
       "[CpuManager] CPU pinning (Affinity) is NOT supported on Apple Silicon. "
       "Ignored.");
   return 0;
@@ -303,12 +304,12 @@ int CpuManager::set_rt(const uint8_t cpu_id, ThreadId tid, SchedPolicy policy,
   (void)policy;
   // Apple: RT 정책 대신 User Interactive QoS 적용 권장
   // 리눅스 코드 구조를 맞추기 위해 흉내만 냄
-  logger_.info("[CpuManager] Setting High Priority (QoS) for TID {}", tid);
+  LOG_INFO(logger_, "[CpuManager] Setting High Priority (QoS) for TID {}", tid);
 
   // Apple에서는 pthread_t 핸들이 없으면 외부 스레드 QoS 설정이 불가함.
   // 여기서는 Nice 값(Priority)을 최대로 낮춰서(-20) 우선순위를 높임
   if (setpriority(PRIO_PROCESS, tid, priority) != 0) {
-    logger_.error("[CpuManager] failed to set priority");
+    LOG_ERROR(logger_, "[CpuManager] failed to set priority");
     return -1;
   }
   return 0;
@@ -326,13 +327,13 @@ int CpuManager::set_cfs(const uint8_t cpu_id, ThreadId tid, SchedPolicy policy,
 #ifdef __linux__
   // 정책 변경 (OTHER, BATCH, IDLE)
   if (set_scheduler(tid, 0, static_cast<int>(policy))) {
-    logger_.error("[CpuManager] failed to chrt to tid");
+    LOG_ERROR(logger_, "[CpuManager] failed to chrt to tid");
     return -1;
   }
 #endif
   (void)policy;
   if (setpriority(PRIO_PROCESS, tid, nicev) != 0) {
-    logger_.error("[CpuManager] failed to set nicev: {}", strerror(errno));
+    LOG_ERROR(logger_, "[CpuManager] failed to set nicev: {}", strerror(errno));
     return -1;
   }
   return 0;
@@ -386,7 +387,9 @@ int CpuManager::set_scheduler(ThreadId tid, int priority,
 #ifdef __linux__
   const sched_param sched_params{.sched_priority = priority};
   if (sched_setscheduler(tid, scheduler_policy, &sched_params) != 0) {
-    logger_.error("[CpuManager] failed to setscheduler: {}", strerror(errno));
+    LOG_ERROR(logger_,
+        "[CpuManager] failed to setscheduler: {}",
+        strerror(errno));
     return -1;
   }
   if (sched_getscheduler(tid) < 0) {
@@ -394,7 +397,7 @@ int CpuManager::set_scheduler(ThreadId tid, int priority,
   }
   return 0;
 #elif __APPLE__
-  logger_.warn(
+  LOG_WARN(logger_,
       "Apple doesn't support setscheduler. "
       "cpu_id:{},priority:{},scheduler_policy:{}",
       tid,
@@ -418,17 +421,17 @@ int CpuManager::set_affinity(const AffinityInfo& info) {
   CPU_SET(info.cpu_id_, &cpu_info);
 
   if (sched_setaffinity(info.tid_, sizeof(cpu_info), &cpu_info) != 0) {
-    logger_.error("[CpuManager] sched_setaffinity :{}", strerror(errno));
+    LOG_ERROR(logger_, "[CpuManager] sched_setaffinity :{}", strerror(errno));
     return -1;
   }
   if (sched_getaffinity(info.tid_, sizeof(cpu_info), &cpu_info) == -1) {
-    logger_.error("[CpuManager] sched_getaffinity :{}", strerror(errno));
+    LOG_ERROR(logger_, "[CpuManager] sched_getaffinity :{}", strerror(errno));
     return -1;
   }
   return 0;
 #else
   // Apple: Not supported
-  logger_.warn("Apple doesn't support: setaffinity. {}", info.cpu_id_);
+  LOG_WARN(logger_, "Apple doesn't support: setaffinity. {}", info.cpu_id_);
   return 0;
 #endif
 }

@@ -74,7 +74,7 @@ class ObiVwapDirectionalStrategy
     if (!bbo->bid_qty.is_valid() || !bbo->ask_qty.is_valid() ||
         !bbo->bid_price.is_valid() || !bbo->ask_price.is_valid() ||
         bbo->ask_price < bbo->bid_price) {
-      this->logger_.warn("Invalid BBO. Skipping quoting.");
+      LOG_WARN(logger_, "Invalid BBO. Skipping quoting.");
       return;
     }
 
@@ -88,7 +88,8 @@ class ObiVwapDirectionalStrategy
         {});
 
     const int64_t vwap = this->feature_engine_->get_vwap();
-    const int64_t obi = this->feature_engine_->orderbook_imbalance_int64(bid_qty_, ask_qty_);
+    const int64_t obi =
+        this->feature_engine_->orderbook_imbalance_int64(bid_qty_, ask_qty_);
     const int64_t mid = this->feature_engine_->get_mid_price();
     const int64_t spread = this->feature_engine_->get_spread_fast();
     const int64_t denom = std::max(spread, minimum_spread_);
@@ -101,7 +102,7 @@ class ObiVwapDirectionalStrategy
     std::vector<QuoteIntentType> intents;
     intents.reserve(1);
 
-    this->logger_.debug(
+    LOG_DEBUG(logger_,
         "[Updated] delta:{} obi:{} signal:{} mid:{}, vwap:{}, spread:{}",
         delta_obi_scaled,
         obi,
@@ -125,7 +126,8 @@ class ObiVwapDirectionalStrategy
       }
       intents.push_back(intent);
 
-      this->logger_.debug("[Directional]Long Entry. price:{}, qty:{}, side:buy",
+      LOG_DEBUG(logger_,
+          "[Directional]Long Entry. price:{}, qty:{}, side:buy",
           order_price.value,
           order_qty.value);
     } else if (delta_obi < -enter_threshold_) {
@@ -142,7 +144,7 @@ class ObiVwapDirectionalStrategy
         intent.position_side = common::PositionSide::kShort;
       }
       intents.push_back(intent);
-      this->logger_.debug(
+      LOG_DEBUG(logger_,
           "[Directional]Short Entry. price:{}, qty:{}, side:sell",
           order_price.value,
           order_qty.value);
@@ -162,7 +164,7 @@ class ObiVwapDirectionalStrategy
               order_qty);
           intent.position_side = common::PositionSide::kLong;
           intents.push_back(intent);
-          this->logger_.debug(
+          LOG_DEBUG(logger_,
               "[Directional]Long Exit. price:{}, qty:{}, side:sell",
               order_price.value,
               order_qty.value);
@@ -184,7 +186,7 @@ class ObiVwapDirectionalStrategy
               order_qty);
           intent.position_side = common::PositionSide::kShort;
           intents.push_back(intent);
-          this->logger_.debug(
+          LOG_DEBUG(logger_,
               "[Directional]Short Exit. price:{}, qty:{}, side:buy",
               order_price.value,
               order_qty.value);

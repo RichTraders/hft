@@ -72,7 +72,7 @@ struct BinanceFuturesMdMessageConverter {
       symbol_ = INI_CONFIG.get("meta", "ticker");
     }
     [[nodiscard]] MarketUpdateData operator()(std::monostate) const {
-      logger_.debug("");
+      LOG_DEBUG(logger_, "");
       return MarketUpdateData{};
     }
     [[nodiscard]] MarketUpdateData operator()(
@@ -225,13 +225,14 @@ struct BinanceFuturesMdMessageConverter {
 
     [[nodiscard]] MarketUpdateData operator()(
         const schema::futures::ApiResponse& /*msg*/) const {
-      logger_.debug("ApiResponse received in MarketDataVisitor");
+      LOG_DEBUG(logger_, "ApiResponse received in MarketDataVisitor");
       return MarketUpdateData{};
     }
 
     [[nodiscard]] MarketUpdateData operator()(
         const schema::futures::ExchangeInfoHttpResponse& /*msg*/) const {
-      logger_.debug("ExchangeInfoHttpResponse received in MarketDataVisitor");
+      LOG_DEBUG(logger_,
+          "ExchangeInfoHttpResponse received in MarketDataVisitor");
       return MarketUpdateData{};
     }
 
@@ -256,7 +257,7 @@ struct BinanceFuturesMdMessageConverter {
           common::PriceType::from_raw(price),
           common::QtyType::from_raw(qty));
       if (!entry) {
-        logger_.error("Market data pool exhausted");
+        LOG_ERROR(logger_, "Market data pool exhausted");
       }
       return entry;
     }
@@ -310,7 +311,7 @@ struct BinanceFuturesMdMessageConverter {
 
     template <typename T>
     [[nodiscard]] MarketUpdateData operator()(const T&) const {
-      logger_.error("Snapshot requested from non-depth wire message");
+      LOG_ERROR(logger_, "Snapshot requested from non-depth wire message");
       return MarketUpdateData{};
     }
 
@@ -400,7 +401,7 @@ struct BinanceFuturesMdMessageConverter {
 
     template <typename T>
     [[nodiscard]] InstrumentInfo operator()(const T&) const {
-      logger_.info("");
+      LOG_INFO(logger_, "");
       return {};
     }
 
@@ -412,7 +413,7 @@ struct BinanceFuturesMdMessageConverter {
         : logger_(converter.logger_) {}
     [[nodiscard]] MarketDataReject operator()(
         const schema::futures::ApiResponse& msg) const {
-      logger_.info("");
+      LOG_INFO(logger_, "");
       MarketDataReject reject{};
       if (msg.error.has_value()) {
         reject.error_code = msg.error.value().code;

@@ -44,6 +44,7 @@ print_usage() {
     echo "  BUILD_DIR_A: $DEFAULT_BUILD_DIR_A"
     echo "  BUILD_DIR_B: $DEFAULT_BUILD_DIR_B"
     echo "  PROGRAM: $DEFAULT_PROGRAM"
+    echo "  BRANCH_PROFILE: 1 (enabled)"
 }
 
 if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then

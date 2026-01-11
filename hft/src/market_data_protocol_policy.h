@@ -18,6 +18,7 @@
 #include <string>
 #include <thread>
 
+#include "common/performance.h"
 #include "depth_validator.h"
 #include "ini_config.hpp"
 #include "market_data.h"
@@ -76,8 +77,10 @@ struct WebSocketMarketDataPolicy {
       bool& first_depth_after_snapshot, OnMarketDataFn& on_market_data_fn,
       MarketUpdateDataPool* market_update_data_pool,
       MarketDataPool* market_data_pool, Logger& logger, auto recover_fn) {
+    START_MEASURE(DOMAIN_MAPPER);
     auto msg_data = app.create_market_data_message(msg);
     auto* data = market_update_data_pool->allocate(std::move(msg_data));
+    END_MEASURE(DOMAIN_MAPPER, logger);
 
     // if (UNLIKELY(data == nullptr)) {
     //   LOG_ERROR(logger, "[handle_subscribe] Market update data pool exhausted!");
@@ -211,8 +214,10 @@ struct FixMarketDataPolicy {
       bool& /*first_depth_after_snapshot*/, OnMarketDataFn& on_market_data_fn,
       MarketUpdateDataPool* market_update_data_pool,
       MarketDataPool* market_data_pool, Logger& logger, auto resubscribe_fn) {
+    START_MEASURE(DOMAIN_MAPPER);
     auto* data =
         market_update_data_pool->allocate(app.create_market_data_message(msg));
+    END_MEASURE(DOMAIN_MAPPER, logger);
 
     if (UNLIKELY(data == nullptr)) {
       LOG_ERROR(logger,

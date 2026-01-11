@@ -96,7 +96,7 @@ graph TB
 |----------|------------|
 | Language | C++23 |
 | Build | CMake 3.28+, Ninja |
-| Compiler | Clang 18+ (recommended), GCC 13+ |
+| Compiler | Clang 18+ (recommended), GCC 13+, **macOS: Homebrew LLVM required** |
 | WebSocket | libwebsockets 4.4.0 |
 | JSON | Glaze (compile-time reflection) |
 | FIX Protocol | fix8 |
@@ -124,6 +124,8 @@ hft/
 # Prerequisite
 
 ## System Dependencies
+
+### Linux
 Install required system packages:
 ```bash
 sudo apt install -y libtbb-dev libcurl4-openssl-dev cmake ninja-build clang-18
@@ -136,6 +138,15 @@ sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 100
 sudo update-alternatives --config cc
 sudo update-alternatives --config c++
 ```
+
+### macOS
+**Homebrew LLVM is required** - Apple Clang does not support `std::from_chars` for floating-point types.
+
+```bash
+brew install llvm ninja cmake
+```
+
+CMake will automatically detect and use Homebrew LLVM at `/opt/homebrew/opt/llvm`.
 
 ## Build
 
@@ -571,11 +582,29 @@ START_MEASURE(TAG);
 END_MEASURE(TAG, logger);  // outputs "[RDTSC]: TAG: <cycles>"
 ```
 
+### Strategy-Specific Benchmark Targets
+
+| Target | Strategy |
+|--------|----------|
+| `full_pipeline_benchmark_directional_tests` | ObiVwapDirectionalStrategy |
+| `full_pipeline_benchmark_mean_reversion_tests` | MeanReversionMakerStrategy |
+| `full_pipeline_benchmark_liquid_taker_tests` | LiquidTaker |
+
+Build example:
+```bash
+cmake --build build --target full_pipeline_benchmark_mean_reversion_tests
+```
+
+**A/B Testing Note**: Ensure the config file matches the strategy being tested. The benchmark loads config from `test/resources/`. Update `full_pipeline_benchmark_tests.cpp` if needed:
+```cpp
+INI_CONFIG.load("resources/config-xrpusdc.ini");  // Verify this matches your strategy
+```
+
 ### Running Benchmarks
 
 Run benchmarks in CPU-isolated environment for accurate results:
 ```bash
-sudo systemd-run --scope --slice=iso.slice -p AllowedCPUs=1-5 ./benchmark_tests
+sudo systemd-run --scope --slice=iso.slice -p AllowedCPUs=1-5 ./full_pipeline_benchmark_mean_reversion_tests
 ```
 
 ### Analyzing Results
@@ -585,6 +614,97 @@ Use `util/analyze_rdtsc.py` to parse RDTSC logs:
 python3 util/analyze_rdtsc.py benchmark_*.log
 python3 util/analyze_rdtsc.py --markdown -o result.md benchmark_*.log
 ```
+
+### Regime & Phase Analysis
+
+Use `util/plot_regime.py` to visualize market regime classification and strategy phase transitions.
+
+**Prerequisites:**
+
+1. Build with converter timing enabled to generate required log entries:
+```bash
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+      -DUSE_ONEPASS_DECODER=OFF \
+      -DENABLE_CONVERTER_TIMING=ON \
+      -G Ninja \
+      -S . -B cmake-build-measure
+
+cmake --build cmake-build-measure --target full_pipeline_benchmark_mean_reversion_tests
+```
+
+2. Set up Python environment:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install matplotlib pandas pyarrow
+```
+
+**Usage:**
+```bash
+# Basic usage (generates 3-panel plot: Regime + Phase LONG + Phase SHORT)
+python3 util/plot_regime.py <logfile> --stats -o output.png -p output.parquet
+
+# Example with custom parameters
+python3 util/plot_regime.py cmake-build-measure/test/benchmark_rdtsc_20260108005323.log \
+    --slice-ms 60000 \
+    --threshold-bps 4.0 \
+    --stats \
+    --output regime_plot.png \
+    --parquet regime_phase_data.parquet
+```
+
+**Parameters:**
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--slice-ms` | 10000 | Time slice duration for regime detection (ms) |
+| `--threshold-bps` | 2.0 | Price threshold for up/down classification (basis points) |
+| `--stats` | - | Print regime/phase statistics |
+| `--output` | - | Output image file path |
+| `--parquet` | - | Export data to parquet for further analysis |
+| `--regime-only` | - | Plot only regime (skip phase analysis) |
+
+**Regime Classification Logic:**
+- Each time slice starts with a reference price
+- **Up**: Price hits upper wall (ref + threshold) first
+- **Down**: Price hits lower wall (ref - threshold) first
+- **Sideways**: Neither wall hit within time slice
+
+**Phase Tracking:**
+- Parses `[Phase LONG/SHORT] Transition: X → Y` logs
+- Maps transitions to nearest preceding BookTickerEvent timestamp
+- Phases: NEUTRAL, BUILDING, DEEP, WEAK, VERY_WEAK
+
+**Output:**
+- PNG: 3-panel subplot (Regime with mid price, Phase LONG/SHORT with trade price)
+- Parquet: Per-tick data with regime and phase labels for backtesting analysis
+
+### Phase Accuracy Analysis
+
+Use `util/analyze_phase_accuracy.py` to evaluate strategy phase predictions against regime ground truth.
+
+```bash
+# Basic usage
+python3 util/analyze_phase_accuracy.py regime_phase_data.parquet
+
+# With confusion matrix plot and detailed breakdown
+python3 util/analyze_phase_accuracy.py regime_phase_data.parquet -v -o confusion_matrix.png
+```
+
+**Entry Confusion Matrix (Mean Reversion Perspective):**
+| Action \ Regime | Up (Rebound) | Sideways (Range) | Down (Trend) |
+|-----------------|--------------|------------------|--------------|
+| Long Entry | TP (Rebound) | Marginal | FATAL (Knife) |
+| Short Entry | FATAL (Rocket) | Marginal | TP (Top) |
+
+**Phase to Action Mapping:**
+- `SHORT VERY_WEAK` → Long Entry (oversold bounce expected)
+- `LONG VERY_WEAK` → Short Entry (overbought drop expected)
+- Other phases → Hold
+
+**Key Metrics:**
+- **Win Rate**: TP entries / Total entries (correct direction)
+- **Safe Rate**: (TP + Marginal) / Total entries (non-losing)
+- **Fatal Rate**: FATAL entries / Total entries (adverse selection)
 
 See `docs/benchmark-guide.md` for detailed workflow and visualization tools.
 

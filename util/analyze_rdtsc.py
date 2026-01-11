@@ -16,12 +16,35 @@ import math
 import glob
 import os
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterator, Tuple
 
-# CPU frequency in Hz
+# CPU frequency in Hz (default, will be auto-detected)
 CPU_FREQ_HZ = 3593.234e6
+
+
+def detect_tsc_freq() -> float | None:
+    """Detect TSC frequency from dmesg (most accurate for RDTSC)."""
+    import subprocess
+
+    try:
+        result = subprocess.run(['sudo', 'dmesg'], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            for line in result.stdout.split('\n'):
+                if 'Refined TSC clocksource calibration' in line:
+                    match = re.search(r'(\d+\.?\d*)\s*MHz', line)
+                    if match:
+                        return float(match.group(1)) * 1e6
+                if 'tsc: Detected' in line:
+                    match = re.search(r'(\d+\.?\d*)\s*MHz', line)
+                    if match:
+                        return float(match.group(1)) * 1e6
+    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
+        pass
+
+    return None
 
 
 @dataclass
@@ -80,15 +103,10 @@ def find_related_files(base_path: str) -> list[str]:
     if '*' in base_path or '?' in base_path:
         return sorted(glob.glob(base_path if base_path.endswith('.log') else f"{base_path}.log"))
 
-    # Find all related files: base.log, base_1.log, base_2.log, ...
+    # Find all related files: base_1.log, base_2.log, ..., base.log (no suffix last)
     files = []
 
-    # Main file (no suffix)
-    main_file = f"{base_path}.log"
-    if os.path.exists(main_file):
-        files.append(main_file)
-
-    # Numbered suffixes
+    # Numbered suffixes first (in order: _1, _2, _3, ...)
     i = 1
     while True:
         suffix_file = f"{base_path}_{i}.log"
@@ -97,6 +115,11 @@ def find_related_files(base_path: str) -> list[str]:
             i += 1
         else:
             break
+
+    # Main file (no suffix) comes last
+    main_file = f"{base_path}.log"
+    if os.path.exists(main_file):
+        files.append(main_file)
 
     return files
 
@@ -117,27 +140,26 @@ def merge_files_by_time(filepaths: list[str]) -> Iterator[str]:
     """
     import heapq
 
-    # Create iterators for each file
     iterators = []
+    counter = 0
     for fp in filepaths:
         it = iter_file_lines_with_timestamp(fp)
         try:
             ts, line = next(it)
-            # heapq uses first element for comparison
-            iterators.append((ts, line, it, fp))
+            iterators.append((ts, counter, line, it, fp))
+            counter += 1
         except StopIteration:
             pass
 
-    # Use heap to merge
     heapq.heapify(iterators)
 
     while iterators:
-        ts, line, it, fp = heapq.heappop(iterators)
+        ts, idx, line, it, fp = heapq.heappop(iterators)
         yield line
 
         try:
             next_ts, next_line = next(it)
-            heapq.heappush(iterators, (next_ts, next_line, it, fp))
+            heapq.heappush(iterators, (next_ts, idx, next_line, it, fp))
         except StopIteration:
             pass
 
@@ -159,7 +181,35 @@ def parse_rdtsc_log(filepath: str, skip: int = 0) -> dict[str, list[int]]:
                     continue
                 measurements[tag].append(cycles)
 
-    return measurements
+    return dict(measurements)
+
+
+def _parse_file_worker(args: tuple) -> dict[str, list[int]]:
+    """Worker function for parallel file parsing."""
+    filepath, skip = args
+    return parse_rdtsc_log(filepath, skip)
+
+
+def parse_rdtsc_parallel(filepaths: list[str], skip: int = 0, max_workers: int = None) -> dict[str, list[int]]:
+    """Parse multiple RDTSC log files in parallel and merge results."""
+    if max_workers is None:
+        max_workers = min(len(filepaths), os.cpu_count() or 4)
+
+    merged = defaultdict(list)
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_parse_file_worker, (fp, skip)): fp for fp in filepaths}
+
+        for future in as_completed(futures):
+            fp = futures[future]
+            try:
+                result = future.result()
+                for tag, values in result.items():
+                    merged[tag].extend(values)
+            except Exception as e:
+                print(f"Error parsing {fp}: {e}", file=sys.stderr)
+
+    return dict(merged)
 
 
 def parse_rdtsc_from_lines(lines: Iterator[str], skip: int = 0) -> dict[str, list[int]]:
@@ -178,7 +228,7 @@ def parse_rdtsc_from_lines(lines: Iterator[str], skip: int = 0) -> dict[str, lis
                 continue
             measurements[tag].append(cycles)
 
-    return measurements
+    return dict(measurements)
 
 
 def percentile(sorted_data: list[int], p: float) -> float:
@@ -209,6 +259,32 @@ def compute_stats(name: str, values: list[int]) -> MeasurementStats:
         min_val=sorted_vals[0],
         max_val=sorted_vals[-1]
     )
+
+
+def _compute_stats_worker(args: tuple) -> MeasurementStats:
+    """Worker function for parallel stats computation."""
+    name, values = args
+    return compute_stats(name, values)
+
+
+def compute_stats_parallel(measurements: dict[str, list[int]], max_workers: int = None) -> list[MeasurementStats]:
+    """Compute statistics for all measurements in parallel."""
+    if max_workers is None:
+        max_workers = min(len(measurements), os.cpu_count() or 4)
+
+    results = {}
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_compute_stats_worker, (name, values)): name
+                   for name, values in measurements.items()}
+
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                results[name] = future.result()
+            except Exception as e:
+                print(f"Error computing stats for {name}: {e}", file=sys.stderr)
+
+    return results
 
 
 def print_stats(stats: MeasurementStats):
@@ -276,6 +352,7 @@ def find_latest_log_group(directory: str = ".", keyword: str = "benchmark_rdtsc"
 
 def main():
     global CPU_FREQ_HZ
+    import time
 
     parser = argparse.ArgumentParser(
         description='Analyze RDTSC measurement logs',
@@ -298,8 +375,8 @@ Examples:
                         help='Keyword to filter log files (default: benchmark_rdtsc)')
     parser.add_argument('--skip', '-s', type=int, default=0,
                         help='Number of initial samples to skip per tag (warmup)')
-    parser.add_argument('--freq', '-f', type=float, default=CPU_FREQ_HZ,
-                        help=f'CPU frequency in Hz (default: {CPU_FREQ_HZ:.3e})')
+    parser.add_argument('--freq', '-f', type=float, default=None,
+                        help=f'CPU frequency in Hz (default: auto-detect from dmesg)')
     parser.add_argument('--no-merge', action='store_true',
                         help='Do not merge related files, parse single file only')
     parser.add_argument('--markdown', '-m', action='store_true',
@@ -308,7 +385,15 @@ Examples:
                         help='Output file for markdown table')
     args = parser.parse_args()
 
-    CPU_FREQ_HZ = args.freq
+    if args.freq:
+        CPU_FREQ_HZ = args.freq
+    else:
+        detected = detect_tsc_freq()
+        if detected:
+            CPU_FREQ_HZ = detected
+            print(f"Auto-detected TSC frequency: {CPU_FREQ_HZ/1e6:.3f} MHz")
+        else:
+            print(f"Warning: Could not detect TSC frequency, using default: {CPU_FREQ_HZ/1e6:.3f} MHz")
 
     if args.logfile:
         base_path = args.logfile
@@ -344,47 +429,52 @@ Examples:
         print(f"Skipping first {args.skip} samples per tag (warmup)")
 
     # Parse measurements
+    import time
+    parse_start = time.perf_counter()
+
     if len(files) == 1:
         print(f"\nParsing single file...")
         measurements = parse_rdtsc_log(files[0], skip=args.skip)
     else:
-        print(f"\nMerging {len(files)} files by timestamp...")
-        merged_lines = merge_files_by_time(files)
-        measurements = parse_rdtsc_from_lines(merged_lines, skip=args.skip)
+        print(f"\nParsing {len(files)} files in parallel...")
+        measurements = parse_rdtsc_parallel(files, skip=args.skip)
+
+    parse_elapsed = time.perf_counter() - parse_start
+    print(f"Parsing completed in {parse_elapsed:.2f}s ({total_size / 1024 / 1024 / parse_elapsed:.1f} MB/s)")
 
     if not measurements:
         print("No RDTSC measurements found!")
         return 1
-
-    # Merge MAKE_ORDERBOOK_UNIT_BID and MAKE_ORDERBOOK_UNIT_ASK into MAKE_ORDERBOOK_UNIT
-    unit_bid = measurements.pop('MAKE_ORDERBOOK_UNIT_BID', [])
-    unit_ask = measurements.pop('MAKE_ORDERBOOK_UNIT_ASK', [])
-    if unit_bid or unit_ask:
-        measurements['MAKE_ORDERBOOK_UNIT'].extend(unit_bid)
-        measurements['MAKE_ORDERBOOK_UNIT'].extend(unit_ask)
 
     print(f"\nCPU Frequency: {CPU_FREQ_HZ:.3e} Hz ({CPU_FREQ_HZ/1e9:.3f} GHz)")
     print(f"\nFound {len(measurements)} measurement types:")
     for name, values in sorted(measurements.items()):
         print(f"  {name}: {len(values):,} samples")
 
+    # Compute stats in parallel
+    stats_start = time.perf_counter()
+    stats_dict = compute_stats_parallel(measurements)
+    stats_elapsed = time.perf_counter() - stats_start
+    print(f"Stats computation completed in {stats_elapsed:.2f}s")
+
     priority_order = [
         'Convert_Message_Stream',
         'Convert_Message_API',
+        'DOMAIN_MAPPER',
+        'ORDERBOOK_APPLY',
         'ORDERBOOK_UPDATED',
         'TRADE_UPDATED',
         'BOOK_TICKER_UPDATED',
-        'MAKE_ORDERBOOK_UNIT',
         'MAKE_ORDERBOOK_ALL',
     ]
 
     all_stats = []
     for tag in priority_order:
-        if tag in measurements:
-            all_stats.append(compute_stats(tag, measurements[tag]))
-    for tag in sorted(measurements.keys()):
+        if tag in stats_dict:
+            all_stats.append(stats_dict[tag])
+    for tag in sorted(stats_dict.keys()):
         if tag not in priority_order:
-            all_stats.append(compute_stats(tag, measurements[tag]))
+            all_stats.append(stats_dict[tag])
 
     if args.markdown or args.output:
         import io

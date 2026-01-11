@@ -1,4 +1,26 @@
 cmake_minimum_required(VERSION 3.28)
+
+# Use Homebrew LLVM on macOS for full C++17 from_chars support
+if (APPLE AND EXISTS "/opt/homebrew/opt/llvm/bin/clang++")
+    set(CMAKE_C_COMPILER "/opt/homebrew/opt/llvm/bin/clang")
+    set(CMAKE_CXX_COMPILER "/opt/homebrew/opt/llvm/bin/clang++")
+    # Set sysroot to avoid SDK header conflicts
+    execute_process(
+        COMMAND xcrun --show-sdk-path
+        OUTPUT_VARIABLE MACOS_SDK_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(CMAKE_OSX_SYSROOT "${MACOS_SDK_PATH}")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3")
+    # Disable C++20 module scanning (conflicts with Ninja + LLVM)
+    set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+    # Use LLVM's libc++ to avoid ABI mismatch
+    set(LLVM_ROOT "/opt/homebrew/opt/llvm")
+    add_compile_options(-stdlib=libc++ -nostdinc++)
+    add_compile_options(-isystem ${LLVM_ROOT}/include/c++/v1)
+    add_link_options(-stdlib=libc++ -L${LLVM_ROOT}/lib/c++ -Wl,-rpath,${LLVM_ROOT}/lib/c++)
+endif ()
+
 project(hft)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -23,6 +45,8 @@ option(USE_FUTURES_API "Use Binance Futures API instead of Spot API" ON)
 option(ENABLE_TESTS "Build and fetch test dependencies" ON)
 option(LOGGER_PERF_TRACE "Enable logger performance tracing with RDTSC" OFF)
 option(ENABLE_ASAN "Build with AddressSanitizer" OFF)
+option(USE_ONEPASS_DECODER "Use OnepassBinanceFuturesMdDecoder instead of JSON decoder" ON)
+option(ENABLE_CONVERTER_TIMING "Enable timing logging in domain converter" OFF)
 option(USE_FLAT_ORDERBOOK "Use flat array based orderbook instead of bucket based" OFF)
 set(FIXED_POINT_SYMBOL "XRPUSDC" CACHE STRING "Target symbol for FixedPoint config")
 
@@ -68,6 +92,18 @@ else ()
     message(STATUS "Using bucket based orderbook (default)")
 endif ()
 
+if (USE_ONEPASS_DECODER)
+    add_compile_definitions(USE_ONEPASS_DECODER)
+    message(STATUS "Using OnepassBinanceFuturesMdDecoder for market data")
+else ()
+    message(STATUS "Using JsonBinanceFuturesMdDecoder for market data (default)")
+endif ()
+
+if (ENABLE_CONVERTER_TIMING)
+    add_compile_definitions(ENABLE_CONVERTER_TIMING)
+    message(STATUS "Converter timing logging enabled")
+endif ()
+
 # FixedPoint config (int64_t based arithmetic - always enabled)
 if (FIXED_POINT_SYMBOL STREQUAL "XRPUSDC")
     add_compile_definitions(FIXED_POINT_SYMBOL_XRPUSDC)
@@ -106,6 +142,7 @@ endfunction()
 
 add_strategy_target(HFT_maker "trading::ObiVwapDirectionalStrategy" "ObiVwapDirectionalStrategy")
 add_strategy_target(HFT_taker "trading::LiquidTaker" "LiquidTaker")
+add_strategy_target(HFT_mean_reversion "trading::MeanReversionMakerStrategy" "MeanReversionMakerStrategy")
 # Default target for backward compatibility (uses obi vwap directional strategy)
 add_strategy_target(HFTMain "trading::ObiVwapDirectionalStrategy" "ObiVwapDirectionalStrategy")
 
@@ -113,8 +150,8 @@ add_subdirectory(repository)
 if (ENABLE_TESTS)
     set(TEST_STRATEGY_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated/tests")
     file(MAKE_DIRECTORY "${TEST_STRATEGY_INCLUDE_DIR}")
-    set(STRATEGY_TYPE "trading::ObiVwapDirectionalStrategy")
-    set(STRATEGY_NAME "ObiVwapDirectionalStrategy")
+    set(STRATEGY_TYPE "trading::MeanReversionMakerStrategy")
+    set(STRATEGY_NAME "MeanReversionMakerStrategy")
     configure_file("${STRATEGY_CONFIG_TEMPLATE}"
             "${TEST_STRATEGY_INCLUDE_DIR}/strategy_config.hpp" @ONLY)
     add_subdirectory(test)
@@ -124,5 +161,4 @@ set(HFT_CONFIG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/hft/config")
 set(RESOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 
 file(COPY ${RESOURCES_DIR} DESTINATION ${CMAKE_BINARY_DIR})
-file(COPY util/set_cpu.sh DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${RESOURCES_DIR} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

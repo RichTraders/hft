@@ -16,6 +16,7 @@ import math
 import glob
 import os
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterator, Tuple
@@ -180,7 +181,35 @@ def parse_rdtsc_log(filepath: str, skip: int = 0) -> dict[str, list[int]]:
                     continue
                 measurements[tag].append(cycles)
 
-    return measurements
+    return dict(measurements)
+
+
+def _parse_file_worker(args: tuple) -> dict[str, list[int]]:
+    """Worker function for parallel file parsing."""
+    filepath, skip = args
+    return parse_rdtsc_log(filepath, skip)
+
+
+def parse_rdtsc_parallel(filepaths: list[str], skip: int = 0, max_workers: int = None) -> dict[str, list[int]]:
+    """Parse multiple RDTSC log files in parallel and merge results."""
+    if max_workers is None:
+        max_workers = min(len(filepaths), os.cpu_count() or 4)
+
+    merged = defaultdict(list)
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_parse_file_worker, (fp, skip)): fp for fp in filepaths}
+
+        for future in as_completed(futures):
+            fp = futures[future]
+            try:
+                result = future.result()
+                for tag, values in result.items():
+                    merged[tag].extend(values)
+            except Exception as e:
+                print(f"Error parsing {fp}: {e}", file=sys.stderr)
+
+    return dict(merged)
 
 
 def parse_rdtsc_from_lines(lines: Iterator[str], skip: int = 0) -> dict[str, list[int]]:
@@ -199,7 +228,7 @@ def parse_rdtsc_from_lines(lines: Iterator[str], skip: int = 0) -> dict[str, lis
                 continue
             measurements[tag].append(cycles)
 
-    return measurements
+    return dict(measurements)
 
 
 def percentile(sorted_data: list[int], p: float) -> float:
@@ -230,6 +259,32 @@ def compute_stats(name: str, values: list[int]) -> MeasurementStats:
         min_val=sorted_vals[0],
         max_val=sorted_vals[-1]
     )
+
+
+def _compute_stats_worker(args: tuple) -> MeasurementStats:
+    """Worker function for parallel stats computation."""
+    name, values = args
+    return compute_stats(name, values)
+
+
+def compute_stats_parallel(measurements: dict[str, list[int]], max_workers: int = None) -> list[MeasurementStats]:
+    """Compute statistics for all measurements in parallel."""
+    if max_workers is None:
+        max_workers = min(len(measurements), os.cpu_count() or 4)
+
+    results = {}
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_compute_stats_worker, (name, values)): name
+                   for name, values in measurements.items()}
+
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                results[name] = future.result()
+            except Exception as e:
+                print(f"Error computing stats for {name}: {e}", file=sys.stderr)
+
+    return results
 
 
 def print_stats(stats: MeasurementStats):
@@ -297,6 +352,7 @@ def find_latest_log_group(directory: str = ".", keyword: str = "benchmark_rdtsc"
 
 def main():
     global CPU_FREQ_HZ
+    import time
 
     parser = argparse.ArgumentParser(
         description='Analyze RDTSC measurement logs',
@@ -373,13 +429,18 @@ Examples:
         print(f"Skipping first {args.skip} samples per tag (warmup)")
 
     # Parse measurements
+    import time
+    parse_start = time.perf_counter()
+
     if len(files) == 1:
         print(f"\nParsing single file...")
         measurements = parse_rdtsc_log(files[0], skip=args.skip)
     else:
-        print(f"\nMerging {len(files)} files by timestamp...")
-        merged_lines = merge_files_by_time(files)
-        measurements = parse_rdtsc_from_lines(merged_lines, skip=args.skip)
+        print(f"\nParsing {len(files)} files in parallel...")
+        measurements = parse_rdtsc_parallel(files, skip=args.skip)
+
+    parse_elapsed = time.perf_counter() - parse_start
+    print(f"Parsing completed in {parse_elapsed:.2f}s ({total_size / 1024 / 1024 / parse_elapsed:.1f} MB/s)")
 
     if not measurements:
         print("No RDTSC measurements found!")
@@ -389,6 +450,12 @@ Examples:
     print(f"\nFound {len(measurements)} measurement types:")
     for name, values in sorted(measurements.items()):
         print(f"  {name}: {len(values):,} samples")
+
+    # Compute stats in parallel
+    stats_start = time.perf_counter()
+    stats_dict = compute_stats_parallel(measurements)
+    stats_elapsed = time.perf_counter() - stats_start
+    print(f"Stats computation completed in {stats_elapsed:.2f}s")
 
     priority_order = [
         'Convert_Message_Stream',
@@ -403,11 +470,11 @@ Examples:
 
     all_stats = []
     for tag in priority_order:
-        if tag in measurements:
-            all_stats.append(compute_stats(tag, measurements[tag]))
-    for tag in sorted(measurements.keys()):
+        if tag in stats_dict:
+            all_stats.append(stats_dict[tag])
+    for tag in sorted(stats_dict.keys()):
         if tag not in priority_order:
-            all_stats.append(compute_stats(tag, measurements[tag]))
+            all_stats.append(stats_dict[tag])
 
     if args.markdown or args.output:
         import io

@@ -93,6 +93,9 @@ TEST(ThreadTest, NormalTest) {
 }
 
 TEST(ThreadTest, ThreadNameTest) {
+#ifdef __APPLE__
+  GTEST_SKIP() << "macOS pthread_getname_np only works for current thread";
+#endif
   ThreadNameTest thread;
 
   EXPECT_FALSE(thread.start());

@@ -22,12 +22,18 @@ using SelectedOrderGateway = trading::OrderGateway<>;
 using SelectedTradeEngine = trading::TradeEngine<SelectedStrategy>;
 using SelectedMarketConsumer = trading::MarketConsumer<SelectedStrategy>;
 
+namespace {
 void block_all_signals(sigset_t& set) {
   sigfillset(&set);
   pthread_sigmask(SIG_BLOCK, &set, nullptr);
 }
+}  // namespace
 int main() {
+#ifdef __APPLE__
+  pthread_setname_np("hft_main");
+#else
   pthread_setname_np(pthread_self(), "hft_main");
+#endif
   sigset_t set;
   block_all_signals(set);
 
@@ -36,7 +42,8 @@ int main() {
     PRECISION_CONFIG.initialize();
 
     std::unique_ptr<common::Logger> logger = std::make_unique<common::Logger>();
-    logger->setLevel(logger->string_to_level(INI_CONFIG.get("log", "level")));
+    logger->setLevel(
+        common::Logger::string_to_level(INI_CONFIG.get("log", "level")));
     logger->clearSink();
     logger->addSink(std::make_unique<common::ConsoleSink>());
     logger->addSink(std::make_unique<common::FileSink>("log",

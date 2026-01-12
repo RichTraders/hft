@@ -13,7 +13,9 @@
 #ifndef FEATURE_ENGINE_HPP
 #define FEATURE_ENGINE_HPP
 
-#include <cmath>
+#include <algorithm>
+#include <cstdint>
+#include <numeric>
 #include <vector>
 
 #include "common/fixed_point_config.hpp"
@@ -23,14 +25,27 @@
 #include "order_book.hpp"
 
 namespace trading {
+
 template <typename Strategy>
 class FeatureEngine {
  public:
+  struct TradeInfo {
+    common::Side side;
+    int64_t price_raw;  // Price in raw scale (e.g., price * kPriceScale)
+    int64_t qty_raw;    // Quantity in raw scale (e.g., qty * kQtyScale)
+    uint64_t timestamp;
+  };
+
   explicit FeatureEngine(const common::Logger::Producer& logger)
       : logger_(logger),
+        tick_multiplier_(
+            INI_CONFIG.get_int("orderbook", "tick_multiplier_int")),
         vwap_size_(INI_CONFIG.get_int("strategy", "vwap_size", kVwapSize)),
         vwap_qty_raw_(vwap_size_),
-        vwap_price_raw_(vwap_size_) {
+        vwap_price_raw_(vwap_size_),
+        recent_trades_(kMaxTradeHistory) {
+    static_assert(kMaxTradeHistory > 0 &&
+                  ((kMaxTradeHistory & kMaxTradeHistory - 1) == 0));
     LOG_INFO(logger_, "[Constructor] FeatureEngine Created");
   }
 
@@ -40,10 +55,14 @@ class FeatureEngine {
       MarketOrderBook<Strategy>* book) noexcept -> void {
     const auto* bbo = book->get_bbo();
     if (LIKELY(bbo->bid_price.value > 0 && bbo->ask_price.value > 0)) {
-      agg_trade_qty_ratio_ =
-          static_cast<double>(market_update->qty.value) /
-          (market_update->side == common::Side::kBuy ? bbo->ask_qty.value
-                                                     : bbo->bid_qty.value);
+      // Calculate ratio in scaled form (kSignalScale)
+      const int64_t denom = (market_update->side == common::Side::kBuy)
+                                ? bbo->ask_qty.value
+                                : bbo->bid_qty.value;
+      if (denom > 0) {
+        agg_trade_qty_ratio_ =
+            (market_update->qty.value * common::kSignalScale) / denom;
+      }
     }
 
     const auto idx = static_cast<size_t>(vwap_index_ & (vwap_size_ - 1));
@@ -58,15 +77,24 @@ class FeatureEngine {
     acc_vwap_qty_raw_ += vwap_qty_raw_[idx];
     acc_vwap_raw_ += vwap_price_raw_[idx] * vwap_qty_raw_[idx];
     if (LIKELY(acc_vwap_qty_raw_ > 0)) {
-      // vwap_raw_ has unit: (price_scale * qty_scale) / qty_scale = price_scale
       vwap_raw_ = acc_vwap_raw_ / acc_vwap_qty_raw_;
     }
     vwap_index_++;
 
+    recent_trades_[trade_history_index_] = {market_update->side,
+        market_update->price.value,
+        market_update->qty.value,
+        0};
+
+    trade_history_index_ = (trade_history_index_ + 1) % kMaxTradeHistory;
+    if (trade_history_count_ < kMaxTradeHistory) {
+      trade_history_count_++;
+    }
+
     LOG_TRACE(logger_,
         "[Updated] {} mkt-price:{} agg-trade-ratio:{}",
         market_update->toString(),
-        get_market_price_double(),
+        mkt_price_raw_,
         agg_trade_qty_ratio_);
   }
 
@@ -85,8 +113,6 @@ class FeatureEngine {
       MarketOrderBook<Strategy>* book) noexcept -> void {
     const auto* bbo = book->get_bbo();
     if (LIKELY(bbo->bid_price.value > 0 && bbo->ask_price.value > 0)) {
-      // mkt_price = (bid_price * ask_qty + ask_price * bid_qty) / (bid_qty + ask_qty)
-
       const int64_t num = bbo->bid_price.value * bbo->ask_qty.value +
                           bbo->ask_price.value * bbo->bid_qty.value;
       const int64_t den = bbo->bid_qty.value + bbo->ask_qty.value;
@@ -100,7 +126,7 @@ class FeatureEngine {
         "[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
         common::toString(price),
         common::toString(side),
-        get_market_price_double(),
+        mkt_price_raw_,
         agg_trade_qty_ratio_);
   }
 
@@ -121,7 +147,6 @@ class FeatureEngine {
   }
 
   // OBI range: [-kObiScale, +kObiScale] representing [-1.0, +1.0]
-  static constexpr int64_t kObiScale = 10000;
   [[nodiscard]] int64_t orderbook_imbalance_int64(
       const std::vector<int64_t>& bid_levels,
       const std::vector<int64_t>& ask_levels) const {
@@ -162,7 +187,7 @@ class FeatureEngine {
 
     if (total <= 0)
       return 0;
-    return (diff * kObiScale) / total;
+    return (diff * common::kObiScale) / total;
   }
 
   [[nodiscard]] int64_t get_market_price() const noexcept {
@@ -177,13 +202,31 @@ class FeatureEngine {
   }
   [[nodiscard]] int64_t get_vwap() const noexcept { return vwap_raw_; }
 
-  [[nodiscard]] double get_market_price_double() const noexcept {
-    return static_cast<double>(mkt_price_raw_) /
-           common::FixedPointConfig::kPriceScale;
+  [[nodiscard]] int64_t get_agg_trade_qty_ratio() const noexcept {
+    return agg_trade_qty_ratio_;
   }
 
-  [[nodiscard]] auto get_agg_trade_qty_ratio() const noexcept {
-    return agg_trade_qty_ratio_;
+  [[nodiscard]] const auto* get_recent_trades() const noexcept {
+    return recent_trades_.data();
+  }
+
+  [[nodiscard]] auto get_trade_history_size() const noexcept {
+    return trade_history_count_;
+  }
+
+  [[nodiscard]] auto get_trade_history_capacity() const noexcept {
+    return kMaxTradeHistory;
+  }
+
+  // Helper to get trade by offset from most recent
+  // offset=0 returns most recent, offset=1 returns second most recent, etc.
+  // Caller must ensure offset < trade_history_count_
+  [[nodiscard]] const TradeInfo& get_trade(size_t offset) const noexcept {
+    // trade_history_index_ points to next write position
+    // Most recent is at (index - 1), going backward for older trades
+    return recent_trades_[(trade_history_index_ + kMaxTradeHistory - 1 -
+                              offset) &
+                          (kMaxTradeHistory - 1)];
   }
 
   FeatureEngine() = delete;
@@ -198,8 +241,10 @@ class FeatureEngine {
 
  private:
   static constexpr int kVwapSize = 64;
+  static constexpr size_t kMaxTradeHistory = 128;
   const common::Logger::Producer& logger_;
-  double agg_trade_qty_ratio_ = common::kQtyInvalid;
+  const int tick_multiplier_;
+  int64_t agg_trade_qty_ratio_ = 0;  // Scaled by kSignalScale
   const uint32_t vwap_size_ = 0;
   uint32_t vwap_index_ = 0;
 
@@ -210,6 +255,11 @@ class FeatureEngine {
   int64_t vwap_raw_ = 0;
   std::vector<int64_t> vwap_qty_raw_;
   std::vector<int64_t> vwap_price_raw_;
+
+  // Trade history tracking
+  std::vector<TradeInfo> recent_trades_;
+  size_t trade_history_index_{0};
+  size_t trade_history_count_{0};
   struct BookTickerRaw {
     int64_t bid_price = 0;
     int64_t bid_qty = 0;

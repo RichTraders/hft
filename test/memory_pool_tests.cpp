@@ -69,8 +69,7 @@ TEST(MemoryPool, BasicAllocateDeallocate) {
     EXPECT_TRUE(pool.deallocate(p1b));  // 정상 해제 → true
   }
 
-  // 잘못된 포인터 방지
-  int dummy;
+  int dummy = 0;
   EXPECT_FALSE(pool.deallocate(reinterpret_cast<Tracked*>(&dummy)));
 
   // 모두 반환 → dtor 개수 검증

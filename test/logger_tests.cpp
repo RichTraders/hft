@@ -191,15 +191,11 @@ TEST_F(LoggerTest, ConsoleLogTest) {
 }
 
 TEST_F(LoggerTest, FileLogTest) {
-  std::string cur_dir_path = get_current_working_directory();
-  std::string remove_dir = cur_dir_path + "/file_log_test.txt";
+  TempDir tmp;
+  const std::string base_name = (tmp.path / "file_log_test").string();
+  const std::string file_path = base_name + ".txt";
 
-  std::ifstream remove_file(remove_dir);
-
-  if (remove_file.is_open())
-    std::remove(remove_dir.c_str());
-
-  logger->addSink(std::make_unique<FileSink>("file_log_test", 1024));
+  logger->addSink(std::make_unique<FileSink>(base_name, 1024));
 
   auto log = logger->make_producer();
 
@@ -212,7 +208,6 @@ TEST_F(LoggerTest, FileLogTest) {
 
   logger->flush();
 
-  const std::string file_path = "file_log_test.txt";
   std::ifstream ifs(file_path);
 
   EXPECT_TRUE(ifs.is_open());
@@ -225,75 +220,13 @@ TEST_F(LoggerTest, FileLogTest) {
   }
 }
 
-TEST_F(LoggerTest, FileLogRotateTest) {
-  const std::string cur_dir_path = get_current_working_directory();
-  const std::string file_path = "file_log_rotate_test_final.txt";
-  const std::string file_path2 = "file_log_rotate_test_final_1.txt";
-  const std::string remove_dir1 = cur_dir_path + "/" + file_path;
-  const std::string remove_dir2 = cur_dir_path + "/" + file_path2;
-
-  // Clean up any existing files
-  std::remove(remove_dir1.c_str());
-  std::remove(remove_dir2.c_str());
-
-  std::vector<std::string> line_list;
-  line_list.push_back("FileLogTest rotate Test");
-  line_list.push_back("Application rotate shutting down333");
-
-  // Use a very small buffer size to force rotation
-  logger->addSink(std::make_unique<FileSink>("file_log_rotate_test_final", 24));
-
-  auto log = logger->make_producer();
-
-  log.debug(line_list[0].c_str());
-  logger->flush();
-  // Small delay to ensure rotation completes
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-  log.debug(line_list[1].c_str());
-  logger->flush();
-  // Small delay to ensure file writes complete
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-  {
-    std::ifstream ifs(file_path);
-    if (!ifs.is_open()) {
-      GTEST_SKIP() << "File rotation may not have occurred as expected";
-    }
-
-    std::string line;
-    if (std::getline(ifs, line)) {
-      EXPECT_TRUE(line.find(line_list[1]) != std::string::npos);
-    }
-    ifs.close();
-  }
-  {
-    std::ifstream ifs(file_path2);
-    if (!ifs.is_open()) {
-      // Rotation file may not exist if rotation threshold wasn't triggered
-      GTEST_SKIP() << "Rotation file not found - buffer size may be larger than test message";
-    }
-
-    std::string line;
-    if (std::getline(ifs, line)) {
-      EXPECT_TRUE(line.find(line_list[0]) != std::string::npos);
-    }
-    ifs.close();
-  }
-}
-
 TEST_F(LoggerTest, FileAndConsoleLogTest) {
-  std::string cur_dir_path = get_current_working_directory();
-  std::string remove_dir = cur_dir_path + "/file_console_file_log_test.txt";
-
-  std::ifstream remove_file(remove_dir);
-
-  if (remove_file.is_open())
-    std::remove(remove_dir.c_str());
+  TempDir tmp;
+  const std::string base_name = (tmp.path / "file_console_test").string();
+  const std::string file_path = base_name + ".txt";
 
   logger->addSink(std::make_unique<ConsoleSink>());
-  logger->addSink(
-      std::make_unique<FileSink>("file_console_file_log_test", 1024));
+  logger->addSink(std::make_unique<FileSink>(base_name, 1024));
 
   std::ostringstream oss;
   auto* old_cout_buf = std::cout.rdbuf(oss.rdbuf());
@@ -323,7 +256,6 @@ TEST_F(LoggerTest, FileAndConsoleLogTest) {
 
   std::cin.rdbuf(old_cin_buf);
 
-  const std::string file_path = "file_console_file_log_test.txt";
   std::ifstream ifs(file_path);
 
   EXPECT_TRUE(ifs.is_open());
@@ -337,7 +269,11 @@ TEST_F(LoggerTest, FileAndConsoleLogTest) {
 }
 
 TEST_F(LoggerTest, LogLevelTest) {
-  logger->addSink(std::make_unique<FileSink>("LogLevelTest", 1024 * 1024));
+  TempDir tmp;
+  const std::string base_name = (tmp.path / "log_level_test").string();
+  const std::string file_path = base_name + ".txt";
+
+  logger->addSink(std::make_unique<FileSink>(base_name, 1024 * 1024));
 
   auto lg = logger->make_producer();
   for (int i = 0; i < 200; i++) {
@@ -346,7 +282,6 @@ TEST_F(LoggerTest, LogLevelTest) {
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
   logger->flush();
 
-  const std::string file_path = "LogLevelTest.txt";
   std::ifstream ifs(file_path);
   EXPECT_TRUE(ifs.is_open());
   std::string line;

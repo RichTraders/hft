@@ -10,7 +10,8 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#pragma once
+#ifndef MPSC_QUEUE_CAS_HPP_
+#define MPSC_QUEUE_CAS_HPP_
 
 #include <array>
 #include <atomic>
@@ -281,3 +282,5 @@ class MPSCSegQueue {
   }
 };
 }  // namespace common
+
+#endif  // MPSC_QUEUE_CAS_HPP_

@@ -171,7 +171,7 @@ class TradeEngine {
       auto sym = std::find_if(instrument_info.symbols.begin(),
           instrument_info.symbols.end(),
           [&target_ticker](
-              auto symbol) { return symbol.symbol == target_ticker; });
+              const auto& symbol) { return symbol.symbol == target_ticker; });
 
       if (sym != instrument_info.symbols.end()) {
         qty_increment_ = sym->min_qty_increment;

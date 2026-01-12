@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OE_TRAITS_CONFIG_HPP
+#define OE_TRAITS_CONFIG_HPP
 
 // Check if SelectedOeTraits is already defined (e.g., by generated test header)
 #ifndef SELECTED_OE_TRAITS_DEFINED
@@ -21,3 +22,5 @@ struct SelectedOeTraits {
 
 #define SELECTED_OE_TRAITS_DEFINED
 #endif
+
+#endif  // OE_TRAITS_CONFIG_HPP

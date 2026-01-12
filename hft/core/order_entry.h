@@ -351,7 +351,7 @@ struct RequestCommon {
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
-    stream << std::fixed << std::setprecision(PRECISION_CONFIG.qty_precision());
+    stream << std::fixed;
     stream << "RequestCommon{"
            << "cl_cancel_order_id=" << cl_cancel_order_id.value
            << ", cl_order_id=" << cl_order_id.value
@@ -435,7 +435,7 @@ struct ExecutionReport {
 
   [[nodiscard]] std::string toString() const {
     std::ostringstream stream;
-    stream << std::fixed << std::setprecision(PRECISION_CONFIG.qty_precision());
+    stream << std::fixed;
     stream << "ExecutionReport{" << "order_id=" << cl_order_id.value
            << ", symbol=" << symbol
            << ", exec_type=" << trading::toString(exec_type)
@@ -448,10 +448,11 @@ struct ExecutionReport {
     if (position_side) {
       stream << ", position_side=" << common::toString(*position_side);
     }
-    stream << ", is_maker=" << (is_maker ? "true" : "false")
-           << ", last_price=" << last_price.value
-           << ", avg_price=" << avg_price.value
-           << ", commission=" << commission;
+    stream << ", is_maker=" << (is_maker ? "true" : "false") << ", last_price="
+           << std::setprecision(PRECISION_CONFIG.price_precision())
+           << last_price.value << ", avg_price="
+           << std::setprecision(PRECISION_CONFIG.price_precision())
+           << avg_price.value << ", commission=" << commission;
     if (commission_asset) {
       stream << ", commission_asset=" << *commission_asset;
     }

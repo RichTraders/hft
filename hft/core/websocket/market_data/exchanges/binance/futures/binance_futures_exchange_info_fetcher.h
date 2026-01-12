@@ -61,7 +61,7 @@ class BinanceFuturesExchangeInfoFetcher {
     const auto parse_result = glz::read_json(exchange_info, response.body);
     if (parse_result) {
       LOG_ERROR(logger_,
-          "[FuturesExchangeInfoFetcher] Failed to parse response: {} {}",
+          "[FuturesExchangeInfoFetcher] Failed to parse response: {}",
           glz::format_error(parse_result, response.body));
       return std::nullopt;
     }

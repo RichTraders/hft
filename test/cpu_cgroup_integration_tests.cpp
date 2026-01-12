@@ -11,6 +11,9 @@
  */
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+
+#ifdef __linux__
+
 #include <sched.h>
 #include <fstream>
 #include "common/cpumanager/cpu_manager.h"
@@ -103,3 +106,11 @@ TEST(CpuCgroupIntegrationTest, FullCpuManagementInIsoSlice) {
   ASSERT_EQ(sched_getaffinity(cpu.get_tid("test_4"), sizeof(cpu_set), &cpu_set), 0);
   EXPECT_TRUE(CPU_ISSET(4, &cpu_set)) << "test_4 should be pinned to CPU 4";
 }
+
+#else
+
+TEST(CpuCgroupIntegrationTest, FullCpuManagementInIsoSlice) {
+  GTEST_SKIP() << "Linux-only test";
+}
+
+#endif

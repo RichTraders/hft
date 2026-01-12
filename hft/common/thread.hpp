@@ -16,12 +16,13 @@
  *  -
  */
 
-#pragma once
+#ifndef COMMON_THREAD_HPP
+#define COMMON_THREAD_HPP
 
-#include <array>
-#include <memory>
 #include <pthread.h>
 #include <sched.h>
+#include <array>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -73,7 +74,7 @@ class Thread {
   int start(F&& func, Args&&... args) {
 
     auto* ctx = new ThreadContext<F, Args...>(std::forward<F>(func),
-                                              std::forward<Args>(args)...);
+        std::forward<Args>(args)...);
 
     const int err =
         pthread_create(&tid_, nullptr, &ThreadContext<F, Args...>::entry, ctx);
@@ -83,8 +84,7 @@ class Thread {
       return true;
     }
 
-    constexpr std::string_view kName{Name.name, sizeof(Name.name) - 1};
-    set_thread_name(kName.data());
+    set_thread_name(std::string{Name.name});
     return false;
   }
   // NOLINTNEXTLINE(modernize-use-nodiscard)
@@ -104,7 +104,11 @@ class Thread {
   }
 
   [[nodiscard]] int detach() const {
+#ifdef __APPLE__
+    if (tid_ == nullptr)
+#else
     if (tid_ == 0)
+#endif
       return -1;
 
     return pthread_detach(tid_);
@@ -122,7 +126,11 @@ class Thread {
   }
 
   int set_thread_name(const std::string& name) {
+#ifdef __APPLE__
+    if (tid_ == nullptr)
+#else
     if (tid_ == 0)
+#endif
       return -1;
 #ifdef __APPLE__
     return pthread_setname_np(name.c_str());
@@ -132,13 +140,25 @@ class Thread {
   }
 
   [[nodiscard]] std::string get_thread_name() const {
+#ifdef __APPLE__
+    if (tid_ == nullptr)
+#else
     if (tid_ == 0)
+#endif
       return "";
 
     static constexpr std::size_t kMaxThreadNameLen = 16;
     std::array<char, kMaxThreadNameLen> name{};
 
+#ifdef __APPLE__
+    if (pthread_equal(tid_, pthread_self())) {
+      pthread_getname_np(tid_, name.data(), name.size());
+    } else {
+      return "";
+    }
+#else
     pthread_getname_np(tid_, name.data(), name.size());
+#endif
     return std::string(name.data());
   }
 
@@ -166,24 +186,38 @@ class Thread {
   }
 
   int set_affinity(int cpu_id) {
-    if (tid_ == 0) return -1;
+#ifdef __APPLE__
+    if (tid_ == nullptr)
+#else
+    if (tid_ == 0)
+#endif
+      return -1;
 #ifdef __linux__
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     CPU_SET(cpu_id, &cpuset);
     return pthread_setaffinity_np(tid_, sizeof(cpu_set_t), &cpuset);
 #elif __APPLE__
-    thread_affinity_policy_data_t policy = { cpu_id };
+    thread_affinity_policy_data_t policy = {cpu_id};
     thread_port_t mach_thread = pthread_mach_thread_np(tid_);
-    return thread_policy_set(mach_thread, THREAD_AFFINITY_POLICY, (thread_policy_t)&policy, THREAD_AFFINITY_POLICY_COUNT);
+    return thread_policy_set(mach_thread,
+        THREAD_AFFINITY_POLICY,
+        reinterpret_cast<thread_policy_t>(&policy),
+        THREAD_AFFINITY_POLICY_COUNT);
 #else
-    return 0; // Not supported
+    return 0;  // Not supported
 #endif
   }
 
   [[nodiscard]] pthread_t get_thread_id() const { return tid_; }
 
  private:
+#ifdef __APPLE__
+  pthread_t tid_{nullptr};
+#else
   pthread_t tid_{0};
+#endif
 };
 }  // namespace common
+
+#endif  // COMMON_THREAD_HPP

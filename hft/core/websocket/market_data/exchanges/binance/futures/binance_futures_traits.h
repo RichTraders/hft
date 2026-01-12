@@ -25,6 +25,7 @@
 #include "common/ini_config.hpp"
 #include "core/websocket/market_data/exchange_traits.h"
 #include "core/websocket/market_data/onepass_binance_futures_md_decoder.hpp"
+#include "core/websocket/market_data/json_binance_futures_md_decoder.hpp"
 #include "schema/futures/response/api_response.h"
 #include "schema/futures/response/book_ticker.h"
 #include "schema/futures/response/depth_stream.h"
@@ -40,7 +41,11 @@ struct BinanceFuturesTraits {
   using Encoder = BinanceFuturesEncoder;
   using MdDomainConverter = BinanceFuturesMdMessageConverter;
   using DispatchRouter = BinanceDispatchRouter;
+#ifdef USE_ONEPASS_DECODER
   using Decoder = core::OnepassBinanceFuturesMdDecoder;
+#else
+  using Decoder = core::JsonBinanceFuturesMdDecoder;
+#endif
 
   using SbeDepthResponse = std::monostate;
   using SbeTradeEvent = std::monostate;

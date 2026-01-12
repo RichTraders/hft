@@ -124,7 +124,8 @@ def print_entry_matrix(count_matrix: dict):
     print()
 
     # Header
-    print(f"{'Action \\ Regime':>15}", end="")
+    header_label = "Action \\ Regime"
+    print(f"{header_label:>15}", end="")
     for regime in regimes:
         header = {'up': 'Up (Rebound)', 'sideways': 'Sideways (Range)', 'down': 'Down (Trend)'}
         print(f"{header[regime]:>20}", end="")

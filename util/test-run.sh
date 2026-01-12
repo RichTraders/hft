@@ -5,6 +5,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISO_SCRIPT="$SCRIPT_DIR/manage_cpu_isolation.sh"
 ANALYZE_SCRIPT="$SCRIPT_DIR/analyze_rdtsc.py"
+PLOT_REGIME_SCRIPT="$SCRIPT_DIR/plot_regime.py"
+PHASE_ACCURACY_SCRIPT="$SCRIPT_DIR/analyze_phase_accuracy.py"
 
 PERF_CMD=$(find /usr/lib/linux-tools-*/perf 2>/dev/null | head -1)
 HUGETLB_LIB=$(find /usr/lib/*/libhugetlbfs.so* 2>/dev/null | head -1)
@@ -25,8 +27,8 @@ if lscpu | grep -q "GenuineIntel"; then
 else
     PERF_EVENTS="cycles,instructions,branches,branch-misses,context-switches,page-faults,l1_data_cache_fills_all,l1_data_cache_fills_from_within_same_ccx,l1_data_cache_fills_from_memory,l2_cache_hits_from_dc_misses,l2_cache_misses_from_dc_misses,l1_dtlb_misses,l2_dtlb_misses,bp_l1_tlb_miss_l2_tlb_hit,bp_l1_tlb_miss_l2_tlb_miss,ic_tag_hit_miss.instruction_cache_miss,ic_fetch_stall.ic_stall_any"
 fi
-#DEFAULT_BUILD_DIR_A="cmake-build-relwithdebinfo-clang/test"
-DEFAULT_BUILD_DIR_A="cmake-build-measure/test"
+DEFAULT_BUILD_DIR_A="cmake-build-relwithdebinfo/test"
+#DEFAULT_BUILD_DIR_A="cmake-build-measure/test"
 DEFAULT_BUILD_DIR_B="cmake-build-relwithdebinfo-clang-double/test"
 DEFAULT_PROGRAM="full_pipeline_benchmark_mean_reversion_tests"
 
@@ -216,7 +218,33 @@ run_test() {
     fi
 
     echo ">>> Analyzing RDTSC..."
-    python3 "$ANALYZE_SCRIPT" -d "$build_dir" -k benchmark_rdtsc -m
+    sudo -u "$SUDO_USER" python3 "$ANALYZE_SCRIPT" -d "$build_dir" -k benchmark_rdtsc -m || true
+
+    # Find latest benchmark log for regime/phase analysis (pass base name without .log)
+    local latest_log=$(ls -t "$build_dir"/benchmark_rdtsc_*.log 2>/dev/null | head -1)
+    local log_base="${latest_log%.log}"  # Remove .log extension
+    # Remove only short _N suffix (1-2 digits), not timestamps
+    log_base=$(echo "$log_base" | sed 's/_[0-9]\{1,2\}$//')
+    if [ -n "$latest_log" ] && [ -f "$PLOT_REGIME_SCRIPT" ]; then
+        local timestamp=$(date +%Y%m%d_%H%M%S)
+        local output_dir="$build_dir/analysis_$timestamp"
+        sudo -u "$SUDO_USER" mkdir -p "$output_dir"
+
+        echo ">>> Plotting regime & phase..."
+        sudo -u "$SUDO_USER" python3 "$PLOT_REGIME_SCRIPT" "$log_base" \
+            --stats \
+            --output "$output_dir/regime_phase.png" \
+            --parquet "$output_dir/regime_phase_data.parquet" --slice-ms 30000 --threshold-bps 5.0 || true
+
+        if [ -f "$output_dir/regime_phase_data.parquet" ] && [ -f "$PHASE_ACCURACY_SCRIPT" ]; then
+            echo ">>> Analyzing phase accuracy..."
+            sudo -u "$SUDO_USER" python3 "$PHASE_ACCURACY_SCRIPT" "$output_dir/regime_phase_data.parquet" \
+                -v \
+                -o "$output_dir/confusion_matrix.png" || true
+        fi
+
+        echo ">>> Analysis outputs saved to: $output_dir"
+    fi
 
     echo ""
     echo "[$label] Done."

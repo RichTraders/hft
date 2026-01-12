@@ -26,9 +26,22 @@ CPU_FREQ_HZ = 3593.234e6
 
 
 def detect_tsc_freq() -> float | None:
-    """Detect TSC frequency from dmesg (most accurate for RDTSC)."""
+    """Detect TSC frequency from system (dmesg on Linux, sysctl on macOS)."""
     import subprocess
+    import platform
 
+    if platform.system() == 'Darwin':
+        # macOS: use sysctl hw.tbfrequency
+        try:
+            result = subprocess.run(['sysctl', '-n', 'hw.tbfrequency'],
+                                    capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                return float(result.stdout.strip())
+        except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
+            pass
+        return None
+
+    # Linux: use dmesg
     try:
         result = subprocess.run(['sudo', 'dmesg'], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:

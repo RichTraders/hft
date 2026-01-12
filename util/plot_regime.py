@@ -11,11 +11,15 @@ Features:
 
 import re
 import sys
+import os
+import glob
 import argparse
+import heapq
 import matplotlib.pyplot as plt
 from datetime import datetime, timezone
 from collections import namedtuple
 from pathlib import Path
+from typing import Iterator, Tuple
 
 BookTicker = namedtuple('BookTicker', ['timestamp_ms', 'bid', 'ask', 'mid'])
 TradeEvent = namedtuple('TradeEvent', ['timestamp_ms', 'price'])
@@ -39,75 +43,174 @@ REGIME_COLORS = {
 }
 
 
-def parse_book_tickers(filepath: str) -> list[BookTicker]:
-    """Parse BookTickerEvent entries from log file."""
+def find_related_files(base_path: str) -> list[str]:
+    """
+    Find all related log files for a given base path.
+    Files with _N suffix come first (in order), file without suffix comes last.
+
+    Examples:
+    - "benchmark_20251225230026" -> finds _1.log, _2.log, _3.log, then .log
+    - "benchmark_20251225230026.log" -> same as above
+    """
+    # Remove .log extension if present
+    if base_path.endswith('.log'):
+        base_path = base_path[:-4]
+
+    # Check if it's a glob pattern
+    if '*' in base_path or '?' in base_path:
+        return sorted(glob.glob(base_path if base_path.endswith('.log') else f"{base_path}.log"))
+
+    # Find all related files: base_1.log, base_2.log, ..., base.log (no suffix last)
+    files = []
+
+    # Numbered suffixes first (in order: _1, _2, _3, ...)
+    i = 1
+    while True:
+        suffix_file = f"{base_path}_{i}.log"
+        if os.path.exists(suffix_file):
+            files.append(suffix_file)
+            i += 1
+        else:
+            break
+
+    # Main file (no suffix) comes last
+    main_file = f"{base_path}.log"
+    if os.path.exists(main_file):
+        files.append(main_file)
+
+    return files
+
+
+def parse_timestamp(line: str) -> datetime | None:
+    """Parse ISO timestamp from log line like [2025-12-25T14:00:26.069206Z]."""
+    match = re.match(r'\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+)Z?\]', line)
+    if match:
+        ts_str = match.group(1)
+        if '.' in ts_str:
+            base, frac = ts_str.split('.')
+            frac = frac[:6].ljust(6, '0')
+            ts_str = f"{base}.{frac}"
+        return datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%S.%f")
+    return None
+
+
+def iter_file_lines_with_timestamp(filepath: str) -> Iterator[Tuple[datetime, str]]:
+    """Iterate over file lines, yielding (timestamp, line) tuples."""
+    with open(filepath, 'r') as f:
+        for line in f:
+            ts = parse_timestamp(line)
+            if ts:
+                yield (ts, line)
+
+
+def merge_files_by_time(filepaths: list[str]) -> Iterator[str]:
+    """
+    Merge multiple log files by timestamp order.
+    Uses a min-heap to efficiently merge sorted streams.
+    """
+    iterators = []
+    counter = 0
+    for fp in filepaths:
+        it = iter_file_lines_with_timestamp(fp)
+        try:
+            ts, line = next(it)
+            iterators.append((ts, counter, line, it, fp))
+            counter += 1
+        except StopIteration:
+            pass
+
+    heapq.heapify(iterators)
+
+    while iterators:
+        ts, idx, line, it, fp = heapq.heappop(iterators)
+        yield line
+
+        try:
+            next_ts, next_line = next(it)
+            heapq.heappush(iterators, (next_ts, idx, next_line, it, fp))
+        except StopIteration:
+            pass
+
+
+def parse_book_tickers_from_lines(lines: Iterator[str]) -> list[BookTicker]:
+    """Parse BookTickerEvent entries from lines iterator."""
     pattern = re.compile(
         r'BookTickerEvent E:(\d+) T:\d+ bid:(\d+)@\d+ ask:(\d+)@\d+'
     )
 
     tickers = []
-    with open(filepath, 'r') as f:
-        for line in f:
-            match = pattern.search(line)
-            if match:
-                ts = int(match.group(1))
-                bid = int(match.group(2))
-                ask = int(match.group(3))
-                mid = (bid + ask) / 2
-                tickers.append(BookTicker(ts, bid, ask, mid))
+    for line in lines:
+        match = pattern.search(line)
+        if match:
+            ts = int(match.group(1))
+            bid = int(match.group(2))
+            ask = int(match.group(3))
+            mid = (bid + ask) / 2
+            tickers.append(BookTicker(ts, bid, ask, mid))
 
     return tickers
 
 
-def parse_trade_events(filepath: str) -> list[TradeEvent]:
-    """Parse TradeEvent entries from log file."""
-    # TradeEvent E:1766709949548 T:1766709949392 data:1829000
+def parse_book_tickers(filepath: str) -> list[BookTicker]:
+    """Parse BookTickerEvent entries from log file."""
+    with open(filepath, 'r') as f:
+        return parse_book_tickers_from_lines(f)
+
+
+def parse_trade_events_from_lines(lines: Iterator[str]) -> list[TradeEvent]:
+    """Parse TradeEvent entries from lines iterator."""
     pattern = re.compile(
         r'TradeEvent E:(\d+) T:\d+ data:(\d+)'
     )
 
     trades = []
-    with open(filepath, 'r') as f:
-        for line in f:
-            match = pattern.search(line)
-            if match:
-                ts = int(match.group(1))
-                price = int(match.group(2))
-                trades.append(TradeEvent(ts, price))
+    for line in lines:
+        match = pattern.search(line)
+        if match:
+            ts = int(match.group(1))
+            price = int(match.group(2))
+            trades.append(TradeEvent(ts, price))
 
     return trades
 
 
-def parse_phase_transitions(filepath: str, tickers: list[BookTicker]) -> list[PhaseTransition]:
+def parse_trade_events(filepath: str) -> list[TradeEvent]:
+    """Parse TradeEvent entries from log file."""
+    with open(filepath, 'r') as f:
+        return parse_trade_events_from_lines(f)
+
+
+def parse_phase_transitions_from_lines(lines: Iterator[str], tickers: list[BookTicker]) -> list[PhaseTransition]:
     """
-    Parse Phase transitions from log file.
+    Parse Phase transitions from lines iterator.
     Use the E timestamp from the immediately preceding BookTickerEvent.
     """
-    # Patterns
     ticker_pattern = re.compile(r'BookTickerEvent E:(\d+)')
     phase_pattern = re.compile(r'\[Phase (LONG|SHORT)\] Transition: (\w+) → (\w+)')
 
     transitions = []
     last_e_ts = tickers[0].timestamp_ms if tickers else 0
 
-    # Read file sequentially - Phase uses the last seen BookTicker's E
-    with open(filepath, 'r') as f:
-        for line in f:
-            # Update last E timestamp from BookTickerEvent
-            ticker_match = ticker_pattern.search(line)
-            if ticker_match:
-                last_e_ts = int(ticker_match.group(1))
-                continue
+    for line in lines:
+        ticker_match = ticker_pattern.search(line)
+        if ticker_match:
+            last_e_ts = int(ticker_match.group(1))
+            continue
 
-            # Check for Phase transition
-            phase_match = phase_pattern.search(line)
-            if phase_match:
-                side = phase_match.group(1)
-                from_phase = phase_match.group(2)
-                to_phase = phase_match.group(3)
-                transitions.append(PhaseTransition(last_e_ts, side, from_phase, to_phase))
+        phase_match = phase_pattern.search(line)
+        if phase_match:
+            side = phase_match.group(1)
+            from_phase = phase_match.group(2)
+            to_phase = phase_match.group(3)
+            transitions.append(PhaseTransition(last_e_ts, side, from_phase, to_phase))
 
     return transitions
+
+
+def parse_phase_transitions(filepath: str, tickers: list[BookTicker]) -> list[PhaseTransition]:
+    """Parse Phase transitions from log file."""
+    with open(filepath, 'r') as f:
+        return parse_phase_transitions_from_lines(f, tickers)
 
 
 def build_phase_timeline(transitions: list[PhaseTransition],
@@ -372,10 +475,46 @@ def print_phase_stats(phase_timeline: list[tuple], side: str):
               f"{durations[phase]/1000:7.1f}s ({dur_pct:5.1f}%)")
 
 
+def parse_all_from_files(files: list[str]) -> tuple[list[BookTicker], list[TradeEvent], list[PhaseTransition]]:
+    """
+    Parse all data from multiple files, merging by timestamp.
+    Returns (tickers, trades, transitions) - transitions need tickers for timestamp lookup.
+    """
+    if len(files) == 1:
+        # Single file - simple path
+        tickers = parse_book_tickers(files[0])
+        trades = parse_trade_events(files[0])
+        transitions = parse_phase_transitions(files[0], tickers)
+        return tickers, trades, transitions
+
+    # Multiple files - need to merge and parse together
+    # We need to read files multiple times or cache lines
+    print(f"Merging {len(files)} files by timestamp...")
+
+    # Collect all lines first (for multiple passes)
+    all_lines = list(merge_files_by_time(files))
+    print(f"Total merged lines: {len(all_lines)}")
+
+    # Parse each type from merged lines
+    tickers = parse_book_tickers_from_lines(iter(all_lines))
+    trades = parse_trade_events_from_lines(iter(all_lines))
+    transitions = parse_phase_transitions_from_lines(iter(all_lines), tickers)
+
+    return tickers, trades, transitions
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description='Plot regime and phase classification from log file')
-    parser.add_argument('logfile', help='Path to log file')
+        description='Plot regime and phase classification from log file',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s benchmark.log                    # Single file
+  %(prog)s benchmark_20251225230026         # Merge _1.log, _2.log, etc. by time
+  %(prog)s benchmark_20251225230026.log     # Same as above
+        """
+    )
+    parser.add_argument('logfile', help='Path to log file or base name (auto-finds related files)')
     parser.add_argument('--slice-ms', type=int, default=10000,
                         help='Time slice duration in milliseconds (default: 10000)')
     parser.add_argument('--threshold-bps', type=float, default=2.0,
@@ -388,11 +527,37 @@ def main():
                         help='Print regime/phase statistics')
     parser.add_argument('--regime-only', action='store_true',
                         help='Plot only regime (no phase)')
+    parser.add_argument('--no-merge', action='store_true',
+                        help='Do not merge related files, parse single file only')
 
     args = parser.parse_args()
 
-    print(f"Parsing log file: {args.logfile}")
-    tickers = parse_book_tickers(args.logfile)
+    # Find related files
+    if args.no_merge:
+        if not args.logfile.endswith('.log'):
+            args.logfile = f"{args.logfile}.log"
+        if not os.path.exists(args.logfile):
+            print(f"Error: File not found: {args.logfile}")
+            return 1
+        files = [args.logfile]
+    else:
+        files = find_related_files(args.logfile)
+
+    if not files:
+        print(f"Error: No files found for: {args.logfile}")
+        return 1
+
+    print(f"Found {len(files)} log file(s):")
+    total_size = 0
+    for f in files:
+        size = os.path.getsize(f)
+        total_size += size
+        print(f"  {f} ({size / 1024 / 1024:.1f} MB)")
+    print(f"Total size: {total_size / 1024 / 1024:.1f} MB")
+
+    # Parse all data
+    print("\nParsing log files...")
+    tickers, trades, transitions = parse_all_from_files(files)
     print(f"Found {len(tickers)} BookTickerEvent entries")
 
     if not tickers:
@@ -412,14 +577,9 @@ def main():
     if args.stats:
         print_regime_stats(regimes)
 
-    # Parse phase transitions and trade events
+    # Build phase timelines
     if not args.regime_only:
-        print("\nParsing trade events...")
-        trades = parse_trade_events(args.logfile)
         print(f"Found {len(trades)} TradeEvent entries")
-
-        print("\nParsing phase transitions...")
-        transitions = parse_phase_transitions(args.logfile, tickers)
         print(f"Found {len(transitions)} phase transitions")
 
         phase_timeline_long = build_phase_timeline(transitions, start_ts, end_ts, 'LONG')

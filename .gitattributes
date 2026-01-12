@@ -1,0 +1,1 @@
+test/data/benchmark/*.txt filter=lfs diff=lfs merge=lfs -text

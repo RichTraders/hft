@@ -33,7 +33,7 @@ FetchContent_MakeAvailable(concurrentqueue)
 file(GLOB_RECURSE LIB_SRC_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/CpuManager/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cpumanager/*.cpp"
 )
 
 add_library(Common STATIC ${LIB_SRC_FILES})

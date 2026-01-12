@@ -31,6 +31,7 @@
 
 struct MarketData;
 
+// NOLINTBEGIN(readability-magic-numbers)
 namespace trading {
 
 // === Phase Tracking ===
@@ -58,8 +59,7 @@ struct ZScores {
 
 // === Strategy Configuration Structures (int64_t version) ===
 struct WallDetectionConfig {
-  int64_t max_distance_bps{
-      15};  // 0.15% = 15 bps (scaled by kBpsScale=10000 for calcs)
+  int64_t max_distance_bps{15};  // 0.15% = 15 bps (scaled by kBpsScale=10000)
   int max_levels{100};
 };
 
@@ -80,7 +80,7 @@ struct EntryConfig {
 
   // OBI normalization (scaled by kObiScale=10000)
   // INVERTED: closer to 0 (neutral) = higher score
-  int64_t obi_norm_min{0};     // 0.0 * kObiScale (neutral start)
+  int64_t obi_norm_min{0};
   int64_t obi_norm_max{1500};  // 0.15 * kObiScale (entry threshold)
 
   // Z-score retention ratio for SHORT entry (0.8 = 80%)
@@ -101,7 +101,7 @@ struct ExitConfig {
   bool cancel_on_wall_decay{true};
 
   // Active exit conditions (profit-taking)
-  int64_t obi_exit_threshold{5000};  // 0.5 * kObiScale (0.3 → 0.5)
+  int64_t obi_exit_threshold{5000};  // 0.5 * kObiScale (0.3 -> 0.5)
 
   // Multi-timeframe exit alignment: neutral zone threshold
   // Exit when all timeframes enter neutral zone (|z| < threshold)
@@ -127,6 +127,7 @@ struct ExitConfig {
   int64_t urgency_high_threshold{8000};  // 0.8 * kSignalScale
   int64_t urgency_low_threshold{5000};   // 0.5 * kSignalScale
 };
+
 struct DebugLoggingConfig {
   bool log_wall_detection{false};
   bool log_defense_check{false};
@@ -135,9 +136,9 @@ struct DebugLoggingConfig {
 
 struct AdverseSelectionConfig {
   int max_fill_history{20};
-  uint64_t measurement_window_ns{1000000000};    // 1 second
-  uint64_t measurement_tolerance_ns{100000000};  // ±100ms
-  int64_t adverse_threshold_bps{2};              // 0.02% = 2 bps
+  uint64_t measurement_window_ns{1'000'000'000};   // 1 second
+  uint64_t measurement_tolerance_ns{100'000'000};  // +/- 100ms
+  int64_t adverse_threshold_bps{2};                // 0.02% = 2 bps
   int min_samples{10};
   int64_t ratio_threshold{5000};     // 0.5 * kSignalScale
   int64_t margin_multiplier{15000};  // 1.5 * kSignalScale
@@ -307,7 +308,7 @@ struct AdverseSelectionTracker {
       if (fill.measured)
         continue;
 
-      uint64_t elapsed = now - fill.fill_time;
+      const uint64_t elapsed = now - fill.fill_time;
 
       // Measure 1 second (±100ms) after fill
       if (elapsed >= cfg.measurement_window_ns - cfg.measurement_tolerance_ns &&
@@ -316,16 +317,17 @@ struct AdverseSelectionTracker {
         fill.measured = true;
 
         // Check if adverse: return in bps = (current - fill) * 10000 / fill
-        int64_t delta = current_price_raw - fill.fill_price_raw;
-        int64_t ret_bps = (delta * common::kBpsScale) / fill.fill_price_raw;
+        const int64_t delta = current_price_raw - fill.fill_price_raw;
+        const int64_t ret_bps =
+            (delta * common::kBpsScale) / fill.fill_price_raw;
         total_measured++;
 
-        if (fill.side == common::Side::kBuy &&
-            ret_bps < -cfg.adverse_threshold_bps) {
-          adverse_count++;  // Bought then dropped = adverse
-        } else if (fill.side == common::Side::kSell &&
-                   ret_bps > cfg.adverse_threshold_bps) {
-          adverse_count++;  // Sold then rose = adverse
+        // Bought then dropped or Sold then rose = adverse
+        if ((fill.side == common::Side::kBuy &&
+                ret_bps < -cfg.adverse_threshold_bps) ||
+            (fill.side == common::Side::kSell &&
+                ret_bps > cfg.adverse_threshold_bps)) {
+          adverse_count++;
         }
       }
     }
@@ -839,7 +841,7 @@ class MeanReversionMakerStrategy
     handle_adverse_selection(get_current_time_ns(), market_data->price.value);
 
     // Update phase tracking (use volatility-adaptive threshold)
-    int64_t adaptive =
+    const int64_t adaptive =
         robust_zscore_mid_->get_adaptive_threshold(zscore_mid_threshold_);
     update_short_phase(zscores, adaptive);
     update_long_phase(zscores, adaptive);
@@ -930,7 +932,9 @@ class MeanReversionMakerStrategy
               *long_position_.pending_order_id == report->cl_order_id) {
             // Normal fill - expected order
             long_position_.status = PositionStatus::kActive;
-            long_position_.entry_price = report->avg_price.value;
+            long_position_.entry_price =
+                static_cast<int64_t>(report->avg_price.value *
+                                     common::FixedPointConfig::kPriceScale);
             long_position_.entry_wall_info =
                 bid_wall_info_;  // Update wall at fill time
             long_position_.state_time = get_current_time_ns();
@@ -938,7 +942,8 @@ class MeanReversionMakerStrategy
 
             // Track fill for adverse selection detection
             adverse_selection_tracker_.on_fill(long_position_.state_time,
-                report->avg_price.value,
+                static_cast<int64_t>(report->avg_price.value *
+                                     common::FixedPointConfig::kPriceScale),
                 report->side,
                 adverse_selection_cfg_.max_fill_history);
 
@@ -947,7 +952,7 @@ class MeanReversionMakerStrategy
                   "[Entry Filled] LONG | qty:{} | price:{} | "
                   "wall:{}@{} bps",
                   report->last_qty.value,
-                  report->avg_price.value,
+                  long_position_.entry_price,
                   long_position_.entry_wall_info.accumulated_notional,
                   long_position_.entry_wall_info.distance_bps);
             }
@@ -968,10 +973,12 @@ class MeanReversionMakerStrategy
             if (actual_position > 0) {
               // CRITICAL FIX: Update position qty BEFORE calling emergency_exit
               long_position_.qty = actual_position;
-              long_position_.entry_price = report->avg_price.value;
+              long_position_.entry_price =
+                  static_cast<int64_t>(report->avg_price.value *
+                                       common::FixedPointConfig::kPriceScale);
 
               auto order_ids = emergency_exit(common::Side::kSell,
-                  report->avg_price.value,
+                  long_position_.entry_price,
                   "Late fill");
 
               // Track the liquidation order
@@ -984,7 +991,7 @@ class MeanReversionMakerStrategy
                     "order_id:{} | qty:{} | price:{}",
                     order_ids[0].value,
                     actual_position,
-                    report->avg_price.value);
+                    long_position_.entry_price);
               } else {
                 // Failed to send liquidation order - force reset
                 LOG_ERROR(logger_,
@@ -1013,10 +1020,11 @@ class MeanReversionMakerStrategy
 
           // CRITICAL FIX: Update position qty BEFORE calling emergency_exit
           long_position_.qty = actual_position;
-          long_position_.entry_price = report->avg_price.value;
+          long_position_.entry_price = static_cast<int64_t>(
+              report->avg_price.value * common::FixedPointConfig::kPriceScale);
 
           auto order_ids = emergency_exit(common::Side::kSell,
-              report->avg_price.value,
+              long_position_.entry_price,
               "Late fill - no pending");
 
           if (!order_ids.empty()) {
@@ -1044,7 +1052,9 @@ class MeanReversionMakerStrategy
               *short_position_.pending_order_id == report->cl_order_id) {
             // Normal fill - expected order
             short_position_.status = PositionStatus::kActive;
-            short_position_.entry_price = report->avg_price.value;
+            short_position_.entry_price =
+                static_cast<int64_t>(report->avg_price.value *
+                                     common::FixedPointConfig::kPriceScale);
             short_position_.entry_wall_info =
                 ask_wall_info_;  // Update wall at fill time
             short_position_.state_time = get_current_time_ns();
@@ -1052,7 +1062,8 @@ class MeanReversionMakerStrategy
 
             // Track fill for adverse selection detection
             adverse_selection_tracker_.on_fill(short_position_.state_time,
-                report->avg_price.value,
+                static_cast<int64_t>(report->avg_price.value *
+                                     common::FixedPointConfig::kPriceScale),
                 report->side,
                 adverse_selection_cfg_.max_fill_history);
 
@@ -1061,7 +1072,7 @@ class MeanReversionMakerStrategy
                   "[Entry Filled] SHORT | qty:{} | price:{} | "
                   "wall:{}@{} bps",
                   report->last_qty.value,
-                  report->avg_price.value,
+                  short_position_.entry_price,
                   short_position_.entry_wall_info.accumulated_notional,
                   short_position_.entry_wall_info.distance_bps);
             }
@@ -1082,10 +1093,12 @@ class MeanReversionMakerStrategy
             if (actual_position > 0) {
               // CRITICAL FIX: Update position qty BEFORE calling emergency_exit
               short_position_.qty = actual_position;
-              short_position_.entry_price = report->avg_price.value;
+              short_position_.entry_price =
+                  static_cast<int64_t>(report->avg_price.value *
+                                       common::FixedPointConfig::kPriceScale);
 
               auto order_ids = emergency_exit(common::Side::kBuy,
-                  report->avg_price.value,
+                  short_position_.entry_price,
                   "Late fill");
 
               // Track the liquidation order
@@ -1098,7 +1111,7 @@ class MeanReversionMakerStrategy
                     "order_id:{} | qty:{} | price:{}",
                     common::toString(order_ids[0]),
                     actual_position,
-                    report->avg_price.value);
+                    short_position_.entry_price);
               } else {
                 // Failed to send liquidation order - force reset
                 LOG_ERROR(logger_,
@@ -1127,10 +1140,11 @@ class MeanReversionMakerStrategy
 
           // CRITICAL FIX: Update position qty BEFORE calling emergency_exit
           short_position_.qty = actual_position;
-          short_position_.entry_price = report->avg_price.value;
+          short_position_.entry_price = static_cast<int64_t>(
+              report->avg_price.value * common::FixedPointConfig::kPriceScale);
 
           auto order_ids = emergency_exit(common::Side::kBuy,
-              report->avg_price.value,
+              short_position_.entry_price,
               "Late fill - no pending");
 
           if (!order_ids.empty()) {
@@ -1227,9 +1241,9 @@ class MeanReversionMakerStrategy
       const bool price_ok = (price_diff <= max_price_move);
 
       // defense_qty_multiplier_ is scaled by kSignalScale, need to divide
-      int64_t required_qty =
+      const int64_t required_qty =
           (trade->qty.value * defense_qty_multiplier_) / common::kSignalScale;
-      bool qty_sufficient = (current_bbo->bid_qty.value >= required_qty);
+      const bool qty_sufficient = (current_bbo->bid_qty.value >= required_qty);
 
       if (debug_cfg_.log_defense_check) {
         LOG_DEBUG(logger_,
@@ -1288,8 +1302,8 @@ class MeanReversionMakerStrategy
   [[nodiscard]] bool check_wall_quality(const WallTracker& wall_tracker,
       const char* side_name) const {
 
-    constexpr double kMinWallQuality = 0.6;  // 60% minimum threshold
-    double wall_quality = wall_tracker.composite_quality();
+    constexpr int64_t kMinWallQuality = 6000;  // 60% of kSignalScale (10000)
+    const int64_t wall_quality = wall_tracker.composite_quality();
 
     if (wall_quality < kMinWallQuality) {
       if (debug_cfg_.log_entry_exit) {
@@ -1480,7 +1494,7 @@ class MeanReversionMakerStrategy
     place_entry_order(common::Side::kBuy, bbo->bid_price.value);
 
     if (debug_cfg_.log_entry_exit) {
-      double wall_quality = bid_wall_tracker_.composite_quality();
+      const int64_t wall_quality = bid_wall_tracker_.composite_quality();
       LOG_INFO(logger_,
           "[Entry Signal] LONG | quality:{} ({}) | wall_quality:{} | "
           "z_robust:{} | "
@@ -1574,7 +1588,7 @@ class MeanReversionMakerStrategy
     place_entry_order(common::Side::kSell, bbo->ask_price.value);
 
     if (debug_cfg_.log_entry_exit) {
-      double wall_quality = ask_wall_tracker_.composite_quality();
+      const int64_t wall_quality = ask_wall_tracker_.composite_quality();
       LOG_INFO(logger_,
           "[Entry Signal] SHORT | quality:{} ({}) | wall_quality:{} | "
           "z_robust:{} | "
@@ -1942,10 +1956,8 @@ class MeanReversionMakerStrategy
   // Helper functions
   // ========================================
   bool is_bbo_valid(const BBO* bbo) const {
-    return bbo->bid_qty.value != common::kQtyInvalid &&
-           bbo->ask_qty.value != common::kQtyInvalid &&
-           bbo->bid_price.value != common::kPriceInvalid &&
-           bbo->ask_price.value != common::kPriceInvalid &&
+    return bbo->bid_qty.is_valid() && bbo->ask_qty.is_valid() &&
+           bbo->bid_price.is_valid() && bbo->ask_price.is_valid() &&
            bbo->ask_price.value >= bbo->bid_price.value;
   }
 
@@ -2049,18 +2061,19 @@ class MeanReversionMakerStrategy
       return;
     }
 
-    bool defense_ok = validate_defense_realtime(market_data,
+    const bool defense_ok = validate_defense_realtime(market_data,
         prev_bbo_,
         current_bbo,
         common::Side::kBuy);
     if (!defense_ok) {
       if (debug_cfg_.log_entry_exit) {
-        int64_t price_diff =
+        const int64_t price_diff =
             prev_bbo_.bid_price.value - current_bbo->bid_price.value;
-        int64_t required_qty =
+        const int64_t required_qty =
             (market_data->qty.value * defense_qty_multiplier_) /
             common::kSignalScale;
-        bool qty_sufficient = (current_bbo->bid_qty.value >= required_qty);
+        const bool qty_sufficient =
+            (current_bbo->bid_qty.value >= required_qty);
 
         LOG_INFO(logger_,
             "[Entry Skip LONG] Defense fail | price_diff:{} ({} -> {}) | "
@@ -2093,18 +2106,19 @@ class MeanReversionMakerStrategy
       return;
     }
 
-    bool defense_ok = validate_defense_realtime(market_data,
+    const bool defense_ok = validate_defense_realtime(market_data,
         prev_bbo_,
         current_bbo,
         common::Side::kSell);
     if (!defense_ok) {
       if (debug_cfg_.log_entry_exit) {
-        int64_t price_diff =
+        const int64_t price_diff =
             current_bbo->ask_price.value - prev_bbo_.ask_price.value;
-        int64_t required_qty =
+        const int64_t required_qty =
             (market_data->qty.value * defense_qty_multiplier_) /
             common::kSignalScale;
-        bool qty_sufficient = (current_bbo->ask_qty.value >= required_qty);
+        const bool qty_sufficient =
+            (current_bbo->ask_qty.value >= required_qty);
 
         LOG_INFO(logger_,
             "[Entry Skip SHORT] Defense fail | price_diff:{} ({} -> {}) | "
@@ -2295,7 +2309,7 @@ class MeanReversionMakerStrategy
     if (entry_wall_info.accumulated_notional <= 0)
       return 0;
 
-    int64_t wall_ratio =
+    const int64_t wall_ratio =
         (current_wall_info.accumulated_notional * common::kSignalScale) /
         entry_wall_info.accumulated_notional;
 
@@ -2947,5 +2961,6 @@ class MeanReversionMakerStrategy
 };
 
 }  // namespace trading
+// NOLINTEND(readability-magic-numbers)
 
 #endif  // MEAN_REVERSION_MAKER_H

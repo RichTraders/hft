@@ -22,10 +22,12 @@ using SelectedOrderGateway = trading::OrderGateway<>;
 using SelectedTradeEngine = trading::TradeEngine<SelectedStrategy>;
 using SelectedMarketConsumer = trading::MarketConsumer<SelectedStrategy>;
 
-static void block_all_signals(sigset_t& set) {
+namespace {
+void block_all_signals(sigset_t& set) {
   sigfillset(&set);
   pthread_sigmask(SIG_BLOCK, &set, nullptr);
 }
+}  // namespace
 int main() {
 #ifdef __APPLE__
   pthread_setname_np("hft_main");

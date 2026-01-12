@@ -9,8 +9,8 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
-#ifndef INVENTORY_MANAGER_H_
-#define INVENTORY_MANAGER_H_
+#ifndef INVENTORY_MANAGER_H
+#define INVENTORY_MANAGER_H
 
 #include "common/logger.h"
 #include "common/types.h"
@@ -50,4 +50,4 @@ class InventoryManager {
 
 }  // namespace trading
 
-#endif  // INVENTORY_MANAGER_H_
+#endif  // INVENTORY_MANAGER_H

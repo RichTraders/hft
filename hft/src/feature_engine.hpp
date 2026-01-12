@@ -56,9 +56,9 @@ class FeatureEngine {
     const auto* bbo = book->get_bbo();
     if (LIKELY(bbo->bid_price.value > 0 && bbo->ask_price.value > 0)) {
       // Calculate ratio in scaled form (kSignalScale)
-      int64_t denom = (market_update->side == common::Side::kBuy)
-                          ? bbo->ask_qty.value
-                          : bbo->bid_qty.value;
+      const int64_t denom = (market_update->side == common::Side::kBuy)
+                                ? bbo->ask_qty.value
+                                : bbo->bid_qty.value;
       if (denom > 0) {
         agg_trade_qty_ratio_ =
             (market_update->qty.value * common::kSignalScale) / denom;

@@ -76,9 +76,7 @@ class DynamicWallThreshold {
         orderbook_weight_(hybrid_cfg.orderbook_weight),
         min_quantity_raw_(hybrid_cfg.min_quantity_raw),
         bid_qty_(ob_cfg.top_levels),
-        ask_qty_(ob_cfg.top_levels),
-        bid_quantities_(ob_cfg.top_levels),
-        ask_quantities_(ob_cfg.top_levels) {}
+        ask_qty_(ob_cfg.top_levels) {}
 
   // === Main calculation function ===
   // Returns threshold in notional raw scale (price * qty / kQtyScale)
@@ -143,36 +141,26 @@ class DynamicWallThreshold {
     }
 
     // Get quantities for top N levels
-    (void)order_book->peek_qty(true,
+    const int bid_levels = order_book->peek_qty(true,
         orderbook_top_levels_,
         std::span<int64_t>(bid_qty_),
         {});
-    (void)order_book->peek_qty(false,
+    const int ask_levels = order_book->peek_qty(false,
         orderbook_top_levels_,
         std::span<int64_t>(ask_qty_),
         {});
 
-    // Copy to percentile buffers
-    size_t bid_count = 0;
-    size_t ask_count = 0;
-
-    for (int i = 0; i < orderbook_top_levels_; ++i) {
-      if (bid_qty_[i] > 0) {
-        bid_quantities_[bid_count++] = bid_qty_[i];
-      }
-      if (ask_qty_[i] > 0) {
-        ask_quantities_[ask_count++] = ask_qty_[i];
-      }
-    }
-
-    if (bid_count == 0 || ask_count == 0) {
+    if (bid_levels == 0 || ask_levels == 0) {
       orderbook_threshold_raw_ = 0;
       return;
     }
 
-    // Calculate percentile using nth_element
-    const int64_t bid_percentile_qty = calculate_percentile_fast_bid(bid_count);
-    const int64_t ask_percentile_qty = calculate_percentile_fast_ask(ask_count);
+    // Calculate percentile using nth_element (modifies bid_qty_/ask_qty_ in place,
+    // but they're overwritten by peek_qty each call anyway)
+    const int64_t bid_percentile_qty =
+        calculate_percentile_fast(bid_qty_, static_cast<size_t>(bid_levels));
+    const int64_t ask_percentile_qty =
+        calculate_percentile_fast(ask_qty_, static_cast<size_t>(ask_levels));
     const int64_t avg_qty = (bid_percentile_qty + ask_percentile_qty) / 2;
 
     // Convert to notional: qty * mid_price * multiplier / kSignalScale
@@ -195,7 +183,8 @@ class DynamicWallThreshold {
 
  private:
   // percentile index = count * percentile / 10000
-  [[nodiscard]] int64_t calculate_percentile_fast_bid(size_t count) {
+  [[nodiscard]] int64_t calculate_percentile_fast(std::vector<int64_t>& data,
+      size_t count) const {
     if (count == 0)
       return 0;
 
@@ -204,25 +193,10 @@ class DynamicWallThreshold {
         static_cast<size_t>(wall_threshold_defaults::kPercentileScale);
     index = std::min(index, count - 1);
 
-    std::nth_element(bid_quantities_.begin(),
-        bid_quantities_.begin() + static_cast<ptrdiff_t>(index),
-        bid_quantities_.begin() + static_cast<ptrdiff_t>(count));
-    return bid_quantities_[index];
-  }
-
-  [[nodiscard]] int64_t calculate_percentile_fast_ask(size_t count) {
-    if (count == 0)
-      return 0;
-
-    size_t index =
-        (count * static_cast<size_t>(orderbook_percentile_)) /
-        static_cast<size_t>(wall_threshold_defaults::kPercentileScale);
-    index = std::min(index, count - 1);
-
-    std::nth_element(ask_quantities_.begin(),
-        ask_quantities_.begin() + static_cast<ptrdiff_t>(index),
-        ask_quantities_.begin() + static_cast<ptrdiff_t>(count));
-    return ask_quantities_[index];
+    std::nth_element(data.begin(),
+        data.begin() + static_cast<ptrdiff_t>(index),
+        data.begin() + static_cast<ptrdiff_t>(count));
+    return data[index];
   }
 
   // Volume-based threshold (EMA)
@@ -246,11 +220,9 @@ class DynamicWallThreshold {
   // Minimum quantity (raw)
   const int64_t min_quantity_raw_;
 
-  // Pre-allocated vectors
+  // Pre-allocated vectors for peek_qty output
   std::vector<int64_t> bid_qty_;
   std::vector<int64_t> ask_qty_;
-  std::vector<int64_t> bid_quantities_;
-  std::vector<int64_t> ask_quantities_;
 };
 
 }  // namespace trading

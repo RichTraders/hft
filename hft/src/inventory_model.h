@@ -1,5 +1,5 @@
-#ifndef INVENTORY_MODEL_H_
-#define INVENTORY_MODEL_H_
+#ifndef INVENTORY_MODEL_H
+#define INVENTORY_MODEL_H
 
 #include "common/fixed_point_config.hpp"
 #include "common/types.h"
@@ -94,4 +94,4 @@ class LinearSkewModel : public InventoryModel<LinearSkewModel> {
 };
 }  // namespace trading
 
-#endif  // INVENTORY_MODEL_H_
+#endif  // INVENTORY_MODEL_H

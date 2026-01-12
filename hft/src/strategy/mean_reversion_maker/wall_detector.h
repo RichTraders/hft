@@ -14,8 +14,8 @@
 #define WALL_DETECTOR_H
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
-#include <deque>
 #include <numeric>
 #include <span>
 #include <vector>
@@ -48,36 +48,41 @@ struct WallInfo {
   bool is_valid{false};
 };
 
-// Wall quality tracking structure
+// Wall quality tracking structure (circular buffer, no dynamic allocation)
 struct WallTracker {
   uint64_t first_seen{0};
   uint64_t last_update{0};
   int snapshot_count{0};
-  std::deque<int64_t> size_snapshots;      // Notional in raw scale
-  std::deque<int64_t> distance_snapshots;  // Distance in bps
+
+  // Circular buffer for snapshots (replaces std::deque)
+  std::array<int64_t, wall_constants::kMaxSnapshots> size_snapshots{};
+  std::array<int64_t, wall_constants::kMaxSnapshots> distance_snapshots{};
+  size_t write_index{0};  // Next write position
 
   void update(uint64_t now, int64_t notional_raw, int64_t distance_bps) {
-    if (first_seen == 0) {
+    if (snapshot_count == 0) {
       first_seen = now;
     }
     last_update = now;
     snapshot_count++;
 
-    size_snapshots.push_back(notional_raw);
-    distance_snapshots.push_back(distance_bps);
-
-    if (size_snapshots.size() > wall_constants::kMaxSnapshots) {
-      size_snapshots.pop_front();
-      distance_snapshots.pop_front();
-    }
+    size_snapshots[write_index] = notional_raw;
+    distance_snapshots[write_index] = distance_bps;
+    write_index = (write_index + 1) % wall_constants::kMaxSnapshots;
   }
 
   void reset() {
     first_seen = 0;
     last_update = 0;
     snapshot_count = 0;
-    size_snapshots.clear();
-    distance_snapshots.clear();
+    write_index = 0;
+    // No need to clear arrays - count tracks valid entries
+  }
+
+  // Get actual number of valid snapshots in buffer
+  [[nodiscard]] size_t buffer_size() const noexcept {
+    return std::min(static_cast<size_t>(snapshot_count),
+        wall_constants::kMaxSnapshots);
   }
 
   // Persistence score: How long has wall been present?
@@ -99,31 +104,33 @@ struct WallTracker {
   // Low variance = high stability
   // Returns [0, kSignalScale]
   [[nodiscard]] int64_t stability_score() const {
-    if (size_snapshots.size() <
+    const size_t count = buffer_size();
+    if (count <
         static_cast<size_t>(wall_constants::kMinSnapshotsForStability)) {
       return 0;
     }
 
-    // Calculate average
-    const int64_t sum = std::accumulate(size_snapshots.begin(),
-        size_snapshots.end(),
-        int64_t{0});
-    const int64_t avg = sum / static_cast<int64_t>(size_snapshots.size());
+    // Calculate average over valid entries
+    int64_t sum = 0;
+    for (size_t i = 0; i < count; ++i) {
+      sum += size_snapshots[i];
+    }
+    const int64_t avg = sum / static_cast<int64_t>(count);
 
     if (avg == 0)
       return 0;
 
     // Calculate variance (sum of squared deviations)
     int64_t variance_sum = 0;
-    for (const int64_t snapshot_size : size_snapshots) {
-      const int64_t diff = snapshot_size - avg;
+    for (size_t i = 0; i < count; ++i) {
+      const int64_t diff = size_snapshots[i] - avg;
       // Use __int128 to avoid overflow in squaring
       const auto squared = static_cast<__int128_t>(diff) * diff;
       variance_sum += static_cast<int64_t>(
           squared / avg);  // Normalize by avg to keep in range
     }
     const int64_t normalized_variance =
-        variance_sum / static_cast<int64_t>(size_snapshots.size());
+        variance_sum / static_cast<int64_t>(count);
 
     // CV^2 threshold: if cv < 0.5, cv^2 < 0.25
     // normalized_variance / avg < 0.25 means stable
@@ -143,16 +150,17 @@ struct WallTracker {
   // Close to BBO = good, far = bad
   // Returns [0, kSignalScale]
   [[nodiscard]] int64_t distance_consistency_score() const {
-    if (distance_snapshots.size() <
+    const size_t count = buffer_size();
+    if (count <
         static_cast<size_t>(wall_constants::kMinSnapshotsForStability)) {
       return 0;
     }
 
-    const int64_t sum = std::accumulate(distance_snapshots.begin(),
-        distance_snapshots.end(),
-        int64_t{0});
-    const int64_t avg_bps =
-        sum / static_cast<int64_t>(distance_snapshots.size());
+    int64_t sum = 0;
+    for (size_t i = 0; i < count; ++i) {
+      sum += distance_snapshots[i];
+    }
+    const int64_t avg_bps = sum / static_cast<int64_t>(count);
 
     // Close to BBO = good (< 5 bps = 10000)
     // Far from BBO = bad (> 15 bps = 0)

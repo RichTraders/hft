@@ -22,7 +22,9 @@ if(ENABLE_WEBSOCKET)
     target_compile_definitions(HftLib_ws PRIVATE
         ENABLE_WEBSOCKET
     )
-else()
+endif()
+
+if(NOT SKIP_FIX_BUILD)
     add_library(HftLib_fix STATIC
             hft_lib.cpp
     )

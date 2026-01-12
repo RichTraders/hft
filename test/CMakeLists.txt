@@ -105,11 +105,12 @@ file(GLOB TEST_SOURCES CONFIGURE_DEPENDS
 list(FILTER TEST_SOURCES EXCLUDE REGEX ".*cpu_cgroup_integration_tests\\.cpp$")
 list(FILTER TEST_SOURCES EXCLUDE REGEX ".*full_pipeline_benchmark_tests\\.cpp$")
 
-# Exclude fix_ tests and FIX benchmark tests when ENABLE_WEBSOCKET is ON
-if(ENABLE_WEBSOCKET)
+if(SKIP_FIX_BUILD)
     list(FILTER TEST_SOURCES EXCLUDE REGEX ".*fix_.*_tests\\.cpp$")
     list(FILTER TEST_SOURCES EXCLUDE REGEX ".*benchmark_decoder_performance_fix_tests\\.cpp$")
-    # Exclude broken benchmark tests that reference non-existent json_md_decoder.hpp
+endif()
+
+if(ENABLE_WEBSOCKET)
     list(FILTER TEST_SOURCES EXCLUDE REGEX ".*benchmark_decoder_performance_json_tests\\.cpp$")
     list(FILTER TEST_SOURCES EXCLUDE REGEX ".*benchmark_fixed_point_tests\\.cpp$")
 endif()
@@ -162,7 +163,6 @@ add_strategy_benchmark("trading::ObiVwapDirectionalStrategy" "directional")
 add_strategy_benchmark("trading::MeanReversionMakerStrategy" "mean_reversion")
 add_strategy_benchmark("trading::LiquidTaker" "liquid_taker")
 
-# Add integration tests with special handling
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cpu_cgroup_integration_tests.cpp")
     add_unit_test(cpu_cgroup_integration)
 

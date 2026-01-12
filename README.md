@@ -168,6 +168,7 @@ ninja -C build HFTMain
 |--------|---------|-------------|
 | `ENABLE_WEBSOCKET` | ON | Enable WebSocket transport (fetches libwebsockets 4.4.0) |
 | `USE_FUTURES_API` | ON | Use Binance Futures API. Set to OFF for Spot trading |
+| `SKIP_FIX_BUILD` | ON (macOS), OFF (Linux) | Skip FIX protocol build (fix8 not available on macOS) |
 | `ENABLE_ASAN` | OFF | Enable AddressSanitizer for memory error detection |
 | `MEASUREMENT` | OFF | Enable RDTSC-based latency measurement macros |
 | `FIXED_POINT_SYMBOL` | XRPUSDC | Target symbol for fixed-point precision config |

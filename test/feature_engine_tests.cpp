@@ -118,7 +118,8 @@ TEST_F(FeatureEngineTest, OnOrderBookUpdated_UpdatesMidPriceAndLogs) {
 
   engine.on_order_book_updated(price, side, &book);
 
-  EXPECT_DOUBLE_EQ(engine.get_market_price_double(), expected_mid);
+  const auto expected_raw = static_cast<int64_t>(expected_mid * common::FixedPointConfig::kPriceScale);
+  EXPECT_EQ(engine.get_market_price(), expected_raw);
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
@@ -159,11 +160,11 @@ TEST_F(FeatureEngineTest, OnTradeUpdated_ComputesAggTradeQtyRatioAndLogs) {
       QtyType::from_double(10.0)};
   book.on_market_data_updated(&md);
 
-  double expected_ratio = static_cast<double>(md.qty.value) / static_cast<double>(book.get_bbo()->ask_qty.value);
+  int64_t expected_ratio = (md.qty.value * common::kSignalScale) / book.get_bbo()->ask_qty.value;
 
   engine.on_trade_updated(&md, &book);
 
-  EXPECT_DOUBLE_EQ(engine.get_agg_trade_qty_ratio(), expected_ratio);
+  EXPECT_EQ(engine.get_agg_trade_qty_ratio(), expected_ratio);
 }
 
 TEST_F(FeatureEngineTest, OnTradeUpdate) {

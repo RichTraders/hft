@@ -48,6 +48,13 @@ option(ENABLE_ASAN "Build with AddressSanitizer" OFF)
 option(USE_ONEPASS_DECODER "Use OnepassBinanceFuturesMdDecoder instead of JSON decoder" ON)
 option(ENABLE_CONVERTER_TIMING "Enable timing logging in domain converter" OFF)
 option(USE_FLAT_ORDERBOOK "Use flat array based orderbook instead of bucket based" OFF)
+
+# FIX protocol requires fix8 library which is not available on macOS
+if(APPLE)
+    option(SKIP_FIX_BUILD "Skip FIX protocol build (fix8 not available)" ON)
+else()
+    option(SKIP_FIX_BUILD "Skip FIX protocol build" OFF)
+endif()
 set(FIXED_POINT_SYMBOL "XRPUSDC" CACHE STRING "Target symbol for FixedPoint config")
 
 if (ENABLE_ASAN)

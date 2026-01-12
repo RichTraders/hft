@@ -22,7 +22,7 @@ using SelectedOrderGateway = trading::OrderGateway<>;
 using SelectedTradeEngine = trading::TradeEngine<SelectedStrategy>;
 using SelectedMarketConsumer = trading::MarketConsumer<SelectedStrategy>;
 
-void block_all_signals(sigset_t& set) {
+static void block_all_signals(sigset_t& set) {
   sigfillset(&set);
   pthread_sigmask(SIG_BLOCK, &set, nullptr);
 }
@@ -40,7 +40,7 @@ int main() {
     PRECISION_CONFIG.initialize();
 
     std::unique_ptr<common::Logger> logger = std::make_unique<common::Logger>();
-    logger->setLevel(logger->string_to_level(INI_CONFIG.get("log", "level")));
+    logger->setLevel(common::Logger::string_to_level(INI_CONFIG.get("log", "level")));
     logger->clearSink();
     logger->addSink(std::make_unique<common::ConsoleSink>());
     logger->addSink(std::make_unique<common::FileSink>("log",

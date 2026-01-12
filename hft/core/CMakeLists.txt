@@ -62,7 +62,7 @@ if(ENABLE_WEBSOCKET)
   target_compile_definitions(Core_ws PRIVATE ENABLE_WEBSOCKET ${EXCHANGE_COMPILE_DEFINITION})
 endif()
 
-if(NOT ENABLE_WEBSOCKET)
+if(NOT SKIP_FIX_BUILD)
     add_subdirectory(fix/NewOroFix44)
     file(GLOB CORE_FIX_SRC
         "${CMAKE_CURRENT_SOURCE_DIR}/fix/*.cpp"

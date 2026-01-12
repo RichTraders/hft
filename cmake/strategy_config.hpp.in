@@ -1,4 +1,5 @@
-#pragma once
+#ifndef STRATEGY_CONFIG_HPP_
+#define STRATEGY_CONFIG_HPP_
 
 #include "oe_traits_config.hpp"
 
@@ -8,3 +9,5 @@
 
 using SelectedStrategy = @STRATEGY_TYPE@;
 inline constexpr std::string_view kSelectedStrategyName = "@STRATEGY_NAME@";
+
+#endif  // STRATEGY_CONFIG_HPP_

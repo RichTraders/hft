@@ -10,7 +10,8 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#pragma once
+#ifndef SINGLETON_H_
+#define SINGLETON_H_
 
 template <class T>
 class Singleton {
@@ -27,3 +28,5 @@ class Singleton {
   Singleton() = default;
   ~Singleton() = default;
 };
+
+#endif  // SINGLETON_H_

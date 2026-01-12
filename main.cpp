@@ -40,7 +40,8 @@ int main() {
     PRECISION_CONFIG.initialize();
 
     std::unique_ptr<common::Logger> logger = std::make_unique<common::Logger>();
-    logger->setLevel(common::Logger::string_to_level(INI_CONFIG.get("log", "level")));
+    logger->setLevel(
+        common::Logger::string_to_level(INI_CONFIG.get("log", "level")));
     logger->clearSink();
     logger->addSink(std::make_unique<common::ConsoleSink>());
     logger->addSink(std::make_unique<common::FileSink>("log",

@@ -20,23 +20,44 @@
 
 namespace trading {
 
+// === Default configuration constants ===
+namespace wall_threshold_defaults {
+// Volume threshold defaults
+inline constexpr int64_t kVolumeEmaAlpha = 300;      // 0.03 * kEmaScale
+inline constexpr int64_t kVolumeMultiplier = 40000;  // 4.0 * kSignalScale
+inline constexpr int kVolumeMinSamples = 20;
+
+// Orderbook threshold defaults
+inline constexpr int kOrderbookTopLevels = 20;
+inline constexpr int64_t kOrderbookMultiplier = 30000;  // 3.0 * kSignalScale
+inline constexpr int64_t kOrderbookPercentile = 8000;   // 80% * 100
+
+// Hybrid threshold defaults
+inline constexpr int64_t kVolumeWeight = 7000;     // 0.7 * kSignalScale
+inline constexpr int64_t kOrderbookWeight = 3000;  // 0.3 * kSignalScale
+inline constexpr int64_t kMinQuantityRaw = 50000;  // min qty in qty scale
+
+// Percentile scale divisor
+inline constexpr int64_t kPercentileScale = 10000;
+}  // namespace wall_threshold_defaults
+
 // === Configuration structures (int64_t version) ===
 struct VolumeThresholdConfig {
-  int64_t ema_alpha{300};    // 0.03 * kEmaScale
-  int64_t multiplier{40000}; // 4.0 * kSignalScale
-  int min_samples{20};
+  int64_t ema_alpha{wall_threshold_defaults::kVolumeEmaAlpha};
+  int64_t multiplier{wall_threshold_defaults::kVolumeMultiplier};
+  int min_samples{wall_threshold_defaults::kVolumeMinSamples};
 };
 
 struct OrderbookThresholdConfig {
-  int top_levels{20};
-  int64_t multiplier{30000};  // 3.0 * kSignalScale
-  int64_t percentile{8000};   // 80% * 100 (scaled to avoid division)
+  int top_levels{wall_threshold_defaults::kOrderbookTopLevels};
+  int64_t multiplier{wall_threshold_defaults::kOrderbookMultiplier};
+  int64_t percentile{wall_threshold_defaults::kOrderbookPercentile};
 };
 
 struct HybridThresholdConfig {
-  int64_t volume_weight{7000};    // 0.7 * kSignalScale
-  int64_t orderbook_weight{3000}; // 0.3 * kSignalScale
-  int64_t min_quantity_raw{50000};  // min_quantity in qty scale (e.g., 50 * kQtyScale for 50 BTC)
+  int64_t volume_weight{wall_threshold_defaults::kVolumeWeight};
+  int64_t orderbook_weight{wall_threshold_defaults::kOrderbookWeight};
+  int64_t min_quantity_raw{wall_threshold_defaults::kMinQuantityRaw};
 };
 
 // === Dynamic wall threshold calculator (int64_t version) ===
@@ -48,42 +69,39 @@ class DynamicWallThreshold {
       : volume_ema_alpha_(vol_cfg.ema_alpha),
         volume_multiplier_(vol_cfg.multiplier),
         volume_min_samples_(vol_cfg.min_samples),
-        ema_notional_raw_(0),
-        sample_count_(0),
-        volume_threshold_raw_(0),
         orderbook_top_levels_(ob_cfg.top_levels),
         orderbook_multiplier_(ob_cfg.multiplier),
         orderbook_percentile_(ob_cfg.percentile),
-        orderbook_threshold_raw_(0),
         volume_weight_(hybrid_cfg.volume_weight),
         orderbook_weight_(hybrid_cfg.orderbook_weight),
         min_quantity_raw_(hybrid_cfg.min_quantity_raw),
         bid_qty_(ob_cfg.top_levels),
         ask_qty_(ob_cfg.top_levels),
         bid_quantities_(ob_cfg.top_levels),
-        ask_quantities_(ob_cfg.top_levels) {
-  }
+        ask_quantities_(ob_cfg.top_levels) {}
 
   // === Main calculation function ===
   // Returns threshold in notional raw scale (price * qty / kQtyScale)
   template <typename MarketOrderBookT>
-  [[nodiscard]] int64_t calculate(const MarketOrderBookT* order_book, uint64_t) {
+  [[nodiscard]] int64_t calculate(const MarketOrderBookT* order_book,
+      uint64_t) {
     const auto* bbo = order_book->get_bbo();
-    if (!bbo) return min_quantity_raw_;
+    if (!bbo)
+      return min_quantity_raw_;
 
     // mid_price in price_raw scale
-    int64_t mid_price = (bbo->bid_price.value + bbo->ask_price.value) / 2;
+    const int64_t mid_price = (bbo->bid_price.value + bbo->ask_price.value) / 2;
 
     // min_threshold = min_quantity_raw * mid_price / kQtyScale
     // This gives notional in price_raw units
-    int64_t min_threshold = (min_quantity_raw_ * mid_price) /
-                            common::FixedPointConfig::kQtyScale;
+    const int64_t min_threshold =
+        (min_quantity_raw_ * mid_price) / common::FixedPointConfig::kQtyScale;
 
     // Hybrid: weighted average
     // (volume * weight + orderbook * weight) / kSignalScale
-    int64_t hybrid = (volume_threshold_raw_ * volume_weight_ +
-                      orderbook_threshold_raw_ * orderbook_weight_) /
-                     common::kSignalScale;
+    const int64_t hybrid = (volume_threshold_raw_ * volume_weight_ +
+                               orderbook_threshold_raw_ * orderbook_weight_) /
+                           common::kSignalScale;
 
     return std::max(hybrid, min_threshold);
   }
@@ -91,16 +109,18 @@ class DynamicWallThreshold {
   // === Feed trade data (realtime) - EMA update ===
   void on_trade(uint64_t, int64_t price_raw, int64_t qty_raw) {
     // notional = price * qty / kQtyScale (to get notional in price units)
-    int64_t notional = (price_raw * qty_raw) / common::FixedPointConfig::kQtyScale;
+    const int64_t notional =
+        (price_raw * qty_raw) / common::FixedPointConfig::kQtyScale;
 
     // EMA update: ema = alpha * new + (1-alpha) * old
     // = (alpha * new + (kEmaScale - alpha) * old) / kEmaScale
     if (sample_count_ == 0) {
       ema_notional_raw_ = notional;
     } else {
-      ema_notional_raw_ = (volume_ema_alpha_ * notional +
-                           (common::kEmaScale - volume_ema_alpha_) * ema_notional_raw_) /
-                          common::kEmaScale;
+      ema_notional_raw_ =
+          (volume_ema_alpha_ * notional +
+              (common::kEmaScale - volume_ema_alpha_) * ema_notional_raw_) /
+          common::kEmaScale;
     }
 
     sample_count_++;
@@ -108,8 +128,8 @@ class DynamicWallThreshold {
     // Update threshold if enough samples
     // threshold = ema * multiplier / kSignalScale
     if (sample_count_ >= volume_min_samples_) {
-      volume_threshold_raw_ = (ema_notional_raw_ * volume_multiplier_) /
-                              common::kSignalScale;
+      volume_threshold_raw_ =
+          (ema_notional_raw_ * volume_multiplier_) / common::kSignalScale;
     }
   }
 
@@ -123,10 +143,14 @@ class DynamicWallThreshold {
     }
 
     // Get quantities for top N levels
-    (void)order_book->peek_qty(true, orderbook_top_levels_,
-        std::span<int64_t>(bid_qty_), {});
-    (void)order_book->peek_qty(false, orderbook_top_levels_,
-        std::span<int64_t>(ask_qty_), {});
+    (void)order_book->peek_qty(true,
+        orderbook_top_levels_,
+        std::span<int64_t>(bid_qty_),
+        {});
+    (void)order_book->peek_qty(false,
+        orderbook_top_levels_,
+        std::span<int64_t>(ask_qty_),
+        {});
 
     // Copy to percentile buffers
     size_t bid_count = 0;
@@ -147,28 +171,37 @@ class DynamicWallThreshold {
     }
 
     // Calculate percentile using nth_element
-    int64_t bid_percentile_qty = calculate_percentile_fast_bid(bid_count);
-    int64_t ask_percentile_qty = calculate_percentile_fast_ask(ask_count);
-    int64_t avg_qty = (bid_percentile_qty + ask_percentile_qty) / 2;
+    const int64_t bid_percentile_qty = calculate_percentile_fast_bid(bid_count);
+    const int64_t ask_percentile_qty = calculate_percentile_fast_ask(ask_count);
+    const int64_t avg_qty = (bid_percentile_qty + ask_percentile_qty) / 2;
 
     // Convert to notional: qty * mid_price * multiplier / kSignalScale
-    int64_t mid_price = (bbo->bid_price.value + bbo->ask_price.value) / 2;
+    const int64_t mid_price = (bbo->bid_price.value + bbo->ask_price.value) / 2;
     // notional = avg_qty * mid_price / kQtyScale * multiplier / kSignalScale
-    orderbook_threshold_raw_ = (avg_qty * mid_price / common::FixedPointConfig::kQtyScale *
-                                orderbook_multiplier_) / common::kSignalScale;
+    orderbook_threshold_raw_ =
+        (avg_qty * mid_price / common::FixedPointConfig::kQtyScale *
+            orderbook_multiplier_) /
+        common::kSignalScale;
   }
 
   // === Getters ===
-  [[nodiscard]] int64_t get_volume_threshold() const { return volume_threshold_raw_; }
-  [[nodiscard]] int64_t get_orderbook_threshold() const { return orderbook_threshold_raw_; }
+  [[nodiscard]] int64_t get_volume_threshold() const {
+    return volume_threshold_raw_;
+  }
+  [[nodiscard]] int64_t get_orderbook_threshold() const {
+    return orderbook_threshold_raw_;
+  }
   [[nodiscard]] int64_t get_min_quantity() const { return min_quantity_raw_; }
 
  private:
   // percentile index = count * percentile / 10000
   [[nodiscard]] int64_t calculate_percentile_fast_bid(size_t count) {
-    if (count == 0) return 0;
+    if (count == 0)
+      return 0;
 
-    size_t index = (count * static_cast<size_t>(orderbook_percentile_)) / 10000;
+    size_t index =
+        (count * static_cast<size_t>(orderbook_percentile_)) /
+        static_cast<size_t>(wall_threshold_defaults::kPercentileScale);
     index = std::min(index, count - 1);
 
     std::nth_element(bid_quantities_.begin(),
@@ -178,9 +211,12 @@ class DynamicWallThreshold {
   }
 
   [[nodiscard]] int64_t calculate_percentile_fast_ask(size_t count) {
-    if (count == 0) return 0;
+    if (count == 0)
+      return 0;
 
-    size_t index = (count * static_cast<size_t>(orderbook_percentile_)) / 10000;
+    size_t index =
+        (count * static_cast<size_t>(orderbook_percentile_)) /
+        static_cast<size_t>(wall_threshold_defaults::kPercentileScale);
     index = std::min(index, count - 1);
 
     std::nth_element(ask_quantities_.begin(),
@@ -190,25 +226,25 @@ class DynamicWallThreshold {
   }
 
   // Volume-based threshold (EMA)
-  int64_t volume_ema_alpha_;
-  int64_t volume_multiplier_;
-  int volume_min_samples_;
-  int64_t ema_notional_raw_;
-  int sample_count_;
-  int64_t volume_threshold_raw_;
+  const int64_t volume_ema_alpha_;
+  const int64_t volume_multiplier_;
+  const int volume_min_samples_;
+  int64_t ema_notional_raw_{0};
+  int sample_count_{0};
+  int64_t volume_threshold_raw_{0};
 
   // Orderbook-based threshold
-  int orderbook_top_levels_;
-  int64_t orderbook_multiplier_;
-  int64_t orderbook_percentile_;
-  int64_t orderbook_threshold_raw_;
+  const int orderbook_top_levels_;
+  const int64_t orderbook_multiplier_;
+  const int64_t orderbook_percentile_;
+  int64_t orderbook_threshold_raw_{0};
 
   // Hybrid weights
-  int64_t volume_weight_;
-  int64_t orderbook_weight_;
+  const int64_t volume_weight_;
+  const int64_t orderbook_weight_;
 
   // Minimum quantity (raw)
-  int64_t min_quantity_raw_;
+  const int64_t min_quantity_raw_;
 
   // Pre-allocated vectors
   std::vector<int64_t> bid_qty_;

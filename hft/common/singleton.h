@@ -10,8 +10,8 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#ifndef SINGLETON_H_
-#define SINGLETON_H_
+#ifndef HFT_COMMON_SINGLETON_H
+#define HFT_COMMON_SINGLETON_H
 
 template <class T>
 class Singleton {
@@ -29,4 +29,4 @@ class Singleton {
   ~Singleton() = default;
 };
 
-#endif  // SINGLETON_H_
+#endif  // HFT_COMMON_SINGLETON_H

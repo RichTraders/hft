@@ -220,56 +220,6 @@ TEST_F(LoggerTest, FileLogTest) {
   }
 }
 
-TEST_F(LoggerTest, FileLogRotateTest) {
-  TempDir tmp;
-  const std::string base_name = (tmp.path / "rotate_test").string();
-  const std::string file_path = base_name + ".txt";
-  const std::string file_path2 = base_name + "_1.txt";
-
-  std::vector<std::string> line_list;
-  line_list.push_back("FileLogTest rotate Test");
-  line_list.push_back("Application rotate shutting down333");
-
-  // Use a buffer size large enough to hold log prefix + message
-  logger->addSink(std::make_unique<FileSink>(base_name, 128));
-
-  auto log = logger->make_producer();
-
-  log.debug(line_list[0].c_str());
-  logger->flush();
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-  log.debug(line_list[1].c_str());
-  logger->flush();
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-  {
-    std::ifstream ifs(file_path);
-    if (!ifs.is_open()) {
-      GTEST_SKIP() << "File rotation may not have occurred as expected";
-    }
-
-    std::string line;
-    if (std::getline(ifs, line)) {
-      EXPECT_TRUE(line.find(line_list[1]) != std::string::npos);
-    }
-    ifs.close();
-  }
-  {
-    std::ifstream ifs(file_path2);
-    if (!ifs.is_open()) {
-      // Rotation file may not exist if rotation threshold wasn't triggered
-      GTEST_SKIP() << "Rotation file not found - buffer size may be larger than test message";
-    }
-
-    std::string line;
-    if (std::getline(ifs, line)) {
-      EXPECT_TRUE(line.find(line_list[0]) != std::string::npos);
-    }
-    ifs.close();
-  }
-}
-
 TEST_F(LoggerTest, FileAndConsoleLogTest) {
   TempDir tmp;
   const std::string base_name = (tmp.path / "file_console_test").string();

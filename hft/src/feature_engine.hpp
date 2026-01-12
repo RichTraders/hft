@@ -15,7 +15,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <deque>
 #include <numeric>
 #include <vector>
 
@@ -26,140 +25,27 @@
 #include "order_book.hpp"
 
 namespace trading {
+
 template <typename Strategy>
 class FeatureEngine {
  public:
   struct TradeInfo {
     common::Side side;
-    int64_t price_raw;   // Price in raw scale (e.g., price * kPriceScale)
-    int64_t qty_raw;     // Quantity in raw scale (e.g., qty * kQtyScale)
+    int64_t price_raw;  // Price in raw scale (e.g., price * kPriceScale)
+    int64_t qty_raw;    // Quantity in raw scale (e.g., qty * kQtyScale)
     uint64_t timestamp;
-  };
-
-  // Wall detection result structure (int64_t version)
-  struct WallInfo {
-    int64_t accumulated_notional{0};  // price * qty in raw scale
-    int64_t distance_bps{0};              // Distance in basis points (15 = 0.15%)
-    int levels_checked{0};
-    bool is_valid{false};
-  };
-
-  // Wall quality tracking structure (int64_t version)
-  struct WallTracker {
-    uint64_t first_seen{0};
-    uint64_t last_update{0};
-    int snapshot_count{0};
-    std::deque<int64_t> size_snapshots;      // Notional in raw scale
-    std::deque<int64_t> distance_snapshots;  // Distance in bps
-
-    void update(uint64_t now, int64_t notional_raw, int64_t distance_bps) {
-      if (first_seen == 0) {
-        first_seen = now;
-      }
-      last_update = now;
-      snapshot_count++;
-
-      size_snapshots.push_back(notional_raw);
-      distance_snapshots.push_back(distance_bps);
-
-      if (size_snapshots.size() > 20) {
-        size_snapshots.pop_front();
-        distance_snapshots.pop_front();
-      }
-    }
-
-    void reset() {
-      first_seen = 0;
-      last_update = 0;
-      snapshot_count = 0;
-      size_snapshots.clear();
-      distance_snapshots.clear();
-    }
-
-    // Persistence score: How long has wall been present?
-    // Returns [0, kSignalScale] where kSignalScale = 10000
-    // 2+ seconds = 10000, 1 second = 5000, 0.5 seconds = 0
-    [[nodiscard]] int64_t persistence_score() const {
-      if (snapshot_count < 5) return 0;
-      // duration in nanoseconds / 2e9 * kSignalScale
-      // = (duration * kSignalScale) / 2e9
-      int64_t duration_ns = static_cast<int64_t>(last_update - first_seen);
-      int64_t score = (duration_ns * common::kSignalScale) / 2'000'000'000;
-      return std::clamp(score, int64_t{0}, common::kSignalScale);
-    }
-
-    // Stability score: Based on variance (no sqrt)
-    // Low variance = high stability
-    // Returns [0, kSignalScale]
-    [[nodiscard]] int64_t stability_score() const {
-      if (size_snapshots.size() < 10) return 0;
-
-      // Calculate average
-      int64_t sum = std::accumulate(size_snapshots.begin(), size_snapshots.end(), int64_t{0});
-      int64_t avg = sum / static_cast<int64_t>(size_snapshots.size());
-
-      if (avg == 0) return 0;
-
-      // Calculate variance (sum of squared deviations)
-      int64_t variance_sum = 0;
-      for (int64_t size : size_snapshots) {
-        int64_t diff = size - avg;
-        // Use __int128 to avoid overflow in squaring
-        __int128_t sq = static_cast<__int128_t>(diff) * diff;
-        variance_sum += static_cast<int64_t>(sq / avg);  // Normalize by avg to keep in range
-      }
-      int64_t normalized_variance = variance_sum / static_cast<int64_t>(size_snapshots.size());
-
-      // CV^2 threshold: if cv < 0.5, cv^2 < 0.25
-      // normalized_variance / avg < 0.25 means stable
-      // score = kSignalScale * (1 - normalized_variance / (avg * 0.25))
-      // = kSignalScale * (1 - 4 * normalized_variance / avg)
-      int64_t threshold = avg / 4;  // 0.25 * avg
-      if (threshold == 0) return common::kSignalScale;
-
-      int64_t score = common::kSignalScale - (normalized_variance * common::kSignalScale) / threshold;
-      return std::clamp(score, int64_t{0}, common::kSignalScale);
-    }
-
-    // Distance consistency score
-    // Close to BBO = good, far = bad
-    // Returns [0, kSignalScale]
-    [[nodiscard]] int64_t distance_consistency_score() const {
-      if (distance_snapshots.size() < 10) return 0;
-
-      int64_t sum = std::accumulate(distance_snapshots.begin(),
-                                    distance_snapshots.end(), int64_t{0});
-      int64_t avg_bps = sum / static_cast<int64_t>(distance_snapshots.size());
-
-      // Close to BBO = good (< 5 bps = 10000)
-      // Far from BBO = bad (> 15 bps = 0)
-      // Linear interpolation: score = kSignalScale * (15 - avg) / 10
-      // In bps: 5 bps = good, 15 bps = bad
-      if (avg_bps <= 5) return common::kSignalScale;
-      if (avg_bps >= 15) return 0;
-
-      return common::kSignalScale * (15 - avg_bps) / 10;
-    }
-
-    // Composite quality score (weighted average)
-    // Returns [0, kSignalScale]
-    [[nodiscard]] int64_t composite_quality() const {
-      // Weights: stability 50%, persistence 35%, distance 15%
-      return (stability_score() * 5000 +
-              persistence_score() * 3500 +
-              distance_consistency_score() * 1500) / common::kSignalScale;
-    }
   };
 
   explicit FeatureEngine(const common::Logger::Producer& logger)
       : logger_(logger),
-        tick_multiplier_(INI_CONFIG.get_int("orderbook", "tick_multiplier_int")),
+        tick_multiplier_(
+            INI_CONFIG.get_int("orderbook", "tick_multiplier_int")),
         vwap_size_(INI_CONFIG.get_int("strategy", "vwap_size", kVwapSize)),
         vwap_qty_raw_(vwap_size_),
         vwap_price_raw_(vwap_size_),
-        recent_trades_(kMaxTradeHistory)
-  {
-    static_assert(kMaxTradeHistory > 0 && ((kMaxTradeHistory & kMaxTradeHistory - 1)== 0));
+        recent_trades_(kMaxTradeHistory) {
+    static_assert(kMaxTradeHistory > 0 &&
+                  ((kMaxTradeHistory & kMaxTradeHistory - 1) == 0));
     LOG_INFO(logger_, "[Constructor] FeatureEngine Created");
   }
 
@@ -174,7 +60,8 @@ class FeatureEngine {
                           ? bbo->ask_qty.value
                           : bbo->bid_qty.value;
       if (denom > 0) {
-        agg_trade_qty_ratio_ = (market_update->qty.value * common::kSignalScale) / denom;
+        agg_trade_qty_ratio_ =
+            (market_update->qty.value * common::kSignalScale) / denom;
       }
     }
 
@@ -194,19 +81,18 @@ class FeatureEngine {
     }
     vwap_index_++;
 
-    recent_trades_[trade_history_index_] = {
-        market_update->side,
+    recent_trades_[trade_history_index_] = {market_update->side,
         market_update->price.value,
         market_update->qty.value,
-        0
-    };
+        0};
 
     trade_history_index_ = (trade_history_index_ + 1) % kMaxTradeHistory;
     if (trade_history_count_ < kMaxTradeHistory) {
       trade_history_count_++;
     }
 
-    LOG_TRACE(logger_,"[Updated] {} mkt-price:{} agg-trade-ratio:{}",
+    LOG_TRACE(logger_,
+        "[Updated] {} mkt-price:{} agg-trade-ratio:{}",
         market_update->toString(),
         mkt_price_raw_,
         agg_trade_qty_ratio_);
@@ -236,7 +122,8 @@ class FeatureEngine {
       spread_raw_ = bbo->ask_price.value - bbo->bid_price.value;
     }
 
-    LOG_TRACE(logger_,"[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
+    LOG_TRACE(logger_,
+        "[Updated] price:{} side:{} mkt-price:{} agg-trade-ratio:{}",
         common::toString(price),
         common::toString(side),
         mkt_price_raw_,
@@ -332,79 +219,14 @@ class FeatureEngine {
   }
 
   // Helper to get trade by offset from most recent
+  // offset=0 returns most recent, offset=1 returns second most recent, etc.
+  // Caller must ensure offset < trade_history_count_
   [[nodiscard]] const TradeInfo& get_trade(size_t offset) const noexcept {
-    return recent_trades_[(trade_history_count_ - 1 - offset) % kMaxTradeHistory];
-  }
-
-  // ========================================
-  // Wall detection (int64_t version)
-  // ========================================
-  template <typename OrderBook>
-  [[nodiscard]] WallInfo detect_wall(const OrderBook* order_book,
-      common::Side side, int max_levels, int64_t threshold_notional_raw,
-      int64_t max_distance_bps, int min_price_int,
-      std::vector<int64_t>& level_qty_buffer,
-      std::vector<int>& level_idx_buffer) const noexcept {
-    WallInfo info;
-    const auto* bbo = order_book->get_bbo();
-
-    if (UNLIKELY(!bbo || bbo->bid_price == common::kPriceInvalid ||
-                 bbo->ask_price == common::kPriceInvalid)) {
-      return info;
-    }
-
-    const int64_t base_price = (side == common::Side::kBuy)
-                                   ? bbo->bid_price.value
-                                   : bbo->ask_price.value;
-
-    if (base_price == 0) {
-      return info;
-    }
-
-    // Peek orderbook levels
-    int actual_levels = order_book->peek_qty(side == common::Side::kBuy,
-        max_levels, std::span<int64_t>(level_qty_buffer),
-        std::span<int>(level_idx_buffer));
-
-    // For weighted average price calculation
-    // Using __int128 to avoid overflow
-    __int128_t weighted_sum = 0;
-
-    for (int i = 0; i < actual_levels; ++i) {
-      if (level_qty_buffer[i] <= 0)
-        break;
-
-      const int64_t price_idx = level_idx_buffer[i];
-      const int64_t price_raw = min_price_int + price_idx;
-
-      // notional = price * qty / kQtyScale (to normalize)
-      // But we keep in raw scale for comparison
-      const int64_t notional = (price_raw * level_qty_buffer[i]) /
-                               common::FixedPointConfig::kQtyScale;
-      info.accumulated_notional += notional;
-      weighted_sum += static_cast<__int128_t>(price_raw) * notional;
-      info.levels_checked = i + 1;
-
-      // Target amount reached
-      if (info.accumulated_notional >= threshold_notional_raw) {
-        // weighted_avg_price = weighted_sum / accumulated
-        int64_t weighted_avg_price = static_cast<int64_t>(
-            weighted_sum / info.accumulated_notional);
-
-        // distance_bps = |avg_price - base_price| * 10000 / base_price
-        int64_t delta = std::abs(weighted_avg_price - base_price);
-        info.distance_bps = (delta * common::kBpsScale) / base_price;
-        info.is_valid = (info.distance_bps <= max_distance_bps);
-
-        break;
-      }
-    }
-
-    if (info.accumulated_notional < threshold_notional_raw) {
-      info.is_valid = false;
-    }
-
-    return info;
+    // trade_history_index_ points to next write position
+    // Most recent is at (index - 1), going backward for older trades
+    return recent_trades_[(trade_history_index_ + kMaxTradeHistory - 1 -
+                              offset) &
+                          (kMaxTradeHistory - 1)];
   }
 
   FeatureEngine() = delete;

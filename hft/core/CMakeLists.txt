@@ -62,23 +62,25 @@ if(ENABLE_WEBSOCKET)
   target_compile_definitions(Core_ws PRIVATE ENABLE_WEBSOCKET ${EXCHANGE_COMPILE_DEFINITION})
 endif()
 
-add_subdirectory(fix/NewOroFix44)
-file(GLOB CORE_FIX_SRC
-    "${CMAKE_CURRENT_SOURCE_DIR}/fix/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/fix/*.tpp"
-)
-add_library(Core_fix STATIC ${CORE_COMMON_SRC} ${CORE_FIX_SRC})
-target_precompile_headers(Core_fix PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
-target_include_directories(Core_fix PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/common
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_compile_options(Core_fix PRIVATE
-    -Wno-missing-field-initializers
-    -Wno-unused-parameter
-    -Wno-error=unused-parameter
-    -Wno-return-type-c-linkage
-    -Wno-error=return-type-c-linkage
-)
-target_link_libraries(Core_fix PUBLIC Common Fix8Schema)
+if(NOT SKIP_FIX_BUILD)
+    add_subdirectory(fix/NewOroFix44)
+    file(GLOB CORE_FIX_SRC
+        "${CMAKE_CURRENT_SOURCE_DIR}/fix/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/fix/*.tpp"
+    )
+    add_library(Core_fix STATIC ${CORE_COMMON_SRC} ${CORE_FIX_SRC})
+    target_precompile_headers(Core_fix PUBLIC ${CMAKE_SOURCE_DIR}/include/pch.h)
+    target_include_directories(Core_fix PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/common
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_compile_options(Core_fix PRIVATE
+        -Wno-missing-field-initializers
+        -Wno-unused-parameter
+        -Wno-error=unused-parameter
+        -Wno-return-type-c-linkage
+        -Wno-error=return-type-c-linkage
+    )
+    target_link_libraries(Core_fix PUBLIC Common Fix8Schema)
+endif()

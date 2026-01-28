@@ -29,6 +29,7 @@
 #ifndef USE_FLAT_ORDERBOOK
 #include "common/memory_pool.hpp"
 #endif
+#include "common/performance.h"
 #include "common/types.h"
 #include "market_data.h"
 
@@ -527,18 +528,21 @@ class MarketOrderBook final {
       }
       case common::MarketUpdateType::kAdd:
       case common::MarketUpdateType::kModify: {
+        START_MEASURE(ORDERBOOK_APPLY);
         add_order(market_update, idx, qty);
+        END_MEASURE(ORDERBOOK_APPLY, logger_);
         break;
       }
       case common::MarketUpdateType::kCancel: {
+        START_MEASURE(ORDERBOOK_APPLY);
         delete_order(market_update, idx);
+        END_MEASURE(ORDERBOOK_APPLY, logger_);
         break;
       }
       case common::MarketUpdateType::kTrade: {
         if (LIKELY(trade_engine_)) {
           trade_engine_->on_trade_updated(market_update, this);
         }
-        //trade_order(market_update, idx);
         return;
       }
       case common::MarketUpdateType::kBookTicker: {
@@ -1051,19 +1055,21 @@ class MarketOrderBook final {
       }
       case common::MarketUpdateType::kAdd:
       case common::MarketUpdateType::kModify: {
+        START_MEASURE(ORDERBOOK_APPLY);
         add_order(market_update, idx, qty);
+        END_MEASURE(ORDERBOOK_APPLY, logger_);
         break;
       }
       case common::MarketUpdateType::kCancel: {
+        START_MEASURE(ORDERBOOK_APPLY);
         delete_order(market_update, idx);
+        END_MEASURE(ORDERBOOK_APPLY, logger_);
         break;
       }
       case common::MarketUpdateType::kTrade: {
         if (LIKELY(trade_engine_)) {
           trade_engine_->on_trade_updated(market_update, this);
         }
-
-        // trade_order(market_update, idx);
         return;
       }
       case common::MarketUpdateType::kBookTicker: {

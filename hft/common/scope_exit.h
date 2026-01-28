@@ -10,7 +10,8 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 
-#pragma once
+#ifndef SCOPE_EXIT_H_
+#define SCOPE_EXIT_H_
 
 #include <type_traits>
 #include <utility>
@@ -37,3 +38,5 @@ template <class Functor>
 auto MakeScopeExit(Functor&& functor) {
   return ScopeExit<std::decay_t<Functor>>(std::forward<Functor>(functor));
 }
+
+#endif  // SCOPE_EXIT_H_

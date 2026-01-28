@@ -1,9 +1,13 @@
-#pragma once
+#ifndef STRATEGY_CONFIG_HPP_
+#define STRATEGY_CONFIG_HPP_
 
 #include "oe_traits_config.hpp"
 
 #include "strategy/directional_strategy/directional_strategy.h"
 #include "strategy/liquid_taker/liquid_taker.h"
+#include "strategy/mean_reversion_maker/mean_reversion_maker.h"
 
 using SelectedStrategy = @STRATEGY_TYPE@;
 inline constexpr std::string_view kSelectedStrategyName = "@STRATEGY_NAME@";
+
+#endif  // STRATEGY_CONFIG_HPP_

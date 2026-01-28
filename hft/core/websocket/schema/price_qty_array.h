@@ -80,7 +80,9 @@ struct PriceQtyArray {
   [[nodiscard]] auto end() const { return data.end(); }
   [[nodiscard]] size_t size() const { return data.size(); }
   [[nodiscard]] bool empty() const { return data.empty(); }
-  const std::array<double, 2>& operator[](size_t idx) const { return data[idx]; }
+  const std::array<double, 2>& operator[](size_t idx) const {
+    return data[idx];
+  }
 };
 
 }  // namespace schema
@@ -215,7 +217,9 @@ struct ScaledInt64PriceQtyArray {
   [[nodiscard]] auto end() const { return data.end(); }
   [[nodiscard]] size_t size() const { return data.size(); }
   [[nodiscard]] bool empty() const { return data.empty(); }
-  const std::array<int64_t, 2>& operator[](size_t idx) const { return data[idx]; }
+  const std::array<int64_t, 2>& operator[](size_t idx) const {
+    return data[idx];
+  }
   void reserve(size_t count) { data.reserve(count); }
   void push_back(const std::array<int64_t, 2>& entry) { data.push_back(entry); }
 };
@@ -354,12 +358,9 @@ struct ScaledInt64 {
 
   ScaledInt64() = default;
   // NOLINTNEXTLINE(google-explicit-constructor) - intentional implicit conversion
-  ScaledInt64(int64_t val)
-      : value(val) {}
+  ScaledInt64(int64_t val) : value(val) {}
   // NOLINTNEXTLINE(google-explicit-constructor) - intentional implicit conversion
-  operator int64_t() const {
-    return value;
-  }
+  operator int64_t() const { return value; }
   ScaledInt64& operator=(int64_t val) {
     value = val;
     return *this;

@@ -227,7 +227,7 @@ class OrderManager {
         cancel_request.toString());
   }
 
-  void apply(const std::vector<QuoteIntentType>& intents) noexcept {
+  std::vector<common::OrderId> apply(const std::vector<QuoteIntentType>& intents) noexcept {
     START_MEASURE(Trading_OrderManager_apply);
 
     const auto now = fast_clock_.get_timestamp();
@@ -235,7 +235,7 @@ class OrderManager {
     if (intents.empty()) {
       sweep_expired_orders(now);
       END_MEASURE(Trading_OrderManager_apply, logger_);
-      return;
+      return {};
     }
 
     auto actions = reconciler_.diff(intents, layer_book_, fast_clock_);
@@ -244,12 +244,14 @@ class OrderManager {
     venue_policy_.filter_by_venue(ticker, actions, now, layer_book_);
     filter_by_risk(intents, actions);
 
-    process_new_orders(ticker, actions, now);
+    std::vector<common::OrderId> order_ids;
+    process_new_orders(ticker, actions, now, order_ids);
     process_replace_orders(ticker, actions, now);
     process_cancel_orders(ticker, actions, now);
     sweep_expired_orders(now);
 
     END_MEASURE(Trading_OrderManager_apply, logger_);
+    return order_ids;
   }
 
   OrderManager() = delete;
@@ -316,7 +318,7 @@ class OrderManager {
   }
 
   void process_new_orders(const common::TickerId& ticker,
-      order::Actions& actions, uint64_t now) noexcept {
+      order::Actions& actions, uint64_t now, std::vector<common::OrderId>& order_ids) noexcept {
     for (auto& action : actions.news) {
       auto& side_book =
           layer_book_.side_book(ticker, action.side, action.position_side);
@@ -344,6 +346,7 @@ class OrderManager {
           action.position_side);
       position_tracker_.add_reserved(action.side, action.qty.value);
 
+      order_ids.push_back(action.cl_order_id);
       LOG_DEBUG(logger_,
           "[Apply][NEW] tick:{}/ layer={}, side:{}, order_id={}, "
           "reserved_position_={}",
